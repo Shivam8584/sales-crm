@@ -28,6 +28,7 @@ import PeopleList from "@/features/people/people-list";
 import RecordDeals from "@/features/deals/record-deals";
 import RecordTasks from "@/features/tasks/record-tasks";
 import AccountVerification from "@/features/enrichment/account-verification";
+import AccountPlatform from "@/features/platform/account-platform";
 import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import type { LifecycleStage } from "@/lib/domain/enums";
@@ -204,6 +205,7 @@ function AccountView({ account }: { account: Account }) {
                 />
               </Property>
             </Properties>
+            <AccountPlatform accountId={account._id} />
             <AccountVerification accountId={account._id} />
             <Properties title="Activity">
               <Property label="Last activity">

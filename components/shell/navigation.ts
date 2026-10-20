@@ -5,6 +5,8 @@ import BuildingIcon from "@/public/assets/icons/building.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
+import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
+import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
 
 export type NavItem = {
   href: string;
@@ -21,6 +23,13 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/people", label: "People", icon: UsersIcon, shortcut: "P" },
   { href: "/deals", label: "Deals", icon: ClipboardIcon, shortcut: "D" },
   { href: "/tasks", label: "Tasks", icon: CheckSquareIcon, shortcut: "K" },
+  {
+    href: "/activation",
+    label: "Activation",
+    icon: AlertTriangleIcon,
+    shortcut: "V",
+  },
+  { href: "/reports", label: "Reports", icon: BarChartIcon, shortcut: "R" },
 ];
 
 /** Workspace settings, shown at the bottom of the sidebar. */
