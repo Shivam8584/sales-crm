@@ -25,6 +25,7 @@ import RecordLayout, {
 } from "@/components/record/record-layout";
 import { Page, PageHeader } from "@/components/shell/page";
 import AccountPicker from "@/features/accounts/account-picker";
+import DinLookup from "@/features/enrichment/din-lookup";
 import MemberPicker from "@/features/members/member-picker";
 import Timeline from "@/features/timeline/timeline";
 import RecordTasks from "@/features/tasks/record-tasks";
@@ -272,6 +273,7 @@ function PersonView({ person }: { person: Person }) {
                 />
               </Property>
             </Properties>
+            <DinLookup personId={person._id} />
             <Properties title="Activity">
               <Property label="Last activity">
                 <span className="text-sm">

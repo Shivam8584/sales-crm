@@ -79,10 +79,13 @@ export default function BoardCard({
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
-    if (event.key === "Enter" || event.key === " ") {
+    if (event.key === "Enter") {
       event.preventDefault();
       open();
+      return;
     }
+    // This handler replaces dnd-kit's, so forward Space to pick the card up.
+    listeners?.onKeyDown?.(event);
   };
 
   return (

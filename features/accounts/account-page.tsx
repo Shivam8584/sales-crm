@@ -196,22 +196,6 @@ function AccountView({ account }: { account: Account }) {
                   }
                 />
               </Property>
-              <Property label="GSTIN">
-                <InlineText
-                  value={account.gstin}
-                  label="GSTIN"
-                  placeholder="Add GSTIN"
-                  display={(gstin) => (
-                    <span className="font-mono">{gstin}</span>
-                  )}
-                  onSave={(gstin) => save({ gstin: gstin || null }, "GSTIN")}
-                />
-              </Property>
-              {account.panRoot && (
-                <Property label="PAN">
-                  <span className="font-mono text-sm">{account.panRoot}</span>
-                </Property>
-              )}
               <Property label="Tags">
                 <TagsField
                   value={account.tags}

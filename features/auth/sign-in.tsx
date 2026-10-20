@@ -2,24 +2,31 @@
 
 import { useState, type FormEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
+import { ROLE_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import Logo from "@/public/assets/images/_common/logo.svg";
 
 type Flow = "signIn" | "signUp";
 
 const MIN_PASSWORD = 8;
+const INVITE_TOKEN = /^[0-9a-f]{32,128}$/;
+
+function inviteToken() {
+  const token = new URLSearchParams(window.location.search).get("invite");
+  return token && INVITE_TOKEN.test(token) ? token : null;
+}
 
 export default function SignIn() {
   const { signIn } = useAuthActions();
-  const [flow, setFlow] = useState<Flow>(() =>
-    new URLSearchParams(window.location.search).has("invite")
-      ? "signUp"
-      : "signIn",
-  );
+  const [token] = useState(inviteToken);
+  const invite = useQuery(api.invites.lookup, token ? { token } : "skip");
+  const [flow, setFlow] = useState<Flow>(token ? "signUp" : "signIn");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +86,24 @@ export default function SignIn() {
           onSubmit={handleSubmit}
           className="flex flex-col gap-4 px-6 pt-5 pb-6"
         >
+          {token && invite !== undefined && (
+            <p
+              role="status"
+              className="caption-style bg-muted text-fg-secondary rounded-lg px-3 py-2.5 leading-snug"
+            >
+              {invite ? (
+                <>
+                  You&apos;ve been invited to join as{" "}
+                  <span className="text-foreground font-medium">
+                    {ROLE_LABEL[invite.role]}
+                  </span>
+                  .
+                </>
+              ) : (
+                "This invite link has expired or was revoked. Ask an admin for a new one."
+              )}
+            </p>
+          )}
           {flow === "signUp" && (
             <Field label="Full name" htmlFor="auth-name">
               <Input
@@ -92,8 +117,12 @@ export default function SignIn() {
           )}
           <Field label="Work email" htmlFor="auth-email">
             <Input
+              key={invite?.email ?? "email"}
               id="auth-email"
               name="email"
+              defaultValue={invite?.email}
+              readOnly={!!invite}
+              className="read-only:bg-muted read-only:text-fg-secondary"
               type="email"
               autoComplete="email"
               spellCheck={false}

@@ -1,11 +1,13 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import type { Role } from "../lib/domain/enums";
 import { normalizeEmail } from "../lib/domain/normalize";
 import { sha256Hex } from "./lib/crypto";
-import { fail } from "./lib/errors";
-import { getViewer, memberQuery } from "./lib/functions";
+import { fail, notFound } from "./lib/errors";
+import { adminMutation, getViewer, memberQuery } from "./lib/functions";
+import { vMemberStatus, vRole } from "./lib/validators";
 
 /** Comma-separated domains such as "hypedrive.in"; empty allows any email. */
 function domainAllowed(email: string) {
@@ -91,5 +93,80 @@ export const list = memberQuery({
     return members
       .map(({ _id, name, email, role }) => ({ _id, name, email, role }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  },
+});
+
+/** Everyone who has joined, including deactivated members, for the team page. */
+export const team = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const members = await ctx.db.query("members").collect();
+    return members
+      .map(({ _id, name, email, role, status, joinedAt }) => ({
+        _id,
+        name,
+        email,
+        role,
+        status,
+        joinedAt,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+});
+
+async function requireOtherMember(
+  ctx: MutationCtx & { viewer: Doc<"members"> },
+  id: Doc<"members">["_id"],
+  message: string,
+) {
+  if (id === ctx.viewer._id) fail("forbidden", message);
+  const member = await ctx.db.get(id);
+  if (!member) notFound("Member");
+  return member;
+}
+
+async function assertAnotherAdmin(ctx: MutationCtx, member: Doc<"members">) {
+  if (member.role !== "admin" || member.status !== "active") return;
+  const admins = await ctx.db
+    .query("members")
+    .withIndex("by_status", (q) => q.eq("status", "active"))
+    .filter((q) => q.eq(q.field("role"), "admin"))
+    .collect();
+  if (admins.length <= 1) {
+    fail("conflict", "The workspace needs at least one active admin");
+  }
+}
+
+/** Returns the previous role so the client can undo. */
+export const setRole = adminMutation({
+  args: { id: v.id("members"), role: vRole },
+  handler: async (ctx, { id, role }) => {
+    const member = await requireOtherMember(
+      ctx,
+      id,
+      "You can't change your own role",
+    );
+    if (member.role !== role) {
+      if (role !== "admin") await assertAnotherAdmin(ctx, member);
+      await ctx.db.patch(id, { role });
+    }
+    return member.role;
+  },
+});
+
+/** Returns the previous status so the client can undo. */
+export const setStatus = adminMutation({
+  args: { id: v.id("members"), status: vMemberStatus },
+  handler: async (ctx, { id, status }) => {
+    const member = await requireOtherMember(
+      ctx,
+      id,
+      "You can't change your own access",
+    );
+    if (member.status !== status) {
+      if (status === "deactivated") await assertAnotherAdmin(ctx, member);
+      await ctx.db.patch(id, { status });
+    }
+    return member.status;
   },
 });

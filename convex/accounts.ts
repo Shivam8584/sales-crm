@@ -3,10 +3,11 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { STAGE_LABEL } from "../lib/domain/labels";
 import { checkGstin, panRoot } from "../lib/domain/gstin";
-import { cleanTags, cleanText, normalizeDomain } from "../lib/domain/normalize";
+import { cleanTags, normalizeDomain } from "../lib/domain/normalize";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import {
+  accountName,
   memberIndex,
   memberRef,
   requireAccount,
@@ -14,8 +15,6 @@ import {
 } from "./lib/records";
 import { diff, logChanges, logSystem } from "./lib/timeline";
 import { vLifecycleStage } from "./lib/validators";
-
-const MAX_NAME = 120;
 
 const editable = {
   name: v.optional(v.string()),
@@ -46,10 +45,7 @@ const LABELS = {
 async function clean(ctx: MutationCtx, patch: Patch, selfId?: Id<"accounts">) {
   const out: Partial<Doc<"accounts">> = {};
   if (patch.name !== undefined) {
-    const name = cleanText(patch.name);
-    if (!name) invalid("name", "Enter the account name");
-    if (name.length > MAX_NAME) invalid("name", "Name is too long");
-    out.name = name;
+    out.name = accountName(patch.name);
   }
   if (patch.domain !== undefined) {
     if (patch.domain === null || !patch.domain.trim()) {

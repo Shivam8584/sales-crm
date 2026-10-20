@@ -13,9 +13,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const createForPage = useCallback(() => {
     const setCreate = useUiStore.getState().setCreate;
-    setCreate(
-      pathname.startsWith("/people") ? { type: "person" } : { type: "account" },
-    );
+    const byPath = [
+      ["/people", { type: "person" }],
+      ["/leads", { type: "lead" }],
+      ["/deals", { type: "deal" }],
+      ["/tasks", { type: "task" }],
+      ["/today", { type: "task" }],
+    ] as const;
+    const match = byPath.find(([prefix]) => pathname.startsWith(prefix));
+    setCreate(match ? { ...match[1] } : { type: "account" });
   }, [pathname]);
 
   return (

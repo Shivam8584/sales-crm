@@ -31,7 +31,11 @@ import { useMounted } from "@/hooks/use-mounted";
 import { cn } from "@/lib/utils";
 import BoardColumn from "./board-column";
 import { CardSurface } from "./board-card";
-import { markDragEnd, type Placement } from "./board-drag";
+import {
+  boardKeyboardCoordinates,
+  markDragEnd,
+  type Placement,
+} from "./board-drag";
 
 export type BoardColumnDef = {
   id: string;
@@ -121,7 +125,9 @@ export default function Board<T extends { id: string }>({
     useSensor(TouchSensor, {
       activationConstraint: { delay: 220, tolerance: 8 },
     }),
-    useSensor(KeyboardSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: boardKeyboardCoordinates,
+    }),
   );
 
   useEffect(() => {

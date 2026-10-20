@@ -9,18 +9,30 @@
  */
 
 import type * as accounts from "../accounts.js";
+import type * as alerts from "../alerts.js";
 import type * as auth from "../auth.js";
+import type * as deals from "../deals.js";
+import type * as enrichment from "../enrichment.js";
 import type * as http from "../http.js";
+import type * as invites from "../invites.js";
+import type * as leads from "../leads.js";
+import type * as lib_assignment from "../lib/assignment.js";
 import type * as lib_crypto from "../lib/crypto.js";
+import type * as lib_enrichment from "../lib/enrichment.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_functions from "../lib/functions.js";
+import type * as lib_http from "../lib/http.js";
+import type * as lib_leads from "../lib/leads.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_records from "../lib/records.js";
+import type * as lib_tasks from "../lib/tasks.js";
 import type * as lib_timeline from "../lib/timeline.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as members from "../members.js";
+import type * as notifications from "../notifications.js";
 import type * as people from "../people.js";
 import type * as seed from "../seed.js";
+import type * as tasks from "../tasks.js";
 import type * as timeline from "../timeline.js";
 
 import type {
@@ -31,18 +43,30 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
+  alerts: typeof alerts;
   auth: typeof auth;
+  deals: typeof deals;
+  enrichment: typeof enrichment;
   http: typeof http;
+  invites: typeof invites;
+  leads: typeof leads;
+  "lib/assignment": typeof lib_assignment;
   "lib/crypto": typeof lib_crypto;
+  "lib/enrichment": typeof lib_enrichment;
   "lib/errors": typeof lib_errors;
   "lib/functions": typeof lib_functions;
+  "lib/http": typeof lib_http;
+  "lib/leads": typeof lib_leads;
   "lib/money": typeof lib_money;
   "lib/records": typeof lib_records;
+  "lib/tasks": typeof lib_tasks;
   "lib/timeline": typeof lib_timeline;
   "lib/validators": typeof lib_validators;
   members: typeof members;
+  notifications: typeof notifications;
   people: typeof people;
   seed: typeof seed;
+  tasks: typeof tasks;
   timeline: typeof timeline;
 }>;
 

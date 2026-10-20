@@ -1,5 +1,6 @@
 import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { cleanText } from "../../lib/domain/normalize";
 import { invalid, notFound } from "./errors";
 
 export type MemberRef = { _id: Id<"members">; name: string };
@@ -59,4 +60,14 @@ export function personSearchText(
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+const MAX_ACCOUNT_NAME = 120;
+
+/** The one rule for account names, shared by edits and accepted suggestions. */
+export function accountName(value: string | null | undefined) {
+  const name = cleanText(value);
+  if (!name) invalid("name", "Enter the account name");
+  if (name.length > MAX_ACCOUNT_NAME) invalid("name", "Name is too long");
+  return name;
 }
