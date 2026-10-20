@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import Button from "@/components/_ui/button";
 import CountBadge from "@/components/_ui/count-badge";
+import EmptyState from "@/components/_ui/empty-state";
+import Tooltip from "@/components/_ui/tooltip";
 import {
   Popover,
   PopoverContent,
@@ -44,26 +46,28 @@ export default function Notifications() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="secondary"
-          size="icon"
-          aria-label={
-            unreadCount > 0
-              ? `Notifications, ${unreadCount} unread`
-              : "Notifications"
-          }
-          className="data-[state=open]:bg-muted relative"
-        >
-          <BellIcon aria-hidden className="size-3.5" />
-          {unreadCount > 0 && (
-            <span
-              aria-hidden
-              className="bg-danger ring-secondary absolute top-[7px] right-[7px] size-1.5 rounded-full ring-2"
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
+      <Tooltip content="Notifications">
+        <PopoverTrigger asChild>
+          <Button
+            variant="secondary"
+            size="icon"
+            aria-label={
+              unreadCount > 0
+                ? `Notifications, ${unreadCount} unread`
+                : "Notifications"
+            }
+            className="group data-[state=open]:bg-muted relative"
+          >
+            <BellIcon aria-hidden className="size-3.5" />
+            {unreadCount > 0 && (
+              <span
+                aria-hidden
+                className="bg-danger ring-secondary group-hover:ring-muted group-data-[state=open]:ring-muted absolute top-1.75 right-1.75 size-1.5 rounded-full ring-2"
+              />
+            )}
+          </Button>
+        </PopoverTrigger>
+      </Tooltip>
       <PopoverContent
         className="w-[min(400px,calc(100vw-2rem))]"
         onCloseAutoFocus={(event) => {
@@ -81,7 +85,7 @@ export default function Notifications() {
             size="sm"
             disabled={unreadCount === 0}
             onClick={markAllRead}
-            className="-mr-1.5"
+            className="-mr-2.25"
           >
             Mark all as read
           </Button>
@@ -91,7 +95,7 @@ export default function Notifications() {
           value={filter}
           onValueChange={(value) => setFilter(value as Filter)}
         >
-          <TabsList className="border-line-strong border-b px-4">
+          <TabsList className="px-4 shadow-[inset_0_-1px_0_var(--line-strong)]">
             <TabsTrigger value="all" className="py-3">
               All
             </TabsTrigger>
@@ -120,17 +124,12 @@ export default function Notifications() {
             </ul>
           </ScrollArea>
         ) : (
-          <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-            <span className="bg-muted flex size-10 items-center justify-center rounded-full shadow-[0px_0px_0px_1px_#232323]">
-              <BellIcon aria-hidden className="text-soft size-4" />
-            </span>
-            <span className="lead-style mt-1 block font-medium">
-              You’re all caught up
-            </span>
-            <span className="caption-style text-subtle block">
-              New mentions and deal updates will show up here.
-            </span>
-          </div>
+          <EmptyState
+            icon={BellIcon}
+            title="You’re all caught up"
+            description="New mentions and deal updates will show up here."
+            className="py-12"
+          />
         )}
       </PopoverContent>
     </Popover>

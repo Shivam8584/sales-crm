@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL, pageMetadata } from "@/lib/seo";
 import ScrollToTop from "@/components/_common/scroll-to-top";
+import Toaster from "@/components/_common/toaster";
+import { TooltipProvider } from "@/components/_ui/tooltip";
+import MotionProvider from "@/components/_common/motion-provider";
+import { THEME_SCRIPT } from "@/lib/theme-script";
 import { SIDEBAR_WIDTH_SCRIPT } from "@/lib/sidebar";
 import "./globals.css";
 
 const geist = Geist({
   subsets: ["latin"],
   variable: "--font-geist",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
@@ -28,19 +37,24 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={geist.variable}
+      className={`${geist.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `history.scrollRestoration="manual";${SIDEBAR_WIDTH_SCRIPT}`,
+            __html: `history.scrollRestoration="manual";${THEME_SCRIPT};${SIDEBAR_WIDTH_SCRIPT}`,
           }}
         />
       </head>
       <body className="relative z-0 font-sans antialiased">
-        <ScrollToTop />
-        {children}
+        <MotionProvider>
+          <TooltipProvider>
+            <ScrollToTop />
+            {children}
+            <Toaster />
+          </TooltipProvider>
+        </MotionProvider>
       </body>
     </html>
   );

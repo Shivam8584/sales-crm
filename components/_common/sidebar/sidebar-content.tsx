@@ -37,7 +37,7 @@ export default function SidebarContent() {
           <span className="lead-style block truncate font-medium tracking-[-0.01em]">
             Sales CRM
           </span>
-          <span className="caption-style text-subtle block truncate">
+          <span className="caption-style text-fg-tertiary block truncate">
             Company pipeline
           </span>
         </div>
@@ -93,18 +93,18 @@ export default function SidebarContent() {
         <SidebarNavItem icon={MessageQuestionIcon} label="Help" tone="quiet" />
       </SidebarSection>
 
-      <div className="border-sidebar-border bg-sidebar-accent flex shrink-0 items-center justify-between gap-2 border-b p-4">
+      <div className="border-sidebar-border bg-sidebar-accent flex shrink-0 items-center justify-between gap-2 border-b py-4 pr-3 pl-5">
         <div className="flex flex-col gap-2">
           <span className="lead-style block font-medium tracking-[-0.01em]">
             14 Days
           </span>
-          <span className="caption-style text-subtle block">
-            Left on trials
+          <span className="caption-style text-fg-tertiary block">
+            left in your trial
           </span>
         </div>
         <Button variant="muted" size="md">
           <WalletIcon aria-hidden className="size-3.5" />
-          Add Billings
+          Add billing
         </Button>
       </div>
     </div>

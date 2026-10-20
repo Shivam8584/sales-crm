@@ -38,7 +38,10 @@ export default function Profile() {
         .sort((a, b) => b.pipelineValue - a.pipelineValue)
     : [];
 
-  const openDeals = accounts.reduce((sum, company) => sum + company.openDeals, 0);
+  const openDeals = accounts.reduce(
+    (sum, company) => sum + company.openDeals,
+    0,
+  );
   const pipeline = accounts.reduce(
     (sum, company) => sum + company.pipelineValue,
     0,
@@ -67,11 +70,13 @@ export default function Profile() {
       open={profileOpen && person !== null}
       onOpenChange={(open) => !open && closeProfile()}
     >
-      <SheetContent side="right" className="sm:w-[480px] sm:max-w-[480px]">
+      <SheetContent side="right" className="sm:w-120 sm:max-w-120">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <UsersIcon aria-hidden className="text-icon size-3.5" />
-            <SheetTitle>{isCurrentUser ? "My Profile" : "Owner Profile"}</SheetTitle>
+            <SheetTitle>
+              {isCurrentUser ? "My Profile" : "Owner Profile"}
+            </SheetTitle>
           </div>
           <SheetDescription className="sr-only">
             Contact details, pipeline summary and assigned accounts
@@ -80,7 +85,7 @@ export default function Profile() {
             <Button
               variant="ghost"
               size="icon-sm"
-              className="-mr-1"
+              className="-mr-2"
               aria-label="Close profile"
             >
               <XIcon aria-hidden className="text-foreground size-4" />
@@ -90,15 +95,15 @@ export default function Profile() {
 
         {person && (
           <ScrollArea className="min-h-0 flex-1">
-            <div className="flex items-center gap-3 p-5 shadow-[inset_0_-1px_0_var(--line-strong)]">
+            <div className="shadow-divider flex items-center gap-3 px-6 py-5">
               <Avatar
                 src={person.avatar}
                 alt=""
-                className="size-[50px] shadow-[0px_6.25px_6.25px_0px_rgba(15,15,15,0.24),0px_0px_0px_1.563px_#232323]"
+                className="shadow-tile size-12.5"
               />
               <div className="flex min-w-0 flex-col gap-2">
                 <h2 className="truncate">{person.name}</h2>
-                <span className="caption-style text-soft block truncate">
+                <span className="caption-style text-fg-secondary block truncate">
                   {person.role}
                 </span>
               </div>
@@ -108,16 +113,16 @@ export default function Profile() {
               <div className="lead-style flex flex-wrap items-center gap-x-4 gap-y-3">
                 <a
                   href={`mailto:${person.email}`}
-                  className="hover:text-soft ease-power3-in-out flex items-center gap-1 transition-colors duration-150"
+                  className="hover:text-fg-secondary ease-power3-in-out duration-fast flex items-center gap-1 transition-colors"
                 >
-                  <MailIcon aria-hidden className="text-soft size-3" />
+                  <MailIcon aria-hidden className="text-fg-secondary size-3" />
                   {person.email}
                 </a>
                 <a
                   href={`tel:${person.phone.replace(/[^\d+]/g, "")}`}
-                  className="hover:text-soft ease-power3-in-out flex items-center gap-1 transition-colors duration-150"
+                  className="hover:text-fg-secondary ease-power3-in-out duration-fast flex items-center gap-1 transition-colors"
                 >
-                  <PhoneIcon aria-hidden className="text-soft size-3" />
+                  <PhoneIcon aria-hidden className="text-fg-secondary size-3" />
                   {person.phone}
                 </a>
               </div>
@@ -128,9 +133,9 @@ export default function Profile() {
                 {stats.map((stat) => (
                   <div
                     key={stat.label}
-                    className="border-line-strong flex flex-col gap-3 rounded-lg border p-[11px]"
+                    className="border-line-strong flex flex-col gap-3 rounded-lg border p-2.75"
                   >
-                    <span className="caption-style text-soft block">
+                    <span className="caption-style text-fg-secondary block">
                       {stat.label}
                     </span>
                     <span className="lead-style block tabular-nums">
@@ -156,7 +161,7 @@ export default function Profile() {
                   ))}
                 </ul>
               ) : (
-                <span className="caption-style text-subtle block">
+                <span className="caption-style text-fg-tertiary block">
                   No accounts assigned yet.
                 </span>
               )}

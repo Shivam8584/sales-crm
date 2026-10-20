@@ -1,11 +1,37 @@
 import type { Company, SortKey } from "@/data/companies";
 
+export type SortDir = "asc" | "desc";
+
+export const VIEWS = [
+  { value: "all", label: "All", test: () => true },
+  { value: "hot", label: "Hot", test: (c: Company) => c.winProbability >= 70 },
+  {
+    value: "at-risk",
+    label: "At risk",
+    test: (c: Company) => c.winProbability < 30,
+  },
+  { value: "stale", label: "Stale", test: (c: Company) => c.activityDays > 30 },
+] as const;
+
+export type View = (typeof VIEWS)[number]["value"];
+
 export type CompanyFilters = {
   sortBy: SortKey;
+  sortDir: SortDir;
   owner: string;
   stage: string;
   activityWindow: number;
+  view: View;
 };
+
+export function defaultSortDir(key: SortKey): SortDir {
+  return key === "name" ? "asc" : "desc";
+}
+
+export function pickFilters(state: CompanyFilters): CompanyFilters {
+  const { sortBy, sortDir, owner, stage, activityWindow, view } = state;
+  return { sortBy, sortDir, owner, stage, activityWindow, view };
+}
 
 export const TODAY = "2026-09-14";
 
@@ -14,9 +40,11 @@ export const ANY_STAGE = "any";
 
 export const DEFAULT_FILTERS: CompanyFilters = {
   sortBy: "pipelineValue",
+  sortDir: "desc",
   owner: ALL_OWNERS,
   stage: ANY_STAGE,
   activityWindow: 90,
+  view: "all",
 };
 
 export function activeFilterCount({
@@ -35,9 +63,12 @@ const TAG_CHAR_BUDGET = 20;
 
 export function filterCompanies(
   companies: Company[],
-  { sortBy, owner, stage, activityWindow }: CompanyFilters,
+  { sortBy, sortDir, owner, stage, activityWindow, view }: CompanyFilters,
 ): Company[] {
+  const inView =
+    VIEWS.find((item) => item.value === view)?.test ?? (() => true);
   const filtered = companies.filter((company) => {
+    if (!inView(company)) return false;
     if (owner !== ALL_OWNERS && company.owner !== owner) return false;
     if (stage !== ANY_STAGE && !company.tags.some((tag) => tag === stage)) {
       return false;
@@ -45,18 +76,22 @@ export function filterCompanies(
     return company.activityDays <= activityWindow;
   });
 
+  const direction = sortDir === "asc" ? 1 : -1;
   return filtered.sort((a, b) => {
     switch (sortBy) {
       case "name":
-        return a.name.localeCompare(b.name);
+        return a.name.localeCompare(b.name) * direction;
       case "lastInteraction":
-        return b.lastInteraction.date.localeCompare(a.lastInteraction.date);
+        return (
+          a.lastInteraction.date.localeCompare(b.lastInteraction.date) *
+          direction
+        );
       case "openDeals":
-        return b.openDeals - a.openDeals;
+        return (a.openDeals - b.openDeals) * direction;
       case "winProbability":
-        return b.winProbability - a.winProbability;
+        return (a.winProbability - b.winProbability) * direction;
       default:
-        return b.pipelineValue - a.pipelineValue;
+        return (a.pipelineValue - b.pipelineValue) * direction;
     }
   });
 }
@@ -72,6 +107,7 @@ export function companiesCsvRows(companies: Company[]) {
       "Win Probability (%)",
       "Last Interaction Date",
       "Last Interaction",
+      "Website",
     ],
     ...companies.map((company) => [
       company.name,
@@ -82,6 +118,7 @@ export function companiesCsvRows(companies: Company[]) {
       company.winProbability,
       company.lastInteraction.date,
       company.lastInteraction.label,
+      company.domain ?? "",
     ]),
   ];
 }
@@ -131,12 +168,33 @@ export function formatDate(iso: string) {
     "Jun",
     "Jul",
     "Aug",
-    "Sept",
+    "Sep",
     "Oct",
     "Nov",
     "Dec",
   ];
   return `${names[month - 1]} ${day}`;
+}
+
+const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+
+export function normalizeDomain(input: string): string | null {
+  const host = input
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z]+:\/\//, "")
+    .replace(/^www\./, "")
+    .split(/[/?#:]/)[0];
+  return DOMAIN_PATTERN.test(host) ? host : null;
+}
+
+export function faviconUrl(domain: string, size = 64) {
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size}`;
+}
+
+export function companyLogoSrc(company: Pick<Company, "logo" | "domain">) {
+  if (company.logo) return company.logo;
+  return company.domain ? faviconUrl(company.domain) : undefined;
 }
 
 export function formatMoney(value: number) {
