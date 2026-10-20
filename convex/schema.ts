@@ -7,6 +7,9 @@ import {
   vDay,
   vDealStage,
   vDisqualifyReason,
+  vFactStatus,
+  vLeadKind,
+  vRunStatus,
   vLeadStatus,
   vLifecycleStage,
   vMemberStatus,
@@ -103,6 +106,7 @@ export default defineSchema({
     }),
 
   leads: defineTable({
+    kind: vLeadKind,
     name: v.string(),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -212,6 +216,60 @@ export default defineSchema({
     .index("by_person", ["personId", "occurredAt"])
     .index("by_deal", ["dealId", "occurredAt"])
     .index("by_lead", ["leadId", "occurredAt"]),
+
+  notifications: defineTable({
+    recipientId: v.id("members"),
+    kind: v.string(),
+    title: v.string(),
+    body: v.optional(v.string()),
+    href: v.optional(v.string()),
+    readAt: v.optional(v.number()),
+  }).index("by_recipient", ["recipientId", "readAt"]),
+
+  /** Evidence-backed field values from enrichment providers. */
+  facts: defineTable({
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    leadId: v.optional(v.id("leads")),
+    field: v.string(),
+    value: v.string(),
+    source: v.string(),
+    evidence: v.string(),
+    observedAt: v.number(),
+    status: vFactStatus,
+    decidedById: v.optional(v.id("members")),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_person", ["personId"])
+    .index("by_lead", ["leadId"]),
+
+  enrichmentRuns: defineTable({
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    leadId: v.optional(v.id("leads")),
+    provider: v.string(),
+    status: vRunStatus,
+    error: v.optional(v.string()),
+    requestedById: v.id("members"),
+    finishedAt: v.optional(v.number()),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_person", ["personId"])
+    .index("by_lead", ["leadId"]),
+
+  /** Raw events received from the Hypedrive platform, deduplicated by eventId. */
+  platformEvents: defineTable({
+    eventId: v.string(),
+    type: v.string(),
+    orgId: v.optional(v.string()),
+    userId: v.optional(v.string()),
+    occurredAt: v.number(),
+    payload: v.string(),
+    processedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+  })
+    .index("by_event_id", ["eventId"])
+    .index("by_org", ["orgId", "occurredAt"]),
 
   settings: defineTable({ key: v.string(), value: v.string() }).index(
     "by_key",

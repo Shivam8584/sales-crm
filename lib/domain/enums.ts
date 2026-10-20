@@ -31,6 +31,9 @@ export const LIFECYCLE_STAGES = [
 ] as const;
 export type LifecycleStage = (typeof LIFECYCLE_STAGES)[number];
 
+export const LEAD_KINDS = ["demo", "contact", "signup", "manual"] as const;
+export type LeadKind = (typeof LEAD_KINDS)[number];
+
 export const LEAD_STATUSES = [
   "new",
   "contacted",
@@ -90,3 +93,15 @@ export type CallOutcome = (typeof CALL_OUTCOMES)[number];
 
 export const CHANNELS = ["email", "phone", "whatsapp"] as const;
 export type Channel = (typeof CHANNELS)[number];
+
+export const FACT_STATUSES = [
+  "applied",
+  "suggested",
+  "accepted",
+  "rejected",
+  "superseded",
+] as const;
+export type FactStatus = (typeof FACT_STATUSES)[number];
+
+export const RUN_STATUSES = ["running", "succeeded", "failed"] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];

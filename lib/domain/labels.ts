@@ -2,6 +2,7 @@ import type {
   CallOutcome,
   DealStage,
   DisqualifyReason,
+  LeadKind,
   LeadStatus,
   LifecycleStage,
   Priority,
@@ -31,6 +32,13 @@ export const STAGE_LABEL: Record<LifecycleStage, string> = {
   at_risk: "At risk",
   dormant: "Dormant",
   disqualified: "Disqualified",
+};
+
+export const LEAD_KIND_LABEL: Record<LeadKind, string> = {
+  demo: "Demo request",
+  contact: "Contact form",
+  signup: "Platform signup",
+  manual: "Added manually",
 };
 
 export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {

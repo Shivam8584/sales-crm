@@ -14,7 +14,10 @@ export function literals<const T extends readonly [string, ...string[]]>(
 export const vRole = literals(enums.ROLES);
 export const vMemberStatus = literals(enums.MEMBER_STATUSES);
 export const vLifecycleStage = literals(enums.LIFECYCLE_STAGES);
+export const vLeadKind = literals(enums.LEAD_KINDS);
 export const vLeadStatus = literals(enums.LEAD_STATUSES);
+export const vFactStatus = literals(enums.FACT_STATUSES);
+export const vRunStatus = literals(enums.RUN_STATUSES);
 export const vDisqualifyReason = literals(enums.DISQUALIFY_REASONS);
 export const vDealStage = literals(enums.DEAL_STAGES);
 export const vTaskStatus = literals(enums.TASK_STATUSES);

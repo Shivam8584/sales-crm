@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isEditableTarget } from "@/lib/keyboard";
 import { useUiStore } from "@/stores/ui-store";
-import { NAV_ITEMS } from "./navigation";
+import { NAV_ITEMS, TEAM_ITEM } from "./navigation";
 
 const SEQUENCE_TIMEOUT = 900;
 const OVERLAY = "[role=dialog], [role=menu], [role=listbox]";
@@ -34,7 +34,7 @@ export default function GlobalShortcuts({
       const key = event.key.toLowerCase();
       if (pendingG && Date.now() - pendingG < SEQUENCE_TIMEOUT) {
         pendingG = 0;
-        const item = NAV_ITEMS.find(
+        const item = [...NAV_ITEMS, TEAM_ITEM].find(
           (nav) => nav.shortcut.toLowerCase() === key,
         );
         if (item) {

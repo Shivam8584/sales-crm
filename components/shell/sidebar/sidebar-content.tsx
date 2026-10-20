@@ -7,7 +7,7 @@ import { MOD_KEY } from "@/lib/keyboard";
 import { useUiStore } from "@/stores/ui-store";
 import Logo from "@/public/assets/images/_common/logo.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
-import { NAV_ITEMS, isActive } from "../navigation";
+import { NAV_ITEMS, TEAM_ITEM, isActive } from "../navigation";
 import SidebarNavItem from "./sidebar-nav-item";
 import UserMenu from "./user-menu";
 
@@ -62,6 +62,15 @@ export default function SidebarContent() {
       </ScrollArea>
 
       <div className="border-sidebar-border shrink-0 border-t p-2">
+        <ul className="mb-1 px-1">
+          <SidebarNavItem
+            href={TEAM_ITEM.href}
+            icon={TEAM_ITEM.icon}
+            label={TEAM_ITEM.label}
+            active={isActive(pathname, TEAM_ITEM.href)}
+            onNavigate={close}
+          />
+        </ul>
         <UserMenu />
       </div>
     </div>
