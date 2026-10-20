@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { COMPANIES } from "@/data/companies";
 import { SITE_NAME } from "@/lib/seo";
 
-export { default } from "@/app/page";
+export { default } from "@/app/(crm)/page";
 
 export function generateStaticParams() {
   return COMPANIES.map((company) => ({ id: company.id }));

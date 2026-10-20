@@ -16,6 +16,12 @@ export type StoredCompany = Omit<Company, "id" | "tags"> & {
   position: number;
 };
 
+export type RemovedCompanies = {
+  companies: StoredCompany[];
+  deals: Record<string, unknown>[];
+  tasks: Record<string, unknown>[];
+};
+
 export type StoredNote = {
   companySlug: string;
   body: string;
@@ -32,8 +38,8 @@ type OwnerReceipt = {
 
 export type Backend = {
   add: (company: Company) => Promise<unknown>;
-  remove: (slugs: string[]) => Promise<StoredCompany[]>;
-  restore: (companies: StoredCompany[]) => Promise<unknown>;
+  remove: (slugs: string[]) => Promise<RemovedCompanies>;
+  restore: (removed: RemovedCompanies) => Promise<unknown>;
   update: (
     slug: string,
     patch: CompanyPatchInput,

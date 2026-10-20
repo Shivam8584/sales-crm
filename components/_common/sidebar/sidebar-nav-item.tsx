@@ -10,6 +10,7 @@ type SidebarNavItemProps = {
   active?: boolean;
   pressed?: boolean;
   onClick?: () => void;
+  href?: string;
   soon?: boolean;
   tone?: "default" | "quiet";
   iconClassName?: string;
@@ -22,6 +23,7 @@ export default function SidebarNavItem({
   active = false,
   pressed,
   onClick,
+  href,
   soon = false,
   tone = "default",
   iconClassName,
@@ -35,6 +37,7 @@ export default function SidebarNavItem({
         aria-current={active ? "page" : undefined}
         aria-pressed={pressed}
         onClick={onClick}
+        href={soon ? undefined : href}
         disabled={soon}
         className={cn(
           "group h-control-md gap-1.5 py-0 data-[active=true]:h-8",

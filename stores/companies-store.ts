@@ -245,7 +245,7 @@ export const useCompaniesStore = create<CompaniesState>()(
             return { companies };
           });
           pending.then((stored) => {
-            if (stored?.length) write((api) => api.restore(stored));
+            if (stored?.companies.length) write((api) => api.restore(stored));
           });
         };
       },

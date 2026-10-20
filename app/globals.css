@@ -119,6 +119,14 @@
   --ease-power3-in: cubic-bezier(0.5, 0, 0.75, 0);
   --ease-power3-out: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-power3-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+
+  --animate-card-lift: card-lift 200ms var(--ease-power3-out) both;
+  @keyframes card-lift {
+    from {
+      rotate: 0deg;
+      box-shadow: var(--elevation-card);
+    }
+  }
 }
 
 :root {

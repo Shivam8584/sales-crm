@@ -50,7 +50,7 @@ export default function SignIn() {
       <div className="bg-card shadow-card flex w-full max-w-90 flex-col rounded-xl">
         <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-2 text-center">
           <Logo aria-hidden className="size-10 overflow-visible" />
-          <h1>Sales CRM</h1>
+          <h1>Hypedrive CRM</h1>
           <p className="caption-style text-fg-secondary leading-snug">
             {flow === "signIn"
               ? "Sign in to see your team's pipeline."

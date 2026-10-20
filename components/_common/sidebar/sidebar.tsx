@@ -28,7 +28,7 @@ export default function Sidebar() {
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <SheetDescription className="sr-only">
-            Sales CRM sections and pipelines
+            Hypedrive CRM sections and pipelines
           </SheetDescription>
           <SidebarContent />
         </SheetContent>

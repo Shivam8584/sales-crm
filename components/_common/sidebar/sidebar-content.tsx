@@ -1,7 +1,6 @@
 "use client";
 
-import Button from "@/components/_ui/button";
-import Tooltip from "@/components/_ui/tooltip";
+import { usePathname, useRouter } from "next/navigation";
 import { ScrollArea } from "@/components/_ui/scroll-area";
 import SidebarNavItem from "./sidebar-nav-item";
 import SidebarSection from "./sidebar-section";
@@ -14,13 +13,11 @@ import ListIcon from "@/public/assets/images/companies/sidebar/list.svg";
 import BookClosedIcon from "@/public/assets/images/companies/sidebar/book-closed.svg";
 import MailIcon from "@/public/assets/images/companies/sidebar/mail.svg";
 import TargetIcon from "@/public/assets/images/companies/sidebar/target-05.svg";
-import TargetAltIcon from "@/public/assets/images/companies/sidebar/target-03.svg";
 import UsersIcon from "@/public/assets/images/companies/sidebar/users.svg";
-import BarChartAltIcon from "@/public/assets/images/companies/sidebar/bar-chart-10.svg";
-import AlertTriangleIcon from "@/public/assets/images/companies/sidebar/alert-triangle.svg";
 import UserPlusIcon from "@/public/assets/images/companies/sidebar/user-plus.svg";
 import MessageQuestionIcon from "@/public/assets/images/companies/sidebar/message-question.svg";
-import WalletIcon from "@/public/assets/images/companies/sidebar/wallet.svg";
+import ActivityIcon from "@/public/assets/images/companies/sidebar/activity.svg";
+import CheckSquareIcon from "@/public/assets/images/companies/sidebar/check-square.svg";
 import { STAGES, TAG_TONES, type Stage, type TagTone } from "@/data/companies";
 import { ANY_STAGE } from "@/lib/companies";
 import type { SVGProps } from "react";
@@ -54,13 +51,30 @@ const STAGE_DOTS = Object.fromEntries(
 ) as Record<Stage, ReturnType<typeof stageDot>>;
 
 export default function SidebarContent() {
+  const pathname = usePathname();
+  const router = useRouter();
   const companies = useCompaniesStore((state) => state.companies);
   const stage = useCompaniesStore((state) => state.stage);
   const setStage = useCompaniesStore((state) => state.setStage);
   const setSidebarOpen = useCompaniesStore((state) => state.setSidebarOpen);
   const setShortcutsOpen = useCompaniesStore((state) => state.setShortcutsOpen);
-  const companyCount = companies.length;
   const loaded = useCompaniesStore((state) => state.loaded);
+  const onCompanies = pathname === "/" || pathname.startsWith("/companies/");
+
+  const nav = (href: string) => ({
+    href,
+    active: href === "/" ? onCompanies : pathname.startsWith(href),
+    onClick: () => setSidebarOpen(false),
+  });
+
+  function pickStage(item: Stage) {
+    setSidebarOpen(false);
+    if (onCompanies) {
+      setStage(stage === item ? ANY_STAGE : item);
+      return;
+    }
+    router.push(`/?stage=${encodeURIComponent(item)}`);
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -68,10 +82,10 @@ export default function SidebarContent() {
         <Logo aria-hidden className="size-8 shrink-0 overflow-visible" />
         <div className="flex min-w-0 flex-col gap-1">
           <span className="lead-style block truncate font-medium tracking-[-0.01em]">
-            Sales CRM
+            Hypedrive CRM
           </span>
           <span className="caption-style text-fg-tertiary block truncate">
-            Company pipeline
+            Brand pipeline
           </span>
         </div>
       </div>
@@ -82,35 +96,43 @@ export default function SidebarContent() {
             <SidebarNavItem
               icon={BuildingIcon}
               label="Companies"
-              count={loaded ? companyCount : undefined}
-              active
+              count={loaded ? companies.length : undefined}
+              {...nav("/")}
             />
-            <SidebarNavItem icon={ClipboardIcon} label="Deals Board" soon />
-            <SidebarNavItem icon={BarChartIcon} label="Forecast" soon />
-            <SidebarNavItem icon={ListIcon} label="Activities" soon />
-            <SidebarNavItem icon={BookClosedIcon} label="Contacts" soon />
-            <SidebarNavItem icon={MailIcon} label="Email Sequences" soon />
-          </SidebarSection>
-
-          <SidebarSection
-            title="Team"
-            className="border-sidebar-border border-b"
-          >
-            <SidebarNavItem icon={TargetIcon} label="Strategic AEs" soon />
-            <SidebarNavItem icon={TargetAltIcon} label="Mid Market" soon />
-            <SidebarNavItem icon={UsersIcon} label="SDR Team" soon />
-          </SidebarSection>
-
-          <SidebarSection
-            title="Reporting"
-            className="border-sidebar-border border-b"
-          >
-            <SidebarNavItem icon={BarChartAltIcon} label="Q1 Forecast" soon />
             <SidebarNavItem
-              icon={AlertTriangleIcon}
-              label="Slipping Deals"
-              soon
+              icon={TargetIcon}
+              label="Leads"
+              {...nav("/leads")}
             />
+            <SidebarNavItem
+              icon={BookClosedIcon}
+              label="Contacts"
+              {...nav("/contacts")}
+            />
+            <SidebarNavItem
+              icon={ClipboardIcon}
+              label="Deals Board"
+              {...nav("/deals")}
+            />
+            <SidebarNavItem
+              icon={CheckSquareIcon}
+              label="Tasks"
+              {...nav("/tasks")}
+            />
+            <SidebarNavItem
+              icon={ActivityIcon}
+              label="Activities"
+              {...nav("/activities")}
+            />
+          </SidebarSection>
+
+          <SidebarSection
+            title="Coming soon"
+            className="border-sidebar-border border-b"
+          >
+            <SidebarNavItem icon={BarChartIcon} label="Forecast" soon />
+            <SidebarNavItem icon={MailIcon} label="Email Sequences" soon />
+            <SidebarNavItem icon={ListIcon} label="Reports" soon />
           </SidebarSection>
 
           <SidebarSection title="Stages">
@@ -125,23 +147,27 @@ export default function SidebarContent() {
                     : companies.filter((company) => company.tags.includes(item))
                         .length
                 }
-                pressed={stage === item}
-                onClick={() => {
-                  setStage(stage === item ? ANY_STAGE : item);
-                  setSidebarOpen(false);
-                }}
+                pressed={onCompanies && stage === item}
+                onClick={() => pickStage(item)}
               />
             ))}
           </SidebarSection>
         </nav>
       </ScrollArea>
 
-      <SidebarSection className="border-sidebar-border shrink-0 border-t border-b">
+      <SidebarSection className="border-sidebar-border shrink-0 border-t">
+        <SidebarNavItem
+          icon={UsersIcon}
+          label="Team"
+          tone="quiet"
+          {...nav("/team")}
+        />
         <SidebarNavItem
           icon={UserPlusIcon}
           label="Invite teammates"
           tone="quiet"
-          soon
+          href="/team?invite=1"
+          onClick={() => setSidebarOpen(false)}
         />
         <SidebarNavItem
           icon={MessageQuestionIcon}
@@ -153,28 +179,6 @@ export default function SidebarContent() {
           }}
         />
       </SidebarSection>
-
-      <div className="border-sidebar-border bg-sidebar-accent flex shrink-0 items-center justify-between gap-2 border-b py-4 pr-3 pl-5">
-        <div className="flex flex-col gap-2">
-          <span className="lead-style block font-medium tracking-[-0.01em]">
-            14 Days
-          </span>
-          <span className="caption-style text-fg-tertiary block">
-            left in your trial
-          </span>
-        </div>
-        <Tooltip content="Billing is coming soon" side="top">
-          <span
-            tabIndex={0}
-            className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
-          >
-            <Button variant="muted" size="md" disabled>
-              <WalletIcon aria-hidden className="size-3.5" />
-              Add billing
-            </Button>
-          </span>
-        </Tooltip>
-      </div>
     </div>
   );
 }

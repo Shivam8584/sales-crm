@@ -1,13 +1,15 @@
 import { ConvexError, v, type Infer } from "convex/values";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { companyFields } from "./schema";
+import { companyFields, dealFields, taskFields } from "./schema";
 import { requireViewer } from "./auth";
 
 // Convex documents are capped at 1 MiB; uploaded logos are data URLs.
 const MAX_LOGO_LENGTH = 512 * 1024;
 
 const company = v.object(companyFields);
+const dealDoc = v.object(dealFields);
+const taskDoc = v.object(taskFields);
 type CompanyInput = Infer<typeof company>;
 
 const patchFields = v.object({
@@ -142,7 +144,27 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     await requireViewer(ctx);
     const removed: (CompanyInput & { position: number })[] = [];
+    const deals: Infer<typeof dealDoc>[] = [];
+    const tasks: Infer<typeof taskDoc>[] = [];
     for (const slug of args.slugs) {
+      for (const deal of await ctx.db
+        .query("deals")
+        .withIndex("by_company", (q) => q.eq("companySlug", slug))
+        .collect()) {
+        const { _id, _creationTime, ...fields } = deal;
+        void _creationTime;
+        deals.push(fields);
+        await ctx.db.delete(_id);
+      }
+      for (const task of await ctx.db
+        .query("tasks")
+        .withIndex("by_company", (q) => q.eq("companySlug", slug))
+        .collect()) {
+        const { _id, _creationTime, ...fields } = task;
+        void _creationTime;
+        tasks.push(fields);
+        await ctx.db.delete(_id);
+      }
       const doc = await ctx.db
         .query("companies")
         .withIndex("by_slug", (q) => q.eq("slug", slug))
@@ -153,16 +175,20 @@ export const remove = mutation({
       removed.push(fields);
       await ctx.db.delete(_id);
     }
-    return removed;
+    return { companies: removed, deals, tasks };
   },
 });
 
 export const restore = mutation({
   args: {
     companies: v.array(v.object({ ...companyFields, position: v.number() })),
+    deals: v.optional(v.array(dealDoc)),
+    tasks: v.optional(v.array(taskDoc)),
   },
   handler: async (ctx, args) => {
     await requireViewer(ctx);
+    for (const deal of args.deals ?? []) await ctx.db.insert("deals", deal);
+    for (const task of args.tasks ?? []) await ctx.db.insert("tasks", task);
     for (const input of args.companies) {
       const existing = await ctx.db
         .query("companies")

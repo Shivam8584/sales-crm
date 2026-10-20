@@ -122,6 +122,7 @@ export type Company = {
   activityDays: number;
   domain?: string;
   logo?: string;
+  gstin?: string;
 };
 
 export const TREND_PATTERN = [

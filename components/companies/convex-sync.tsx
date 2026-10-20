@@ -44,7 +44,7 @@ export default function ConvexSync() {
     setBackend({
       add: (company) => add({ company: toStored(company) }),
       remove: (slugs) => remove({ slugs }),
-      restore: (stored) => restore({ companies: stored }),
+      restore: (stored) => restore(stored as Parameters<typeof restore>[0]),
       update: (slug, patch, texts) => update({ slug, patch, changes: texts }),
       revert: ({ slug, previous, changeIds }) =>
         revert({

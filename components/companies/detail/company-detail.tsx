@@ -28,6 +28,16 @@ import ActivityTrend from "./activity-trend";
 import ScoreCard from "./score-card";
 import ActivityTimeline from "./activity-timeline";
 import CompanyNotes from "./company-notes";
+import CompanyVerifiedSection from "./company-verified-section";
+import CompanyContactsTab, {
+  useCompanyContactsCount,
+} from "./tabs/company-contacts-tab";
+import CompanyDealsTab, {
+  useCompanyDealsCount,
+} from "./tabs/company-deals-tab";
+import CompanyTasksTab, {
+  useCompanyTasksCount,
+} from "./tabs/company-tasks-tab";
 import CompanyFields, {
   draftToPatch,
   isDirty,
@@ -54,7 +64,13 @@ import PhoneIcon from "@/public/assets/images/companies/detail/phone.svg";
 
 const WINDOW_OPTIONS = TREND_WINDOWS.map((label) => ({ value: label, label }));
 
-type DetailTab = "overview" | "activity" | "notes";
+type DetailTab =
+  | "overview"
+  | "contacts"
+  | "deals"
+  | "tasks"
+  | "activity"
+  | "notes";
 
 export default function CompanyDetail() {
   const detailId = useCompaniesStore((state) => state.detailId);
@@ -117,6 +133,9 @@ function DetailBody({ company }: { company: Company }) {
   }
 
   const owner = ownerByName(company.owner);
+  const contactCount = useCompanyContactsCount(company.id);
+  const dealCount = useCompanyDealsCount(company.id);
+  const taskCount = useCompanyTasksCount(company.id);
   const dirty = isDirty(draft, company);
   const companyNotes = useMemo(
     () => notes.filter((note) => note.companyId === company.id),
@@ -167,19 +186,22 @@ function DetailBody({ company }: { company: Company }) {
         </div>
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as DetailTab)}>
-          <TabsList className="shadow-divider px-6">
+          <TabsList className="shadow-divider scrollbar-none overflow-x-auto px-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="contacts">
+              <TabLabel label="Contacts" count={contactCount} />
+            </TabsTrigger>
+            <TabsTrigger value="deals">
+              <TabLabel label="Deals" count={dealCount} />
+            </TabsTrigger>
+            <TabsTrigger value="tasks">
+              <TabLabel label="Tasks" count={taskCount} />
+            </TabsTrigger>
             <TabsTrigger value="activity">
-              <span className="flex items-center gap-1.5">
-                Activity
-                <CountBadge>{timeline.length}</CountBadge>
-              </span>
+              <TabLabel label="Activity" count={timeline.length} />
             </TabsTrigger>
             <TabsTrigger value="notes">
-              <span className="flex items-center gap-1.5">
-                Notes
-                <CountBadge>{companyNotes.length}</CountBadge>
-              </span>
+              <TabLabel label="Notes" count={companyNotes.length} />
             </TabsTrigger>
           </TabsList>
 
@@ -206,6 +228,8 @@ function DetailBody({ company }: { company: Company }) {
                 </span>
               </div>
             </DetailSection>
+
+            <CompanyVerifiedSection company={company} />
 
             <DetailSection title="Details">
               <form id="company-details-form" onSubmit={save} noValidate>
@@ -255,6 +279,18 @@ function DetailBody({ company }: { company: Company }) {
                 ))}
               </div>
             </DetailSection>
+          </TabsContent>
+
+          <TabsContent value="contacts" className="px-6 py-5">
+            <CompanyContactsTab companyId={company.id} />
+          </TabsContent>
+
+          <TabsContent value="deals" className="px-6 py-5">
+            <CompanyDealsTab companyId={company.id} />
+          </TabsContent>
+
+          <TabsContent value="tasks" className="px-6 py-5">
+            <CompanyTasksTab companyId={company.id} />
           </TabsContent>
 
           <TabsContent value="activity" className="px-6 py-5">
@@ -316,5 +352,14 @@ function DetailBody({ company }: { company: Company }) {
         </div>
       </SheetFooter>
     </>
+  );
+}
+
+function TabLabel({ label, count }: { label: string; count?: number }) {
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
+      {label}
+      {count !== undefined && <CountBadge>{count}</CountBadge>}
+    </span>
   );
 }

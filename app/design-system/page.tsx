@@ -114,7 +114,7 @@ export default function DesignSystemPage() {
         <div className="flex flex-col gap-2">
           <h1>Design system</h1>
           <p className="text-fg-tertiary">
-            Tokens and components used across Sales CRM.
+            Tokens and components used across Hypedrive CRM.
           </p>
         </div>
         <ThemeMenu />
