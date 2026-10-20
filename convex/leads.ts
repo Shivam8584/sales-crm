@@ -9,8 +9,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { checkGstin, panRoot } from "../lib/domain/gstin";
-import type { LeadStatus } from "../lib/domain/enums";
-import { LEAD_KIND_LABEL } from "../lib/domain/labels";
+import type { LeadKind, LeadStatus } from "../lib/domain/enums";
 import {
   CONSENT_TEXT,
   LEAD_LIMITS,
@@ -69,6 +68,12 @@ const MIN_FILL_MS = 2000;
 const WEBHOOK_BODY_LIMIT = 256 * 1024;
 // Moving a lead into one of these means someone spoke to them; disqualifying spam does not.
 const WORKED_STATUSES: LeadStatus[] = ["contacted", "qualified", "nurture"];
+const KIND_NOUN: Record<LeadKind, string> = {
+  demo: "demo request",
+  contact: "contact request",
+  signup: "platform signup",
+  manual: "lead",
+};
 
 async function requireLead(ctx: MutationCtx, id: Id<"leads">) {
   const lead = await ctx.db.get(id);
@@ -102,6 +107,40 @@ export const list = memberQuery({
         slaBreachedAt: lead.slaBreachedAt ?? null,
         demoAt: lead.demoAt ?? null,
       })),
+    };
+  },
+});
+
+/** The viewer's new leads, the longest-waiting untouched ones first. */
+export const waiting = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const leads = await ctx.db
+      .query("leads")
+      .withIndex("by_owner_status", (q) =>
+        q.eq("ownerId", ctx.viewer._id).eq("status", "new"),
+      )
+      .take(100);
+    return {
+      slaMs: slaSeconds() * 1000,
+      leads: leads
+        .sort(
+          (a, b) =>
+            Number(Boolean(a.firstTouchedAt)) -
+              Number(Boolean(b.firstTouchedAt)) ||
+            a._creationTime - b._creationTime,
+        )
+        .map((lead) => ({
+          _id: lead._id,
+          _creationTime: lead._creationTime,
+          name: lead.name,
+          companyName: lead.companyName,
+          kind: lead.kind,
+          status: lead.status,
+          firstTouchedAt: lead.firstTouchedAt ?? null,
+          slaBreachedAt: lead.slaBreachedAt ?? null,
+          demoAt: lead.demoAt ?? null,
+        })),
     };
   },
 });
@@ -440,7 +479,7 @@ export const convert = memberMutation({
       await logSystem(
         ctx,
         { accountId },
-        `created the account from a ${LEAD_KIND_LABEL[lead.kind].toLowerCase()}`,
+        `created the account from a ${KIND_NOUN[lead.kind]}`,
         undefined,
         actor,
       );
@@ -499,6 +538,17 @@ export const convert = memberMutation({
       }
     }
 
+    const history = await ctx.db
+      .query("timeline")
+      .withIndex("by_lead", (q) => q.eq("leadId", id))
+      .collect();
+    for (const entry of history) {
+      await ctx.db.patch(entry._id, {
+        accountId: entry.accountId ?? account._id,
+        personId: entry.personId ?? person._id,
+      });
+    }
+
     const details = [
       `Source: ${leadChannel(lead)}`,
       lead.utm.campaign && `Campaign: ${lead.utm.campaign}`,
@@ -510,7 +560,7 @@ export const convert = memberMutation({
     await logSystem(
       ctx,
       { accountId: account._id, personId: person._id },
-      `converted ${lead.name}'s ${LEAD_KIND_LABEL[lead.kind].toLowerCase()}`,
+      `converted ${lead.name}'s ${KIND_NOUN[lead.kind]}`,
       details,
       actor,
     );

@@ -124,7 +124,9 @@ function optimisticRemove(
 }
 
 function report(error: unknown) {
-  toast(readError(error, "Couldn't save that change").message);
+  toast(readError(error, "Couldn't save that change").message, {
+    tone: "danger",
+  });
 }
 
 /** `tasks.update` with an optimistic update; rejects so forms can show field errors. */

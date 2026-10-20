@@ -2,7 +2,10 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
+import { useMobileBreakpoints } from "@/hooks/use-mobile-breakpoints";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import MenuIcon from "@/public/assets/icons/menu.svg";
@@ -39,6 +42,8 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
+  const { belowLg } = useMobileBreakpoints();
+  const unread = useQuery(api.notifications.unreadCount, belowLg ? {} : "skip");
 
   return (
     <header className="border-border flex h-13 shrink-0 items-center gap-2 border-b px-4">
@@ -46,10 +51,20 @@ export function PageHeader({
         variant="ghost"
         size="icon-sm"
         className="-ml-1.5 lg:hidden"
-        aria-label="Open navigation"
+        aria-label={
+          unread
+            ? `Open navigation, ${unread} unread notifications`
+            : "Open navigation"
+        }
         onClick={() => setSidebarOpen(true)}
       >
         <MenuIcon aria-hidden className="size-3.5" />
+        {unread ? (
+          <span
+            aria-hidden
+            className="bg-primary ring-background absolute top-1 right-1 size-2 rounded-full ring-2"
+          />
+        ) : null}
       </Button>
       <nav
         aria-label="Breadcrumb"

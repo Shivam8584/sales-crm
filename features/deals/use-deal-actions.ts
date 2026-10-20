@@ -81,7 +81,9 @@ export function useMoveDeal() {
             stage: previous.stage,
             position: previous.position,
             lostReason: previous.lostReason,
-          }).catch((error) => toast(readError(error).message));
+          }).catch((error) =>
+            toast(readError(error).message, { tone: "danger" }),
+          );
         toast(
           args.stage === "won"
             ? `Won ${deal.title}`
@@ -89,7 +91,9 @@ export function useMoveDeal() {
           undo,
         );
       } catch (error) {
-        toast(readError(error, `Couldn't move ${deal.title}`).message);
+        toast(readError(error, `Couldn't move ${deal.title}`).message, {
+          tone: "danger",
+        });
       }
     },
     [move],
@@ -117,11 +121,15 @@ export function useRemoveDeal() {
         const removed = await remove({ id: deal._id });
         toast(`Deleted ${deal.title}`, () => {
           void restore(removed).catch((error) =>
-            toast(readError(error, `Couldn't restore ${deal.title}`).message),
+            toast(readError(error, `Couldn't restore ${deal.title}`).message, {
+              tone: "danger",
+            }),
           );
         });
       } catch (error) {
-        toast(readError(error, `Couldn't delete ${deal.title}`).message);
+        toast(readError(error, `Couldn't delete ${deal.title}`).message, {
+          tone: "danger",
+        });
       }
     },
     [remove, restore],

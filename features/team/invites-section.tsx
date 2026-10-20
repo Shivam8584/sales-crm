@@ -63,7 +63,9 @@ export default function InvitesSection({
           : `New link for ${invite.email} is ready to copy`,
       );
     } catch (error) {
-      toast(readError(error, "Couldn't resend the invite").message);
+      toast(readError(error, "Couldn't resend the invite").message, {
+        tone: "danger",
+      });
     }
   }
 
@@ -72,11 +74,13 @@ export default function InvitesSection({
       await revoke({ id: invite._id });
       toast(`Revoked the invite for ${invite.email}`, () => {
         restore({ id: invite._id }).catch((error) =>
-          toast(readError(error).message),
+          toast(readError(error).message, { tone: "danger" }),
         );
       });
     } catch (error) {
-      toast(readError(error, "Couldn't revoke the invite").message);
+      toast(readError(error, "Couldn't revoke the invite").message, {
+        tone: "danger",
+      });
     }
   }
 

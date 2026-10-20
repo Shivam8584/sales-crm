@@ -93,7 +93,7 @@ function AccountView({ account }: { account: Account }) {
       );
       router.push("/accounts");
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 

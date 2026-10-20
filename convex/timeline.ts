@@ -3,7 +3,9 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { fail, invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
+import { isOpen } from "./lib/leads";
 import { memberIndex, memberRef } from "./lib/records";
+import type { RecordRefs } from "./lib/timeline";
 import { literals, vCallOutcome } from "./lib/validators";
 
 const MAX_BODY = 10_000;
@@ -14,13 +16,10 @@ const vLoggable = literals(["note", "call", "email", "meeting", "whatsapp"]);
 const vTarget = v.union(
   v.object({ accountId: v.id("accounts") }),
   v.object({ personId: v.id("people") }),
+  v.object({ leadId: v.id("leads") }),
 );
 
-async function touch(
-  ctx: MutationCtx,
-  refs: { accountId?: Id<"accounts">; personId?: Id<"people"> },
-  at: number,
-) {
+async function touch(ctx: MutationCtx, refs: RecordRefs, at: number) {
   for (const id of [refs.accountId, refs.personId]) {
     if (!id) continue;
     const doc = await ctx.db.get(id);
@@ -41,11 +40,17 @@ export const forRecord = memberQuery({
             .withIndex("by_account", (q) => q.eq("accountId", target.accountId))
             .order("desc")
             .take(PAGE)
-        : await ctx.db
-            .query("timeline")
-            .withIndex("by_person", (q) => q.eq("personId", target.personId))
-            .order("desc")
-            .take(PAGE);
+        : "personId" in target
+          ? await ctx.db
+              .query("timeline")
+              .withIndex("by_person", (q) => q.eq("personId", target.personId))
+              .order("desc")
+              .take(PAGE)
+          : await ctx.db
+              .query("timeline")
+              .withIndex("by_lead", (q) => q.eq("leadId", target.leadId))
+              .order("desc")
+              .take(PAGE);
     const members = await memberIndex(ctx);
     const personIds = [
       ...new Set(entries.map((entry) => entry.personId).filter(Boolean)),
@@ -71,6 +76,10 @@ export const forRecord = memberQuery({
   },
 });
 
+/**
+ * Returns whether this entry was the lead's first touch. Only the owner's own
+ * activity stops the SLA clock, so a manager's note doesn't hide a slow reply.
+ */
 export const log = memberMutation({
   args: {
     target: vTarget,
@@ -96,8 +105,17 @@ export const log = memberMutation({
       invalid("durationMin", "Enter minutes between 0 and 600");
     }
 
-    let refs: { accountId?: Id<"accounts">; personId?: Id<"people"> };
-    if ("personId" in args.target) {
+    let refs: RecordRefs;
+    let lead: Doc<"leads"> | null = null;
+    if ("leadId" in args.target) {
+      lead = await ctx.db.get(args.target.leadId);
+      if (!lead) notFound("Lead");
+      refs = {
+        leadId: lead._id,
+        accountId: lead.accountId,
+        personId: lead.personId,
+      };
+    } else if ("personId" in args.target) {
       const person = await ctx.db.get(args.target.personId);
       if (!person) notFound("Person");
       refs = { personId: person._id, accountId: person.accountId };
@@ -117,7 +135,21 @@ export const log = memberMutation({
       outcome: args.kind === "call" ? args.outcome : undefined,
     });
     await touch(ctx, refs, occurredAt);
-    return id;
+
+    const firstTouch =
+      lead !== null &&
+      !lead.firstTouchedAt &&
+      lead.ownerId === ctx.viewer._id &&
+      isOpen(lead);
+    if (lead && firstTouch) {
+      await ctx.db.patch(lead._id, {
+        firstTouchedAt: Math.max(lead._creationTime, occurredAt),
+        ...(args.kind !== "note" && lead.status === "new"
+          ? { status: "contacted" as const }
+          : {}),
+      });
+    }
+    return { id, firstTouch };
   },
 });
 
@@ -167,6 +199,8 @@ export const restore = memberMutation({
       kind: vLoggable,
       accountId: v.optional(v.id("accounts")),
       personId: v.optional(v.id("people")),
+      dealId: v.optional(v.id("deals")),
+      leadId: v.optional(v.id("leads")),
       actorId: v.optional(v.id("members")),
       occurredAt: v.number(),
       subject: v.optional(v.string()),

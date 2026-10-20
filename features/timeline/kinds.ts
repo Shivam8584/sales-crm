@@ -11,7 +11,8 @@ import DotIcon from "@/public/assets/icons/dot.svg";
 
 export type TimelineTarget =
   | { accountId: Id<"accounts"> }
-  | { personId: Id<"people"> };
+  | { personId: Id<"people"> }
+  | { leadId: Id<"leads"> };
 
 export const LOGGABLE_KINDS = [
   "note",

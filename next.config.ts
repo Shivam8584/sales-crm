@@ -3,15 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   devIndicators: false,
   images: {
-    // unoptimized: true,
     formats: ["image/avif", "image/webp"],
     qualities: [75, 90],
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "api.builder.io",
-      },
-    ],
   },
   turbopack: {
     rules: {

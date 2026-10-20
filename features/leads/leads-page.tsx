@@ -88,7 +88,7 @@ export default function LeadsPage() {
         () => void assign({ id: row._id, ownerId: previous }),
       );
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 

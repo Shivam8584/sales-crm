@@ -61,7 +61,9 @@ function useArrivalToasts(items: Item[] | undefined) {
       if (seen.has(item._id)) continue;
       seen.add(item._id);
       if (!item.read && TOAST_KINDS.has(item.kind)) {
-        toast(item.body ? `${item.title} · ${item.body}` : item.title);
+        toast(item.body ? `${item.title} · ${item.body}` : item.title, {
+          tone: item.kind === "lead_sla" ? "warning" : "info",
+        });
       }
     }
   }, [items]);

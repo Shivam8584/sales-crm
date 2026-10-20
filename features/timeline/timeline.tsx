@@ -91,7 +91,7 @@ function TimelineItem({
         }
       });
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 
@@ -100,7 +100,7 @@ function TimelineItem({
       await edit({ id: entry._id, body: draft });
       setEditing(false);
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 
@@ -230,11 +230,15 @@ function TimelineItem({
           </div>
         ) : (
           entry.body &&
-          !automatic && (
+          (entry.kind === "system" ? (
+            <p className="caption-style text-fg-secondary leading-snug break-words">
+              {entry.body}
+            </p>
+          ) : (
             <p className="bg-card border-border rounded-lg border px-3 py-2.5 text-sm leading-relaxed break-words whitespace-pre-wrap">
               {entry.body}
             </p>
-          )
+          ))
         )}
       </div>
     </li>

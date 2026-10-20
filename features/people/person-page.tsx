@@ -106,7 +106,7 @@ function PersonView({ person }: { person: Person }) {
       );
       router.push("/people");
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 

@@ -269,7 +269,8 @@ export default defineSchema({
     error: v.optional(v.string()),
   })
     .index("by_event_id", ["eventId"])
-    .index("by_org", ["orgId", "occurredAt"]),
+    .index("by_org", ["orgId", "occurredAt"])
+    .index("by_user_type", ["userId", "type"]),
 
   settings: defineTable({ key: v.string(), value: v.string() }).index(
     "by_key",

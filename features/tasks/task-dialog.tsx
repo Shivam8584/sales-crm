@@ -266,7 +266,9 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
               : "Task updated";
         toast(message, () => {
           update({ id: task._id, patch: restore }).catch((error) =>
-            toast(readError(error, "Couldn't undo that").message),
+            toast(readError(error, "Couldn't undo that").message, {
+              tone: "danger",
+            }),
           );
         });
       } else {

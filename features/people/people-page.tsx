@@ -221,7 +221,7 @@ export default function PeoplePage() {
         },
       );
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 

@@ -187,7 +187,7 @@ export default function AccountsPage() {
         },
       );
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 
@@ -203,7 +203,7 @@ export default function AccountsPage() {
         },
       );
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 

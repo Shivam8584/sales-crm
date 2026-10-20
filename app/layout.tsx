@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_URL, pageMetadata } from "@/lib/seo";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
 import ScrollToTop from "@/components/_common/scroll-to-top";
 import Toaster from "@/components/_common/toaster";
 import { TooltipProvider } from "@/components/_ui/tooltip";
@@ -22,11 +22,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  ...pageMetadata({
-    title: SITE_NAME,
-    description: SITE_DESCRIPTION,
-    path: "/",
-  }),
+  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "en_IN" },
 };
 
 export default function RootLayout({

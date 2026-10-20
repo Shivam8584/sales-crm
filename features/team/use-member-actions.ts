@@ -49,12 +49,14 @@ export function useMemberActions() {
         `${member.name} is now ${article(role)} ${ROLE_LABEL[role]}`,
         () => {
           setRoleMutation({ id: member._id, role: previous }).catch((error) =>
-            toast(readError(error).message),
+            toast(readError(error).message, { tone: "danger" }),
           );
         },
       );
     } catch (error) {
-      toast(readError(error, "Couldn't change the role").message);
+      toast(readError(error, "Couldn't change the role").message, {
+        tone: "danger",
+      });
     }
   }
 
@@ -68,12 +70,14 @@ export function useMemberActions() {
           : `Reactivated ${member.name}`,
         () => {
           setStatusMutation({ id: member._id, status: previous }).catch(
-            (error) => toast(readError(error).message),
+            (error) => toast(readError(error).message, { tone: "danger" }),
           );
         },
       );
     } catch (error) {
-      toast(readError(error, "Couldn't update access").message);
+      toast(readError(error, "Couldn't update access").message, {
+        tone: "danger",
+      });
     }
   }
 

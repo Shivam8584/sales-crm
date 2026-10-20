@@ -459,9 +459,6 @@ select:autofill {
   transition: background-color 9999s ease-in-out 0s;
 }
 
-@layer components {
-}
-
 html[data-theme-switching] *,
 html[data-theme-switching] *::before,
 html[data-theme-switching] *::after {
@@ -472,14 +469,6 @@ html[data-sidebar-resizing],
 html[data-sidebar-resizing] * {
   cursor: col-resize !important;
   user-select: none !important;
-}
-
-.pswp .pswp__button--arrow--next .pswp__icn {
-  transform: none;
-}
-
-.pswp .pswp__icn-shadow {
-  display: none;
 }
 
 @media (max-width: 340px) {

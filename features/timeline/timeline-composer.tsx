@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useId, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
@@ -33,6 +33,7 @@ export default function TimelineComposer({
   target: TimelineTarget;
 }) {
   const log = useMutation(api.timeline.log);
+  const bodyId = useId();
   const [kind, setKind] = useState<LoggableKind>("note");
   const [body, setBody] = useState("");
   const [outcome, setOutcome] = useState<CallOutcome>("connected");
@@ -48,7 +49,7 @@ export default function TimelineComposer({
     setSaving(true);
     setError(null);
     try {
-      await log({
+      const { firstTouch } = await log({
         target,
         kind,
         body: body.trim() || undefined,
@@ -57,7 +58,11 @@ export default function TimelineComposer({
       });
       setBody("");
       setDuration("");
-      toast(`${KIND_META[kind].label} logged`);
+      toast(
+        firstTouch
+          ? `${KIND_META[kind].label} logged · SLA clock stopped`
+          : `${KIND_META[kind].label} logged`,
+      );
     } catch (caught) {
       setError(readError(caught, "Couldn't save that").message);
     } finally {
@@ -80,7 +85,7 @@ export default function TimelineComposer({
       <div
         role="tablist"
         aria-label="Entry type"
-        className="flex gap-1 px-2 pt-2"
+        className="scrollbar-none flex gap-1 overflow-x-auto px-2 pt-2"
       >
         {LOGGABLE_KINDS.map((value) => {
           const meta = KIND_META[value];
@@ -92,7 +97,7 @@ export default function TimelineComposer({
               aria-selected={kind === value}
               onClick={() => setKind(value)}
               className={cn(
-                "caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast flex h-7 items-center gap-1.5 rounded-md px-2 transition-colors outline-none focus-visible:ring-2",
+                "caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 transition-colors outline-none focus-visible:ring-2",
                 kind === value && "bg-overlay-2 text-foreground",
               )}
             >
@@ -102,11 +107,11 @@ export default function TimelineComposer({
           );
         })}
       </div>
-      <label htmlFor="timeline-body" className="sr-only">
+      <label htmlFor={bodyId} className="sr-only">
         {KIND_META[kind].label}
       </label>
       <textarea
-        id="timeline-body"
+        id={bodyId}
         value={body}
         onChange={(event) => setBody(event.target.value)}
         onKeyDown={onKeyDown}
@@ -156,6 +161,7 @@ export default function TimelineComposer({
           type="submit"
           variant="primary"
           size="xs"
+          className="max-sm:ml-auto"
           disabled={!canSubmit}
           loading={saving}
         >

@@ -251,7 +251,7 @@ function DealForm({
           undoPatch.lostReason = previous.lostReason;
         const undo = () =>
           void updateDeal({ id: deal._id, patch: undoPatch }).catch((error) =>
-            toast(readError(error).message),
+            toast(readError(error).message, { tone: "danger" }),
           );
         toast(
           patch.stage === "won" && deal.stage !== "won"
@@ -273,7 +273,7 @@ function DealForm({
         });
         toast(`Created ${title}`, () => {
           void removeCreated({ id }).catch((error) =>
-            toast(readError(error).message),
+            toast(readError(error).message, { tone: "danger" }),
           );
         });
       }

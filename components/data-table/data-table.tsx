@@ -36,6 +36,8 @@ type DataTableProps<T> = {
   onSelectedChange?: (selected: Set<string>) => void;
   onPeek?: (row: T) => void;
   empty: ReactNode;
+  /** Page-wide J/K/Enter shortcuts; turn off for secondary tables on a page. */
+  keyboard?: boolean;
 };
 
 /**
@@ -57,6 +59,7 @@ export default function DataTable<T>({
   onSelectedChange,
   onPeek,
   empty,
+  keyboard = true,
 }: DataTableProps<T>) {
   const router = useRouter();
   const { width, belowSm } = useMobileBreakpoints();
@@ -108,7 +111,7 @@ export default function DataTable<T>({
   }
 
   useEffect(() => {
-    if (!sorted) return;
+    if (!sorted || !keyboard) return;
     const rowsList = sorted;
     function onKeyDown(event: KeyboardEvent) {
       if (event.metaKey || event.ctrlKey || event.altKey) return;

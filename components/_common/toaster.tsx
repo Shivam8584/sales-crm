@@ -4,11 +4,26 @@ import { useCallback, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import Button from "@/components/_ui/button";
 import Kbd from "@/components/_ui/kbd";
-import { useToastStore, type Toast } from "@/stores/toast-store";
+import { cn } from "@/lib/utils";
+import {
+  useToastStore,
+  type Toast,
+  type ToastTone,
+} from "@/stores/toast-store";
 import XIcon from "@/public/assets/icons/x.svg";
+import AlertCircleIcon from "@/public/assets/icons/alert-circle.svg";
+import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
+import InfoCircleIcon from "@/public/assets/icons/info-circle.svg";
 
 const DURATION = 5000;
+
+const TONE = {
+  success: { icon: CheckCircleIcon, className: "text-success" },
+  info: { icon: InfoCircleIcon, className: "text-fg-secondary" },
+  warning: { icon: AlertTriangleIcon, className: "text-warning" },
+  danger: { icon: AlertCircleIcon, className: "text-danger" },
+} satisfies Record<ToastTone, { icon: unknown; className: string }>;
 
 function isEditable(target: EventTarget | null) {
   return (
@@ -34,6 +49,8 @@ function ToastItem({ toast }: { toast: Toast }) {
     return pause;
   }, [start, pause]);
 
+  const tone = TONE[toast.tone];
+
   function undo() {
     toast.undo?.();
     dismiss(toast.id);
@@ -52,7 +69,10 @@ function ToastItem({ toast }: { toast: Toast }) {
       onBlur={start}
       className="bg-popover border-line-strong shadow-overlay pointer-events-auto flex min-h-11 w-full items-center gap-2 rounded-xl border py-1.5 pr-1.5 pl-3.5 sm:w-90"
     >
-      <CheckCircleIcon aria-hidden className="text-success size-4 shrink-0" />
+      <tone.icon
+        aria-hidden
+        className={cn("size-4 shrink-0", tone.className)}
+      />
       <span className="lead-style min-w-0 flex-1 py-1.5 leading-snug">
         {toast.message}
       </span>

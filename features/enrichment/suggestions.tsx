@@ -54,10 +54,14 @@ export function Suggestions({
             : `${label} accepted`
           : `${label} suggestion rejected`,
         () =>
-          void undo(receipt).catch((error) => toast(readError(error).message)),
+          void undo(receipt).catch((error) =>
+            toast(readError(error).message, { tone: "danger" }),
+          ),
       );
     } catch (error) {
-      toast(readError(error, "Couldn't save that decision").message);
+      toast(readError(error, "Couldn't save that decision").message, {
+        tone: "danger",
+      });
     } finally {
       setPending(null);
     }

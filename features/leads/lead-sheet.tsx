@@ -32,6 +32,7 @@ import {
 import Skeleton from "@/components/_ui/skeleton";
 import OptionPicker from "@/components/fields/option-picker";
 import { Properties, Property } from "@/components/record/properties";
+import Timeline from "@/features/timeline/timeline";
 import { useMembers } from "@/hooks/use-viewer";
 import {
   DISQUALIFY_REASONS,
@@ -154,7 +155,7 @@ function LeadBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
 
   function recordTouch(channel: TouchChannel) {
     touch({ id: lead._id, channel }).catch((error) =>
-      toast(readError(error).message),
+      toast(readError(error).message, { tone: "danger" }),
     );
   }
 
@@ -173,7 +174,7 @@ function LeadBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           }),
       );
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 
@@ -189,7 +190,7 @@ function LeadBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
         () => void assign({ id: lead._id, ownerId: previous }),
       );
     } catch (error) {
-      toast(readError(error).message);
+      toast(readError(error).message, { tone: "danger" });
     }
   }
 
@@ -205,7 +206,9 @@ function LeadBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
       onClose();
       router.push(`/accounts/${result.accountId}`);
     } catch (error) {
-      toast(readError(error, "Couldn't convert the lead").message);
+      toast(readError(error, "Couldn't convert the lead").message, {
+        tone: "danger",
+      });
       setConverting(false);
     }
   }
@@ -387,6 +390,10 @@ function LeadBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           ) : (
             <p className="text-fg-tertiary">No message.</p>
           )}
+        </Section>
+
+        <Section title="Activity">
+          <Timeline target={{ leadId: lead._id }} />
         </Section>
 
         <Section title="Attribution">
