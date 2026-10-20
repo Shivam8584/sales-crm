@@ -1,6 +1,7 @@
 "use client";
 
 import Button from "@/components/_ui/button";
+import Tooltip from "@/components/_ui/tooltip";
 import { ScrollArea } from "@/components/_ui/scroll-area";
 import SidebarNavItem from "./sidebar-nav-item";
 import SidebarSection from "./sidebar-section";
@@ -23,8 +24,6 @@ import WalletIcon from "@/public/assets/images/companies/sidebar/wallet.svg";
 import { STAGES, TAG_TONES, type Stage, type TagTone } from "@/data/companies";
 import { ANY_STAGE } from "@/lib/companies";
 import type { SVGProps } from "react";
-
-const BASE_COMPANY_COUNT = 223;
 
 const DOT_FILL: Record<TagTone, string> = {
   blue: "fill-(--tag-blue-text)",
@@ -59,6 +58,7 @@ export default function SidebarContent() {
   const stage = useCompaniesStore((state) => state.stage);
   const setStage = useCompaniesStore((state) => state.setStage);
   const setSidebarOpen = useCompaniesStore((state) => state.setSidebarOpen);
+  const setShortcutsOpen = useCompaniesStore((state) => state.setShortcutsOpen);
   const companyCount = companies.length;
 
   return (
@@ -81,31 +81,35 @@ export default function SidebarContent() {
             <SidebarNavItem
               icon={BuildingIcon}
               label="Companies"
-              count={BASE_COMPANY_COUNT + companyCount}
+              count={companyCount}
               active
             />
-            <SidebarNavItem icon={ClipboardIcon} label="Deals Board" />
-            <SidebarNavItem icon={BarChartIcon} label="Forecast" count={9} />
-            <SidebarNavItem icon={ListIcon} label="Activities" />
-            <SidebarNavItem icon={BookClosedIcon} label="Contacts" count={38} />
-            <SidebarNavItem icon={MailIcon} label="Email Sequences" />
+            <SidebarNavItem icon={ClipboardIcon} label="Deals Board" soon />
+            <SidebarNavItem icon={BarChartIcon} label="Forecast" soon />
+            <SidebarNavItem icon={ListIcon} label="Activities" soon />
+            <SidebarNavItem icon={BookClosedIcon} label="Contacts" soon />
+            <SidebarNavItem icon={MailIcon} label="Email Sequences" soon />
           </SidebarSection>
 
           <SidebarSection
             title="Team"
             className="border-sidebar-border border-b"
           >
-            <SidebarNavItem icon={TargetIcon} label="Strategic AEs" />
-            <SidebarNavItem icon={TargetAltIcon} label="Mid Market" />
-            <SidebarNavItem icon={UsersIcon} label="SDR Team" />
+            <SidebarNavItem icon={TargetIcon} label="Strategic AEs" soon />
+            <SidebarNavItem icon={TargetAltIcon} label="Mid Market" soon />
+            <SidebarNavItem icon={UsersIcon} label="SDR Team" soon />
           </SidebarSection>
 
           <SidebarSection
             title="Reporting"
             className="border-sidebar-border border-b"
           >
-            <SidebarNavItem icon={BarChartAltIcon} label="Q1 Forecast" />
-            <SidebarNavItem icon={AlertTriangleIcon} label="Slipping Deals" />
+            <SidebarNavItem icon={BarChartAltIcon} label="Q1 Forecast" soon />
+            <SidebarNavItem
+              icon={AlertTriangleIcon}
+              label="Slipping Deals"
+              soon
+            />
           </SidebarSection>
 
           <SidebarSection title="Stages">
@@ -134,8 +138,17 @@ export default function SidebarContent() {
           icon={UserPlusIcon}
           label="Invite teammates"
           tone="quiet"
+          soon
         />
-        <SidebarNavItem icon={MessageQuestionIcon} label="Help" tone="quiet" />
+        <SidebarNavItem
+          icon={MessageQuestionIcon}
+          label="Help & shortcuts"
+          tone="quiet"
+          onClick={() => {
+            setSidebarOpen(false);
+            setShortcutsOpen(true);
+          }}
+        />
       </SidebarSection>
 
       <div className="border-sidebar-border bg-sidebar-accent flex shrink-0 items-center justify-between gap-2 border-b py-4 pr-3 pl-5">
@@ -147,10 +160,17 @@ export default function SidebarContent() {
             left in your trial
           </span>
         </div>
-        <Button variant="muted" size="md">
-          <WalletIcon aria-hidden className="size-3.5" />
-          Add billing
-        </Button>
+        <Tooltip content="Billing is coming soon" side="top">
+          <span
+            tabIndex={0}
+            className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
+          >
+            <Button variant="muted" size="md" disabled>
+              <WalletIcon aria-hidden className="size-3.5" />
+              Add billing
+            </Button>
+          </span>
+        </Tooltip>
       </div>
     </div>
   );

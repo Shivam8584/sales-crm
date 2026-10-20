@@ -416,7 +416,11 @@ export const ACTIVITY_WINDOWS = [7, 30, 60, 90] as const;
 
 export type ActivityWindow = (typeof ACTIVITY_WINDOWS)[number];
 
-export const TREND_WINDOWS = ["Last 7 Days", "Last 30 Days", "Last 90 Days"];
+export const TREND_WINDOWS = [
+  "Last 7 Days",
+  "Last 30 Days",
+  "Last 90 Days",
+] as const;
 
 export type ScoreCard = {
   title: string;

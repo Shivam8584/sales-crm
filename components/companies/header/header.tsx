@@ -72,7 +72,7 @@ export default function CompaniesHeader() {
           </Tag>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 max-[359px]:gap-1">
+        <div className="flex shrink-0 items-center gap-2 max-[359px]:gap-1 max-[359px]:[&_button]:after:-inset-x-0.5">
           <Tooltip content="Search" shortcut={MOD_K}>
             <Button
               variant="secondary"

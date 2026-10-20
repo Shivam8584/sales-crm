@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
 import NotificationItem from "./notification-item";
 import { NOTIFICATIONS } from "@/data/notifications";
 import { useCompaniesStore } from "@/stores/companies-store";
+import { toast } from "@/stores/toast-store";
 import BellIcon from "@/public/assets/images/companies/header/bell.svg";
 
 type Filter = "all" | "unread";
@@ -38,7 +39,10 @@ export default function Notifications() {
 
   function handleSelect(id: string, companyId: string) {
     markRead(id);
-    if (!companies.some((company) => company.id === companyId)) return;
+    if (!companies.some((company) => company.id === companyId)) {
+      toast("That company was deleted from your pipeline");
+      return;
+    }
     navigated.current = true;
     setOpen(false);
     openDetail(companyId);

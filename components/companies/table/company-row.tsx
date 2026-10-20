@@ -32,6 +32,7 @@ type CompanyRowProps = {
   onToggle: () => void;
   onOpen: () => void;
   onOpenOwner: () => void;
+  sizer?: boolean;
 };
 
 function cellClass(key: TableColumnKey) {
@@ -51,6 +52,7 @@ export default function CompanyRow({
   onToggle,
   onOpen,
   onOpenOwner,
+  sizer = false,
 }: CompanyRowProps) {
   const owner = ownerByName(company.owner);
   const { visible, hidden } = splitTags(company.tags);
@@ -60,11 +62,14 @@ export default function CompanyRow({
       role="row"
       onClick={onOpen}
       tabIndex={-1}
-      data-row-index={index}
+      aria-hidden={sizer || undefined}
+      inert={sizer || undefined}
+      data-row-index={sizer ? undefined : index}
       data-cursor={cursor}
       data-active={active || selected}
       className={cn(
         TABLE_ROW_CLASS,
+        sizer && "invisible h-0 overflow-hidden",
         "group/row bg-background cursor-pointer scroll-mt-9.5 scroll-mb-16 outline-none hover:bg-[color-mix(in_srgb,var(--foreground)_4%,var(--background))] data-[active=true]:bg-[color-mix(in_srgb,var(--primary)_12%,var(--background))] data-[cursor=true]:not-data-[active=true]:bg-[color-mix(in_srgb,var(--foreground)_4%,var(--background))]",
       )}
     >

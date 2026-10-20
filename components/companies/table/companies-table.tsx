@@ -115,6 +115,7 @@ export default function CompaniesTable() {
   const [scrolledX, setScrolledX] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
 
   const visible = useMemo(
     () => filterCompanies(companies, filters),
@@ -127,7 +128,7 @@ export default function CompaniesTable() {
   );
   const [cursor, setCursor] = useTableKeyboard({
     ids,
-    tableRef,
+    tableRef: rowsRef,
     hasSelection: selectedVisible.length > 0,
     onOpen: openDetail,
     onToggle: toggleSelected,
@@ -173,7 +174,7 @@ export default function CompaniesTable() {
         }
       }}
     >
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={rowsRef} className="relative flex min-h-0 flex-1 flex-col">
         <ScrollArea orientation="both" className="min-h-0 flex-1">
           <Table
             ref={tableRef}
@@ -259,6 +260,22 @@ export default function CompaniesTable() {
                     onOpenOwner={() => openProfile(company.owner)}
                   />
                 ))}
+              {hydrated &&
+                visible.length === 0 &&
+                companies.map((company) => (
+                  <CompanyRow
+                    key={company.id}
+                    sizer
+                    index={-1}
+                    cursor={false}
+                    company={company}
+                    selected={false}
+                    active={false}
+                    onToggle={() => {}}
+                    onOpen={() => {}}
+                    onOpenOwner={() => {}}
+                  />
+                ))}
               {hydrated && visible.length === 0 && (
                 <TableRow role="row" className={TABLE_ROW_CLASS}>
                   <td role="cell" className="col-span-full">
@@ -282,6 +299,25 @@ export default function CompaniesTable() {
             </TableBody>
           </Table>
 
+          {hydrated && visible.length > 0 && (
+            <div className="border-border flex items-center gap-3 border-b px-4 py-2.5 sm:hidden">
+              <Checkbox
+                id="select-all-cards"
+                checked={
+                  allSelected ? true : someSelected ? "indeterminate" : false
+                }
+                onCheckedChange={toggleAll}
+              />
+              <label
+                htmlFor="select-all-cards"
+                className="caption-style text-fg-secondary cursor-pointer"
+              >
+                {selectedVisible.length > 0
+                  ? `${selectedVisible.length} of ${visible.length} selected`
+                  : `Select all ${visible.length}`}
+              </label>
+            </div>
+          )}
           <ul
             aria-label="Companies"
             className={cn("sm:hidden", selectedVisible.length > 0 && "pb-16")}
@@ -300,14 +336,19 @@ export default function CompaniesTable() {
                 </li>
               ))}
             {hydrated &&
-              visible.map((company) => (
+              visible.map((company, index) => (
                 <CompanyCard
                   key={company.id}
+                  index={index}
+                  cursor={cursor === index}
                   company={company}
                   selected={selectedIds.includes(company.id)}
                   active={detailOpen && detailId === company.id}
                   onToggle={() => toggleSelected(company.id)}
-                  onOpen={() => openDetail(company.id)}
+                  onOpen={() => {
+                    setCursor(index);
+                    openDetail(company.id);
+                  }}
                 />
               ))}
             {hydrated && visible.length === 0 && (

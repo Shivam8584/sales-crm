@@ -37,13 +37,13 @@ import CompanyFields, {
   type DraftErrors,
 } from "./company-fields";
 import {
-  SCORE_CARDS,
   TAG_TONES,
   TREND_WINDOWS,
   ownerByName,
   type Company,
 } from "@/data/companies";
 import { buildTimeline } from "@/lib/activity";
+import { scoreCardsFor, type TrendWindow } from "@/lib/companies";
 import CompanyLogo from "@/components/companies/company-logo";
 import { useCompaniesStore } from "@/stores/companies-store";
 import { toast } from "@/stores/toast-store";
@@ -98,12 +98,13 @@ export default function CompanyDetail() {
 
 function DetailBody({ company }: { company: Company }) {
   const openProfile = useCompaniesStore((state) => state.openProfile);
+  const setShortcutsOpen = useCompaniesStore((state) => state.setShortcutsOpen);
   const updateCompany = useCompaniesStore((state) => state.updateCompany);
   const notes = useCompaniesStore((state) => state.notes);
   const changes = useCompaniesStore((state) => state.changes);
   const [tab, setTab] = useState<DetailTab>("overview");
-  const [trendWindow, setTrendWindow] = useState(TREND_WINDOWS[1]);
-  const [scoreWindow, setScoreWindow] = useState(TREND_WINDOWS[1]);
+  const [trendWindow, setTrendWindow] = useState<TrendWindow>(TREND_WINDOWS[1]);
+  const [scoreWindow, setScoreWindow] = useState<TrendWindow>(TREND_WINDOWS[1]);
   const [draft, setDraft] = useState<CompanyDraft>(() => toDraft(company));
   const [errors, setErrors] = useState<DraftErrors>({});
   const [baseline, setBaseline] = useState(company);
@@ -227,12 +228,12 @@ function DetailBody({ company }: { company: Company }) {
                 <FilterMenu
                   value={trendWindow}
                   options={WINDOW_OPTIONS}
-                  onChange={setTrendWindow}
+                  onChange={(value) => setTrendWindow(value as TrendWindow)}
                   align="end"
                 />
               }
             >
-              <ActivityTrend company={company} />
+              <ActivityTrend company={company} window={trendWindow} />
             </DetailSection>
 
             <DetailSection
@@ -242,14 +243,14 @@ function DetailBody({ company }: { company: Company }) {
                 <FilterMenu
                   value={scoreWindow}
                   options={WINDOW_OPTIONS}
-                  onChange={setScoreWindow}
+                  onChange={(value) => setScoreWindow(value as TrendWindow)}
                   align="end"
                   className="shadow-raised"
                 />
               }
             >
               <div className="flex flex-col gap-2">
-                {SCORE_CARDS.map((card, index) => (
+                {scoreCardsFor(company, scoreWindow).map((card, index) => (
                   <ScoreCard key={`${card.title}-${index}`} card={card} />
                 ))}
               </div>
@@ -279,10 +280,10 @@ function DetailBody({ company }: { company: Company }) {
           <Button
             variant="link"
             size="none"
-            href="#"
+            onClick={() => setShortcutsOpen(true)}
             className="lead-style min-w-0 truncate max-[359px]:hidden"
           >
-            Need help? Ask us.
+            Keyboard shortcuts
           </Button>
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">

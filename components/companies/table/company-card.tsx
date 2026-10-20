@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 
 type CompanyCardProps = {
   company: Company;
+  index: number;
+  cursor: boolean;
   selected: boolean;
   active: boolean;
   onToggle: () => void;
@@ -19,6 +21,8 @@ type CompanyCardProps = {
 
 export default function CompanyCard({
   company,
+  index,
+  cursor,
   selected,
   active,
   onToggle,
@@ -30,8 +34,11 @@ export default function CompanyCard({
 
   return (
     <li
+      tabIndex={-1}
+      data-row-index={index}
+      data-cursor={cursor}
       data-active={active || selected}
-      className="border-border short:py-2.5 relative flex gap-3 border-b px-4 py-3.5 data-[active=true]:bg-[color-mix(in_srgb,var(--primary)_12%,var(--background))]"
+      className="border-border short:py-2.5 before:bg-selected relative flex scroll-mb-16 gap-3 border-b px-4 py-3.5 outline-none before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:opacity-0 data-[active=true]:bg-[color-mix(in_srgb,var(--primary)_12%,var(--background))] data-[cursor=true]:not-data-[active=true]:bg-[color-mix(in_srgb,var(--foreground)_4%,var(--background))] data-[cursor=true]:before:opacity-100"
     >
       <Checkbox
         checked={selected}

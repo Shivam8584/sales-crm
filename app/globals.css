@@ -126,7 +126,6 @@
   --row-height: 42px;
   --logo-tile: #ffffff;
   --logo-tile-fg: #52525b;
-  --avatar-placeholder: #f2f2f2;
   --sidebar-width: 254px;
 }
 
@@ -134,6 +133,7 @@
 [data-theme="dark"] {
   color-scheme: dark;
   --background: #161616;
+  --avatar-placeholder: #2a2a2a;
   --foreground: #f9fbff;
   --fg-secondary: #b0b0b0;
   --fg-tertiary: #929292;
@@ -228,6 +228,7 @@
 [data-theme="light"] {
   color-scheme: light;
   --background: #ffffff;
+  --avatar-placeholder: #f2f2f2;
   --foreground: #111113;
   --fg-secondary: #52525b;
   --fg-tertiary: #65656e;

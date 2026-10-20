@@ -19,7 +19,7 @@ export default function DetailSection({
       className={cn("shadow-divider flex flex-col gap-4 px-6 py-5", className)}
     >
       {action ? (
-        <div className="h-control-md flex items-center justify-between gap-2">
+        <div className="flex h-3 items-center justify-between gap-2">
           <h4 className="eyebrow-style font-normal">{title}</h4>
           {action}
         </div>

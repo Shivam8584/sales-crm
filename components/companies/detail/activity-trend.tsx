@@ -1,7 +1,11 @@
 import type { ComponentType, SVGProps } from "react";
 import Sparkline from "@/components/_common/sparkline";
 import type { Company } from "@/data/companies";
-import { companyActivity } from "@/lib/companies";
+import {
+  companyActivity,
+  trendForWindow,
+  type TrendWindow,
+} from "@/lib/companies";
 import CursorClickIcon from "@/public/assets/images/companies/detail/cursor-click.svg";
 import MailIcon from "@/public/assets/images/companies/detail/mail-03.svg";
 import CalendarIcon from "@/public/assets/images/companies/detail/calendar.svg";
@@ -9,6 +13,7 @@ import PhoneCallIcon from "@/public/assets/images/companies/detail/phone-call.sv
 
 type ActivityTrendProps = {
   company: Company;
+  window: TrendWindow;
 };
 
 type Stat = {
@@ -17,8 +22,8 @@ type Stat = {
   value: number;
 };
 
-export default function ActivityTrend({ company }: ActivityTrendProps) {
-  const activity = companyActivity(company);
+export default function ActivityTrend({ company, window }: ActivityTrendProps) {
+  const activity = companyActivity(company, window);
   const stats: Stat[] = [
     { icon: CursorClickIcon, label: "Total touches", value: activity.touches },
     { icon: MailIcon, label: "Emails", value: activity.emails },
@@ -33,7 +38,10 @@ export default function ActivityTrend({ company }: ActivityTrendProps) {
           <span className="block text-2xl leading-none font-semibold">
             {activity.total}
           </span>
-          <Sparkline values={company.trend} className="h-5.5" />
+          <Sparkline
+            values={trendForWindow(company.trend, window)}
+            className="h-5.5"
+          />
         </div>
         <span className="caption-style text-fg-secondary block">
           Spikes around QBR prep and renewal review

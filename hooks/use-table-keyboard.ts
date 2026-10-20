@@ -116,9 +116,12 @@ export function useTableKeyboard({
 
   useEffect(() => {
     if (current === null) return;
-    const row = tableRef.current?.querySelector<HTMLElement>(
-      `[data-row-index="${current}"]`,
-    );
+    // The desktop table and the mobile card list both render; pick the visible one.
+    const row = [
+      ...(tableRef.current?.querySelectorAll<HTMLElement>(
+        `[data-row-index="${current}"]`,
+      ) ?? []),
+    ].find((element) => element.offsetParent !== null);
     row?.focus({ preventScroll: true });
     row?.scrollIntoView({ block: "nearest" });
   }, [current, tableRef]);

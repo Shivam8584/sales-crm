@@ -1,4 +1,9 @@
-import type { Company, SortKey } from "@/data/companies";
+import {
+  SCORE_CARDS,
+  type Company,
+  type SortKey,
+  type TREND_WINDOWS,
+} from "@/data/companies";
 
 export type SortDir = "asc" | "desc";
 
@@ -146,15 +151,73 @@ export function companyHealth(company: Company) {
   };
 }
 
-export function companyActivity(company: Company) {
+export type TrendWindow = (typeof TREND_WINDOWS)[number];
+
+const WINDOW_SCALE: Record<TrendWindow, number> = {
+  "Last 7 Days": 0.25,
+  "Last 30 Days": 1,
+  "Last 90 Days": 3,
+};
+
+export function companyActivity(
+  company: Company,
+  window: TrendWindow = "Last 30 Days",
+) {
   const deals = company.openDeals;
+  const scale = WINDOW_SCALE[window];
+  const scaled = (value: number) => Math.round(value * scale);
   return {
-    total: deals * 15,
-    touches: deals * 4,
-    emails: deals + 4,
-    meetings: Math.ceil(deals / 2),
-    calls: deals + 1,
+    total: scaled(deals * 15),
+    touches: scaled(deals * 4),
+    emails: scaled(deals + 4),
+    meetings: scaled(Math.ceil(deals / 2)),
+    calls: scaled(deals + 1),
   };
+}
+
+export function trendForWindow(trend: number[], window: TrendWindow) {
+  if (window === "Last 7 Days") return trend.slice(-7);
+  if (window === "Last 30 Days") return trend;
+  // Three rotated copies averaged per point stand in for a longer, smoother history.
+  return trend.map((_, index) => {
+    const at = (offset: number) => trend[(index + offset) % trend.length];
+    return (at(0) + at(5) + at(9)) / 3;
+  });
+}
+
+function verdictFor(stars: number) {
+  if (stars >= 4) return "High potential";
+  if (stars === 3) return "Needs work";
+  return "At risk";
+}
+
+const WINDOW_STAR_SHIFT: Record<TrendWindow, number[]> = {
+  "Last 7 Days": [0, 1, -1],
+  "Last 30 Days": [0, 0, 0],
+  "Last 90 Days": [-1, 0, 0],
+};
+
+const WINDOW_UPDATED: Record<TrendWindow, string> = {
+  "Last 7 Days": "Updated 2h ago",
+  "Last 30 Days": "Updated 3d ago",
+  "Last 90 Days": "Updated 6w ago",
+};
+
+export function scoreCardsFor(company: Company, window: TrendWindow) {
+  const momentum =
+    company.winProbability >= 70 ? 1 : company.winProbability < 30 ? -1 : 0;
+  return SCORE_CARDS.map((card, index) => {
+    const stars = Math.min(
+      5,
+      Math.max(1, card.stars + momentum + WINDOW_STAR_SHIFT[window][index]),
+    );
+    return {
+      ...card,
+      stars,
+      verdict: verdictFor(stars),
+      updated: WINDOW_UPDATED[window],
+    };
+  });
 }
 
 export function formatDate(iso: string) {
@@ -189,7 +252,7 @@ export function normalizeDomain(input: string): string | null {
 }
 
 export function faviconUrl(domain: string, size = 64) {
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size}`;
+  return `/api/logo?domain=${encodeURIComponent(domain)}&sz=${size}`;
 }
 
 export function companyLogoSrc(company: Pick<Company, "logo" | "domain">) {
