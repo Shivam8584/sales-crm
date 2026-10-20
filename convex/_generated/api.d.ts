@@ -11,9 +11,11 @@
 import type * as activity from "../activity.js";
 import type * as auth from "../auth.js";
 import type * as companies from "../companies.js";
+import type * as deals from "../deals.js";
 import type * as http from "../http.js";
+import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
-import type * as work from "../work.js";
+import type * as workShared from "../workShared.js";
 
 import type {
   ApiFromModules,
@@ -25,9 +27,11 @@ declare const fullApi: ApiFromModules<{
   activity: typeof activity;
   auth: typeof auth;
   companies: typeof companies;
+  deals: typeof deals;
   http: typeof http;
+  tasks: typeof tasks;
   users: typeof users;
-  work: typeof work;
+  workShared: typeof workShared;
 }>;
 
 /**

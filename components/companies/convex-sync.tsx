@@ -25,6 +25,9 @@ export default function ConvexSync() {
   const changes = useQuery(api.activity.changes);
   const viewer = useQuery(api.users.me);
   const bootstrap = useMutation(api.companies.bootstrap);
+  const bootstrapDeals = useMutation(api.deals.bootstrap);
+  const bootstrapTasks = useMutation(api.tasks.bootstrap);
+  const workSeeded = useRef(false);
   const bootstrapping = useRef(false);
   const bootstrapped = useRef(false);
   const serverCompanies = useRef<Company[] | null>(null);
@@ -141,6 +144,12 @@ export default function ConvexSync() {
       }));
     }
   }, [companies, bootstrap]);
+
+  useEffect(() => {
+    if (!companies?.length || workSeeded.current) return;
+    workSeeded.current = true;
+    void bootstrapDeals().then(() => bootstrapTasks());
+  }, [companies, bootstrapDeals, bootstrapTasks]);
 
   useEffect(() => {
     if (notes) useCompaniesStore.setState({ notes });
