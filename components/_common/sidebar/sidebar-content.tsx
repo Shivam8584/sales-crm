@@ -60,6 +60,7 @@ export default function SidebarContent() {
   const setSidebarOpen = useCompaniesStore((state) => state.setSidebarOpen);
   const setShortcutsOpen = useCompaniesStore((state) => state.setShortcutsOpen);
   const companyCount = companies.length;
+  const loaded = useCompaniesStore((state) => state.loaded);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -81,7 +82,7 @@ export default function SidebarContent() {
             <SidebarNavItem
               icon={BuildingIcon}
               label="Companies"
-              count={companyCount}
+              count={loaded ? companyCount : undefined}
               active
             />
             <SidebarNavItem icon={ClipboardIcon} label="Deals Board" soon />
@@ -119,8 +120,10 @@ export default function SidebarContent() {
                 icon={STAGE_DOTS[item]}
                 label={item}
                 count={
-                  companies.filter((company) => company.tags.includes(item))
-                    .length
+                  !loaded
+                    ? undefined
+                    : companies.filter((company) => company.tags.includes(item))
+                        .length
                 }
                 pressed={stage === item}
                 onClick={() => {

@@ -4,10 +4,31 @@ import { cn } from "@/lib/utils";
 type AvatarProps = {
   src: string;
   alt: string;
+  name?: string;
   className?: string;
 };
 
-export default function Avatar({ src, alt, className }: AvatarProps) {
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return (parts[0]?.[0] ?? "") + (parts.length > 1 ? parts.at(-1)![0] : "");
+}
+
+export default function Avatar({ src, alt, name, className }: AvatarProps) {
+  if (!src) {
+    return (
+      <span
+        role={alt ? "img" : undefined}
+        aria-label={alt || undefined}
+        aria-hidden={alt ? undefined : true}
+        className={cn(
+          "bg-primary text-primary-foreground [container-type:size] flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full leading-none font-medium uppercase select-none",
+          className,
+        )}
+      >
+        <span className="text-[40cqh]">{initials(name ?? alt)}</span>
+      </span>
+    );
+  }
   return (
     <Asset
       type="image"

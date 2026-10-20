@@ -86,6 +86,7 @@ export default function CompanyNotes({ companyId, notes }: CompanyNotesProps) {
         <ul className="flex flex-col gap-2">
           {sorted.map((note) => {
             const author = profileByName(note.author);
+            const pending = note.id.startsWith("pending-");
             return (
               <li
                 key={note.id}
@@ -93,24 +94,33 @@ export default function CompanyNotes({ companyId, notes }: CompanyNotesProps) {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="caption-style text-fg-secondary flex min-w-0 items-center gap-1.5">
-                    <Avatar src={author.avatar} alt="" className="size-4" />
+                    <Avatar
+                      src={author.avatar}
+                      name={author.name}
+                      alt=""
+                      className="size-4"
+                    />
                     <span className="truncate">{author.name}</span>
                     <span aria-hidden>·</span>
                     <time dateTime={note.at} className="shrink-0 tabular-nums">
                       {formatTimestamp(note.at)}
                     </time>
                   </span>
-                  <Tooltip content="Delete note">
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="Delete note"
-                      onClick={() => toast("Note deleted", deleteNote(note.id))}
-                      className="-my-1 -mr-1"
-                    >
-                      <TrashIcon aria-hidden className="size-3" />
-                    </Button>
-                  </Tooltip>
+                  {!pending && (
+                    <Tooltip content="Delete note">
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Delete note"
+                        onClick={() =>
+                          toast("Note deleted", deleteNote(note.id))
+                        }
+                        className="-my-1 -mr-1"
+                      >
+                        <TrashIcon aria-hidden className="size-3" />
+                      </Button>
+                    </Tooltip>
+                  )}
                 </div>
                 <p className="text-foreground text-sm leading-snug break-words whitespace-pre-wrap">
                   {note.body}

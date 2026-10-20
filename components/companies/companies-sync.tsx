@@ -109,6 +109,7 @@ export default function CompaniesSync() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const query = searchParams.toString();
+  const loaded = useCompaniesStore((state) => state.loaded);
   const initialized = useRef(false);
   const missingNotified = useRef<string | null>(null);
 
@@ -148,14 +149,15 @@ export default function CompaniesSync() {
       if (state.detailOpen) state.closeDetail();
       return;
     }
-    if (state.companies.some((company) => company.id === id)) {
+    if (!loaded || state.companies.some((company) => company.id === id)) {
       if (!state.detailOpen || state.detailId !== id) state.openDetail(id);
       return;
     }
     window.history.replaceState(null, "", `/${window.location.search}`);
+    state.closeDetail();
     if (missingNotified.current !== id) toast("That company no longer exists");
     missingNotified.current = id;
-  }, [pathname]);
+  }, [pathname, loaded]);
 
   useEffect(
     () =>

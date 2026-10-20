@@ -5,6 +5,7 @@ import ScrollToTop from "@/components/_common/scroll-to-top";
 import Toaster from "@/components/_common/toaster";
 import { TooltipProvider } from "@/components/_ui/tooltip";
 import MotionProvider from "@/components/_common/motion-provider";
+import ConvexProvider from "@/components/_common/convex-provider";
 import { THEME_SCRIPT } from "@/lib/theme-script";
 import { SIDEBAR_WIDTH_SCRIPT } from "@/lib/sidebar";
 import "./globals.css";
@@ -48,13 +49,15 @@ export default function RootLayout({
         />
       </head>
       <body className="relative z-0 font-sans antialiased">
-        <MotionProvider>
-          <TooltipProvider>
-            <ScrollToTop />
-            {children}
-            <Toaster />
-          </TooltipProvider>
-        </MotionProvider>
+        <ConvexProvider>
+          <MotionProvider>
+            <TooltipProvider>
+              <ScrollToTop />
+              {children}
+              <Toaster />
+            </TooltipProvider>
+          </MotionProvider>
+        </ConvexProvider>
       </body>
     </html>
   );

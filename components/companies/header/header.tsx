@@ -10,7 +10,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
 import Notifications from "./notifications/notifications";
 import ThemeMenu from "./theme-menu";
 import Tooltip from "@/components/_ui/tooltip";
-import { CURRENT_USER } from "@/data/companies";
 import { useCompaniesStore } from "@/stores/companies-store";
 import { useStoreHydrated } from "@/hooks/use-store-hydrated";
 import {
@@ -47,6 +46,8 @@ export default function CompaniesHeader() {
   const setSidebarOpen = useCompaniesStore((state) => state.setSidebarOpen);
   const setSearchOpen = useCompaniesStore((state) => state.setSearchOpen);
   const openProfile = useCompaniesStore((state) => state.openProfile);
+  const viewer = useCompaniesStore((state) => state.viewer);
+  const viewerName = viewer?.name ?? "";
 
   return (
     <header className="shrink-0">
@@ -89,11 +90,14 @@ export default function CompaniesHeader() {
           <Button
             variant="secondary"
             size="avatar"
-            aria-label={`Open profile for ${CURRENT_USER.name}`}
-            onClick={() => openProfile(CURRENT_USER.name)}
+            aria-label={viewer ? `Open profile for ${viewerName}` : "Profile"}
+            disabled={!viewer}
+            onClick={() => openProfile(viewerName)}
           >
-            <Avatar src={CURRENT_USER.avatar} alt="" />
-            <span className="hidden sm:inline">{CURRENT_USER.name}</span>
+            <Avatar src="" name={viewerName || "?"} alt="" />
+            <span className="hidden max-w-40 truncate sm:inline">
+              {viewerName || "Loading…"}
+            </span>
           </Button>
         </div>
       </div>

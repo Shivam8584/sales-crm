@@ -62,7 +62,12 @@ export default function ActivityTimeline({ entries }: ActivityTimelineProps) {
                 </p>
               )}
               <span className="caption-style text-fg-tertiary flex items-center gap-1.5">
-                <Avatar src={author.avatar} alt="" className="size-4" />
+                <Avatar
+                  src={author.avatar}
+                  name={author.name}
+                  alt=""
+                  className="size-4"
+                />
                 {author.name}
               </span>
             </div>

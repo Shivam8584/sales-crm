@@ -14,7 +14,8 @@ import {
 } from "@/components/_ui/sheet";
 import DetailSection from "../detail/detail-section";
 import ProfileAccount from "./profile-account";
-import { CURRENT_USER, profileByName } from "@/data/companies";
+import { profileByName } from "@/data/companies";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { ALL_OWNERS, formatMoney } from "@/lib/companies";
 import { useCompaniesStore } from "@/stores/companies-store";
 import UsersIcon from "@/public/assets/images/companies/sidebar/users.svg";
@@ -30,8 +31,10 @@ export default function Profile() {
   const openDetail = useCompaniesStore((state) => state.openDetail);
   const setOwner = useCompaniesStore((state) => state.setOwner);
 
-  const person = profileName ? profileByName(profileName) : null;
-  const isCurrentUser = person?.name === CURRENT_USER.name;
+  const viewer = useCompaniesStore((state) => state.viewer);
+  const { signOut } = useAuthActions();
+  const person = profileName ? profileByName(profileName, viewer) : null;
+  const isCurrentUser = viewer !== null && person?.name === viewer.name;
   const accounts = person
     ? companies
         .filter((company) => isCurrentUser || company.owner === person.name)
@@ -98,6 +101,7 @@ export default function Profile() {
             <div className="shadow-divider flex items-center gap-3 px-6 py-5">
               <Avatar
                 src={person.avatar}
+                name={person.name}
                 alt=""
                 className="shadow-tile size-12.5"
               />
@@ -111,20 +115,30 @@ export default function Profile() {
 
             <DetailSection title="Contact">
               <div className="lead-style flex flex-wrap items-center gap-x-4 gap-y-3">
-                <a
-                  href={`mailto:${person.email}`}
-                  className="hover:text-fg-secondary ease-power3-in-out duration-fast flex items-center gap-1 transition-colors"
-                >
-                  <MailIcon aria-hidden className="text-fg-secondary size-3" />
-                  {person.email}
-                </a>
-                <a
-                  href={`tel:${person.phone.replace(/[^\d+]/g, "")}`}
-                  className="hover:text-fg-secondary ease-power3-in-out duration-fast flex items-center gap-1 transition-colors"
-                >
-                  <PhoneIcon aria-hidden className="text-fg-secondary size-3" />
-                  {person.phone}
-                </a>
+                {person.email && (
+                  <a
+                    href={`mailto:${person.email}`}
+                    className="hover:text-fg-secondary ease-power3-in-out duration-fast flex items-center gap-1 transition-colors"
+                  >
+                    <MailIcon
+                      aria-hidden
+                      className="text-fg-secondary size-3"
+                    />
+                    {person.email}
+                  </a>
+                )}
+                {person.phone && (
+                  <a
+                    href={`tel:${person.phone.replace(/[^\d+]/g, "")}`}
+                    className="hover:text-fg-secondary ease-power3-in-out duration-fast flex items-center gap-1 transition-colors"
+                  >
+                    <PhoneIcon
+                      aria-hidden
+                      className="text-fg-secondary size-3"
+                    />
+                    {person.phone}
+                  </a>
+                )}
               </div>
             </DetailSection>
 
@@ -170,11 +184,24 @@ export default function Profile() {
         )}
 
         <SheetFooter>
-          <SheetClose asChild>
-            <Button variant="subtle" size="sm">
-              Close
+          {isCurrentUser ? (
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() => {
+                closeProfile();
+                void signOut();
+              }}
+            >
+              Sign out
             </Button>
-          </SheetClose>
+          ) : (
+            <SheetClose asChild>
+              <Button variant="subtle" size="sm">
+                Close
+              </Button>
+            </SheetClose>
+          )}
           <Button
             variant="primary"
             size="sm"

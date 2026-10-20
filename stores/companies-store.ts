@@ -1,12 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import {
-  COMPANIES,
-  COMPANY_DOMAINS,
-  CURRENT_USER,
-  type Company,
-  type SortKey,
-} from "@/data/companies";
+import { COMPANY_DOMAINS, type Company, type SortKey } from "@/data/companies";
 import { NOTIFICATIONS } from "@/data/notifications";
 import {
   DEFAULT_FILTERS,
@@ -16,9 +10,20 @@ import {
   type View,
 } from "@/lib/companies";
 import { newId, type Change, type Note } from "@/lib/activity";
+import { write } from "@/lib/backend";
+
+export type Viewer = { id: string; name: string; email: string };
+
+export type LegacyData = {
+  companies: Company[];
+  notes: Note[];
+  changes: Change[];
+};
 
 type CompaniesState = {
   companies: Company[];
+  loaded: boolean;
+  viewer: Viewer | null;
   sortBy: SortKey;
   sortDir: SortDir;
   view: View;
@@ -84,11 +89,8 @@ type Undo = () => void;
 export type Density = "comfortable" | "compact";
 
 const PERSISTED_KEYS = [
-  "companies",
   "unreadNotificationIds",
   "density",
-  "notes",
-  "changes",
   "sortBy",
   "sortDir",
   "view",
@@ -99,7 +101,17 @@ const PERSISTED_KEYS = [
 
 type PersistedState = Pick<CompaniesState, (typeof PERSISTED_KEYS)[number]>;
 
-function describeChanges(before: Company, patch: CompanyPatch): string[] {
+// Companies and notes saved in this browser before the Convex backend existed.
+export let legacyData: LegacyData | null = null;
+
+export function clearLegacyData() {
+  legacyData = null;
+}
+
+export function describeChanges(
+  before: Company,
+  patch: CompanyPatch,
+): string[] {
   const lines: string[] = [];
   if (patch.name !== undefined && patch.name !== before.name) {
     lines.push(`Renamed to ${patch.name}`);
@@ -133,17 +145,6 @@ function describeChanges(before: Company, patch: CompanyPatch): string[] {
   return lines;
 }
 
-function changeEntries(companyId: string, lines: string[]): Change[] {
-  const at = new Date().toISOString();
-  return lines.map((text) => ({
-    id: newId("change"),
-    companyId,
-    text,
-    author: CURRENT_USER.name,
-    at,
-  }));
-}
-
 const safeLocalStorage = createJSONStorage<PersistedState>(() => ({
   getItem: (key) => localStorage.getItem(key),
   setItem: (key, value) => {
@@ -157,7 +158,9 @@ const safeLocalStorage = createJSONStorage<PersistedState>(() => ({
 export const useCompaniesStore = create<CompaniesState>()(
   persist(
     (set, get) => ({
-      companies: COMPANIES,
+      companies: [],
+      loaded: false,
+      viewer: null,
       ...DEFAULT_FILTERS,
       selectedIds: [],
       detailId: null,
@@ -216,7 +219,10 @@ export const useCompaniesStore = create<CompaniesState>()(
           companies: [company, ...state.companies],
           newCompanyOpen: false,
         }));
-        return () => get().deleteCompanies([company.id]);
+        const pending = write((api) => api.add(company));
+        return () => {
+          pending.then(() => get().deleteCompanies([company.id]));
+        };
       },
       deleteCompanies: (ids) => {
         const removed = get()
@@ -229,7 +235,8 @@ export const useCompaniesStore = create<CompaniesState>()(
           selectedIds: state.selectedIds.filter((id) => !ids.includes(id)),
           detailOpen: state.detailOpen && !ids.includes(state.detailId ?? ""),
         }));
-        return () =>
+        const pending = write((api) => api.remove(ids));
+        return () => {
           set((state) => {
             const companies = [...state.companies];
             for (const { company, index } of removed) {
@@ -237,6 +244,10 @@ export const useCompaniesStore = create<CompaniesState>()(
             }
             return { companies };
           });
+          pending.then((stored) => {
+            if (stored?.length) write((api) => api.restore(stored));
+          });
+        };
       },
       assignOwner: (ids, owner) => {
         const previous = new Map(
@@ -244,59 +255,73 @@ export const useCompaniesStore = create<CompaniesState>()(
             .companies.filter((company) => ids.includes(company.id))
             .map((company) => [company.id, company.owner]),
         );
-        const logged = [...previous]
-          .filter(([, before]) => before !== owner)
-          .flatMap(([id]) => changeEntries(id, [`Owner changed to ${owner}`]));
-        const loggedIds = new Set(logged.map((change) => change.id));
         set((state) => ({
           companies: state.companies.map((company) =>
             ids.includes(company.id) ? { ...company, owner } : company,
           ),
-          changes: [...state.changes, ...logged],
         }));
-        return () =>
+        const pending = write((api) => api.assignOwner(ids, owner));
+        return () => {
           set((state) => ({
             companies: state.companies.map((company) =>
               previous.has(company.id)
                 ? { ...company, owner: previous.get(company.id)! }
                 : company,
             ),
-            changes: state.changes.filter(
-              (change) => !loggedIds.has(change.id),
-            ),
           }));
+          pending.then((receipt) => {
+            if (receipt) write((api) => api.restoreOwners(receipt));
+          });
+        };
       },
       updateCompany: (id, patch) => {
         const before = get().companies.find((company) => company.id === id);
         if (!before) return () => {};
-        const logged = changeEntries(id, describeChanges(before, patch));
-        const loggedIds = new Set(logged.map((change) => change.id));
         set((state) => ({
           companies: state.companies.map((company) =>
             company.id === id ? { ...company, ...patch } : company,
           ),
-          changes: [...state.changes, ...logged],
         }));
-        return () =>
+        const { domain, ...rest } = patch;
+        const pending = write((api) =>
+          api.update(
+            id,
+            {
+              ...rest,
+              ...("domain" in patch ? { domain: domain ?? null } : {}),
+            },
+            describeChanges(before, patch),
+          ),
+        );
+        return () => {
           set((state) => ({
             companies: state.companies.map((company) =>
               company.id === id ? before : company,
             ),
-            changes: state.changes.filter(
-              (change) => !loggedIds.has(change.id),
-            ),
           }));
+          pending.then((receipt) => {
+            if (receipt) write((api) => api.revert({ ...receipt, slug: id }));
+          });
+        };
       },
       addNote: (companyId, body) => {
         const note: Note = {
-          id: newId("note"),
+          id: newId("pending-note"),
           companyId,
           body,
-          author: CURRENT_USER.name,
+          author: get().viewer?.name ?? "You",
           at: new Date().toISOString(),
         };
         set((state) => ({ notes: [...state.notes, note] }));
-        return () => get().deleteNote(note.id);
+        const pending = write((api) => api.addNote(companyId, body));
+        return () => {
+          set((state) => ({
+            notes: state.notes.filter((item) => item.id !== note.id),
+          }));
+          pending.then((id) => {
+            if (id) write((api) => api.removeNote(id));
+          });
+        };
       },
       deleteNote: (id) => {
         const index = get().notes.findIndex((note) => note.id === id);
@@ -305,28 +330,40 @@ export const useCompaniesStore = create<CompaniesState>()(
         set((state) => ({
           notes: state.notes.filter((note) => note.id !== id),
         }));
-        return () =>
+        const pending = write((api) => api.removeNote(id));
+        return () => {
           set((state) => {
             const notes = [...state.notes];
             notes.splice(Math.min(index, notes.length), 0, removed);
             return { notes };
           });
+          pending.then((stored) => {
+            if (stored) write((api) => api.restoreNote(stored));
+          });
+        };
       },
     }),
     {
       name: "sales-crm",
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
-        const saved = persisted as Partial<PersistedState>;
-        if (version < 2 && saved.companies) {
-          saved.companies = saved.companies.map((company) => ({
-            ...company,
-            domain: company.domain ?? COMPANY_DOMAINS[company.id],
-            logo: company.logo?.startsWith("/assets/")
-              ? undefined
-              : company.logo,
-          }));
+        const saved = persisted as Partial<PersistedState & LegacyData>;
+        if (version < 3 && saved.companies?.length) {
+          legacyData = {
+            companies: saved.companies.map((company) => ({
+              ...company,
+              domain: company.domain ?? COMPANY_DOMAINS[company.id],
+              logo: company.logo?.startsWith("/assets/")
+                ? undefined
+                : company.logo,
+            })),
+            notes: saved.notes ?? [],
+            changes: saved.changes ?? [],
+          };
         }
+        delete saved.companies;
+        delete saved.notes;
+        delete saved.changes;
         return saved as PersistedState;
       },
       storage: safeLocalStorage,
@@ -335,17 +372,10 @@ export const useCompaniesStore = create<CompaniesState>()(
         Object.fromEntries(
           PERSISTED_KEYS.map((key) => [key, state[key]]),
         ) as PersistedState,
-      merge: (persisted, current) => {
-        const saved = persisted as Partial<PersistedState> | undefined;
-        const companies = saved?.companies ?? current.companies;
-        return {
-          ...current,
-          ...saved,
-          selectedIds: current.selectedIds.filter((id) =>
-            companies.some((company) => company.id === id),
-          ),
-        };
-      },
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<PersistedState> | undefined),
+      }),
     },
   ),
 );
