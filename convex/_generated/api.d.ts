@@ -8,14 +8,15 @@
  * @module
  */
 
-import type * as activity from "../activity.js";
 import type * as auth from "../auth.js";
-import type * as companies from "../companies.js";
-import type * as deals from "../deals.js";
 import type * as http from "../http.js";
-import type * as tasks from "../tasks.js";
-import type * as users from "../users.js";
-import type * as workShared from "../workShared.js";
+import type * as lib_crypto from "../lib/crypto.js";
+import type * as lib_errors from "../lib/errors.js";
+import type * as lib_functions from "../lib/functions.js";
+import type * as lib_timeline from "../lib/timeline.js";
+import type * as lib_validators from "../lib/validators.js";
+import type * as members from "../members.js";
+import type * as seed from "../seed.js";
 
 import type {
   ApiFromModules,
@@ -24,14 +25,15 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  activity: typeof activity;
   auth: typeof auth;
-  companies: typeof companies;
-  deals: typeof deals;
   http: typeof http;
-  tasks: typeof tasks;
-  users: typeof users;
-  workShared: typeof workShared;
+  "lib/crypto": typeof lib_crypto;
+  "lib/errors": typeof lib_errors;
+  "lib/functions": typeof lib_functions;
+  "lib/timeline": typeof lib_timeline;
+  "lib/validators": typeof lib_validators;
+  members: typeof members;
+  seed: typeof seed;
 }>;
 
 /**

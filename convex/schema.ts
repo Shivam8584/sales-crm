@@ -1,193 +1,226 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import {
+  vCallOutcome,
+  vChannel,
+  vDay,
+  vDealStage,
+  vDisqualifyReason,
+  vLeadStatus,
+  vLifecycleStage,
+  vMemberStatus,
+  vMoney,
+  vPriority,
+  vRole,
+  vTaskStatus,
+  vTimelineKind,
+  vUtm,
+} from "./lib/validators";
 
-export const companyFields = {
-  slug: v.string(),
-  name: v.string(),
-  tags: v.array(v.string()),
-  owner: v.string(),
-  openDeals: v.number(),
-  pipelineValue: v.number(),
-  winProbability: v.number(),
-  trend: v.array(v.number()),
-  lastInteraction: v.object({ date: v.string(), label: v.string() }),
-  activityDays: v.number(),
-  domain: v.optional(v.string()),
-  logo: v.optional(v.string()),
-  gstin: v.optional(v.string()),
-};
-
-export const dealFields = {
-  title: v.string(),
-  companySlug: v.string(),
-  stage: v.string(),
-  value: v.number(),
-  owner: v.string(),
-  closeDate: v.union(v.string(), v.null()),
-  rank: v.number(),
-  createdAt: v.string(),
-  contactIds: v.optional(v.array(v.id("contacts"))),
-};
-
-export const taskFields = {
-  title: v.string(),
-  description: v.string(),
-  status: v.string(),
-  priority: v.string(),
-  assignee: v.string(),
-  companySlug: v.union(v.string(), v.null()),
-  dueDate: v.union(v.string(), v.null()),
-  rank: v.number(),
-  createdAt: v.string(),
-  contactId: v.optional(v.union(v.id("contacts"), v.null())),
-  dealId: v.optional(v.union(v.id("deals"), v.null())),
-};
-
-export const contactFields = {
-  companySlug: v.union(v.string(), v.null()),
-  firstName: v.string(),
-  lastName: v.string(),
-  email: v.union(v.string(), v.null()),
-  phone: v.union(v.string(), v.null()),
-  title: v.union(v.string(), v.null()),
-  linkedin: v.union(v.string(), v.null()),
-  owner: v.string(),
-  tags: v.array(v.string()),
-  createdAt: v.string(),
-};
-
-export const leadFields = {
-  name: v.string(),
-  email: v.union(v.string(), v.null()),
-  phone: v.union(v.string(), v.null()),
-  companyName: v.string(),
-  website: v.union(v.string(), v.null()),
-  gstin: v.union(v.string(), v.null()),
-  source: v.string(),
-  status: v.string(),
-  message: v.string(),
-  owner: v.union(v.string(), v.null()),
-  utm: v.optional(
-    v.object({
-      source: v.optional(v.string()),
-      medium: v.optional(v.string()),
-      campaign: v.optional(v.string()),
-    }),
-  ),
-  createdAt: v.string(),
-  convertedAt: v.union(v.string(), v.null()),
-  convertedCompanySlug: v.union(v.string(), v.null()),
-  convertedContactId: v.union(v.id("contacts"), v.null()),
-  convertedDealId: v.union(v.id("deals"), v.null()),
-};
-
-export const activityFields = {
-  kind: v.string(),
-  subject: v.string(),
-  body: v.string(),
-  at: v.string(),
-  durationMin: v.union(v.number(), v.null()),
-  outcome: v.union(v.string(), v.null()),
-  companySlug: v.union(v.string(), v.null()),
-  contactId: v.union(v.id("contacts"), v.null()),
-  dealId: v.union(v.id("deals"), v.null()),
-  author: v.string(),
-  authorId: v.union(v.id("users"), v.null()),
-  createdAt: v.string(),
-};
-
-export const memberFields = {
-  userId: v.id("users"),
-  role: v.string(),
-  name: v.string(),
-  email: v.string(),
-  active: v.boolean(),
-  joinedAt: v.string(),
-};
-
-export const inviteFields = {
-  email: v.string(),
-  role: v.string(),
-  token: v.string(),
-  invitedBy: v.string(),
-  createdAt: v.string(),
-  expiresAt: v.string(),
-  acceptedAt: v.union(v.string(), v.null()),
-  revokedAt: v.union(v.string(), v.null()),
-};
-
-export const factFields = {
-  subjectType: v.string(),
-  subjectId: v.string(),
-  field: v.string(),
-  value: v.string(),
-  source: v.string(),
-  evidence: v.string(),
-  observedAt: v.string(),
-  status: v.string(),
-  decidedBy: v.union(v.string(), v.null()),
-};
-
-export const enrichmentRunFields = {
-  subjectType: v.string(),
-  subjectId: v.string(),
-  provider: v.string(),
-  status: v.string(),
-  error: v.union(v.string(), v.null()),
-  requestedBy: v.string(),
-  startedAt: v.string(),
-  finishedAt: v.union(v.string(), v.null()),
-};
-
+/**
+ * Times are epoch milliseconds; calendar days are `YYYY-MM-DD` strings.
+ * Records reference each other by Convex id, and people by `members` id,
+ * never by display name.
+ */
 export default defineSchema({
   ...authTables,
-  companies: defineTable({ ...companyFields, position: v.number() })
-    .index("by_slug", ["slug"])
-    .index("by_position", ["position"]),
-  notes: defineTable({
-    companySlug: v.string(),
-    body: v.string(),
-    author: v.string(),
-    authorId: v.optional(v.id("users")),
-    at: v.string(),
-  }).index("by_company", ["companySlug"]),
-  deals: defineTable(dealFields).index("by_company", ["companySlug"]),
-  tasks: defineTable(taskFields).index("by_company", ["companySlug"]),
-  contacts: defineTable(contactFields)
-    .index("by_company", ["companySlug"])
-    .index("by_email", ["email"]),
-  leads: defineTable(leadFields)
-    .index("by_status", ["status"])
-    .index("by_email", ["email"]),
-  activities: defineTable(activityFields)
-    .index("by_company", ["companySlug"])
-    .index("by_contact", ["contactId"])
-    .index("by_deal", ["dealId"]),
-  members: defineTable(memberFields)
+
+  members: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    email: v.string(),
+    role: vRole,
+    status: vMemberStatus,
+    joinedAt: v.number(),
+  })
     .index("by_user", ["userId"])
-    .index("by_email", ["email"]),
-  invites: defineTable(inviteFields)
     .index("by_email", ["email"])
-    .index("by_token", ["token"]),
-  facts: defineTable(factFields).index("by_subject", [
-    "subjectType",
-    "subjectId",
-  ]),
-  enrichmentRuns: defineTable(enrichmentRunFields).index("by_subject", [
-    "subjectType",
-    "subjectId",
-  ]),
+    .index("by_status", ["status"]),
+
+  invites: defineTable({
+    email: v.string(),
+    role: vRole,
+    tokenHash: v.string(),
+    invitedById: v.id("members"),
+    expiresAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_email", ["email"])
+    .index("by_token_hash", ["tokenHash"]),
+
+  accounts: defineTable({
+    name: v.string(),
+    domain: v.optional(v.string()),
+    logoUrl: v.optional(v.string()),
+    ownerId: v.id("members"),
+    stage: vLifecycleStage,
+    tags: v.array(v.string()),
+    gstin: v.optional(v.string()),
+    panRoot: v.optional(v.string()),
+    platformOrgId: v.optional(v.string()),
+    archivedAt: v.optional(v.number()),
+    lastActivityAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_stage", ["stage"])
+    .index("by_domain", ["domain"])
+    .index("by_pan_root", ["panRoot"])
+    .index("by_platform_org", ["platformOrgId"])
+    .index("by_updated", ["updatedAt"])
+    .searchIndex("search_name", {
+      searchField: "name",
+      filterFields: ["ownerId", "stage"],
+    }),
+
+  people: defineTable({
+    accountId: v.optional(v.id("accounts")),
+    firstName: v.string(),
+    lastName: v.string(),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    title: v.optional(v.string()),
+    linkedinUrl: v.optional(v.string()),
+    ownerId: v.id("members"),
+    tags: v.array(v.string()),
+    platformUserId: v.optional(v.string()),
+    archivedAt: v.optional(v.number()),
+    lastActivityAt: v.optional(v.number()),
+    updatedAt: v.number(),
+    searchText: v.string(),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_email", ["email"])
+    .index("by_phone", ["phone"])
+    .index("by_owner", ["ownerId"])
+    .index("by_platform_user", ["platformUserId"])
+    .index("by_updated", ["updatedAt"])
+    .searchIndex("search_text", {
+      searchField: "searchText",
+      filterFields: ["accountId", "ownerId"],
+    }),
+
+  leads: defineTable({
+    name: v.string(),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    companyName: v.string(),
+    website: v.optional(v.string()),
+    gstin: v.optional(v.string()),
+    message: v.optional(v.string()),
+    source: v.string(),
+    utm: vUtm,
+    referrer: v.optional(v.string()),
+    landingPage: v.optional(v.string()),
+    status: vLeadStatus,
+    disqualifyReason: v.optional(vDisqualifyReason),
+    ownerId: v.optional(v.id("members")),
+    assignedAt: v.optional(v.number()),
+    firstTouchedAt: v.optional(v.number()),
+    slaBreachedAt: v.optional(v.number()),
+    demoAt: v.optional(v.number()),
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    convertedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_owner_status", ["ownerId", "status"])
+    .index("by_email", ["email"])
+    .index("by_phone", ["phone"]),
+
+  consents: defineTable({
+    personId: v.optional(v.id("people")),
+    leadId: v.optional(v.id("leads")),
+    channel: vChannel,
+    granted: v.boolean(),
+    text: v.string(),
+    source: v.string(),
+    ip: v.optional(v.string()),
+    recordedAt: v.number(),
+  })
+    .index("by_person", ["personId"])
+    .index("by_lead", ["leadId"]),
+
+  deals: defineTable({
+    accountId: v.id("accounts"),
+    title: v.string(),
+    stage: vDealStage,
+    amount: vMoney,
+    ownerId: v.id("members"),
+    closeDate: v.optional(vDay),
+    personIds: v.array(v.id("people")),
+    position: v.number(),
+    lostReason: v.optional(v.string()),
+    closedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_stage_position", ["stage", "position"])
+    .index("by_owner", ["ownerId"]),
+
+  tasks: defineTable({
+    title: v.string(),
+    notes: v.optional(v.string()),
+    status: vTaskStatus,
+    priority: vPriority,
+    assigneeId: v.id("members"),
+    dueDate: v.optional(vDay),
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    dealId: v.optional(v.id("deals")),
+    leadId: v.optional(v.id("leads")),
+    position: v.number(),
+    automationKey: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_assignee_status", ["assigneeId", "status"])
+    .index("by_status_position", ["status", "position"])
+    .index("by_account", ["accountId"])
+    .index("by_person", ["personId"])
+    .index("by_deal", ["dealId"])
+    .index("by_lead", ["leadId"])
+    .index("by_automation_key", ["automationKey"]),
+
+  /** Every interaction and change on a record, shown as one timeline. */
+  timeline: defineTable({
+    kind: vTimelineKind,
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    dealId: v.optional(v.id("deals")),
+    leadId: v.optional(v.id("leads")),
+    actorId: v.optional(v.id("members")),
+    occurredAt: v.number(),
+    subject: v.optional(v.string()),
+    body: v.optional(v.string()),
+    durationMin: v.optional(v.number()),
+    outcome: v.optional(vCallOutcome),
+    changes: v.optional(
+      v.array(
+        v.object({
+          field: v.string(),
+          from: v.optional(v.string()),
+          to: v.optional(v.string()),
+        }),
+      ),
+    ),
+    editedAt: v.optional(v.number()),
+  })
+    .index("by_account", ["accountId", "occurredAt"])
+    .index("by_person", ["personId", "occurredAt"])
+    .index("by_deal", ["dealId", "occurredAt"])
+    .index("by_lead", ["leadId", "occurredAt"]),
+
+  settings: defineTable({ key: v.string(), value: v.string() }).index(
+    "by_key",
+    ["key"],
+  ),
+
   rateLimits: defineTable({
     key: v.string(),
     windowStart: v.number(),
     count: v.number(),
   }).index("by_key", ["key"]),
-  meta: defineTable({ key: v.string() }).index("by_key", ["key"]),
-  changes: defineTable({
-    companySlug: v.string(),
-    text: v.string(),
-    author: v.string(),
-    at: v.string(),
-  }).index("by_company", ["companySlug"]),
 });
