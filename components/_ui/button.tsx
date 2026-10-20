@@ -45,6 +45,7 @@ export const buttonVariants = cva(
 type ButtonProps = VariantProps<typeof buttonVariants> &
   ComponentProps<"button"> & {
     href?: ComponentProps<typeof Link>["href"];
+    loading?: boolean;
   };
 
 export default function Button({
@@ -54,6 +55,8 @@ export default function Button({
   href,
   children,
   type = "button",
+  loading = false,
+  disabled,
   ...props
 }: ButtonProps) {
   const classes = cn(buttonVariants({ variant, size }), className);
@@ -71,8 +74,28 @@ export default function Button({
   }
 
   return (
-    <button type={type} className={classes} {...props}>
-      {children}
+    <button
+      type={type}
+      className={cn(classes, loading && "relative disabled:opacity-100")}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading ? (
+        <>
+          <span className="inline-flex items-center [gap:inherit] opacity-0">
+            {children}
+          </span>
+          <span
+            aria-hidden
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <span className="size-3.5 animate-spin rounded-full border-[1.5px] border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+          </span>
+        </>
+      ) : (
+        children
+      )}
     </button>
   );
 }

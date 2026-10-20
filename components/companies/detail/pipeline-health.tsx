@@ -21,7 +21,7 @@ export default function PipelineHealth({ company }: PipelineHealthProps) {
   return (
     <div className="flex flex-col gap-3 tabular-nums">
       <div className="flex flex-col gap-1">
-        <span className="text-display block leading-none font-semibold">
+        <span className="block text-2xl leading-none font-semibold">
           {company.winProbability}%
         </span>
         <span className="caption-style text-fg-secondary block">

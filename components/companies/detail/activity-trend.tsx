@@ -30,7 +30,9 @@ export default function ActivityTrend({ company }: ActivityTrendProps) {
     <div className="flex flex-col gap-3 tabular-nums">
       <div className="flex flex-col gap-1">
         <div className="flex items-baseline gap-0.75">
-          <span className="block text-2xl leading-none">{activity.total}</span>
+          <span className="block text-2xl leading-none font-semibold">
+            {activity.total}
+          </span>
           <Sparkline values={company.trend} className="h-5.5" />
         </div>
         <span className="caption-style text-fg-secondary block">

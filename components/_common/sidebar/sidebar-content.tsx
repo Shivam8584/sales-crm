@@ -17,17 +17,49 @@ import TargetAltIcon from "@/public/assets/images/companies/sidebar/target-03.sv
 import UsersIcon from "@/public/assets/images/companies/sidebar/users.svg";
 import BarChartAltIcon from "@/public/assets/images/companies/sidebar/bar-chart-10.svg";
 import AlertTriangleIcon from "@/public/assets/images/companies/sidebar/alert-triangle.svg";
-import DotYellow from "@/public/assets/images/companies/sidebar/dot-yellow.svg";
-import DotPink from "@/public/assets/images/companies/sidebar/dot-pink.svg";
-import DotPurple from "@/public/assets/images/companies/sidebar/dot-purple.svg";
 import UserPlusIcon from "@/public/assets/images/companies/sidebar/user-plus.svg";
 import MessageQuestionIcon from "@/public/assets/images/companies/sidebar/message-question.svg";
 import WalletIcon from "@/public/assets/images/companies/sidebar/wallet.svg";
+import { STAGES, TAG_TONES, type Stage, type TagTone } from "@/data/companies";
+import { ANY_STAGE } from "@/lib/companies";
+import type { SVGProps } from "react";
 
 const BASE_COMPANY_COUNT = 223;
 
+const DOT_FILL: Record<TagTone, string> = {
+  blue: "fill-(--tag-blue-text)",
+  purple: "fill-(--tag-purple-text)",
+  green: "fill-(--tag-green-text)",
+  moss: "fill-(--tag-moss-text)",
+  red: "fill-(--tag-red-text)",
+  orange: "fill-(--tag-orange-text)",
+  amber: "fill-(--tag-amber-text)",
+  teal: "fill-(--tag-teal-text)",
+  yellow: "fill-(--tag-yellow-text)",
+  neutral: "fill-(--tag-neutral-text)",
+};
+
+function stageDot(stage: Stage) {
+  function StageDot(props: SVGProps<SVGSVGElement>) {
+    return (
+      <svg viewBox="0 0 14 14" {...props}>
+        <circle cx="7" cy="7" r="4" className={DOT_FILL[TAG_TONES[stage]]} />
+      </svg>
+    );
+  }
+  return StageDot;
+}
+
+const STAGE_DOTS = Object.fromEntries(
+  STAGES.map((stage) => [stage, stageDot(stage)]),
+) as Record<Stage, ReturnType<typeof stageDot>>;
+
 export default function SidebarContent() {
-  const companyCount = useCompaniesStore((state) => state.companies.length);
+  const companies = useCompaniesStore((state) => state.companies);
+  const stage = useCompaniesStore((state) => state.stage);
+  const setStage = useCompaniesStore((state) => state.setStage);
+  const setSidebarOpen = useCompaniesStore((state) => state.setSidebarOpen);
+  const companyCount = companies.length;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -76,10 +108,23 @@ export default function SidebarContent() {
             <SidebarNavItem icon={AlertTriangleIcon} label="Slipping Deals" />
           </SidebarSection>
 
-          <SidebarSection title="Pipelines">
-            <SidebarNavItem icon={DotYellow} label="North America" />
-            <SidebarNavItem icon={DotPink} label="EMEA Enterprise" />
-            <SidebarNavItem icon={DotPurple} label="APAC Expansion" />
+          <SidebarSection title="Stages">
+            {STAGES.map((item) => (
+              <SidebarNavItem
+                key={item}
+                icon={STAGE_DOTS[item]}
+                label={item}
+                count={
+                  companies.filter((company) => company.tags.includes(item))
+                    .length
+                }
+                pressed={stage === item}
+                onClick={() => {
+                  setStage(stage === item ? ANY_STAGE : item);
+                  setSidebarOpen(false);
+                }}
+              />
+            ))}
           </SidebarSection>
         </nav>
       </ScrollArea>

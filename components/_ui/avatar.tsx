@@ -17,7 +17,7 @@ export default function Avatar({ src, alt, className }: AvatarProps) {
       height={1}
       sizes="48px"
       className={cn(
-        "size-5 shrink-0 rounded-full bg-[#f2f2f2] outline-1 -outline-offset-1 outline-(--image-outline)",
+        "bg-avatar-placeholder size-5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-(--image-outline)",
         className,
       )}
     />

@@ -8,6 +8,8 @@ type SidebarNavItemProps = {
   label: string;
   count?: number;
   active?: boolean;
+  pressed?: boolean;
+  onClick?: () => void;
   tone?: "default" | "quiet";
   iconClassName?: string;
 };
@@ -17,6 +19,8 @@ export default function SidebarNavItem({
   label,
   count,
   active = false,
+  pressed,
+  onClick,
   tone = "default",
   iconClassName,
 }: SidebarNavItemProps) {
@@ -25,8 +29,10 @@ export default function SidebarNavItem({
       <Button
         variant="nav"
         size="md"
-        data-active={active}
+        data-active={active || pressed === true}
         aria-current={active ? "page" : undefined}
+        aria-pressed={pressed}
+        onClick={onClick}
         className={cn(
           "group h-control-md gap-1.5 py-0 data-[active=true]:h-8",
           tone === "quiet" && "text-fg-tertiary",

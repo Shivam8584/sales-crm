@@ -13,9 +13,9 @@ function readPreference(): ThemePreference {
     const value = localStorage.getItem(STORAGE_KEY);
     return value === "light" || value === "dark" || value === "system"
       ? value
-      : "dark";
+      : "system";
   } catch {
-    return "dark";
+    return "system";
   }
 }
 
@@ -61,5 +61,9 @@ export function setThemePreference(preference: ThemePreference) {
 }
 
 export function useThemePreference() {
-  return useSyncExternalStore(subscribe, readPreference, () => "dark" as const);
+  return useSyncExternalStore(
+    subscribe,
+    readPreference,
+    () => "system" as const,
+  );
 }

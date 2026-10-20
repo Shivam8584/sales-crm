@@ -58,6 +58,7 @@
   --color-track: var(--track);
   --color-logo-tile: var(--logo-tile);
   --color-logo-tile-fg: var(--logo-tile-fg);
+  --color-avatar-placeholder: var(--avatar-placeholder);
 
   --shadow-hairline: 0 0 0 1px var(--border);
   --shadow-divider: inset 0 -1px 0 var(--line-strong);
@@ -125,6 +126,7 @@
   --row-height: 42px;
   --logo-tile: #ffffff;
   --logo-tile-fg: #52525b;
+  --avatar-placeholder: #f2f2f2;
   --sidebar-width: 254px;
 }
 

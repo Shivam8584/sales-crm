@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import {
   COMPANIES,
   COMPANY_DOMAINS,
+  CURRENT_USER,
   type Company,
   type SortKey,
 } from "@/data/companies";
@@ -10,9 +11,11 @@ import { NOTIFICATIONS } from "@/data/notifications";
 import {
   DEFAULT_FILTERS,
   defaultSortDir,
+  formatMoney,
   type SortDir,
   type View,
 } from "@/lib/companies";
+import { newId, type Change, type Note } from "@/lib/activity";
 
 type CompaniesState = {
   companies: Company[];
@@ -33,6 +36,8 @@ type CompaniesState = {
   shortcutsOpen: boolean;
   unreadNotificationIds: string[];
   density: Density;
+  notes: Note[];
+  changes: Change[];
   setSortBy: (sortBy: SortKey) => void;
   setOwner: (owner: string) => void;
   setStage: (stage: string) => void;
@@ -56,16 +61,88 @@ type CompaniesState = {
   addCompany: (company: Company) => Undo;
   deleteCompanies: (ids: string[]) => Undo;
   assignOwner: (ids: string[], owner: string) => Undo;
+  updateCompany: (id: string, patch: CompanyPatch) => Undo;
+  addNote: (companyId: string, body: string) => Undo;
+  deleteNote: (id: string) => Undo;
 };
+
+export type CompanyPatch = Partial<
+  Pick<
+    Company,
+    | "name"
+    | "domain"
+    | "tags"
+    | "owner"
+    | "openDeals"
+    | "pipelineValue"
+    | "winProbability"
+  >
+>;
 
 type Undo = () => void;
 
 export type Density = "comfortable" | "compact";
 
-type PersistedState = Pick<
-  CompaniesState,
-  "companies" | "unreadNotificationIds" | "density"
->;
+const PERSISTED_KEYS = [
+  "companies",
+  "unreadNotificationIds",
+  "density",
+  "notes",
+  "changes",
+  "sortBy",
+  "sortDir",
+  "view",
+  "owner",
+  "stage",
+  "activityWindow",
+] as const;
+
+type PersistedState = Pick<CompaniesState, (typeof PERSISTED_KEYS)[number]>;
+
+function describeChanges(before: Company, patch: CompanyPatch): string[] {
+  const lines: string[] = [];
+  if (patch.name !== undefined && patch.name !== before.name) {
+    lines.push(`Renamed to ${patch.name}`);
+  }
+  if (patch.owner !== undefined && patch.owner !== before.owner) {
+    lines.push(`Owner changed to ${patch.owner}`);
+  }
+  if (patch.tags !== undefined && patch.tags.join() !== before.tags.join()) {
+    lines.push(`Tags set to ${patch.tags.join(", ")}`);
+  }
+  if (
+    patch.pipelineValue !== undefined &&
+    patch.pipelineValue !== before.pipelineValue
+  ) {
+    lines.push(`Pipeline value set to $${formatMoney(patch.pipelineValue)}`);
+  }
+  if (patch.openDeals !== undefined && patch.openDeals !== before.openDeals) {
+    lines.push(`Open deals set to ${patch.openDeals}`);
+  }
+  if (
+    patch.winProbability !== undefined &&
+    patch.winProbability !== before.winProbability
+  ) {
+    lines.push(`Win probability set to ${patch.winProbability}%`);
+  }
+  if ("domain" in patch && patch.domain !== before.domain) {
+    lines.push(
+      patch.domain ? `Website set to ${patch.domain}` : "Website removed",
+    );
+  }
+  return lines;
+}
+
+function changeEntries(companyId: string, lines: string[]): Change[] {
+  const at = new Date().toISOString();
+  return lines.map((text) => ({
+    id: newId("change"),
+    companyId,
+    text,
+    author: CURRENT_USER.name,
+    at,
+  }));
+}
 
 const safeLocalStorage = createJSONStorage<PersistedState>(() => ({
   getItem: (key) => localStorage.getItem(key),
@@ -82,7 +159,7 @@ export const useCompaniesStore = create<CompaniesState>()(
     (set, get) => ({
       companies: COMPANIES,
       ...DEFAULT_FILTERS,
-      selectedIds: ["microsoft"],
+      selectedIds: [],
       detailId: null,
       detailOpen: false,
       profileName: null,
@@ -95,6 +172,8 @@ export const useCompaniesStore = create<CompaniesState>()(
         (item) => item.id,
       ),
       density: "comfortable",
+      notes: [],
+      changes: [],
       setSortBy: (sortBy) => set({ sortBy, sortDir: defaultSortDir(sortBy) }),
       setOwner: (owner) => set({ owner }),
       setStage: (stage) => set({ stage }),
@@ -165,10 +244,15 @@ export const useCompaniesStore = create<CompaniesState>()(
             .companies.filter((company) => ids.includes(company.id))
             .map((company) => [company.id, company.owner]),
         );
+        const logged = [...previous]
+          .filter(([, before]) => before !== owner)
+          .flatMap(([id]) => changeEntries(id, [`Owner changed to ${owner}`]));
+        const loggedIds = new Set(logged.map((change) => change.id));
         set((state) => ({
           companies: state.companies.map((company) =>
             ids.includes(company.id) ? { ...company, owner } : company,
           ),
+          changes: [...state.changes, ...logged],
         }));
         return () =>
           set((state) => ({
@@ -177,7 +261,56 @@ export const useCompaniesStore = create<CompaniesState>()(
                 ? { ...company, owner: previous.get(company.id)! }
                 : company,
             ),
+            changes: state.changes.filter(
+              (change) => !loggedIds.has(change.id),
+            ),
           }));
+      },
+      updateCompany: (id, patch) => {
+        const before = get().companies.find((company) => company.id === id);
+        if (!before) return () => {};
+        const logged = changeEntries(id, describeChanges(before, patch));
+        const loggedIds = new Set(logged.map((change) => change.id));
+        set((state) => ({
+          companies: state.companies.map((company) =>
+            company.id === id ? { ...company, ...patch } : company,
+          ),
+          changes: [...state.changes, ...logged],
+        }));
+        return () =>
+          set((state) => ({
+            companies: state.companies.map((company) =>
+              company.id === id ? before : company,
+            ),
+            changes: state.changes.filter(
+              (change) => !loggedIds.has(change.id),
+            ),
+          }));
+      },
+      addNote: (companyId, body) => {
+        const note: Note = {
+          id: newId("note"),
+          companyId,
+          body,
+          author: CURRENT_USER.name,
+          at: new Date().toISOString(),
+        };
+        set((state) => ({ notes: [...state.notes, note] }));
+        return () => get().deleteNote(note.id);
+      },
+      deleteNote: (id) => {
+        const index = get().notes.findIndex((note) => note.id === id);
+        const removed = get().notes[index];
+        if (!removed) return () => {};
+        set((state) => ({
+          notes: state.notes.filter((note) => note.id !== id),
+        }));
+        return () =>
+          set((state) => {
+            const notes = [...state.notes];
+            notes.splice(Math.min(index, notes.length), 0, removed);
+            return { notes };
+          });
       },
     }),
     {
@@ -198,11 +331,10 @@ export const useCompaniesStore = create<CompaniesState>()(
       },
       storage: safeLocalStorage,
       skipHydration: true,
-      partialize: (state) => ({
-        companies: state.companies,
-        unreadNotificationIds: state.unreadNotificationIds,
-        density: state.density,
-      }),
+      partialize: (state) =>
+        Object.fromEntries(
+          PERSISTED_KEYS.map((key) => [key, state[key]]),
+        ) as PersistedState,
       merge: (persisted, current) => {
         const saved = persisted as Partial<PersistedState> | undefined;
         const companies = saved?.companies ?? current.companies;

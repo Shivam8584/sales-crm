@@ -204,6 +204,9 @@ export default function DesignSystemPage() {
               <Button variant={variant} size="sm" disabled>
                 Disabled
               </Button>
+              <Button variant={variant} size="sm" loading>
+                Loading
+              </Button>
             </div>
           ))}
           <div className="flex flex-wrap items-center gap-2">

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   ACTIVITY_WINDOWS,
   OWNERS,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/companies";
 import { STAGE_OPTIONS } from "./toolbar/filter-options";
 import { useCompaniesStore } from "@/stores/companies-store";
+import { toast } from "@/stores/toast-store";
 
 const FILTER_PARAMS = [
   "view",
@@ -91,32 +92,83 @@ function sameFilters(a: CompanyFilters, b: CompanyFilters) {
   );
 }
 
+const COMPANY_PATH = /^\/companies\/([^/]+)\/?$/;
+
+function companyIdFromPath(pathname: string) {
+  const match = COMPANY_PATH.exec(pathname);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function desiredPath(state: { detailOpen: boolean; detailId: string | null }) {
+  return state.detailOpen && state.detailId
+    ? `/companies/${encodeURIComponent(state.detailId)}`
+    : "/";
+}
+
 export default function CompaniesSync() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const query = searchParams.toString();
+  const initialized = useRef(false);
+  const missingNotified = useRef<string | null>(null);
 
   useEffect(() => {
     useCompaniesStore.persist.rehydrate();
   }, []);
 
   useEffect(() => {
-    const fromUrl = parseFilters(new URLSearchParams(query));
+    const params = new URLSearchParams(query);
+    const hasFilterParams = FILTER_PARAMS.some((key) => params.has(key));
+    const firstRun = !initialized.current;
+    initialized.current = true;
+
+    // A bare URL on first load restores the saved filters instead of resetting them.
+    if (firstRun && !hasFilterParams) {
+      const next = filtersQuery(useCompaniesStore.getState(), params);
+      if (next !== query) {
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${next ? `?${next}` : ""}`,
+        );
+      }
+      return;
+    }
+
+    const fromUrl = parseFilters(params);
     if (!sameFilters(useCompaniesStore.getState(), fromUrl)) {
       useCompaniesStore.setState(fromUrl);
     }
   }, [query]);
 
+  useEffect(() => {
+    const id = companyIdFromPath(pathname);
+    const state = useCompaniesStore.getState();
+    if (!id) {
+      if (state.detailOpen) state.closeDetail();
+      return;
+    }
+    if (state.companies.some((company) => company.id === id)) {
+      if (!state.detailOpen || state.detailId !== id) state.openDetail(id);
+      return;
+    }
+    window.history.replaceState(null, "", `/${window.location.search}`);
+    if (missingNotified.current !== id) toast("That company no longer exists");
+    missingNotified.current = id;
+  }, [pathname]);
+
   useEffect(
     () =>
       useCompaniesStore.subscribe((state) => {
         const current = new URLSearchParams(window.location.search);
-        if (sameFilters(state, parseFilters(current))) return;
-        const next = filtersQuery(state, current);
-        window.history.pushState(
-          null,
-          "",
-          next ? `?${next}` : window.location.pathname,
-        );
+        const path = desiredPath(state);
+        const pathChanged = path !== window.location.pathname;
+        const filtersChanged = !sameFilters(state, parseFilters(current));
+        if (!pathChanged && !filtersChanged) return;
+        const next = filtersChanged
+          ? filtersQuery(state, current)
+          : current.toString();
+        window.history.pushState(null, "", `${path}${next ? `?${next}` : ""}`);
       }),
     [],
   );
