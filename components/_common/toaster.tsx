@@ -5,8 +5,8 @@ import { AnimatePresence, motion } from "motion/react";
 import Button from "@/components/_ui/button";
 import Kbd from "@/components/_ui/kbd";
 import { useToastStore, type Toast } from "@/stores/toast-store";
-import XIcon from "@/public/assets/images/companies/detail/x.svg";
-import CheckCircleIcon from "@/public/assets/images/_common/check-circle.svg";
+import XIcon from "@/public/assets/icons/x.svg";
+import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 
 const DURATION = 5000;
 
@@ -100,6 +100,7 @@ export default function Toaster() {
 
   return (
     <ol
+      data-toaster
       aria-live="polite"
       aria-label="Recent actions"
       className="z-toast short:top-3 short:bottom-auto pointer-events-none fixed inset-x-3 bottom-3 flex flex-col items-end gap-2 sm:inset-x-auto sm:right-4 sm:bottom-4"

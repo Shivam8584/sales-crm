@@ -5,7 +5,20 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/_ui/scroll-area";
 import Button from "@/components/_ui/button";
-import XIcon from "@/public/assets/images/companies/detail/x.svg";
+import XIcon from "@/public/assets/icons/x.svg";
+
+/** Clicking a toast (e.g. Undo) must not count as clicking outside the overlay. */
+function keepOpenForToasts(event: {
+  target: EventTarget | null;
+  preventDefault: () => void;
+}) {
+  if (
+    event.target instanceof Element &&
+    event.target.closest("[data-toaster]")
+  ) {
+    event.preventDefault();
+  }
+}
 
 function Dialog(props: ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -45,11 +58,19 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        {...props}
+        onPointerDownOutside={(event) => {
+          keepOpenForToasts(event);
+          props.onPointerDownOutside?.(event);
+        }}
+        onInteractOutside={(event) => {
+          keepOpenForToasts(event);
+          props.onInteractOutside?.(event);
+        }}
         className={cn(
           "border-line-strong bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-slow data-[state=closed]:duration-base fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-120 -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border outline-none",
           className,
         )}
-        {...props}
       >
         <ScrollArea viewportClassName="max-h-[calc(100dvh-2rem)]">
           {children}

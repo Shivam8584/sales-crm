@@ -49,6 +49,7 @@ export async function logChanges(
   });
 }
 
+/** `subject` reads after the actor's name, e.g. "created the account". */
 export async function logSystem(
   ctx: MutationCtx,
   refs: RecordRefs,

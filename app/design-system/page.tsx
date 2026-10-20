@@ -9,13 +9,11 @@ import Kbd from "@/components/_ui/kbd";
 import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
-import SegmentBar from "@/components/_common/segment-bar";
-import Sparkline from "@/components/_common/sparkline";
-import ThemeMenu from "@/components/companies/header/theme-menu";
-import { DEFAULT_TREND, type TagTone } from "@/data/companies";
-import PlusIcon from "@/public/assets/images/_common/plus.svg";
-import SearchIcon from "@/public/assets/images/_common/search.svg";
-import FilterIcon from "@/public/assets/images/_common/filter.svg";
+import Avatar from "@/components/_ui/avatar";
+import type { TagTone } from "@/components/_ui/tag";
+import PlusIcon from "@/public/assets/icons/plus.svg";
+import SearchIcon from "@/public/assets/icons/search.svg";
+import FilterIcon from "@/public/assets/icons/filter.svg";
 
 export const metadata: Metadata = {
   title: "Design system",
@@ -117,7 +115,6 @@ export default function DesignSystemPage() {
             Tokens and components used across Hypedrive CRM.
           </p>
         </div>
-        <ThemeMenu />
       </header>
 
       <Section title="Color">
@@ -256,10 +253,13 @@ export default function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="Data">
-        <div className="flex flex-wrap items-center gap-8">
-          <SegmentBar percent={68} className="w-24" />
-          <Sparkline values={DEFAULT_TREND} />
+      <Section title="Avatars">
+        <div className="flex flex-wrap items-center gap-3">
+          {["Priya Iyer", "Rohit Agarwal", "Sana Qureshi", "Vikram Singh"].map(
+            (name) => (
+              <Avatar key={name} name={name} size="md" label={name} />
+            ),
+          )}
         </div>
       </Section>
 

@@ -1,5 +1,5 @@
-import Companies from "@/components/companies/companies";
+import { redirect } from "next/navigation";
 
-export default function CompaniesPage() {
-  return <Companies />;
+export default function Home() {
+  redirect("/accounts");
 }

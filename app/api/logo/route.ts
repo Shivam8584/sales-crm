@@ -1,4 +1,4 @@
-import { normalizeDomain } from "@/lib/companies";
+import { normalizeDomain } from "@/lib/domain/normalize";
 
 const DAY = 60 * 60 * 24;
 const SIZES = new Set([16, 32, 64, 128]);

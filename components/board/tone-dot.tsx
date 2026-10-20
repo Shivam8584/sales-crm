@@ -1,4 +1,4 @@
-import type { TagTone } from "@/data/companies";
+import type { TagTone } from "@/components/_ui/tag";
 import { cn } from "@/lib/utils";
 
 const DOT_BG: Record<TagTone, string> = {

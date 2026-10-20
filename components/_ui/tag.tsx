@@ -2,6 +2,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
+export type TagTone =
+  | "blue"
+  | "purple"
+  | "green"
+  | "moss"
+  | "red"
+  | "orange"
+  | "amber"
+  | "teal"
+  | "yellow"
+  | "neutral";
+
 export const tagVariants = cva(
   "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full border text-sm leading-none tabular-nums",
   {

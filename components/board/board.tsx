@@ -25,7 +25,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { motion } from "motion/react";
-import type { TagTone } from "@/data/companies";
+import type { TagTone } from "@/components/_ui/tag";
 import { useMobileBreakpoints } from "@/hooks/use-mobile-breakpoints";
 import { useMounted } from "@/hooks/use-mounted";
 import { cn } from "@/lib/utils";

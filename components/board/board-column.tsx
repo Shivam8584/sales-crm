@@ -9,7 +9,7 @@ import BoardCard, { CardSurface } from "./board-card";
 import ToneDot from "./tone-dot";
 import type { Placement } from "./board-drag";
 import type { BoardColumnDef } from "./board";
-import PlusIcon from "@/public/assets/images/_common/plus.svg";
+import PlusIcon from "@/public/assets/icons/plus.svg";
 
 type BoardColumnProps<T extends { id: string }> = {
   column: BoardColumnDef;

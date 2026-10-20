@@ -4,6 +4,19 @@ import type { ComponentProps } from "react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 
+/** Clicking a toast (e.g. Undo) must not count as clicking outside the overlay. */
+function keepOpenForToasts(event: {
+  target: EventTarget | null;
+  preventDefault: () => void;
+}) {
+  if (
+    event.target instanceof Element &&
+    event.target.closest("[data-toaster]")
+  ) {
+    event.preventDefault();
+  }
+}
+
 function Sheet(props: ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
 }
@@ -47,6 +60,15 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        {...props}
+        onPointerDownOutside={(event) => {
+          keepOpenForToasts(event);
+          props.onPointerDownOutside?.(event);
+        }}
+        onInteractOutside={(event) => {
+          keepOpenForToasts(event);
+          props.onInteractOutside?.(event);
+        }}
         className={cn(
           "bg-background text-foreground data-[state=closed]:animate-out data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:ease-power3-out z-overlay duration-panel data-[state=closed]:duration-slow fixed flex w-full flex-col outline-none",
           side === "right" &&
@@ -57,7 +79,6 @@ function SheetContent({
             "border-line-strong shadow-overlay data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 max-h-[85dvh] rounded-t-xl border-t",
           className,
         )}
-        {...props}
       >
         {children}
       </SheetPrimitive.Content>

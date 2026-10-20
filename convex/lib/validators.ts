@@ -24,7 +24,7 @@ export const vCallOutcome = literals(enums.CALL_OUTCOMES);
 export const vChannel = literals(enums.CHANNELS);
 export const vCurrency = literals(CURRENCIES);
 
-/** Integer minor units; integrality is enforced in `assertMoney`. */
+/** Integer minor units; mutations check it with `assertMoney`. */
 export const vMoney = v.object({ amount: v.number(), currency: vCurrency });
 
 /** Calendar day as `YYYY-MM-DD`, for due and close dates that have no time. */
