@@ -27,6 +27,7 @@ import { Page, PageHeader } from "@/components/shell/page";
 import AccountPicker from "@/features/accounts/account-picker";
 import MemberPicker from "@/features/members/member-picker";
 import Timeline from "@/features/timeline/timeline";
+import RecordTasks from "@/features/tasks/record-tasks";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
@@ -288,6 +289,7 @@ function PersonView({ person }: { person: Person }) {
           </>
         }
       >
+        <RecordTasks target={{ personId: person._id }} />
         <RecordSection title="Timeline">
           <Timeline target={{ personId: person._id }} />
         </RecordSection>

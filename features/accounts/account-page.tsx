@@ -25,6 +25,9 @@ import RecordLayout, {
 import { Page, PageHeader } from "@/components/shell/page";
 import MemberPicker from "@/features/members/member-picker";
 import PeopleList from "@/features/people/people-list";
+import RecordDeals from "@/features/deals/record-deals";
+import RecordTasks from "@/features/tasks/record-tasks";
+import AccountVerification from "@/features/enrichment/account-verification";
 import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import type { LifecycleStage } from "@/lib/domain/enums";
@@ -217,6 +220,7 @@ function AccountView({ account }: { account: Account }) {
                 />
               </Property>
             </Properties>
+            <AccountVerification accountId={account._id} />
             <Properties title="Activity">
               <Property label="Last activity">
                 <span className="text-sm">
@@ -251,6 +255,8 @@ function AccountView({ account }: { account: Account }) {
         >
           <PeopleList accountId={account._id} />
         </RecordSection>
+        <RecordTasks target={{ accountId: account._id }} />
+        <RecordDeals accountId={account._id} />
         <RecordSection title="Timeline">
           <Timeline target={{ accountId: account._id }} />
         </RecordSection>

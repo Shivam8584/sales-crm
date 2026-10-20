@@ -61,6 +61,24 @@ export default function CommandMenu() {
               <PlusIcon aria-hidden className="text-fg-tertiary size-3" />
               New person
             </CommandItem>
+            <CommandItem
+              onSelect={() => run(() => setCreate({ type: "lead" }))}
+            >
+              <PlusIcon aria-hidden className="text-fg-tertiary size-3" />
+              New lead
+            </CommandItem>
+            <CommandItem
+              onSelect={() => run(() => setCreate({ type: "deal" }))}
+            >
+              <PlusIcon aria-hidden className="text-fg-tertiary size-3" />
+              New deal
+            </CommandItem>
+            <CommandItem
+              onSelect={() => run(() => setCreate({ type: "task" }))}
+            >
+              <PlusIcon aria-hidden className="text-fg-tertiary size-3" />
+              New task
+            </CommandItem>
           </CommandGroup>
           <CommandGroup heading="Go to">
             {NAV_ITEMS.map((item) => (

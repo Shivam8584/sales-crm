@@ -10,6 +10,7 @@ import SearchIcon from "@/public/assets/icons/search.svg";
 import { NAV_ITEMS, TEAM_ITEM, isActive } from "../navigation";
 import SidebarNavItem from "./sidebar-nav-item";
 import UserMenu from "./user-menu";
+import NotificationBell from "@/features/notifications/notification-bell";
 
 export default function SidebarContent() {
   const pathname = usePathname();
@@ -21,9 +22,10 @@ export default function SidebarContent() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-13 shrink-0 items-center gap-2.5 px-4">
         <Logo aria-hidden className="size-6 shrink-0 overflow-visible" />
-        <span className="lead-style truncate font-medium tracking-[-0.01em]">
+        <span className="lead-style flex-1 truncate font-medium tracking-[-0.01em]">
           Hypedrive
         </span>
+        <NotificationBell />
       </div>
 
       <div className="px-3 pb-2">

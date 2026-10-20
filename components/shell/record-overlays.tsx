@@ -17,6 +17,9 @@ import AccountLogo from "@/features/accounts/account-logo";
 import CreateAccountDialog from "@/features/accounts/create-account-dialog";
 import { StageTag } from "@/features/accounts/stage";
 import CreatePersonDialog from "@/features/people/create-person-dialog";
+import CreateLeadDialog from "@/features/leads/create-lead-dialog";
+import DealDialog from "@/features/deals/deal-dialog";
+import TaskDialog from "@/features/tasks/task-dialog";
 import Timeline from "@/features/timeline/timeline";
 import { personName } from "@/lib/domain/labels";
 import { useUiStore, type Peek } from "@/stores/ui-store";
@@ -39,6 +42,9 @@ export default function RecordOverlays() {
         accountId={create?.type === "person" ? create.accountId : undefined}
         onOpenChange={(open) => !open && setCreate(null)}
       />
+      <CreateLeadDialog />
+      <DealDialog />
+      <TaskDialog />
       <Sheet
         open={peek !== null}
         onOpenChange={(open) => !open && setPeek(null)}
