@@ -1,28 +1,29 @@
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
 import type { TagTone } from "@/components/_ui/tag";
+import type { BadgeTone } from "@/components/_common/status-badge";
 import type { Priority, TaskStatus } from "@/lib/domain/enums";
 import { cn } from "@/lib/utils";
+import BarChartIcon from "@/public/assets/icons/kanban/bar-chart-12.svg";
+import ClipboardCheckIcon from "@/public/assets/icons/kanban/clipboard-check.svg";
+import ContrastIcon from "@/public/assets/icons/kanban/contrast-02.svg";
+import ListIcon from "@/public/assets/icons/kanban/list.svg";
 
 export type TaskRow = FunctionReturnType<typeof api.tasks.list>[number];
 
 export const STATUS_TONE: Record<TaskStatus, TagTone> = {
   todo: "neutral",
-  in_progress: "amber",
+  in_progress: "blue",
   done: "green",
 };
 
-const TONE_TEXT: Record<TagTone, string> = {
-  blue: "text-(--tag-blue-text)",
-  purple: "text-(--tag-purple-text)",
-  green: "text-(--tag-green-text)",
-  moss: "text-(--tag-moss-text)",
-  red: "text-(--tag-red-text)",
-  orange: "text-(--tag-orange-text)",
-  amber: "text-(--tag-amber-text)",
-  teal: "text-(--tag-teal-text)",
-  yellow: "text-(--tag-yellow-text)",
-  neutral: "text-fg-tertiary",
+export const STATUS_BADGE: Record<
+  TaskStatus,
+  { icon: typeof ListIcon; tone: BadgeTone; text: string }
+> = {
+  todo: { icon: ListIcon, tone: "neutral", text: "text-fg-tertiary" },
+  in_progress: { icon: ContrastIcon, tone: "info", text: "text-info" },
+  done: { icon: ClipboardCheckIcon, tone: "success", text: "text-success" },
 };
 
 export function StatusIcon({
@@ -32,67 +33,17 @@ export function StatusIcon({
   status: TaskStatus;
   className?: string;
 }) {
+  const { icon: Icon, text } = STATUS_BADGE[status];
   return (
-    <svg
-      aria-hidden
-      viewBox="0 0 14 14"
-      fill="none"
-      className={cn(
-        "size-3.5 shrink-0",
-        TONE_TEXT[STATUS_TONE[status]],
-        className,
-      )}
-    >
-      {status === "todo" && (
-        <circle
-          cx="7"
-          cy="7"
-          r="5.6"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeDasharray="2.2 1.8"
-        />
-      )}
-      {status === "in_progress" && (
-        <>
-          <circle
-            cx="7"
-            cy="7"
-            r="5.6"
-            stroke="currentColor"
-            strokeWidth="1.4"
-          />
-          <path d="M7 3.5a3.5 3.5 0 0 1 0 7z" fill="currentColor" />
-        </>
-      )}
-      {status === "done" && (
-        <>
-          <circle cx="7" cy="7" r="6.3" fill="currentColor" />
-          <path
-            d="M4.4 7.2 6.2 9l3.4-3.6"
-            className="stroke-background"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </>
-      )}
-    </svg>
+    <Icon aria-hidden className={cn("size-3.5 shrink-0", text, className)} />
   );
 }
 
-const PRIORITY_BARS: Record<Priority, number> = {
-  urgent: 3,
-  high: 3,
-  normal: 2,
-  low: 1,
-};
-
 export const PRIORITY_TEXT: Record<Priority, string> = {
-  urgent: TONE_TEXT.red,
-  high: TONE_TEXT.orange,
-  normal: "text-fg-secondary",
-  low: "text-fg-tertiary",
+  urgent: "text-warning",
+  high: "text-(--tag-orange-text)",
+  normal: "text-info",
+  low: "text-success",
 };
 
 export function PriorityIcon({
@@ -102,44 +53,11 @@ export function PriorityIcon({
   priority: Priority;
   className?: string;
 }) {
-  if (priority === "urgent") {
-    return (
-      <svg
-        aria-hidden
-        viewBox="0 0 14 14"
-        className={cn("size-3.5 shrink-0", PRIORITY_TEXT.urgent, className)}
-      >
-        <rect x="1" y="1" width="12" height="12" rx="3" fill="currentColor" />
-        <path
-          d="M7 3.8v3.7"
-          className="stroke-background"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
-        <circle cx="7" cy="9.9" r="0.95" className="fill-background" />
-      </svg>
-    );
-  }
-  const filled = PRIORITY_BARS[priority];
   return (
-    <svg
+    <BarChartIcon
       aria-hidden
-      viewBox="0 0 14 14"
       className={cn("size-3.5 shrink-0", PRIORITY_TEXT[priority], className)}
-    >
-      {[0, 1, 2].map((bar) => (
-        <rect
-          key={bar}
-          x={1.5 + bar * 4}
-          y={8 - bar * 3}
-          width="3"
-          height={4.5 + bar * 3}
-          rx="1"
-          fill="currentColor"
-          opacity={bar < filled ? 1 : 0.25}
-        />
-      ))}
-    </svg>
+    />
   );
 }
 

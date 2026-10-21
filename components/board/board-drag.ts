@@ -4,6 +4,8 @@ export type Placement = {
   columnId: string;
   index: number;
   beforeId: string | null;
+  /** Dropped on a row of the hidden columns panel. */
+  hidden: boolean;
 };
 
 let lastDragEndedAt = 0;

@@ -14,14 +14,10 @@ export function Properties({
   className?: string;
 }) {
   return (
-    <section className={cn("flex min-w-0 flex-col gap-1.5", className)}>
+    <section className={cn("flex min-w-0 flex-col gap-2", className)}>
       {(title || action) && (
         <div className="flex h-6 items-center justify-between gap-2">
-          {title && (
-            <h2 className="caption-style text-fg-tertiary font-medium">
-              {title}
-            </h2>
-          )}
+          {title && <h2 className="eyebrow-style font-normal">{title}</h2>}
           {action}
         </div>
       )}

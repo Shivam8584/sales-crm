@@ -7,6 +7,7 @@ import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
+import CountBadge from "@/components/_ui/count-badge";
 import EmptyState from "@/components/_ui/empty-state";
 import {
   Popover,
@@ -14,10 +15,10 @@ import {
   PopoverTrigger,
 } from "@/components/_ui/popover";
 import Skeleton from "@/components/_ui/skeleton";
+import Tooltip from "@/components/_ui/tooltip";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
-import { useUiStore } from "@/stores/ui-store";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import BellIcon from "@/public/assets/icons/bell.svg";
 import { isUrgentKind, KindIcon } from "./kinds";
@@ -33,8 +34,8 @@ const TOAST_KINDS = new Set([
   "demo_booked",
 ]);
 
-// Shared by every mounted bell (desktop sidebar and the mobile drawer), so a
-// notification is toasted once however many bells are on screen.
+// Module-level so a notification is toasted once even when the bell remounts
+// with each page header.
 const seen = new Set<string>();
 let baselined = false;
 
@@ -58,23 +59,19 @@ function useArrivalToasts(items: Item[] | undefined) {
   }, [items]);
 }
 
-/** Unread notifications for the signed-in member, in the sidebar header. */
+/** Unread notifications for the signed-in member, in the page header. */
 export default function NotificationBell() {
   const router = useRouter();
   const items = useQuery(api.notifications.listMine);
   const unread = useQuery(api.notifications.unreadCount) ?? 0;
   const { markRead, markAllRead } = useNotificationActions();
-  const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
   const [open, setOpen] = useState(false);
   useArrivalToasts(items);
 
   function select(item: Item) {
     if (!item.read) void markRead({ id: item._id });
     setOpen(false);
-    if (item.href) {
-      setSidebarOpen(false);
-      router.push(item.href);
-    }
+    if (item.href) router.push(item.href);
   }
 
   const label = unread
@@ -83,39 +80,44 @@ export default function NotificationBell() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={label}
-          className="data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground -mr-1"
-        >
-          <BellIcon aria-hidden className="size-3.5" />
-          {unread > 0 && (
-            <span
-              aria-hidden
-              className="bg-primary text-primary-foreground ring-sidebar absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.75 text-[9px] leading-none font-semibold tabular-nums ring-2"
-            >
-              {unread > 9 ? "9+" : unread}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+      <Tooltip content="Notifications">
+        <PopoverTrigger asChild>
+          <Button
+            variant="secondary"
+            size="icon"
+            aria-label={label}
+            className="group data-[state=open]:bg-muted"
+          >
+            <BellIcon aria-hidden className="size-3.5" />
+            {unread > 0 && (
+              <span
+                aria-hidden
+                className="bg-danger ring-secondary group-hover:ring-muted group-data-[state=open]:ring-muted absolute top-1.75 right-1.75 size-1.5 rounded-full ring-2"
+              />
+            )}
+          </Button>
+        </PopoverTrigger>
+      </Tooltip>
       <PopoverContent
-        align="start"
-        className="flex w-[min(22.5rem,calc(100vw-2rem))] flex-col p-0"
+        align="end"
+        className="flex w-[min(25rem,calc(100vw-2rem))] flex-col p-0"
       >
-        <div className="border-line-strong flex h-11 shrink-0 items-center justify-between gap-2 border-b pr-2 pl-4">
-          <h2 className="lead-style font-medium">Notifications</h2>
-          {unread > 0 && (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => void markAllRead()}
-            >
-              Mark all read
-            </Button>
-          )}
+        <div className="border-line-strong flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4">
+          <span className="flex items-center gap-2">
+            <h2>Notifications</h2>
+            {unread > 0 && (
+              <CountBadge>{unread > 99 ? "99+" : unread}</CountBadge>
+            )}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={unread === 0}
+            onClick={() => void markAllRead()}
+            className="-mr-2.25"
+          >
+            Mark all as read
+          </Button>
         </div>
         <div className="scrollbar-none max-h-[min(28rem,70dvh)] overflow-y-auto">
           {items === undefined ? (
@@ -145,10 +147,7 @@ export default function NotificationBell() {
         </div>
         <Link
           href="/inbox"
-          onClick={() => {
-            setOpen(false);
-            setSidebarOpen(false);
-          }}
+          onClick={() => setOpen(false)}
           className="border-line-strong text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:bg-overlay-2 duration-fast caption-style flex h-10 shrink-0 items-center justify-center gap-1.5 border-t font-medium transition-colors outline-none"
         >
           View all in Inbox

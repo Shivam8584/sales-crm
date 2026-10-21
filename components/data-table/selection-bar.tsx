@@ -29,7 +29,7 @@ export default function SelectionBar({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.18, ease: [0.25, 1, 0.5, 1] }}
-          className="bg-popover border-line-strong shadow-overlay z-floating absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border py-1 pr-1 pl-4"
+          className="bg-popover border-line-strong shadow-overlay z-floating absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border py-1 pr-1 pl-4 [:has(>[data-slot=data-table][data-footer])>&]:bottom-24 sm:[:has(>[data-slot=data-table][data-footer])>&]:bottom-16"
         >
           <span className="caption-style text-foreground mr-2 whitespace-nowrap tabular-nums">
             {count} {count === 1 ? noun[0] : noun[1]} selected

@@ -1,25 +1,42 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
-import Kbd from "@/components/_ui/kbd";
 import { ScrollArea } from "@/components/_ui/scroll-area";
 import Tooltip from "@/components/_ui/tooltip";
-import { MOD_KEY } from "@/lib/keyboard";
+import { useViewer } from "@/hooks/use-viewer";
 import {
   toggleSidebarCollapsed,
   useSidebarCollapsed,
 } from "@/lib/sidebar-collapse";
+import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import Logo from "@/public/assets/images/_common/logo.svg";
-import SearchIcon from "@/public/assets/icons/search.svg";
 import SidebarIcon from "@/public/assets/icons/sidebar.svg";
-import NotificationBell from "@/features/notifications/notification-bell";
+import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
+import HelpIcon from "@/public/assets/icons/message-question.svg";
 import { NAV_SECTIONS, SETTINGS_ITEM, isActive } from "../navigation";
 import SidebarNavItem from "./sidebar-nav-item";
-import UserMenu from "./user-menu";
+import SidebarSection from "./sidebar-section";
+
+type CountKey = "accounts" | "leads" | "tasks" | "inbox";
+
+const COUNTS: Record<string, { key: CountKey; label: string; alert: boolean }> =
+  {
+    "/accounts": { key: "accounts", label: "accounts", alert: false },
+    "/leads": { key: "leads", label: "new", alert: true },
+    "/tasks": { key: "tasks", label: "overdue", alert: true },
+    "/inbox": { key: "inbox", label: "unread", alert: true },
+  };
+
+function localDay() {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
 
 /** Sidebar body shared by the desktop rail and the mobile drawer. */
 export default function SidebarContent({
@@ -28,94 +45,85 @@ export default function SidebarContent({
   variant?: "desktop" | "drawer";
 }) {
   const pathname = usePathname();
+  const viewer = useViewer();
   const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
-  const setCommandOpen = useUiStore((state) => state.setCommandOpen);
+  const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen);
   const collapsedState = useSidebarCollapsed();
   const collapsed = variant === "desktop" && collapsedState;
-  const unread = useQuery(api.notifications.unreadCount) ?? 0;
+  const counts = useQuery(api.shell.navCounts, { today: localDay() });
   const close = () => setSidebarOpen(false);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="collapsed:justify-center collapsed:px-0 flex h-13 shrink-0 items-center gap-2 pr-2.5 pl-4">
-        <Logo
-          aria-hidden
-          className="collapsed:hidden size-5.5 shrink-0 overflow-visible"
-        />
-        <span className="lead-style collapsed:hidden flex-1 truncate font-medium tracking-[-0.01em]">
-          Hypedrive
-        </span>
-        <span className="collapsed:hidden flex items-center">
-          <NotificationBell />
-        </span>
-        {variant === "desktop" && (
-          <Tooltip
-            content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            shortcut="["
-            side={collapsed ? "right" : "bottom"}
-          >
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-expanded={!collapsed}
+      <div className="border-sidebar-border bg-sidebar-accent collapsed:justify-center collapsed:px-2 flex h-14.5 shrink-0 items-center gap-2 border-b px-3">
+        {collapsed ? (
+          <Tooltip content="Expand sidebar" shortcut="[" side="right">
+            <button
+              type="button"
+              aria-label="Expand sidebar"
+              aria-expanded={false}
               onClick={toggleSidebarCollapsed}
+              className="group focus-visible:ring-ring hover:bg-overlay-2 relative flex size-8 items-center justify-center rounded-lg outline-none focus-visible:ring-2"
             >
-              <SidebarIcon aria-hidden className="size-3.5" />
-            </Button>
+              <Logo
+                aria-hidden
+                className="size-8 overflow-visible group-hover:opacity-0 group-focus-visible:opacity-0"
+              />
+              <SidebarIcon
+                aria-hidden
+                className="text-icon absolute size-3.5 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+              />
+            </button>
           </Tooltip>
+        ) : (
+          <>
+            <Link
+              href="/today"
+              onClick={close}
+              className="focus-visible:ring-ring -m-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg p-1 outline-none focus-visible:ring-2"
+            >
+              <Logo aria-hidden className="size-8 shrink-0 overflow-visible" />
+              <span className="flex min-w-0 flex-col gap-1">
+                <span className="lead-style block truncate font-medium tracking-[-0.01em]">
+                  Hypedrive
+                </span>
+                <span className="caption-style text-fg-tertiary block truncate">
+                  Brand pipeline
+                </span>
+              </span>
+            </Link>
+            {variant === "desktop" && (
+              <Tooltip content="Collapse sidebar" shortcut="[">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Collapse sidebar"
+                  aria-expanded
+                  onClick={toggleSidebarCollapsed}
+                  className="-mr-0.5"
+                >
+                  <SidebarIcon aria-hidden className="size-3.5" />
+                </Button>
+              </Tooltip>
+            )}
+          </>
         )}
       </div>
 
-      <div className="collapsed:flex collapsed:justify-center collapsed:px-2 px-3 pb-2">
-        <Tooltip
-          content="Search"
-          shortcut={`${MOD_KEY} K`}
-          side="right"
-          disabled={!collapsed}
-        >
-          <button
-            type="button"
-            aria-label={collapsed ? "Search" : undefined}
-            onClick={() => {
-              close();
-              setCommandOpen(true);
-            }}
-            className="border-border bg-overlay-1 text-fg-tertiary hover:text-fg-secondary hover:bg-overlay-2 focus-visible:ring-ring duration-fast collapsed:size-8 collapsed:justify-center collapsed:px-0 flex h-8 w-full items-center gap-2 rounded-md border px-2 text-sm leading-none transition-colors outline-none focus-visible:ring-2"
-          >
-            <SearchIcon aria-hidden className="size-3.5 shrink-0" />
-            <span className="collapsed:hidden flex-1 text-left">Search</span>
-            <span className="collapsed:hidden flex gap-0.5">
-              <Kbd>{MOD_KEY}</Kbd>
-              <Kbd>K</Kbd>
-            </span>
-          </button>
-        </Tooltip>
-      </div>
-
       <ScrollArea className="min-h-0 flex-1">
-        <nav
-          aria-label="Primary"
-          className="collapsed:items-center collapsed:gap-3 collapsed:px-2 flex flex-col gap-5 px-3 pt-2 pb-4"
-        >
+        <nav aria-label="Primary">
           {NAV_SECTIONS.map((section, index) => (
-            <div
+            <SidebarSection
               key={section.title ?? index}
-              className="collapsed:items-center flex flex-col gap-0.5"
-            >
-              {section.title && (
-                <>
-                  <h2 className="caption-style text-fg-tertiary collapsed:hidden flex h-6 items-center px-2 font-medium">
-                    {section.title}
-                  </h2>
-                  <span
-                    aria-hidden
-                    className="bg-border collapsed:block mb-2 hidden h-px w-5"
-                  />
-                </>
+              title={section.title}
+              className={cn(
+                index < NAV_SECTIONS.length - 1 &&
+                  "border-sidebar-border border-b",
               )}
-              <ul className="flex flex-col gap-0.5">
-                {section.items.map((item) => (
+            >
+              {section.items.map((item) => {
+                const count = COUNTS[item.href];
+                return (
                   <SidebarNavItem
                     key={item.href}
                     href={item.href}
@@ -124,49 +132,50 @@ export default function SidebarContent({
                     shortcut={item.shortcut}
                     collapsed={collapsed}
                     active={isActive(pathname, item.href)}
-                    onNavigate={close}
-                    badge={
-                      item.href === "/inbox" && unread > 0 ? (
-                        <UnreadBadge count={unread} />
-                      ) : undefined
-                    }
+                    onClick={close}
+                    count={count && counts ? counts[count.key] : undefined}
+                    countLabel={count?.label}
+                    alert={count?.alert}
                   />
-                ))}
-              </ul>
-            </div>
+                );
+              })}
+            </SidebarSection>
           ))}
         </nav>
       </ScrollArea>
 
-      <div className="border-sidebar-border collapsed:items-center collapsed:px-2 flex shrink-0 flex-col gap-1 border-t p-2">
-        <ul className="collapsed:px-0 px-1">
+      <SidebarSection className="border-sidebar-border shrink-0 border-t">
+        <SidebarNavItem
+          href={SETTINGS_ITEM.href}
+          icon={SETTINGS_ITEM.icon}
+          label={SETTINGS_ITEM.label}
+          shortcut={SETTINGS_ITEM.shortcut}
+          collapsed={collapsed}
+          active={isActive(pathname, SETTINGS_ITEM.href)}
+          onClick={close}
+          tone="quiet"
+        />
+        {viewer.role === "admin" && (
           <SidebarNavItem
-            href={SETTINGS_ITEM.href}
-            icon={SETTINGS_ITEM.icon}
-            label={SETTINGS_ITEM.label}
-            shortcut={SETTINGS_ITEM.shortcut}
+            href="/settings/team?invite=1"
+            icon={UserPlusIcon}
+            label="Invite teammates"
             collapsed={collapsed}
-            active={isActive(pathname, SETTINGS_ITEM.href)}
-            onNavigate={close}
+            onClick={close}
+            tone="quiet"
           />
-        </ul>
-        <UserMenu collapsed={collapsed} />
-      </div>
+        )}
+        <SidebarNavItem
+          icon={HelpIcon}
+          label="Help & shortcuts"
+          collapsed={collapsed}
+          onClick={() => {
+            close();
+            setShortcutsOpen(true);
+          }}
+          tone="quiet"
+        />
+      </SidebarSection>
     </div>
-  );
-}
-
-function UnreadBadge({ count }: { count: number }) {
-  return (
-    <>
-      <span className="caption-style text-fg-secondary collapsed:hidden tabular-nums">
-        {count > 99 ? "99+" : count}
-        <span className="sr-only"> unread</span>
-      </span>
-      <span
-        aria-hidden
-        className="bg-primary ring-sidebar collapsed:block absolute top-1 right-1 hidden size-1.5 rounded-full ring-2"
-      />
-    </>
   );
 }

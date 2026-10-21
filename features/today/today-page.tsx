@@ -415,7 +415,7 @@ export default function TodayPage() {
                   {section.items === undefined ? (
                     <SectionSkeleton />
                   ) : section.items.length > 0 ? (
-                    <ul className="border-border divide-border flex flex-col divide-y overflow-hidden rounded-xl border">
+                    <ul className="bg-card shadow-card divide-border flex flex-col divide-y overflow-hidden rounded-2xl">
                       {section.items.map(renderItem)}
                     </ul>
                   ) : (
@@ -431,7 +431,7 @@ export default function TodayPage() {
                       defaultDueDate={today}
                       label="New task due today"
                       onClose={() => setComposing(false)}
-                      className="border-border border shadow-none"
+                      className="bg-card shadow-card"
                     />
                   )}
                 </CockpitSection>
@@ -463,7 +463,7 @@ function FocusStat({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "bg-card shadow-card hover:bg-raised focus-visible:ring-ring duration-fast flex min-w-0 cursor-pointer flex-col gap-2.5 rounded-xl px-3.5 py-3 text-left transition-colors outline-none focus-visible:ring-2 max-sm:flex-row-reverse max-sm:items-center max-sm:justify-end max-sm:gap-2 max-sm:px-3 max-sm:py-2.5",
+        "bg-card shadow-card hover:bg-raised focus-visible:ring-ring duration-fast flex min-w-0 cursor-pointer flex-col gap-2.5 rounded-2xl px-3.5 py-3 text-left transition-colors outline-none focus-visible:ring-2 max-sm:flex-row-reverse max-sm:items-center max-sm:justify-end max-sm:gap-2 max-sm:px-3 max-sm:py-2.5",
         active && "ring-selected bg-raised ring-2",
       )}
     >
@@ -557,9 +557,9 @@ function CockpitSection({
 
 function SectionSkeleton() {
   return (
-    <div className="border-border divide-border flex flex-col divide-y rounded-xl border">
+    <div className="bg-card shadow-card divide-border flex flex-col divide-y rounded-2xl">
       {[0, 1].map((index) => (
-        <div key={index} className="flex h-12 items-center gap-3 px-3">
+        <div key={index} className="flex h-13 items-center gap-3 px-4">
           <Skeleton className="size-4 rounded-sm" />
           <Skeleton className="h-3 w-48" />
           <Skeleton className="ml-auto h-3 w-14" />

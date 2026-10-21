@@ -116,6 +116,13 @@ function optimisticMove(
   });
 }
 
+function optimisticPlace(
+  store: OptimisticLocalStore,
+  { id, status, position }: FunctionArgs<typeof api.tasks.place>,
+) {
+  rewrite(store, id, (row) => withStatus(row, status, position));
+}
+
 function optimisticRemove(
   store: OptimisticLocalStore,
   { id }: FunctionArgs<typeof api.tasks.remove>,
@@ -164,7 +171,11 @@ export function useTaskActions() {
     () => removeBase.withOptimisticUpdate(optimisticRemove),
     [removeBase],
   );
-  const placeTask = useMutation(api.tasks.place);
+  const placeBase = useMutation(api.tasks.place);
+  const placeTask = useMemo(
+    () => placeBase.withOptimisticUpdate(optimisticPlace),
+    [placeBase],
+  );
   const restoreTask = useMutation(api.tasks.restore);
 
   const update = useCallback(
@@ -243,8 +254,39 @@ export function useTaskActions() {
     [removeTask, restoreTask],
   );
 
+  /** Puts a column's tasks in the given order, with undo. */
+  const reorder = useCallback(
+    async (tasks: TaskRow[], ids: string[], label: string) => {
+      const byId = new Map(tasks.map((task) => [task._id as string, task]));
+      const ordered = ids.flatMap((id) => byId.get(id) ?? []);
+      const previous = ordered.map((task) => ({
+        id: task._id,
+        status: task.status,
+        position: task.position,
+      }));
+      const run = (
+        places: { id: Id<"tasks">; status: TaskStatus; position: number }[],
+      ) => Promise.all(places.map((place) => placeTask(place)));
+      try {
+        await run(
+          ordered.map((task, index) => ({
+            id: task._id,
+            status: task.status,
+            position: (index + 1) * GAP,
+          })),
+        );
+        toast(label, () => {
+          run(previous).catch(report);
+        });
+      } catch (error) {
+        report(error);
+      }
+    },
+    [placeTask],
+  );
+
   return useMemo(
-    () => ({ update, setDone, move, remove }),
-    [update, setDone, move, remove],
+    () => ({ update, setDone, move, remove, reorder }),
+    [update, setDone, move, remove, reorder],
   );
 }

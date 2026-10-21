@@ -5,22 +5,18 @@ import Link from "next/link";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
 import Avatar from "@/components/_ui/avatar";
-import { Checkbox } from "@/components/_ui/checkbox";
-import Tooltip from "@/components/_ui/tooltip";
 import AccountLogo from "@/features/accounts/account-logo";
 import { DealStageTag } from "@/features/deals/stage";
 import { DemoTag } from "@/features/leads/lead-meta";
 import SlaIndicator from "@/features/leads/sla";
 import { firstSentence, stuckFor } from "@/features/activation/stall";
-import { AutoTag, RecordChip } from "@/features/tasks/task-card";
-import { DueChip } from "@/features/tasks/task-chips";
+import { AutoTag, DoneToggle, RecordChip } from "@/features/tasks/task-card";
+import { DueChip, PriorityChip } from "@/features/tasks/task-chips";
 import {
-  PriorityIcon,
   dayFromToday,
   dayPhrase,
   type TaskRow,
 } from "@/features/tasks/task-meta";
-import { useTaskActions } from "@/features/tasks/use-task-actions";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
 import { formatMoney } from "@/lib/domain/money";
 import { cn } from "@/lib/utils";
@@ -49,7 +45,7 @@ function RowShell({ id, active, onHover, children }: RowShellProps) {
       data-today-row={id}
       data-cursor={active}
       onMouseMove={() => !active && onHover(id)}
-      className="group/card data-[cursor=true]:bg-row-hover hover:bg-row-hover duration-fast relative flex min-h-12 scroll-my-16 items-start gap-3 px-3 py-2.5 transition-colors sm:items-center"
+      className="group/card data-[cursor=true]:bg-overlay-2 hover:bg-overlay-1 duration-fast relative flex min-h-13 scroll-my-16 items-start gap-3 px-4 py-3 transition-colors sm:items-center"
     >
       {children}
     </li>
@@ -68,17 +64,11 @@ export function TaskItem({
   active: boolean;
   onHover: (id: string) => void;
 }) {
-  const { setDone } = useTaskActions();
   const setEdit = useUiStore((state) => state.setEdit);
   const done = task.status === "done";
   return (
     <RowShell id={task._id} active={active} onHover={onHover}>
-      <Checkbox
-        checked={done}
-        onCheckedChange={(checked) => void setDone(task, checked === true)}
-        aria-label={done ? `Reopen ${task.title}` : `Complete ${task.title}`}
-        className="z-sticky relative mt-px sm:mt-0"
-      />
+      <DoneToggle task={task} className="z-sticky relative mt-0.75 sm:mt-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
         <button
           type="button"
@@ -91,19 +81,10 @@ export function TaskItem({
         >
           {task.title}
         </button>
-        <div className="z-sticky relative flex min-w-0 items-center gap-2 sm:shrink-0">
+        <div className="z-sticky relative flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0 sm:flex-nowrap">
           {task.automated && <AutoTag />}
-          {(task.priority === "urgent" || task.priority === "high") && (
-            <Tooltip content={task.priority === "urgent" ? "Urgent" : "High"}>
-              <span
-                role="img"
-                aria-label={`${task.priority === "urgent" ? "Urgent" : "High"} priority`}
-              >
-                <PriorityIcon priority={task.priority} className="size-3" />
-              </span>
-            </Tooltip>
-          )}
           <RecordChip task={task} className="max-w-48" />
+          <PriorityChip task={task} />
           <DueChip task={task} hideEmpty />
         </div>
       </div>

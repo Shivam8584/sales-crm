@@ -1,14 +1,15 @@
 "use client";
 
-import { useId } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
+import { DetailSection } from "@/components/record/detail";
 import type { Channel } from "@/lib/domain/enums";
 import { dateTime, shortDate } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 const CHANNEL: Record<Channel, string> = {
   email: "Email",
@@ -19,20 +20,21 @@ const CHANNEL: Record<Channel, string> = {
 /** What the person agreed to be contacted on, with the exact wording they saw. */
 export default function ConsentRecords({
   personId,
+  className,
+  divider,
 }: {
   personId: Id<"people">;
+  className?: string;
+  divider?: boolean;
 }) {
   const consents = useQuery(api.people.consents, { personId });
-  const headingId = useId();
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-1">
-      <h2
-        id={headingId}
-        className="caption-style text-fg-tertiary mb-1.5 font-medium"
-      >
-        Consent
-      </h2>
+    <DetailSection
+      title="Consent"
+      className={cn("gap-2", className)}
+      divider={divider}
+    >
       {consents === undefined ? (
         <div aria-busy className="flex flex-col gap-2 py-1">
           <Skeleton className="h-3 w-40" />
@@ -74,6 +76,6 @@ export default function ConsentRecords({
           ))}
         </ul>
       )}
-    </section>
+    </DetailSection>
   );
 }

@@ -5,8 +5,6 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
-import { Input } from "@/components/_ui/input";
-import Kbd from "@/components/_ui/kbd";
 import type { Priority, TaskStatus } from "@/lib/domain/enums";
 import { TASK_STATUS_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
@@ -99,44 +97,40 @@ export default function TaskComposer({
       onSubmit={submit}
       onBlur={onBlur}
       aria-label={label}
-      className={cn(
-        "bg-card shadow-card flex flex-col gap-2 rounded-xl p-2",
-        className,
-      )}
+      className={cn("bg-card shadow-card flex flex-col rounded-2xl", className)}
     >
-      <Input
-        autoFocus
-        value={title}
-        maxLength={200}
-        onChange={(event) => {
-          setTitle(event.target.value);
-          setError(null);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            event.stopPropagation();
-            onClose();
-          }
-        }}
-        placeholder="What needs to happen?"
-        aria-label={label}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-        className="h-control-md aria-invalid:border-danger"
-      />
-      {error && (
-        <p id={errorId} role="alert" className="caption-style text-danger px-1">
-          {error}
-        </p>
-      )}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <DuePicker value={dueDate} onChange={setDueDate} />
-        <PriorityPicker value={priority} onChange={setPriority} />
-        <span className="caption-style text-fg-tertiary ml-auto flex items-center gap-1 max-sm:hidden">
-          <Kbd>Enter</Kbd> to add
-        </span>
-        <div className="flex items-center gap-1 max-sm:ml-auto">
+      <div className="flex flex-col gap-2 p-4">
+        <input
+          autoFocus
+          value={title}
+          maxLength={200}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            setError(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              onClose();
+            }
+          }}
+          placeholder="What needs to happen?"
+          aria-label={label}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className="lead-style placeholder:text-fg-tertiary min-w-0 bg-transparent leading-5 font-medium outline-none"
+        />
+        {error && (
+          <p id={errorId} role="alert" className="caption-style text-danger">
+            {error}
+          </p>
+        )}
+      </div>
+      <div className="border-border flex flex-wrap items-center gap-2 border-t px-4 py-3">
+        <PriorityPicker size="md" value={priority} onChange={setPriority} />
+        <DuePicker size="md" value={dueDate} onChange={setDueDate} />
+        <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="xs" onClick={onClose}>
             Cancel
           </Button>

@@ -1,32 +1,73 @@
-import type { ComponentType, ReactNode, SVGProps } from "react";
+import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
+import { buttonVariants } from "@/components/_ui/button";
+import CountBadge from "@/components/_ui/count-badge";
 import Tooltip from "@/components/_ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type SidebarNavItemProps = {
-  href: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   label: string;
-  active: boolean;
+  /** Renders a link when set, otherwise a button. */
+  href?: string;
+  onClick?: () => void;
+  active?: boolean;
   /** Key pressed after `G`, shown in the collapsed tooltip. */
   shortcut?: string;
   /** Tooltips only matter when the label is hidden. */
   collapsed?: boolean;
-  /** Small indicator after the label, e.g. an unread count. */
-  badge?: ReactNode;
-  onNavigate?: () => void;
+  count?: number;
+  /** Read after the count by screen readers, e.g. "unread". */
+  countLabel?: string;
+  /** Shows a dot on the collapsed icon while the count is above zero. */
+  alert?: boolean;
+  tone?: "default" | "quiet";
 };
 
 export default function SidebarNavItem({
-  href,
   icon: Icon,
   label,
-  active,
+  href,
+  onClick,
+  active = false,
   shortcut,
   collapsed = false,
-  badge,
-  onNavigate,
+  count,
+  countLabel,
+  alert = false,
+  tone = "default",
 }: SidebarNavItemProps) {
+  const showCount = count !== undefined && count > 0;
+  const className = cn(
+    buttonVariants({ variant: "nav", size: "md" }),
+    "group relative h-8 gap-1.5 py-0 font-normal",
+    "collapsed:size-8 collapsed:justify-center collapsed:gap-0 collapsed:px-0",
+    tone === "quiet" && "text-fg-tertiary",
+  );
+  const content = (
+    <>
+      <Icon
+        aria-hidden
+        className="text-fg-tertiary ease-power3-out group-hover:text-icon group-data-[active=true]:text-icon duration-fast size-3.5 shrink-0 transition-colors"
+      />
+      <span className="collapsed:sr-only min-w-0 flex-1 truncate text-left">
+        {label}
+      </span>
+      {showCount && (
+        <CountBadge className="collapsed:hidden">
+          {alert && count > 99 ? "99+" : count}
+          {countLabel && <span className="sr-only"> {countLabel}</span>}
+        </CountBadge>
+      )}
+      {showCount && alert && (
+        <span
+          aria-hidden
+          className="bg-danger ring-sidebar collapsed:block absolute top-1 right-1 hidden size-1.5 rounded-full ring-2"
+        />
+      )}
+    </>
+  );
+
   return (
     <li>
       <Tooltip
@@ -35,30 +76,26 @@ export default function SidebarNavItem({
         side="right"
         disabled={!collapsed}
       >
-        <Link
-          href={href}
-          onClick={onNavigate}
-          aria-current={active ? "page" : undefined}
-          aria-label={collapsed ? label : undefined}
-          className={cn(
-            "group text-sidebar-foreground hover:bg-overlay-2 hover:text-foreground focus-visible:ring-ring duration-fast ease-power3-out relative flex h-8 items-center gap-2.5 rounded-md px-2 text-sm leading-none transition-colors outline-none focus-visible:ring-2",
-            "collapsed:size-8 collapsed:justify-center collapsed:gap-0 collapsed:px-0",
-            active &&
-              "bg-sidebar-primary text-foreground shadow-raised hover:bg-sidebar-primary",
-          )}
-        >
-          <Icon
-            aria-hidden
-            className={cn(
-              "text-fg-tertiary group-hover:text-icon duration-fast size-3.5 shrink-0 transition-colors",
-              active && "text-icon",
-            )}
-          />
-          <span className="collapsed:sr-only min-w-0 flex-1 truncate">
-            {label}
-          </span>
-          {badge}
-        </Link>
+        {href ? (
+          <Link
+            href={href}
+            onClick={onClick}
+            data-active={active}
+            aria-current={active ? "page" : undefined}
+            className={className}
+          >
+            {content}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={onClick}
+            data-active={active}
+            className={className}
+          >
+            {content}
+          </button>
+        )}
       </Tooltip>
     </li>
   );

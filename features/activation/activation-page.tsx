@@ -13,6 +13,7 @@ import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
 import { StageTag } from "@/features/accounts/stage";
 import GroupedTable, { type RowGroup } from "@/features/tasks/grouped-table";
+import { chipClass } from "@/features/tasks/task-chips";
 import { PriorityIcon, StatusIcon } from "@/features/tasks/task-meta";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime } from "@/lib/time";
+import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
@@ -63,31 +65,30 @@ function TaskAction({ row }: { row: Row }) {
 
   if (!task) {
     return (
-      <Button
-        variant="ghost"
-        size="xs"
-        loading={busy}
-        className="-ml-2"
+      <button
+        type="button"
+        disabled={busy}
+        aria-busy={busy || undefined}
+        className={cn(chipClass(), "text-fg-tertiary disabled:opacity-60")}
         onClick={() => void create()}
       >
         <PlusIcon aria-hidden className="size-2.5" />
         Create task
-      </Button>
+      </button>
     );
   }
   return (
-    <Button
-      variant="ghost"
-      size="xs"
-      className="text-fg-secondary -ml-2 min-w-0"
+    <button
+      type="button"
+      className={cn(chipClass(), "max-w-full")}
       onClick={() => setEdit({ type: "task", id: task._id })}
       aria-label={`Open task for ${row.account.name}: ${TASK_STATUS_LABEL[task.status]}${task.assignee ? `, assigned to ${task.assignee.name}` : ""}`}
     >
-      <StatusIcon status={task.status} className="size-3" />
+      <StatusIcon status={task.status} />
       <span className="truncate">
         {task.status === "done" ? "Followed up" : "Open task"}
       </span>
-    </Button>
+    </button>
   );
 }
 

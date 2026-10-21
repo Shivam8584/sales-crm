@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import type { ComponentProps, ComponentType, SVGProps } from "react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 
@@ -115,14 +115,26 @@ function SheetFooter({ className, ...props }: ComponentProps<"div">) {
 
 function SheetTitle({
   className,
+  icon: Icon,
+  children,
   ...props
-}: ComponentProps<typeof SheetPrimitive.Title>) {
+}: ComponentProps<typeof SheetPrimitive.Title> & {
+  /** Leading icon, as in "🏢 Account details". */
+  icon?: ComponentType<SVGProps<SVGSVGElement>>;
+}) {
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn("lead-style", className)}
+      className={cn(
+        "lead-style min-w-0 truncate",
+        Icon && "flex items-center gap-2",
+        className,
+      )}
       {...props}
-    />
+    >
+      {Icon && <Icon aria-hidden className="text-icon size-3.5 shrink-0" />}
+      {children}
+    </SheetPrimitive.Title>
   );
 }
 

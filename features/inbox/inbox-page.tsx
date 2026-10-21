@@ -9,15 +9,14 @@ import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Kbd from "@/components/_ui/kbd";
-import SegmentedControl from "@/components/_ui/segmented-control";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
 import FilterMenu from "@/components/_common/filter-menu";
 import {
   Page,
-  PageActions,
   PageHeader,
   PageToolbar,
+  PageViews,
 } from "@/components/shell/page";
 import {
   isUrgentKind,
@@ -167,41 +166,30 @@ export default function InboxPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Inbox"
-        meta={
-          unread ? (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {unread > 99 ? "99+" : unread} unread
-            </span>
-          ) : null
-        }
-        actions={
-          <PageActions
-            primary={
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!unread}
-                onClick={() => void readAll()}
-              >
-                <CheckCircleIcon aria-hidden className="size-3" />
-                Mark all read
-              </Button>
-            }
-          />
-        }
+      <PageHeader title="Inbox" />
+      <PageViews
+        label="Show"
+        value={filter}
+        onChange={changeView}
+        views={[
+          { id: UNREAD, label: "Unread", count: unread },
+          { id: ALL, label: "All" },
+        ]}
       />
-      <PageToolbar>
-        <SegmentedControl
-          label="Show"
-          value={filter}
-          onChange={changeView}
-          segments={[
-            { value: UNREAD, label: "Unread" },
-            { value: ALL, label: "All" },
-          ]}
-        />
+      <PageToolbar
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!unread}
+            onClick={() => void readAll()}
+            className="h-control-md py-0"
+          >
+            <CheckCircleIcon aria-hidden className="size-3" />
+            Mark all as read
+          </Button>
+        }
+      >
         <FilterMenu
           label="Type"
           value={type}
@@ -214,7 +202,7 @@ export default function InboxPage() {
             })),
           ]}
         />
-        <span className="caption-style text-fg-tertiary ml-auto hidden items-center gap-1.5 md:flex">
+        <span className="caption-style text-fg-tertiary ml-auto hidden items-center gap-1.5 pr-2 lg:flex">
           <Kbd>J</Kbd>
           <Kbd>K</Kbd>
           to move

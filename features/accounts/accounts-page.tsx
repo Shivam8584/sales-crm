@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -9,10 +8,8 @@ import type { FunctionReturnType } from "convex/server";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
-import Tooltip from "@/components/_ui/tooltip";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
-import RowAction from "@/components/data-table/row-action";
 import SearchInput from "@/components/data-table/search-input";
 import SelectionBar from "@/components/data-table/selection-bar";
 import OptionPicker from "@/components/fields/option-picker";
@@ -22,12 +19,15 @@ import {
   type SortState,
 } from "@/components/data-table/types";
 import {
+  CreateButton,
+  ExportButton,
   Page,
   PageActions,
   PageHeader,
+  PageStatus,
   PageToolbar,
+  PageViews,
 } from "@/components/shell/page";
-import { formatTotals } from "@/features/deals/format";
 import LogCallDialog from "@/features/timeline/log-call-dialog";
 import type { TimelineTarget } from "@/features/timeline/kinds";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
@@ -35,83 +35,75 @@ import { useUrlState } from "@/hooks/use-url-state";
 import { downloadCsv } from "@/lib/csv";
 import { LIFECYCLE_STAGES, type LifecycleStage } from "@/lib/domain/enums";
 import { STAGE_LABEL } from "@/lib/domain/labels";
-import { CURRENCIES, formatMoney, type Money } from "@/lib/domain/money";
-import { ACTIVATION_STAGES } from "@/lib/domain/platform";
+import { formatMoney, toMajor, type Money } from "@/lib/domain/money";
 import { readError } from "@/lib/errors";
-import { dateTime, relativeTime } from "@/lib/time";
-import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
-import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import BuildingIcon from "@/public/assets/icons/building.svg";
-import EyeIcon from "@/public/assets/icons/eye.svg";
 import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import TrashIcon from "@/public/assets/icons/trash.svg";
 import AccountLogo from "./account-logo";
 import CsvImportDialog, { type ImportConfig } from "./csv-import-dialog";
-import { StageTag } from "./stage";
+import {
+  ActivationCell,
+  LastInteractionCell,
+  MoneyValue,
+  OwnerCell,
+  StageAndTags,
+  TrendCell,
+  activationPercent,
+  activationSteps,
+  dash,
+  interactionLabel,
+  rankTotals,
+} from "./record-cells";
 
 type Stats = FunctionReturnType<typeof api.accounts.listStats>[number];
 
-export type AccountRow = FunctionReturnType<
-  typeof api.accounts.list
->[number] & {
-  openDeals: number;
-  pipeline: Money[];
-  gstVerified: boolean;
-};
+export type AccountRow = FunctionReturnType<typeof api.accounts.list>[number] &
+  Omit<Stats, "accountId" | "pipeline"> & {
+    pipeline: Money[];
+    activation: number | null;
+  };
 
 const ALL = "all";
 const MINE = "mine";
-const DEFAULT_SORT: SortState = { id: "activity", dir: "desc" };
-const dash = <span className="text-fg-tertiary">—</span>;
+const DEFAULT_SORT: SortState = { id: "lastInteraction", dir: "desc" };
+const DAY = 24 * 60 * 60_000;
 
-/** Steps done on the activation path, or null when not on the platform. */
-function platformProgress(row: Pick<AccountRow, "linked" | "stage">) {
-  if (!row.linked) return null;
-  if (row.stage === "expanding") return ACTIVATION_STAGES.length;
-  return (
-    (ACTIVATION_STAGES as readonly string[]).indexOf(row.stage) + 1 || null
-  );
+const VIEWS = [
+  { id: "all", label: "All" },
+  { id: "mine", label: "My accounts" },
+  { id: "stuck", label: "Stuck" },
+  { id: "activated", label: "Activated" },
+  { id: "archived", label: "Archived" },
+] as const;
+type View = (typeof VIEWS)[number]["id"];
+
+function inView(row: AccountRow, view: View, viewerId: string) {
+  if (view === "archived") return row.archivedAt !== null;
+  if (row.archivedAt !== null) return false;
+  switch (view) {
+    case "mine":
+      return row.owner?._id === viewerId;
+    case "stuck":
+      return row.stuck;
+    case "activated":
+      return row.stage === "activated" || row.stage === "expanding";
+    default:
+      return true;
+  }
 }
 
-function pipelineValue(pipeline: Money[]) {
-  return pipeline.find((money) => money.currency === "INR")?.amount ?? 0;
-}
-
-function PlatformCell({ row }: { row: AccountRow }) {
-  if (!row.linked) return dash;
-  const done = platformProgress(row);
-  const total = ACTIVATION_STAGES.length;
-  return (
-    <Tooltip
-      content={done ? `${done} of ${total} activation steps` : "On Hypedrive"}
-    >
-      <span className="flex min-w-0 items-center gap-2">
-        <span aria-hidden className="flex gap-0.5">
-          {ACTIVATION_STAGES.map((stage, index) => (
-            <span
-              key={stage}
-              className={cn(
-                "h-2.5 w-1 rounded-full",
-                done && index < done ? "bg-success" : "bg-line-strong",
-              )}
-            />
-          ))}
-        </span>
-        <span className="text-fg-secondary truncate text-sm">
-          {done ? STAGE_LABEL[ACTIVATION_STAGES[done - 1]] : "Linked"}
-        </span>
-      </span>
-    </Tooltip>
-  );
-}
+const mainAmount = (row: AccountRow) =>
+  row.pipeline[0] ? toMajor(row.pipeline[0]) : null;
 
 const COLUMNS: Column<AccountRow>[] = [
   {
     id: "name",
     header: "Account",
-    width: "minmax(14rem,2fr)",
+    width: "minmax(9.5rem,1.3fr)",
     sortValue: (row) => row.name,
     cell: (row) => (
       <>
@@ -124,139 +116,90 @@ const COLUMNS: Column<AccountRow>[] = [
   },
   {
     id: "stage",
-    header: "Stage",
-    width: "minmax(8rem,1fr)",
+    header: "Stage & tags",
+    width: "minmax(12rem,1.2fr)",
     sortValue: (row) => LIFECYCLE_STAGES.indexOf(row.stage),
-    cell: (row) => <StageTag stage={row.stage} />,
+    cell: (row) => <StageAndTags stage={row.stage} tags={row.tags} />,
   },
   {
     id: "owner",
     header: "Owner",
     width: "minmax(9rem,1fr)",
+    minViewport: 900,
     sortValue: (row) => row.owner?.name ?? null,
-    cell: (row) =>
-      row.owner ? (
-        <span className="flex min-w-0 items-center gap-2">
-          <Avatar name={row.owner.name} />
-          <span className="truncate">{row.owner.name}</span>
-        </span>
-      ) : (
-        <span className="text-fg-tertiary">No owner</span>
-      ),
+    cell: (row) => <OwnerCell owner={row.owner} />,
   },
   {
     id: "deals",
     header: "Open deals",
-    width: "6.5rem",
+    width: "6.75rem",
     align: "end",
     defaultDir: "desc",
-    minViewport: 900,
+    minViewport: 1100,
     sortValue: (row) => row.openDeals,
-    cell: (row) => (row.openDeals ? <span>{row.openDeals}</span> : dash),
+    cell: (row) => (row.openDeals ? row.openDeals : dash),
   },
   {
     id: "pipeline",
-    header: "Pipeline",
-    width: "minmax(7rem,0.8fr)",
+    header: "Pipeline value",
+    width: "7.5rem",
     align: "end",
     defaultDir: "desc",
-    minViewport: 900,
-    sortValue: (row) => pipelineValue(row.pipeline),
-    cell: (row) => {
-      const total = formatTotals(row.pipeline, "");
-      if (!total) return dash;
-      return (
-        <Tooltip
-          content={row.pipeline
-            .filter((money) => money.amount > 0)
-            .sort(
-              (a, b) =>
-                CURRENCIES.indexOf(a.currency) - CURRENCIES.indexOf(b.currency),
-            )
-            .map((money) => formatMoney(money))
-            .join(" · ")}
-        >
-          <span className="truncate">{total}</span>
-        </Tooltip>
-      );
-    },
+    minViewport: 800,
+    sortValue: mainAmount,
+    cell: (row) => <MoneyValue totals={row.pipeline} />,
   },
   {
-    id: "platform",
-    header: "Platform",
+    id: "activation",
+    header: "Activation",
+    width: "7.5rem",
+    align: "end",
+    defaultDir: "desc",
+    minViewport: 1200,
+    sortValue: (row) => row.activation,
+    cell: (row) => <ActivationCell steps={row.activation} />,
+  },
+  {
+    id: "trend",
+    header: "Activity trend",
+    width: "7rem",
+    minViewport: 1400,
+    cell: (row) => <TrendCell values={row.trend} />,
+  },
+  {
+    id: "lastInteraction",
+    header: "Last interaction",
     width: "minmax(9rem,1fr)",
-    minViewport: 1180,
-    sortValue: (row) => (row.linked ? (platformProgress(row) ?? 0) : null),
     defaultDir: "desc",
-    cell: (row) => <PlatformCell row={row} />,
-  },
-  {
-    id: "gst",
-    header: "GST",
-    width: "4.5rem",
-    minViewport: 1180,
-    sortValue: (row) => (row.gstVerified ? 2 : row.gstin ? 1 : null),
-    defaultDir: "desc",
-    cell: (row) =>
-      row.gstVerified ? (
-        <Tooltip content={`Verified · ${row.gstin}`}>
-          <span
-            role="img"
-            aria-label="GSTIN verified"
-            className="bg-success/15 text-success flex size-5 items-center justify-center rounded-full"
-          >
-            <svg viewBox="0 0 12 12" fill="none" className="size-3">
-              <path
-                d="M3 6.25 5 8.25 9 4"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-        </Tooltip>
-      ) : row.gstin ? (
-        <Tooltip content={`Not verified yet · ${row.gstin}`}>
-          <span
-            role="img"
-            aria-label="GSTIN not verified"
-            className="border-line-strong flex size-5 items-center justify-center rounded-full border border-dashed"
-          />
-        </Tooltip>
-      ) : (
-        dash
-      ),
-  },
-  {
-    id: "people",
-    header: "People",
-    width: "5rem",
-    align: "end",
-    defaultDir: "desc",
-    minViewport: 1360,
-    sortValue: (row) => row.peopleCount,
-    cell: (row) => (row.peopleCount ? <span>{row.peopleCount}</span> : dash),
-  },
-  {
-    id: "activity",
-    header: "Last activity",
-    width: "8.5rem",
-    align: "end",
-    defaultDir: "desc",
-    sortValue: (row) => row.lastActivityAt,
-    cell: (row) =>
-      row.lastActivityAt ? (
-        <Tooltip content={dateTime(row.lastActivityAt)}>
-          <span className="text-fg-secondary">
-            {relativeTime(row.lastActivityAt)}
-          </span>
-        </Tooltip>
-      ) : (
-        dash
-      ),
+    minViewport: 1000,
+    sortValue: (row) => row.lastInteraction?.at ?? null,
+    cell: (row) => <LastInteractionCell last={row.lastInteraction} />,
   },
 ];
+
+const SORT_OPTIONS = [
+  { value: "lastInteraction", label: "Last interaction" },
+  { value: "pipeline", label: "Pipeline value" },
+  { value: "deals", label: "Open deals" },
+  { value: "activation", label: "Activation" },
+  { value: "name", label: "Name" },
+];
+const SORT_DIR: Record<string, "asc" | "desc"> = { name: "asc" };
+
+const ACTIVITY_OPTIONS = [
+  { value: ALL, label: "Any time" },
+  { value: "7", label: "7 days" },
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+  { value: "stale", label: "Over 30 days ago" },
+];
+
+function activeWithin(row: AccountRow, window: string, now: number) {
+  if (window === ALL) return true;
+  const at = row.lastActivityAt;
+  if (window === "stale") return !at || now - at > 30 * DAY;
+  return at !== null && now - at <= Number(window) * DAY;
+}
 
 function matches(row: AccountRow, query: string) {
   const text =
@@ -280,9 +223,11 @@ function exportRows(rows: AccountRow[]) {
       "Open deals",
       "Pipeline",
       "On platform",
+      "Activation",
       "GSTIN",
       "GST verified",
       "Tags",
+      "Last interaction",
       "Last activity",
     ],
     ...rows.map((row) => [
@@ -296,20 +241,23 @@ function exportRows(rows: AccountRow[]) {
         .filter((money) => money.amount > 0)
         .map((money) => formatMoney(money))
         .join(" + "),
-      row.linked ? "Yes" : "No",
+      row.onPlatform ? "Yes" : "No",
+      row.activation === null ? "" : `${activationPercent(row.activation)}%`,
       row.gstin ?? "",
       row.gstVerified ? "Yes" : "No",
       row.tags.join(", "),
+      row.lastInteraction
+        ? `${new Date(row.lastInteraction.at).toISOString()} ${interactionLabel(row.lastInteraction)}`
+        : "",
       row.lastActivityAt ? new Date(row.lastActivityAt).toISOString() : "",
     ]),
   ]);
 }
 
 export default function AccountsPage() {
-  const router = useRouter();
   const viewer = useViewer();
   const members = useMembers();
-  const accounts = useQuery(api.accounts.list, {});
+  const accounts = useQuery(api.accounts.list, { includeArchived: true });
   const stats = useQuery(api.accounts.listStats, {});
   const setOwner = useMutation(api.accounts.setOwner);
   const setArchived = useMutation(api.accounts.setArchived);
@@ -317,10 +265,11 @@ export default function AccountsPage() {
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
 
+  const [viewParam, setView] = useUrlState("view", "all");
   const [search, setSearch] = useUrlState("q", "");
   const [stage, setStage] = useUrlState("stage", ALL);
   const [owner, setOwnerFilter] = useUrlState("owner", ALL);
-  const [platform, setPlatform] = useUrlState("platform", ALL);
+  const [activity, setActivity] = useUrlState("activity", ALL);
   const [sortParam, setSortParam] = useUrlState(
     "sort",
     `${DEFAULT_SORT.id}:${DEFAULT_SORT.dir}`,
@@ -331,10 +280,28 @@ export default function AccountsPage() {
     target: TimelineTarget;
     name: string;
   } | null>(null);
+  const [now] = useState(() => Date.now());
+
+  const view: View = VIEWS.some((item) => item.id === viewParam)
+    ? (viewParam as View)
+    : "all";
+
+  async function toggleArchived(row: AccountRow) {
+    const archived = !row.archivedAt;
+    try {
+      await setArchived({ ids: [row._id], archived });
+      toast(
+        `${row.name} ${archived ? "archived" : "restored"}`,
+        () => void setArchived({ ids: [row._id], archived: !archived }),
+      );
+    } catch (error) {
+      toast(readError(error).message, { tone: "danger" });
+    }
+  }
 
   const [sortId, sortDir] = sortParam.split(":");
   const sort: SortState = {
-    id: COLUMNS.some((column) => column.id === sortId)
+    id: COLUMNS.some((column) => column.id === sortId && column.sortValue)
       ? sortId
       : DEFAULT_SORT.id,
     dir: sortDir === "asc" ? "asc" : "desc",
@@ -347,41 +314,74 @@ export default function AccountsPage() {
     );
     return accounts.map((account): AccountRow => {
       const item = byId.get(account._id);
+      const onPlatform = item?.onPlatform ?? false;
       return {
         ...account,
         openDeals: item?.openDeals ?? 0,
-        pipeline: item?.pipeline ?? [],
+        pipeline: rankTotals(item?.pipeline ?? []),
         gstVerified: item?.gstVerified ?? false,
+        onPlatform,
+        stuck: item?.stuck ?? false,
+        trend: item?.trend ?? [],
+        lastInteraction: item?.lastInteraction ?? null,
+        activation: activationSteps(onPlatform, account.stage),
       };
     });
   }, [accounts, stats]);
 
+  const counts = useMemo(() => {
+    if (!all || !stats) return undefined;
+    return Object.fromEntries(
+      VIEWS.map((item) => [
+        item.id,
+        all.filter((row) => inView(row, item.id, viewer._id)).length,
+      ]),
+    ) as Record<View, number>;
+  }, [all, stats, viewer._id]);
+
   const rows = useMemo(() => {
-    if (!all) return undefined;
+    if (!all || !stats) return undefined;
     return all.filter(
       (row) =>
+        inView(row, view, viewer._id) &&
         (stage === ALL || row.stage === stage) &&
         (owner === ALL ||
           (owner === MINE
             ? row.owner?._id === viewer._id
             : row.owner?._id === owner)) &&
-        (platform === ALL ||
-          (platform === "linked" ? row.linked : !row.linked)) &&
+        activeWithin(row, activity, now) &&
         (!search.trim() || matches(row, search)),
     );
-  }, [all, stage, owner, platform, search, viewer._id]);
+  }, [all, stats, view, stage, owner, activity, search, viewer._id, now]);
 
   const filtered =
-    stage !== ALL || owner !== ALL || platform !== ALL || search.trim() !== "";
+    stage !== ALL || owner !== ALL || activity !== ALL || search.trim() !== "";
   const selectedIds = [...selected].filter((id) =>
     rows?.some((row) => row._id === id),
   ) as Id<"accounts">[];
+
+  const totals = useMemo(() => {
+    if (!rows) return null;
+    const onPlatform = rows.filter((row) => row.activation !== null);
+    return {
+      pipeline: rankTotals(rows.flatMap((row) => row.pipeline)),
+      openDeals: rows.reduce((sum, row) => sum + row.openDeals, 0),
+      activation: onPlatform.length
+        ? Math.round(
+            onPlatform.reduce(
+              (sum, row) => sum + activationPercent(row.activation!),
+              0,
+            ) / onPlatform.length,
+          )
+        : null,
+    };
+  }, [rows]);
 
   function clearFilters() {
     setSearch("");
     setStage(ALL);
     setOwnerFilter(ALL);
-    setPlatform(ALL);
+    setActivity(ALL);
   }
 
   function exportView() {
@@ -474,31 +474,34 @@ export default function AccountsPage() {
     }
   }
 
-  async function archive() {
+  async function archiveSelected() {
     const ids = selectedIds;
+    const archived = view !== "archived";
     try {
-      await setArchived({ ids, archived: true });
+      await setArchived({ ids, archived });
       setSelected(new Set());
       toast(
-        `Archived ${ids.length} ${ids.length === 1 ? "account" : "accounts"}`,
-        () => {
-          void setArchived({ ids, archived: false });
-        },
+        `${archived ? "Archived" : "Restored"} ${ids.length} ${ids.length === 1 ? "account" : "accounts"}`,
+        () => void setArchived({ ids, archived: !archived }),
       );
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }
   }
 
+  const sortMenu = SORT_OPTIONS.some((option) => option.value === sort.id)
+    ? sort.id
+    : DEFAULT_SORT.id;
+
   return (
     <Page>
       <PageHeader
         title="Accounts"
         meta={
-          accounts && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {accounts.length}
-            </span>
+          counts && (
+            <PageStatus>
+              <span className="tabular-nums">{counts.all} active</span>
+            </PageStatus>
           )
         }
         actions={
@@ -506,42 +509,38 @@ export default function AccountsPage() {
             label="Account list actions"
             actions={[
               { label: "Import CSV", onSelect: () => setImporting(true) },
-              {
-                label: filtered ? "Export this view" : "Export CSV",
-                disabled: !rows?.length,
-                onSelect: exportView,
-              },
             ]}
-            primary={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setCreate({ type: "account" })}
-              >
-                <PlusIcon aria-hidden className="size-3" />
-                New account
-              </Button>
-            }
           />
         }
       />
-      <PageToolbar>
+      <PageViews
+        value={view}
+        onChange={(next) => {
+          setView(next);
+          setSelected(new Set());
+        }}
+        views={VIEWS.map((item) => ({ ...item, count: counts?.[item.id] }))}
+      />
+      <PageToolbar
+        actions={
+          <>
+            <ExportButton disabled={!rows?.length} onClick={exportView} />
+            <CreateButton onClick={() => setCreate({ type: "account" })}>
+              New account
+            </CreateButton>
+          </>
+        }
+      >
         <SearchInput
           value={search}
           onChange={setSearch}
           placeholder="Search accounts"
         />
         <FilterMenu
-          label="Stage"
-          value={stage}
-          onChange={setStage}
-          options={[
-            { value: ALL, label: "Any" },
-            ...LIFECYCLE_STAGES.map((value) => ({
-              value,
-              label: STAGE_LABEL[value as LifecycleStage],
-            })),
-          ]}
+          label="Sort by"
+          value={sortMenu}
+          options={SORT_OPTIONS}
+          onChange={(id) => setSortParam(`${id}:${SORT_DIR[id] ?? "desc"}`)}
         />
         <FilterMenu
           label="Owner"
@@ -556,24 +555,27 @@ export default function AccountsPage() {
           ]}
         />
         <FilterMenu
-          label="Platform"
-          value={platform}
-          onChange={setPlatform}
+          label="Stage"
+          value={stage}
+          onChange={setStage}
           options={[
             { value: ALL, label: "Any" },
-            { value: "linked", label: "On Hypedrive" },
-            { value: "unlinked", label: "Not on Hypedrive" },
+            ...LIFECYCLE_STAGES.map((value) => ({
+              value,
+              label: STAGE_LABEL[value as LifecycleStage],
+            })),
           ]}
+        />
+        <FilterMenu
+          label="Last activity"
+          value={activity}
+          onChange={setActivity}
+          options={ACTIVITY_OPTIONS}
         />
         {filtered && (
           <Button variant="ghost" size="xs" onClick={clearFilters}>
             Clear
           </Button>
-        )}
-        {rows && filtered && (
-          <span className="caption-style text-fg-tertiary ml-auto tabular-nums">
-            {rows.length} of {accounts?.length}
-          </span>
         )}
       </PageToolbar>
 
@@ -590,53 +592,41 @@ export default function AccountsPage() {
           selected={selected}
           onSelectedChange={setSelected}
           onPeek={(row) => setPeek({ type: "account", id: row._id })}
-          rowActions={(row) => (
-            <>
-              <RowAction
-                label="Log call"
-                icon={PhoneCallIcon}
-                onClick={() =>
-                  setCall({ target: { accountId: row._id }, name: row.name })
-                }
-              />
-              <RowAction
-                label="Peek"
-                shortcut="Space"
-                icon={EyeIcon}
-                onClick={() => setPeek({ type: "account", id: row._id })}
-              />
-              <RowAction
-                label="Open"
-                shortcut="↵"
-                icon={ArrowRightIcon}
-                onClick={() => router.push(`/accounts/${row._id}`)}
-              />
-            </>
-          )}
-          renderCard={(row) => (
-            <span className="flex items-center gap-3">
-              <AccountLogo account={row} size="md" />
-              <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <span className="lead-style truncate font-medium">
-                  {row.name}
-                </span>
-                <span className="caption-style text-fg-tertiary truncate">
-                  {[
-                    row.owner?.name ?? "No owner",
-                    row.openDeals
-                      ? `${row.openDeals} open · ${formatTotals(row.pipeline, "")}`
-                      : null,
-                    row.lastActivityAt
-                      ? relativeTime(row.lastActivityAt)
-                      : "No activity",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </span>
-              <StageTag stage={row.stage} />
-            </span>
-          )}
+          rowMenu={(row) => [
+            {
+              label: "Log call",
+              icon: PhoneCallIcon,
+              onSelect: () =>
+                setCall({ target: { accountId: row._id }, name: row.name }),
+            },
+            {
+              label: row.archivedAt ? "Restore" : "Archive",
+              icon: TrashIcon,
+              tone: row.archivedAt ? undefined : "danger",
+              onSelect: () => void toggleArchived(row),
+            },
+          ]}
+          footer={[
+            { label: "Accounts in view", value: rows?.length ?? 0 },
+            {
+              label: "Pipeline",
+              value: <MoneyValue totals={totals?.pipeline ?? []} compact />,
+            },
+            {
+              label: "Avg activation",
+              value:
+                totals?.activation == null ? (
+                  dash
+                ) : (
+                  <>
+                    {totals.activation}
+                    <span className="text-fg-tertiary">%</span>
+                  </>
+                ),
+            },
+            { label: "Open deals", value: totals?.openDeals ?? 0 },
+          ]}
+          renderCard={(row) => <AccountCard row={row} />}
           empty={
             filtered ? (
               <EmptyState
@@ -646,6 +636,21 @@ export default function AccountsPage() {
                 action={
                   <Button variant="secondary" size="sm" onClick={clearFilters}>
                     Clear filters
+                  </Button>
+                }
+              />
+            ) : view !== "all" ? (
+              <EmptyState
+                icon={BuildingIcon}
+                title={EMPTY_VIEW[view].title}
+                description={EMPTY_VIEW[view].description}
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setView("all")}
+                  >
+                    Show all accounts
                   </Button>
                 }
               />
@@ -696,8 +701,12 @@ export default function AccountsPage() {
           >
             Assign
           </OptionPicker>
-          <Button variant="ghost" size="xs" onClick={() => void archive()}>
-            Archive
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => void archiveSelected()}
+          >
+            {view === "archived" ? "Restore" : "Archive"}
           </Button>
         </SelectionBar>
       </div>
@@ -708,5 +717,57 @@ export default function AccountsPage() {
       />
       <LogCallDialog call={call} onClose={() => setCall(null)} />
     </Page>
+  );
+}
+
+const EMPTY_VIEW: Record<
+  Exclude<View, "all">,
+  { title: string; description: string }
+> = {
+  mine: {
+    title: "No accounts of yours yet",
+    description:
+      "Accounts you own show up here. Assign yourself from the list.",
+  },
+  stuck: {
+    title: "Nobody is stuck",
+    description:
+      "Brands that stall on a step of the Hypedrive activation path show up here.",
+  },
+  activated: {
+    title: "No activated brands yet",
+    description:
+      "Brands land here once their first enrollment is approved on Hypedrive.",
+  },
+  archived: {
+    title: "Nothing archived",
+    description: "Archived accounts stay here, ready to restore.",
+  },
+};
+
+function AccountCard({ row }: { row: AccountRow }) {
+  return (
+    <span className="flex flex-col gap-2.5">
+      <span className="flex items-center gap-3">
+        <AccountLogo account={row} size="md" />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="lead-style truncate font-medium">{row.name}</span>
+          <span className="caption-style text-fg-tertiary truncate">
+            {row.owner?.name ?? "No owner"}
+            {row.openDeals > 0 &&
+              ` · ${row.openDeals} open ${row.openDeals === 1 ? "deal" : "deals"}`}
+          </span>
+        </span>
+        <span className="lead-style shrink-0">
+          <MoneyValue totals={row.pipeline} compact />
+        </span>
+      </span>
+      <span className="caption-style flex items-center justify-between gap-3 pl-11">
+        <StageAndTags stage={row.stage} tags={row.tags} max={1} />
+        <span className="text-fg-secondary min-w-0">
+          <LastInteractionCell last={row.lastInteraction} />
+        </span>
+      </span>
+    </span>
   );
 }

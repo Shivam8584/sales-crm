@@ -235,6 +235,10 @@ export default function DesignSystemPage() {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Tag tone="blue">Medium</Tag>
+          <Tag tone="blue" size="sm">
+            Small
+          </Tag>
           <Tag tone="neutral" size="xs">
             Extra small
           </Tag>
@@ -264,12 +268,16 @@ export default function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="Kit · page header, list, record, board">
+      <Section title="Kit · shell, list, detail, record, board">
         <p className="text-fg-tertiary max-w-2xl">
-          PageHeader with one primary action and a PageActions overflow menu;
-          DataTable with sticky first column and hover rowActions; RecordTabs
-          with Properties; Board where a click peeks and ⌘/Ctrl-click or Enter
-          opens the page.
+          Sidebar with eyebrow sections, counts and quiet items. PageHeader with
+          a status pill, a &ldquo;…&rdquo; menu and round search, notifications
+          and account buttons; PageViews as underline tabs with counts;
+          PageToolbar with filters on the left and Export plus one primary
+          action on the right. DataTable with 42/34px rows, sticky header and
+          first column, a &ldquo;…&rdquo; row menu and a calculation footer.
+          Detail sections, big numbers, meters and stat tiles for peeks and
+          record sidebars.
         </p>
         <KitDemo />
       </Section>

@@ -41,6 +41,7 @@ import type * as platform from "../platform.js";
 import type * as reports from "../reports.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
+import type * as shell from "../shell.js";
 import type * as tasks from "../tasks.js";
 import type * as timeline from "../timeline.js";
 
@@ -84,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   reports: typeof reports;
   seed: typeof seed;
   settings: typeof settings;
+  shell: typeof shell;
   tasks: typeof tasks;
   timeline: typeof timeline;
 }>;

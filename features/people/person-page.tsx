@@ -13,13 +13,25 @@ import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
 import InlineText from "@/components/fields/inline-text";
 import TagsField from "@/components/fields/tags-field";
+import Tag, { tagVariants } from "@/components/_ui/tag";
+import { DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
 import RecordLayout, { RecordHeader } from "@/components/record/record-layout";
 import RecordTabs from "@/components/record/record-tabs";
 import { useCommandActions } from "@/components/shell/command-actions";
-import { Page, PageActions, PageHeader } from "@/components/shell/page";
+import {
+  Page,
+  PageActions,
+  PageHeader,
+  PageStatus,
+} from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
+import {
+  ASIDE_SECTION,
+  ActivityTrend,
+} from "@/features/accounts/account-insights";
 import AccountPicker from "@/features/accounts/account-picker";
+import { StageAndTags } from "@/features/accounts/record-cells";
 import {
   editRecordTitle,
   useTitleShortcut,
@@ -33,6 +45,7 @@ import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime, shortDate } from "@/lib/time";
+import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
@@ -179,11 +192,7 @@ function PersonView({ person }: { person: Person }) {
       <PageHeader
         crumbs={CRUMBS}
         title={name}
-        meta={
-          archived && (
-            <span className="caption-style text-warning">Archived</span>
-          )
-        }
+        meta={archived && <PageStatus tone="warning">Archived</PageStatus>}
         actions={
           <PageActions
             label="Person actions"
@@ -230,16 +239,30 @@ function PersonView({ person }: { person: Person }) {
             }
             subtitle={
               <>
-                {person.title && <span>{person.title}</span>}
-                {person.account && (
-                  <Link
-                    href={`/accounts/${person.account._id}`}
-                    className="hover:text-foreground focus-visible:ring-ring flex min-w-0 items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2"
-                  >
-                    <AccountLogo account={person.account} size="xs" />
-                    <span className="truncate">{person.account.name}</span>
-                  </Link>
-                )}
+                <span className="flex min-w-0 flex-wrap items-center gap-0.75">
+                  {person.title && (
+                    <Tag tone="neutral" size="sm">
+                      {person.title}
+                    </Tag>
+                  )}
+                  {person.account && (
+                    <Link
+                      href={`/accounts/${person.account._id}`}
+                      className={cn(
+                        tagVariants({ tone: "neutral", size: "sm" }),
+                        "hover:text-foreground focus-visible:ring-ring min-w-0 gap-1 pl-0.5 outline-none focus-visible:ring-2",
+                      )}
+                    >
+                      <AccountLogo
+                        account={person.account}
+                        size="xs"
+                        className="size-4"
+                      />
+                      <span className="truncate">{person.account.name}</span>
+                    </Link>
+                  )}
+                  <StageAndTags tags={person.tags} max={4} />
+                </span>
                 {person.owner && (
                   <span className="flex min-w-0 items-center gap-1.5">
                     <Avatar name={person.owner.name} size="xs" />
@@ -252,117 +275,137 @@ function PersonView({ person }: { person: Person }) {
         }
         aside={
           <>
-            <Properties title="Details">
-              <Property label="First name">
-                <InlineText
-                  value={person.firstName}
-                  label="First name"
-                  onSave={(firstName) => save({ firstName }, "First name")}
-                />
-              </Property>
-              <Property label="Last name">
-                <InlineText
-                  value={person.lastName || null}
-                  label="Last name"
-                  placeholder="Add last name"
-                  onSave={(lastName) => save({ lastName }, "Last name")}
-                />
-              </Property>
-              <Property label="Title">
-                <InlineText
-                  value={person.title}
-                  label="Title"
-                  placeholder="Add title"
-                  onSave={(title) => save({ title: title || null }, "Title")}
-                />
-              </Property>
-              <Property label="Account">
-                <AccountPicker
-                  value={person.account?._id ?? null}
-                  currentName={person.account?.name}
-                  onChange={(accountId) =>
-                    void save(
-                      { accountId: (accountId as Id<"accounts">) ?? null },
-                      "Account",
-                    )
-                  }
-                />
-              </Property>
-              <Property label="Owner">
-                <MemberPicker
-                  value={person.owner?._id ?? null}
-                  currentName={person.owner?.name}
-                  onChange={(ownerId) =>
-                    void save({ ownerId: ownerId as Id<"members"> }, "Owner")
-                  }
-                />
-              </Property>
-              <Property label="Tags">
-                <TagsField
-                  value={person.tags}
-                  label="Tags"
-                  onChange={(tags) => void save({ tags }, "Tags")}
-                />
-              </Property>
-            </Properties>
-            <Properties title="Contact">
-              <ContactActions person={person} className="mb-2" />
-              <Property label="Email">
-                <InlineText
-                  value={person.email}
-                  type="email"
-                  label="Email"
-                  placeholder="Add email"
-                  onSave={(email) => save({ email: email || null }, "Email")}
-                />
-              </Property>
-              <Property label="Phone">
-                <InlineText
-                  value={person.phone}
-                  type="tel"
-                  label="Phone"
-                  placeholder="Add phone"
-                  display={formatPhone}
-                  onSave={(phone) => save({ phone: phone || null }, "Phone")}
-                />
-              </Property>
-              <Property label="LinkedIn">
-                <InlineText
-                  value={person.linkedinUrl}
-                  type="url"
-                  label="LinkedIn"
-                  placeholder="Add profile"
-                  display={(url) =>
-                    url.replace(/^https:\/\/www\.linkedin\.com/, "")
-                  }
-                  onSave={(linkedinUrl) =>
-                    save({ linkedinUrl: linkedinUrl || null }, "LinkedIn")
-                  }
-                />
-              </Property>
-            </Properties>
-            <ConsentRecords personId={person._id} />
-            <DinLookup personId={person._id} />
-            <Properties title="Activity">
-              <Property label="Last activity">
-                {person.lastActivityAt ? (
-                  <Tooltip content={dateTime(person.lastActivityAt)}>
+            <DetailSection
+              title="Contact"
+              className={cn(ASIDE_SECTION, "gap-2")}
+            >
+              <ContactActions person={person} className="mb-1" />
+              <Properties>
+                <Property label="Email">
+                  <InlineText
+                    value={person.email}
+                    type="email"
+                    label="Email"
+                    placeholder="Add email"
+                    onSave={(email) => save({ email: email || null }, "Email")}
+                  />
+                </Property>
+                <Property label="Phone">
+                  <InlineText
+                    value={person.phone}
+                    type="tel"
+                    label="Phone"
+                    placeholder="Add phone"
+                    display={formatPhone}
+                    onSave={(phone) => save({ phone: phone || null }, "Phone")}
+                  />
+                </Property>
+                <Property label="LinkedIn">
+                  <InlineText
+                    value={person.linkedinUrl}
+                    type="url"
+                    label="LinkedIn"
+                    placeholder="Add profile"
+                    display={(url) =>
+                      url.replace(/^https:\/\/www\.linkedin\.com/, "")
+                    }
+                    onSave={(linkedinUrl) =>
+                      save({ linkedinUrl: linkedinUrl || null }, "LinkedIn")
+                    }
+                  />
+                </Property>
+              </Properties>
+            </DetailSection>
+            <ActivityTrend
+              target={{ personId: person._id }}
+              className={ASIDE_SECTION}
+            />
+            <DetailSection
+              title="Details"
+              className={cn(ASIDE_SECTION, "gap-2")}
+            >
+              <Properties>
+                <Property label="First name">
+                  <InlineText
+                    value={person.firstName}
+                    label="First name"
+                    onSave={(firstName) => save({ firstName }, "First name")}
+                  />
+                </Property>
+                <Property label="Last name">
+                  <InlineText
+                    value={person.lastName || null}
+                    label="Last name"
+                    placeholder="Add last name"
+                    onSave={(lastName) => save({ lastName }, "Last name")}
+                  />
+                </Property>
+                <Property label="Title">
+                  <InlineText
+                    value={person.title}
+                    label="Title"
+                    placeholder="Add title"
+                    onSave={(title) => save({ title: title || null }, "Title")}
+                  />
+                </Property>
+                <Property label="Account">
+                  <AccountPicker
+                    value={person.account?._id ?? null}
+                    currentName={person.account?.name}
+                    onChange={(accountId) =>
+                      void save(
+                        { accountId: (accountId as Id<"accounts">) ?? null },
+                        "Account",
+                      )
+                    }
+                  />
+                </Property>
+                <Property label="Owner">
+                  <MemberPicker
+                    value={person.owner?._id ?? null}
+                    currentName={person.owner?.name}
+                    onChange={(ownerId) =>
+                      void save({ ownerId: ownerId as Id<"members"> }, "Owner")
+                    }
+                  />
+                </Property>
+                <Property label="Tags">
+                  <TagsField
+                    value={person.tags}
+                    label="Tags"
+                    onChange={(tags) => void save({ tags }, "Tags")}
+                  />
+                </Property>
+              </Properties>
+            </DetailSection>
+            <ConsentRecords personId={person._id} className={ASIDE_SECTION} />
+            <DinLookup personId={person._id} className={ASIDE_SECTION} />
+            <DetailSection
+              title="Record"
+              className={cn(ASIDE_SECTION, "gap-2")}
+              divider={false}
+            >
+              <Properties>
+                <Property label="Last activity">
+                  {person.lastActivityAt ? (
+                    <Tooltip content={dateTime(person.lastActivityAt)}>
+                      <span className="text-sm">
+                        {relativeTime(person.lastActivityAt)}
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <span className="text-fg-tertiary text-sm">None yet</span>
+                  )}
+                </Property>
+                <Property label="Added">
+                  <Tooltip content={dateTime(person._creationTime)}>
                     <span className="text-sm">
-                      {relativeTime(person.lastActivityAt)}
+                      {shortDate(person._creationTime)}
                     </span>
                   </Tooltip>
-                ) : (
-                  <span className="text-fg-tertiary text-sm">None yet</span>
-                )}
-              </Property>
-              <Property label="Added">
-                <Tooltip content={dateTime(person._creationTime)}>
-                  <span className="text-sm">
-                    {shortDate(person._creationTime)}
-                  </span>
-                </Tooltip>
-              </Property>
-            </Properties>
+                </Property>
+              </Properties>
+            </DetailSection>
           </>
         }
       >

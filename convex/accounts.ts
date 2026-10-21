@@ -6,6 +6,7 @@ import { STAGE_LABEL } from "../lib/domain/labels";
 import { checkGstin, panRoot } from "../lib/domain/gstin";
 import { cleanTags, normalizeDomain } from "../lib/domain/normalize";
 import { sumMoney, type Money } from "../lib/domain/money";
+import { accountStall, isOnPlatform } from "./lib/activation";
 import { sourceFamily } from "./lib/enrichment";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
@@ -22,6 +23,7 @@ import {
 } from "./lib/records";
 import { diff, logChanges, logSystem } from "./lib/timeline";
 import { vLifecycleStage } from "./lib/validators";
+import { bucketCounts, isInteraction, windowStart } from "./timeline";
 
 const editable = {
   name: v.optional(v.string()),
@@ -140,57 +142,87 @@ export const list = memberQuery({
   },
 });
 
+const TREND_DAYS = 14;
+
 /**
- * Per-account rollups for the list: open deals, open pipeline per currency and
- * whether the GSTIN on record matches a registry lookup. Kept apart from
- * `list` so deal and fact churn doesn't re-run the main list query.
+ * Per-account rollups for the list: open deals and pipeline per currency,
+ * GSTIN verification, timeline entries per day for the last two weeks, the
+ * latest logged interaction and whether onboarding is stuck. Kept apart from
+ * `list` so deal, fact and timeline churn doesn't re-run the main list query.
  */
 export const listStats = memberQuery({
   args: {},
   handler: async (ctx) => {
+    const now = Date.now();
+    const since = windowStart(TREND_DAYS, now);
     const [accounts, deals] = await Promise.all([
       ctx.db.query("accounts").collect(),
       ctx.db.query("deals").collect(),
     ]);
-    const stats = new Map<
-      Id<"accounts">,
-      { openDeals: number; pipeline: Money[]; gstVerified: boolean }
-    >();
-    const entry = (id: Id<"accounts">) => {
-      let value = stats.get(id);
-      if (!value) {
-        value = { openDeals: 0, pipeline: [], gstVerified: false };
-        stats.set(id, value);
-      }
-      return value;
-    };
+    const open = new Map<Id<"accounts">, Money[]>();
     for (const deal of deals) {
       if (deal.stage === "won" || deal.stage === "lost") continue;
-      const value = entry(deal.accountId);
-      value.openDeals += 1;
-      value.pipeline.push(deal.amount);
+      open.set(deal.accountId, [
+        ...(open.get(deal.accountId) ?? []),
+        deal.amount,
+      ]);
     }
-    for (const account of accounts) {
-      const gstin = account.gstin;
-      if (!gstin || account.archivedAt) continue;
-      const facts = await ctx.db
-        .query("facts")
-        .withIndex("by_account", (q) => q.eq("accountId", account._id))
-        .collect();
-      entry(account._id).gstVerified = facts.some(
-        (fact) =>
-          fact.field === "gstin" &&
-          fact.value === gstin &&
-          (fact.status === "applied" || fact.status === "accepted") &&
-          sourceFamily(fact.source) === "gst",
-      );
-    }
-    return [...stats].map(([accountId, value]) => ({
-      accountId,
-      openDeals: value.openDeals,
-      pipeline: sumMoney(value.pipeline),
-      gstVerified: value.gstVerified,
-    }));
+    return await Promise.all(
+      accounts.map(async (account) => {
+        const amounts = open.get(account._id) ?? [];
+        const recent = await ctx.db
+          .query("timeline")
+          .withIndex("by_account", (q) =>
+            q.eq("accountId", account._id).gte("occurredAt", since),
+          )
+          .collect();
+        let last: Doc<"timeline"> | null = null;
+        for await (const entry of ctx.db
+          .query("timeline")
+          .withIndex("by_account", (q) => q.eq("accountId", account._id))
+          .order("desc")) {
+          if (isInteraction(entry.kind)) {
+            last = entry;
+            break;
+          }
+        }
+        const gstin = account.gstin;
+        let gstVerified = false;
+        if (gstin && !account.archivedAt) {
+          const facts = await ctx.db
+            .query("facts")
+            .withIndex("by_account", (q) => q.eq("accountId", account._id))
+            .collect();
+          gstVerified = facts.some(
+            (fact) =>
+              fact.field === "gstin" &&
+              fact.value === gstin &&
+              (fact.status === "applied" || fact.status === "accepted") &&
+              sourceFamily(fact.source) === "gst",
+          );
+        }
+        return {
+          accountId: account._id,
+          openDeals: amounts.length,
+          pipeline: sumMoney(amounts),
+          gstVerified,
+          onPlatform: isOnPlatform(account),
+          stuck: Boolean(await accountStall(ctx, account, now)),
+          trend: bucketCounts(
+            recent.map((entry) => entry.occurredAt),
+            TREND_DAYS,
+            now,
+          ),
+          lastInteraction: last
+            ? {
+                at: last.occurredAt,
+                kind: last.kind,
+                subject: last.subject ?? null,
+              }
+            : null,
+        };
+      }),
+    );
   },
 });
 
@@ -200,11 +232,14 @@ export const get = memberQuery({
     const account = await ctx.db.get(id);
     if (!account) return null;
     const members = await memberIndex(ctx);
+    const owner = members.get(account.ownerId);
     return {
       ...account,
       domain: account.domain ?? null,
       gstin: account.gstin ?? null,
-      owner: memberRef(members, account.ownerId),
+      owner: owner
+        ? { _id: owner._id, name: owner.name, email: owner.email }
+        : null,
     };
   },
 });

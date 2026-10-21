@@ -136,7 +136,7 @@ export default function Timeline({
         <ol className="flex flex-col gap-5" aria-busy>
           {Array.from({ length: 3 }, (_, index) => (
             <li key={index} className="flex gap-3">
-              <Skeleton className="size-6 rounded-full" />
+              <Skeleton className="size-7 rounded-lg" />
               <span className="flex flex-1 flex-col gap-2 pt-1">
                 <Skeleton className="h-3 w-40" />
                 <Skeleton className="h-3 w-64" />
@@ -163,11 +163,11 @@ export default function Timeline({
         <div className="flex flex-col gap-4">
           {groups.map((group) => (
             <section key={group.key} aria-label={group.label}>
-              <h3 className="caption-style text-fg-tertiary bg-background sticky top-0 z-1 flex items-center gap-3 py-1.5 font-medium">
+              <h3 className="eyebrow-style text-fg-secondary bg-background sticky top-0 z-1 flex items-center gap-3 py-2">
                 {group.label}
-                <span aria-hidden className="bg-border h-px flex-1" />
+                <span aria-hidden className="bg-line-strong h-px flex-1" />
               </h3>
-              <ol className="flex flex-col pt-2">
+              <ol className="flex flex-col pt-3">
                 {group.entries.map((entry, index) => (
                   <TimelineItem
                     key={entry._id}
@@ -191,8 +191,8 @@ function Rail({ last, compact }: { last: boolean; compact: boolean }) {
     <span
       aria-hidden
       className={cn(
-        "bg-border absolute bottom-0 left-3 w-px -translate-x-1/2",
-        compact ? "top-5" : "top-7",
+        "bg-line-strong absolute bottom-0.5 left-3.5 w-px -translate-x-1/2",
+        compact ? "top-6.5" : "top-8.5",
       )}
     />
   );
@@ -235,11 +235,13 @@ function AutomaticItem({ entry, last }: { entry: Entry; last: boolean }) {
   return (
     <li className="relative flex gap-3 pb-3.5">
       <Rail last={last} compact />
-      <span className="text-fg-tertiary bg-background flex h-5 w-6 shrink-0 items-center justify-center">
-        <meta.icon aria-hidden className="size-3" />
+      <span className="flex w-7 shrink-0 justify-center">
+        <span className="bg-overlay-2 text-fg-tertiary flex size-5.5 items-center justify-center rounded-md">
+          <meta.icon aria-hidden className="size-3" />
+        </span>
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="caption-style flex min-h-5 items-baseline gap-2 leading-5">
+        <div className="caption-style flex min-h-5.5 items-baseline gap-2 pt-0.5 leading-5">
           <p className="text-fg-secondary min-w-0 flex-1">
             <span className="text-foreground font-medium">{actorName}</span>{" "}
             {entry.kind === "system" ? (
@@ -382,10 +384,10 @@ function LoggedItem({
   return (
     <li className="group/item relative flex gap-3 pb-5">
       <Rail last={last} compact={false} />
-      <span className="bg-raised shadow-hairline text-fg-secondary flex size-6 shrink-0 items-center justify-center rounded-full">
-        <meta.icon aria-hidden className="size-3" />
+      <span className="bg-card shadow-card text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg">
+        <meta.icon aria-hidden className="size-3.5" />
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
         <div className="flex min-h-5 items-baseline gap-2 text-sm leading-5">
           <p className="text-fg-secondary min-w-0 flex-1">
             <span className="text-foreground font-medium">{actorName}</span>{" "}
@@ -480,7 +482,7 @@ function LoggedItem({
           </div>
         ) : (
           entry.body && (
-            <p className="bg-card border-border rounded-lg border px-3 py-2.5 text-sm leading-relaxed break-words whitespace-pre-wrap">
+            <p className="bg-card shadow-card text-fg-secondary rounded-lg px-4 py-3 text-sm leading-relaxed break-words whitespace-pre-wrap">
               {entry.body}
             </p>
           )

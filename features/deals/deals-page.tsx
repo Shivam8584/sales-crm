@@ -10,7 +10,12 @@ import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
 import FilterMenu from "@/components/_common/filter-menu";
-import Board, { type BoardColumnDef } from "@/components/board/board";
+import Board, {
+  type BoardColumnDef,
+  type BoardSort,
+} from "@/components/board/board";
+import { useBoardPrefs } from "@/components/board/board-prefs";
+import { HiddenColumnsToggle } from "@/components/board/hidden-columns";
 import DataTable from "@/components/data-table/data-table";
 import RowAction from "@/components/data-table/row-action";
 import SearchInput from "@/components/data-table/search-input";
@@ -24,16 +29,18 @@ import { DEAL_STAGES, type DealStage } from "@/lib/domain/enums";
 import { DEAL_STAGE_LABEL } from "@/lib/domain/labels";
 import { DEFAULT_CURRENCY, formatMoney } from "@/lib/domain/money";
 import { cn } from "@/lib/utils";
+import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import EyeIcon from "@/public/assets/icons/eye.svg";
 import FilterIcon from "@/public/assets/icons/filter.svg";
+import ListIcon from "@/public/assets/icons/list.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import DealCard from "./deal-card";
 import DealQuickAdd from "./deal-quick-add";
 import { formatDay, formatTotals, today as todayDay } from "./format";
 import LostReasonDialog from "./lost-reason-dialog";
-import { DEAL_STAGE_TONE, DealStageTag, isOpenStage } from "./stage";
+import { DEAL_STAGE_BADGE, DealStageTag, isOpenStage } from "./stage";
 import { positionBefore, useMoveDeal, type DealRow } from "./use-deal-actions";
 
 const ZERO = formatMoney({ amount: 0, currency: DEFAULT_CURRENCY });
@@ -46,17 +53,31 @@ const LIST = "list";
 const CLOSE_MONTH = "month";
 const CLOSE_OVERDUE = "overdue";
 const CLOSE_NONE = "none";
-const DRAFT_PREFIX = "new:";
 const DEFAULT_SORT: SortState = { id: "close", dir: "asc" };
 
 type BoardDeal = DealRow & { id: string };
-type BoardItem = BoardDeal | { id: string; draft: DealStage };
 type PendingLost = { deal: DealRow; position: number };
 
-const isDraft = (item: BoardItem): item is { id: string; draft: DealStage } =>
-  "draft" in item;
-const stageOf = (item: BoardItem) => (isDraft(item) ? item.draft : item.stage);
-const labelOf = (item: BoardItem) => (isDraft(item) ? "New deal" : item.title);
+const stageOf = (item: BoardDeal) => item.stage;
+const labelOf = (item: BoardDeal) => item.title;
+
+const SORTS: BoardSort<BoardDeal>[] = [
+  {
+    id: "amount",
+    label: "amount",
+    compare: (a, b) =>
+      a.amount.currency.localeCompare(b.amount.currency) ||
+      b.amount.amount - a.amount.amount ||
+      a.position - b.position,
+  },
+  {
+    id: "close",
+    label: "close date",
+    compare: (a, b) =>
+      (a.closeDate ?? "9999").localeCompare(b.closeDate ?? "9999") ||
+      a.position - b.position,
+  },
+];
 
 function matches(deal: DealRow, query: string) {
   const text =
@@ -91,6 +112,7 @@ export default function DealsPage() {
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
   const moveDeal = useMoveDeal();
+  const boardPrefs = useBoardPrefs("deals");
 
   const [search, setSearch] = useState("");
   const [view, setView] = useUrlState("view", BOARD);
@@ -133,50 +155,43 @@ export default function DealsPage() {
     [closed],
   );
 
-  const items = useMemo<BoardItem[]>(() => {
-    const placed: BoardItem[] = visible
-      .map((deal) =>
-        pending && deal._id === pending.deal._id
-          ? { ...deal, stage: "lost" as const, position: pending.position }
-          : deal,
-      )
-      .sort((a, b) => a.position - b.position)
-      .map((deal) => ({ ...deal, id: deal._id }));
-    return drafting
-      ? [{ id: `${DRAFT_PREFIX}${drafting}`, draft: drafting }, ...placed]
-      : placed;
-  }, [visible, pending, drafting]);
+  const items = useMemo<BoardDeal[]>(
+    () =>
+      visible
+        .map((deal) =>
+          pending && deal._id === pending.deal._id
+            ? { ...deal, stage: "lost" as const, position: pending.position }
+            : deal,
+        )
+        .sort((a, b) => a.position - b.position)
+        .map((deal) => ({ ...deal, id: deal._id })),
+    [visible, pending],
+  );
 
   const columns = useMemo<BoardColumnDef[]>(
     () =>
-      stages.map((stage) => {
-        const inStage = items.filter(
-          (item): item is BoardDeal => !isDraft(item) && item.stage === stage,
-        );
-        return {
-          id: stage,
-          name: DEAL_STAGE_LABEL[stage],
-          tone: DEAL_STAGE_TONE[stage],
-          summary: <ColumnTotals deals={inStage} />,
-        };
-      }),
+      stages.map((stage) => ({
+        id: stage,
+        name: DEAL_STAGE_LABEL[stage],
+        icon: DEAL_STAGE_BADGE[stage].icon,
+        tone: DEAL_STAGE_BADGE[stage].tone,
+        summary: (
+          <ColumnTotals deals={items.filter((item) => item.stage === stage)} />
+        ),
+      })),
     [stages, items],
   );
 
   const onMove = useCallback(
     (id: string, columnId: string, beforeId: string | null) => {
-      if (id.startsWith(DRAFT_PREFIX)) return;
       const deal = deals?.find((entry) => entry._id === id);
       if (!deal) return;
       const stage = columnId as DealStage;
       const column = (deals ?? []).filter((entry) => entry.stage === stage);
-      const before = beforeId?.startsWith(DRAFT_PREFIX)
-        ? (column.find((entry) => entry._id !== id)?._id ?? null)
-        : beforeId;
-      const position = positionBefore(column, id, before);
+      const position = positionBefore(column, id, beforeId);
       if (stage === "lost" && deal.stage !== "lost") {
         setPending({ deal, position });
-        return;
+        return false;
       }
       void moveDeal(deal, { stage, position });
     },
@@ -194,30 +209,47 @@ export default function DealsPage() {
   }
 
   const renderCard = useCallback(
-    (item: BoardItem) =>
-      isDraft(item) ? (
+    (item: BoardDeal) => <DealCard deal={item} today={today} />,
+    [today],
+  );
+
+  const renderColumnTop = (stage: string) =>
+    drafting === stage ? (
+      <div className="bg-card shadow-card rounded-2xl p-4">
         <DealQuickAdd
-          stage={item.draft}
+          stage={drafting}
           accountId={draftAccount}
           onAccountChange={setDraftAccount}
           onClose={() => setDrafting(null)}
         />
-      ) : (
-        <DealCard deal={item} today={today} />
-      ),
-    [today, draftAccount],
-  );
+      </div>
+    ) : null;
+
+  function reorder(stage: string, ids: string[], sort: BoardSort<BoardDeal>) {
+    const byId = new Map(
+      (deals ?? []).map((deal) => [deal._id as string, deal]),
+    );
+    const ordered = ids.flatMap((id) => byId.get(id) ?? []);
+    const previous = ordered.map((deal) => [deal, deal.position] as const);
+    ordered.forEach((deal, index) => {
+      void moveDeal(deal, { stage: deal.stage, position: index + 1 });
+    });
+    toast(
+      `Sorted ${DEAL_STAGE_LABEL[stage as DealStage]} by ${sort.label}`,
+      () => {
+        for (const [deal, position] of previous) {
+          void moveDeal(deal, { stage: deal.stage, position });
+        }
+      },
+    );
+  }
 
   const openPage = useCallback(
-    (id: string) => {
-      if (!id.startsWith(DRAFT_PREFIX)) router.push(`/deals/${id}`);
-    },
+    (id: string) => router.push(`/deals/${id}`),
     [router],
   );
   const peek = useCallback(
-    (id: string) => {
-      if (!id.startsWith(DRAFT_PREFIX)) setPeek({ type: "deal", id });
-    },
+    (id: string) => setPeek({ type: "deal", id }),
     [setPeek],
   );
 
@@ -286,15 +318,6 @@ export default function DealsPage() {
         actions={newDeal}
       />
       <PageToolbar>
-        <Segmented
-          label="View"
-          value={listView ? LIST : BOARD}
-          onChange={(next) => setView(next)}
-          options={[
-            { value: BOARD, label: "Board" },
-            { value: LIST, label: "List" },
-          ]}
-        />
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -343,6 +366,26 @@ export default function DealsPage() {
             Clear
           </Button>
         )}
+        <Segmented
+          label="View"
+          value={listView ? LIST : BOARD}
+          onChange={(next) => setView(next)}
+          compact
+          options={[
+            {
+              value: BOARD,
+              label: "Board",
+              icon: <ClipboardIcon aria-hidden className="size-3.5" />,
+            },
+            {
+              value: LIST,
+              label: "List",
+              icon: <ListIcon aria-hidden className="size-3.5" />,
+            },
+          ]}
+          className="ml-auto"
+        />
+        {!listView && <HiddenColumnsToggle prefs={boardPrefs} />}
       </PageToolbar>
       <PipelineSummary deals={matching} />
       <div className="border-border relative flex min-h-0 flex-1 flex-col border-t">
@@ -385,6 +428,10 @@ export default function DealsPage() {
             onOpen={openPage}
             onPeek={peek}
             onAdd={(stage) => setDrafting(stage as DealStage)}
+            renderColumnTop={renderColumnTop}
+            sorts={SORTS}
+            onReorder={reorder}
+            prefs={boardPrefs}
             addLabel="New deal"
             emptyLabel="No deals"
             overlay={emptyState && <BoardMessage>{emptyState}</BoardMessage>}
@@ -640,12 +687,27 @@ function BoardSkeleton({ columns }: { columns: number }) {
       {Array.from({ length: columns }, (_, column) => (
         <div
           key={column}
-          className="border-border flex w-[85vw] max-w-80 shrink-0 flex-col gap-2.5 border-r p-3 sm:w-72 lg:w-auto lg:max-w-none lg:min-w-64 lg:flex-1"
+          className="border-border flex w-[85vw] max-w-85 shrink-0 flex-col gap-3 border-r px-4 pt-4 sm:w-80 lg:w-auto lg:max-w-none lg:min-w-80 lg:flex-1"
         >
-          <Skeleton className="mb-1 h-4 w-24" />
-          <Skeleton className="mb-2 h-3 w-16" />
+          <div className="flex flex-col gap-2 pb-5">
+            <div className="flex h-5 items-center gap-2">
+              <Skeleton className="size-3.5 rounded-[4px]" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="ml-5.5 h-3 w-12" />
+          </div>
           {Array.from({ length: 3 - (column % 2) }, (_, card) => (
-            <Skeleton key={card} className="h-24 w-full rounded-xl" />
+            <div key={card} className="bg-card shadow-card rounded-2xl">
+              <div className="flex flex-col gap-3 p-4">
+                <Skeleton className="h-3.5 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+              <div className="border-border flex gap-2 border-t px-4 py-3">
+                <Skeleton className="h-7 w-14 rounded-full" />
+                <Skeleton className="h-7 w-18 rounded-full" />
+                <Skeleton className="h-7 w-16 rounded-full" />
+              </div>
+            </div>
           ))}
         </div>
       ))}

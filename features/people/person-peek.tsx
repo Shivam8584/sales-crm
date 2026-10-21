@@ -14,21 +14,28 @@ import {
   SheetTitle,
 } from "@/components/_ui/sheet";
 import InlineText from "@/components/fields/inline-text";
+import Tag, { tagVariants } from "@/components/_ui/tag";
+import { DetailHero, DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
+import AccountLogo from "@/features/accounts/account-logo";
+import { ActivityTrend } from "@/features/accounts/account-insights";
 import AccountPicker from "@/features/accounts/account-picker";
 import { PeekSkeleton } from "@/features/accounts/account-peek";
+import { StageAndTags } from "@/features/accounts/record-cells";
 import MemberPicker from "@/features/members/member-picker";
 import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
+import { cn } from "@/lib/utils";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
+import UsersIcon from "@/public/assets/icons/users.svg";
 import XIcon from "@/public/assets/icons/x.svg";
 import ContactActions from "./contact-actions";
 
 type Person = NonNullable<FunctionReturnType<typeof api.people.get>>;
 
-/** Quick look at a person from a list: contact details and recent activity. */
+/** Quick look at a person from a list: contact, activity trend, details and timeline. */
 export default function PersonPeek({
   id,
   onClose,
@@ -41,7 +48,10 @@ export default function PersonPeek({
   return (
     <>
       <SheetHeader>
-        <SheetTitle>Person</SheetTitle>
+        <div className="flex min-w-0 items-center gap-2">
+          <UsersIcon aria-hidden className="text-icon size-3.5 shrink-0" />
+          <SheetTitle>Person details</SheetTitle>
+        </div>
         <SheetDescription className="sr-only">
           Contact details and recent activity for this person
         </SheetDescription>
@@ -90,38 +100,65 @@ function PeekBody({
 
   return (
     <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
-      <div className="flex flex-col gap-4 px-6 pt-6 pb-5">
-        <div className="flex items-start gap-3.5">
-          <Avatar name={name} size="xl" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <h2
-              title={name}
-              className="truncate text-lg leading-6 font-semibold"
-            >
-              {name}
-            </h2>
-            <p className="caption-style text-fg-secondary flex min-h-4 min-w-0 items-center gap-1.5">
-              {person.title && <span className="truncate">{person.title}</span>}
-              {person.title && person.account && <span aria-hidden>·</span>}
-              {person.account && (
-                <Link
-                  href={`/accounts/${person.account._id}`}
-                  onClick={onClose}
-                  className="hover:text-foreground focus-visible:ring-ring truncate rounded-sm outline-none focus-visible:ring-2"
-                >
-                  {person.account.name}
-                </Link>
-              )}
-              {!person.title && !person.account && (
-                <span className="text-fg-tertiary">No title or account</span>
-              )}
-            </p>
-          </div>
-        </div>
-        <ContactActions person={person} />
-      </div>
+      <DetailHero visual={<Avatar name={name} size="xl" />} title={name}>
+        {person.title && (
+          <Tag tone="neutral" size="sm">
+            {person.title}
+          </Tag>
+        )}
+        {person.account && (
+          <Link
+            href={`/accounts/${person.account._id}`}
+            onClick={onClose}
+            className={cn(
+              tagVariants({ tone: "neutral", size: "sm" }),
+              "hover:text-foreground focus-visible:ring-ring min-w-0 gap-1 pl-0.5 outline-none focus-visible:ring-2",
+            )}
+          >
+            <AccountLogo
+              account={person.account}
+              size="xs"
+              className="size-4"
+            />
+            <span className="truncate">{person.account.name}</span>
+          </Link>
+        )}
+        <StageAndTags tags={person.tags} max={3} />
+        {!person.title && !person.account && person.tags.length === 0 && (
+          <span className="caption-style text-fg-tertiary">
+            No title or account yet
+          </span>
+        )}
+      </DetailHero>
 
-      <div className="border-border border-t px-6 py-5">
+      <DetailSection title="Contact" className="gap-2">
+        <ContactActions person={person} className="mb-1" />
+        <Properties>
+          <Property label="Email">
+            <InlineText
+              value={person.email}
+              type="email"
+              label="Email"
+              placeholder="Add email"
+              onSave={(email) => save({ email: email || null }, "Email")}
+            />
+          </Property>
+          <Property label="Phone">
+            <InlineText
+              value={person.phone}
+              type="tel"
+              label="Phone"
+              placeholder="Add phone"
+              display={formatPhone}
+              onSave={(phone) => save({ phone: phone || null }, "Phone")}
+            />
+          </Property>
+        </Properties>
+      </DetailSection>
+
+      <ActivityTrend target={{ personId: person._id }} />
+
+      <DetailSection title="Details" className="gap-2">
         <Properties>
           <Property label="Title">
             <InlineText
@@ -152,32 +189,12 @@ function PeekBody({
               }
             />
           </Property>
-          <Property label="Email">
-            <InlineText
-              value={person.email}
-              type="email"
-              label="Email"
-              placeholder="Add email"
-              onSave={(email) => save({ email: email || null }, "Email")}
-            />
-          </Property>
-          <Property label="Phone">
-            <InlineText
-              value={person.phone}
-              type="tel"
-              label="Phone"
-              placeholder="Add phone"
-              display={formatPhone}
-              onSave={(phone) => save({ phone: phone || null }, "Phone")}
-            />
-          </Property>
         </Properties>
-      </div>
+      </DetailSection>
 
-      <div className="border-border flex flex-col gap-3 border-t px-6 py-5">
-        <h3 className="caption-style text-fg-tertiary font-medium">Activity</h3>
+      <DetailSection title="Recent activity" divider={false}>
         <Timeline target={{ personId: person._id }} compact />
-      </div>
+      </DetailSection>
     </div>
   );
 }

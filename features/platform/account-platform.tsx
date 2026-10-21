@@ -7,6 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
+import { DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
 import { STAGE_LABEL } from "@/lib/domain/labels";
 import { formatMoney } from "@/lib/domain/money";
@@ -20,16 +21,20 @@ type Linked = Extract<
   { steps: unknown }
 >;
 
-/** Hypedrive usage for a linked account, in the account page sidebar. */
+/** Hypedrive usage for a linked account, in the account sidebar and peek. */
 export default function AccountPlatform({
   accountId,
+  className,
+  divider,
 }: {
   accountId: Id<"accounts">;
+  className?: string;
+  divider?: boolean;
 }) {
   const data = useQuery(api.platform.forAccount, { accountId });
 
   return (
-    <Properties title="Platform">
+    <DetailSection title="Platform" className={className} divider={divider}>
       {data === undefined ? (
         <div aria-busy className="flex flex-col gap-3 py-2">
           <Skeleton className="h-3 w-44" />
@@ -37,13 +42,13 @@ export default function AccountPlatform({
           <Skeleton className="h-3 w-40" />
         </div>
       ) : data.orgId === null ? (
-        <p className="text-fg-tertiary text-sm leading-8">
-          Not on Hypedrive yet
-        </p>
+        <p className="text-fg-tertiary -mt-2 text-sm">Not on Hypedrive yet</p>
       ) : (
-        <PlatformDetails data={data} />
+        <Properties className="-mt-2">
+          <PlatformDetails data={data} />
+        </Properties>
       )}
-    </Properties>
+    </DetailSection>
   );
 }
 

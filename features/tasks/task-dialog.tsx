@@ -23,7 +23,7 @@ import Skeleton from "@/components/_ui/skeleton";
 import OptionPicker, { type Option } from "@/components/fields/option-picker";
 import AccountPicker from "@/features/accounts/account-picker";
 import MemberPicker from "@/features/members/member-picker";
-import { useViewer } from "@/hooks/use-viewer";
+import { useMembers, useViewer } from "@/hooks/use-viewer";
 import {
   PRIORITIES,
   TASK_STATUSES,
@@ -41,12 +41,13 @@ import { relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
-import TrashIcon from "@/public/assets/icons/trash.svg";
-import Segmented from "./segmented";
+import StatusBadge from "@/components/_common/status-badge";
+import Pills from "./pills";
+import { chipClass } from "./task-chips";
 import {
   PriorityIcon,
   QUICK_DATES,
-  StatusIcon,
+  STATUS_BADGE,
   dayFromToday,
   type TaskRow,
 } from "./task-meta";
@@ -85,6 +86,8 @@ const FIELDS = new Set<FieldName>([
   "accountId",
   "personId",
 ]);
+
+const MAX_MEMBER_PILLS = 8;
 
 const PICKER_CLASS = "border-input bg-secondary mx-0 h-9 w-full border px-3";
 
@@ -176,6 +179,7 @@ type TaskFormProps = {
 
 function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
   const viewer = useViewer();
+  const members = useMembers();
   const createTask = useMutation(api.tasks.create);
   const update = useUpdateTask();
   const { remove } = useTaskActions();
@@ -326,6 +330,19 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
 
   const canSave = valid && !saving && (task ? dirty : true);
 
+  const assigneeOptions = [...(members ?? [])];
+  if (
+    task?.assignee &&
+    !assigneeOptions.some((member) => member._id === task.assigneeId)
+  ) {
+    assigneeOptions.unshift({
+      _id: task.assigneeId,
+      name: task.assignee.name,
+      email: "",
+      role: "rep",
+    });
+  }
+
   return (
     <form
       onSubmit={submit}
@@ -381,6 +398,23 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
         )}
       </DialogHeader>
       <div className="flex flex-col gap-5 px-6 py-5">
+        <Choice label="Status">
+          <Pills
+            label="Status"
+            value={draft.status}
+            onChange={(value) => set("status", value)}
+            options={TASK_STATUSES.map((value) => ({
+              value,
+              label: TASK_STATUS_LABEL[value],
+              icon: (
+                <StatusBadge
+                  icon={STATUS_BADGE[value].icon}
+                  tone={STATUS_BADGE[value].tone}
+                />
+              ),
+            }))}
+          />
+        </Choice>
         <Field label="Title" htmlFor="task-title" required error={errors.title}>
           <Input
             id="task-title"
@@ -406,7 +440,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
             className="aria-invalid:border-danger"
           />
         </Field>
-        <Field label="Notes" htmlFor="task-notes" error={errors.notes}>
+        <Field label="Description" htmlFor="task-notes" error={errors.notes}>
           <textarea
             id="task-notes"
             value={draft.notes}
@@ -415,40 +449,34 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
             placeholder="Context, links, what was promised…"
             rows={3}
             aria-invalid={errors.notes ? true : undefined}
-            className="border-input bg-secondary text-foreground placeholder:text-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 duration-fast aria-invalid:border-danger field-sizing-content max-h-60 min-h-20 w-full resize-none rounded-lg border px-3 py-2.5 text-sm leading-snug transition-[border-color,box-shadow] outline-none focus-visible:ring-3"
+            className="border-input bg-secondary text-foreground placeholder:text-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 duration-fast aria-invalid:border-danger field-sizing-content max-h-60 min-h-22 w-full resize-none rounded-lg border px-3 py-2.5 text-sm leading-snug transition-[border-color,box-shadow] outline-none focus-visible:ring-3"
           />
         </Field>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Choice label="Status">
-            <Segmented
-              label="Status"
-              value={draft.status}
-              onChange={(value) => set("status", value)}
-              options={TASK_STATUSES.map((value) => ({
-                value,
-                label: TASK_STATUS_LABEL[value],
-                icon: <StatusIcon status={value} className="size-3" />,
+        <Choice label="Priority">
+          <Pills
+            label="Priority"
+            value={draft.priority}
+            onChange={(value) => set("priority", value)}
+            options={PRIORITIES.map((value) => ({
+              value,
+              label: PRIORITY_LABEL[value],
+              icon: <PriorityIcon priority={value} />,
+            }))}
+          />
+        </Choice>
+        <Choice label="Assignee" error={errors.assigneeId}>
+          {members && members.length <= MAX_MEMBER_PILLS ? (
+            <Pills
+              label="Assignee"
+              value={draft.assigneeId as string}
+              onChange={(value) => set("assigneeId", value as Id<"members">)}
+              options={assigneeOptions.map((member) => ({
+                value: member._id,
+                label: member.name,
+                icon: <Avatar name={member.name} size="xs" className="-ml-1" />,
               }))}
-              className="flex w-full"
             />
-          </Choice>
-          <Choice label="Priority">
-            <Segmented
-              label="Priority"
-              value={draft.priority}
-              onChange={(value) => set("priority", value)}
-              options={PRIORITIES.map((value) => ({
-                value,
-                label: PRIORITY_LABEL[value],
-                icon: <PriorityIcon priority={value} className="size-3" />,
-              }))}
-              compact
-              className="flex w-full"
-            />
-          </Choice>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Choice label="Assignee" error={errors.assigneeId}>
+          ) : (
             <MemberPicker
               label="Assignee"
               value={draft.assigneeId}
@@ -456,17 +484,14 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
               onChange={(id) => set("assigneeId", id as Id<"members">)}
               className={PICKER_CLASS}
             />
-          </Choice>
-          <Field label="Due date" htmlFor="task-due" error={errors.dueDate}>
-            <Input
-              id="task-due"
-              type="date"
-              value={draft.dueDate ?? ""}
-              onChange={(event) => set("dueDate", event.target.value || null)}
-              aria-invalid={errors.dueDate ? true : undefined}
-              className="aria-invalid:border-danger tabular-nums"
-            />
-            <div className="flex flex-wrap gap-1.5">
+          )}
+        </Choice>
+        <Field
+          label="Due date"
+          htmlFor="task-due"
+          error={errors.dueDate}
+          trailing={
+            <div className="-my-1 flex flex-wrap justify-end gap-1">
               {QUICK_DATES.map((item) => {
                 const day = dayFromToday(item.days);
                 const active = draft.dueDate === day;
@@ -477,9 +502,8 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
                     aria-pressed={active}
                     onClick={() => set("dueDate", active ? null : day)}
                     className={cn(
-                      "caption-style border-line-strong text-fg-secondary hover:bg-overlay-2 hover:text-foreground focus-visible:ring-ring duration-fast h-6 cursor-pointer rounded-full border px-2 transition-colors outline-none focus-visible:ring-2",
-                      active &&
-                        "border-selected/40 bg-selected/10 text-foreground",
+                      chipClass("sm"),
+                      "text-fg-tertiary aria-pressed:text-foreground aria-pressed:shadow-[0_0_0_1px_var(--foreground)]",
                     )}
                   >
                     {item.label}
@@ -487,8 +511,17 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
                 );
               })}
             </div>
-          </Field>
-        </div>
+          }
+        >
+          <Input
+            id="task-due"
+            type="date"
+            value={draft.dueDate ?? ""}
+            onChange={(event) => set("dueDate", event.target.value || null)}
+            aria-invalid={errors.dueDate ? true : undefined}
+            className="aria-invalid:border-danger tabular-nums"
+          />
+        </Field>
         <div className="grid gap-5 sm:grid-cols-2">
           <Choice label="Account" error={errors.accountId}>
             <AccountPicker
@@ -539,34 +572,17 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
       </div>
       <DialogFooter className="flex-wrap">
         {task && (
-          <div className="mr-auto flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void onDelete()}
-              className="hover:text-danger"
-            >
-              <TrashIcon aria-hidden className="size-3.5" />
-              Delete
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!valid || saving}
-              onClick={() =>
-                void submit(undefined, task.status === "done" ? "todo" : "done")
-              }
-            >
-              <StatusIcon
-                status={task.status === "done" ? "todo" : "done"}
-                className="size-3.5"
-              />
-              {task.status === "done" ? "Reopen" : "Mark done"}
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void onDelete()}
+            className="text-danger hover:bg-danger/10 hover:text-danger mr-auto"
+          >
+            Delete
+          </Button>
         )}
         <DialogClose asChild>
-          <Button variant="subtle" size="sm">
+          <Button variant="secondary" size="sm">
             Cancel
           </Button>
         </DialogClose>
@@ -578,7 +594,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
           disabled={!valid || (task ? !dirty : false)}
           aria-keyshortcuts="Meta+Enter Control+Enter"
         >
-          {task ? "Save" : "Add task"}
+          {task ? "Save changes" : "Add task"}
           <Kbd className="-mr-1 border-current/25 bg-transparent text-current opacity-75 max-sm:hidden">
             {MOD_KEY}↵
           </Kbd>

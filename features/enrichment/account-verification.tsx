@@ -11,6 +11,7 @@ import { Label } from "@/components/_ui/label";
 import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
+import { DetailSection } from "@/components/record/detail";
 import { Property } from "@/components/record/properties";
 import { sourceFamily } from "@/convex/lib/enrichment";
 import {
@@ -41,27 +42,28 @@ const SUGGESTION_ORDER = ["name", "phone", "email"];
 const SANDBOX_HINT =
   "Sandbox: 10BSDPG0911J1ZG is active, 29AAACI4798L1ZU is cancelled.";
 
-/** Verified registry details (GST) shown in the account page sidebar. */
+/** Verified registry details (GST) in the account sidebar and peek. */
 export default function AccountVerification({
   accountId,
+  className,
+  divider,
 }: {
   accountId: Id<"accounts">;
+  className?: string;
+  divider?: boolean;
 }) {
   const data = useQuery(api.enrichment.forAccount, { accountId });
   const config = useQuery(api.enrichment.config, {});
-  const headingId = useId();
 
   if (data === null) return null;
   const loading = data === undefined || config === undefined;
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-1">
-      <h2
-        id={headingId}
-        className="caption-style text-fg-tertiary mb-1.5 font-medium"
-      >
-        Verified details
-      </h2>
+    <DetailSection
+      title="Verified details"
+      className={cn("gap-2", className)}
+      divider={divider}
+    >
       {loading ? (
         <div aria-busy className="flex flex-col gap-2.5 py-1">
           <Skeleton className="h-8 w-full rounded-lg" />
@@ -71,7 +73,7 @@ export default function AccountVerification({
       ) : (
         <Verification accountId={accountId} data={data} config={config} />
       )}
-    </section>
+    </DetailSection>
   );
 }
 

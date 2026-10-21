@@ -9,6 +9,7 @@ import { Input } from "@/components/_ui/input";
 import { Label } from "@/components/_ui/label";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
+import { DetailSection } from "@/components/record/detail";
 import {
   DIN_PATTERN,
   SANDBOX_DIN,
@@ -24,7 +25,15 @@ import { SourceBadge } from "./source-badge";
 import { Suggestions } from "./suggestions";
 
 /** Looks up a director's DIN and offers the registered phone as a suggestion. */
-export default function DinLookup({ personId }: { personId: Id<"people"> }) {
+export default function DinLookup({
+  personId,
+  className,
+  divider,
+}: {
+  personId: Id<"people">;
+  className?: string;
+  divider?: boolean;
+}) {
   const id = useId();
   const data = useQuery(api.enrichment.forPerson, { personId });
   const config = useQuery(api.enrichment.config, {});
@@ -92,13 +101,11 @@ export default function DinLookup({ personId }: { personId: Id<"people"> }) {
       : "The phone registered with the DIN arrives as a suggestion.";
 
   return (
-    <section aria-labelledby={`${id}-title`} className="flex flex-col gap-3">
-      <h2
-        id={`${id}-title`}
-        className="caption-style text-fg-tertiary font-medium"
-      >
-        Director lookup
-      </h2>
+    <DetailSection
+      title="Director lookup"
+      className={cn("gap-3", className)}
+      divider={divider}
+    >
       {loading ? (
         <div aria-busy className="flex flex-col gap-2.5">
           <Skeleton className="h-9 w-full rounded-lg" />
@@ -218,6 +225,6 @@ export default function DinLookup({ personId }: { personId: Id<"people"> }) {
           )}
         </>
       )}
-    </section>
+    </DetailSection>
   );
 }

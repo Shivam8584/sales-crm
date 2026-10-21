@@ -34,8 +34,8 @@ import {
 import { PRIORITY_LABEL, TASK_STATUS_LABEL } from "@/lib/domain/labels";
 import { cn } from "@/lib/utils";
 import CalendarIcon from "@/public/assets/icons/calendar.svg";
+import UserIcon from "@/public/assets/icons/kanban/user-03.svg";
 import {
-  PRIORITY_TEXT,
   PriorityIcon,
   QUICK_DATES,
   StatusIcon,
@@ -73,8 +73,20 @@ export function CardSafe({
   );
 }
 
-export const CHIP_CLASS =
-  "caption-style border-line-strong text-fg-secondary duration-fast ease-power3-out hover:bg-overlay-2 hover:text-foreground data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground focus-visible:ring-ring inline-flex h-6 min-w-0 cursor-pointer items-center gap-1 rounded-full border px-2 whitespace-nowrap outline-none transition-colors focus-visible:ring-2";
+export type ChipSize = "sm" | "md";
+
+const CHIP_BASE =
+  "text-fg-secondary shadow-hairline duration-fast ease-power3-out hover:text-foreground hover:shadow-[0_0_0_1px_var(--line-strong)] data-[state=open]:text-foreground data-[state=open]:shadow-[0_0_0_1px_var(--fg-tertiary)] focus-visible:ring-ring inline-flex min-w-0 cursor-pointer items-center rounded-full whitespace-nowrap outline-none transition-[color,box-shadow] focus-visible:ring-2";
+
+/** Pill used for task properties: `md` on cards, `sm` in dense rows. */
+export function chipClass(size: ChipSize = "sm") {
+  return cn(
+    CHIP_BASE,
+    size === "md"
+      ? "h-7 gap-1.5 px-2.5 text-[13px] leading-none"
+      : "caption-style h-6 gap-1 px-2",
+  );
+}
 
 function firstName(name: string) {
   return name.trim().split(/\s+/)[0] ?? name;
@@ -91,16 +103,22 @@ type ChipTask = Pick<
   | "status"
 >;
 
-export function StatusChip({ task }: { task: ChipTask }) {
+export function StatusChip({
+  task,
+  size,
+}: {
+  task: ChipTask;
+  size?: ChipSize;
+}) {
   const { update, setDone } = useTaskActions();
   return (
     <CardSafe>
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`Status: ${TASK_STATUS_LABEL[task.status]}. Change status`}
-          className={CHIP_CLASS}
+          className={chipClass(size)}
         >
-          <StatusIcon status={task.status} className="size-3" />
+          <StatusIcon status={task.status} />
           {TASK_STATUS_LABEL[task.status]}
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-36">
@@ -133,21 +151,20 @@ export function StatusChip({ task }: { task: ChipTask }) {
 export function PriorityPicker({
   value,
   onChange,
+  size,
 }: {
   value: Priority;
   onChange: (priority: Priority) => void;
+  size?: ChipSize;
 }) {
   return (
     <CardSafe>
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`Priority: ${PRIORITY_LABEL[value]}. Change priority`}
-          className={cn(
-            CHIP_CLASS,
-            (value === "urgent" || value === "high") && PRIORITY_TEXT[value],
-          )}
+          className={chipClass(size)}
         >
-          <PriorityIcon priority={value} className="size-3" />
+          <PriorityIcon priority={value} />
           {PRIORITY_LABEL[value]}
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-36">
@@ -171,17 +188,30 @@ export function PriorityPicker({
   );
 }
 
-export function PriorityChip({ task }: { task: ChipTask }) {
+export function PriorityChip({
+  task,
+  size,
+}: {
+  task: ChipTask;
+  size?: ChipSize;
+}) {
   const { update } = useTaskActions();
   return (
     <PriorityPicker
+      size={size}
       value={task.priority}
       onChange={(priority) => void update(task._id, { priority }, "Priority")}
     />
   );
 }
 
-export function AssigneeChip({ task }: { task: ChipTask }) {
+export function AssigneeChip({
+  task,
+  size = "sm",
+}: {
+  task: ChipTask;
+  size?: ChipSize;
+}) {
   const { update } = useTaskActions();
   const members = useMembers();
   const name = task.assignee?.name ?? "Unassigned";
@@ -199,9 +229,12 @@ export function AssigneeChip({ task }: { task: ChipTask }) {
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`Assignee: ${name}. Change assignee`}
-          className={cn(CHIP_CLASS, "max-w-36 pl-1")}
+          className={cn(chipClass(size), "max-w-36")}
         >
-          <Avatar name={name} size="xs" />
+          <UserIcon
+            aria-hidden
+            className="text-fg-tertiary size-3.5 shrink-0"
+          />
           <span className="truncate">{firstName(name)}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-48">
@@ -305,11 +338,13 @@ export function DuePicker({
   onChange,
   overdue = false,
   hideEmpty = false,
+  size,
 }: {
   value: string | null;
   onChange: (day: string | null) => void;
   overdue?: boolean;
   hideEmpty?: boolean;
+  size?: ChipSize;
 }) {
   const [open, setOpen] = useState(false);
   const label = value ? formatDay(value) : null;
@@ -345,18 +380,31 @@ export function DuePicker({
               ? `Due ${label}${overdue ? ", overdue" : ""}. Change due date`
               : "Set due date"
           }
+          title={overdue && value ? `Was due ${shortDay(value)}` : undefined}
           className={cn(
-            CHIP_CLASS,
+            chipClass(size),
             !label && "text-fg-tertiary",
             !label &&
               hideEmpty &&
               "opacity-0 group-hover/card:opacity-100 group-data-[cursor=true]/card:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100",
             overdue &&
-              "text-danger hover:text-danger data-[state=open]:text-danger border-current/30",
+              "text-danger hover:text-danger data-[state=open]:text-danger",
           )}
         >
-          <CalendarIcon aria-hidden className="size-3 shrink-0" />
-          <span className="tabular-nums">{label ?? "Due date"}</span>
+          {overdue && label ? (
+            <>
+              Overdue
+              <span className="text-fg-tertiary tabular-nums">{label}</span>
+            </>
+          ) : (
+            <>
+              <CalendarIcon
+                aria-hidden
+                className="text-fg-tertiary size-3.5 shrink-0"
+              />
+              <span className="tabular-nums">{label ?? "Due date"}</span>
+            </>
+          )}
         </PopoverTrigger>
         <PopoverContent
           align="start"
@@ -374,13 +422,16 @@ export function DuePicker({
 export function DueChip({
   task,
   hideEmpty = false,
+  size,
 }: {
   task: ChipTask;
   hideEmpty?: boolean;
+  size?: ChipSize;
 }) {
   const { update } = useTaskActions();
   return (
     <DuePicker
+      size={size}
       value={task.dueDate}
       overdue={isOverdue(task)}
       hideEmpty={hideEmpty}
@@ -389,12 +440,21 @@ export function DueChip({
   );
 }
 
-export default function TaskChips({ task }: { task: ChipTask }) {
+/** Priority, assignee and due chips, each with its own menu. */
+export default function TaskChips({
+  task,
+  size = "md",
+  className,
+}: {
+  task: ChipTask;
+  size?: ChipSize;
+  className?: string;
+}) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-      <PriorityChip task={task} />
-      <AssigneeChip task={task} />
-      <DueChip task={task} />
+    <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
+      <PriorityChip task={task} size={size} />
+      <AssigneeChip task={task} size={size} />
+      <DueChip task={task} size={size} hideEmpty />
     </div>
   );
 }

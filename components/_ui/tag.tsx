@@ -39,7 +39,7 @@ export const tagVariants = cva(
       size: {
         md: "h-5.5 px-2",
         sm: "h-5.5 px-1.5",
-        xs: "caption-style h-5 gap-1 px-1.5",
+        xs: "h-5 gap-1 px-1.5 text-xs",
       },
     },
     defaultVariants: {

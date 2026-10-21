@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
@@ -12,22 +11,32 @@ import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
-import RowAction from "@/components/data-table/row-action";
 import SearchInput from "@/components/data-table/search-input";
 import SelectionBar from "@/components/data-table/selection-bar";
-import Tooltip from "@/components/_ui/tooltip";
 import {
   compareBy,
   type Column,
   type SortState,
 } from "@/components/data-table/types";
 import {
+  CreateButton,
+  ExportButton,
   Page,
   PageActions,
   PageHeader,
+  PageStatus,
   PageToolbar,
+  PageViews,
 } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
+import {
+  LastInteractionCell,
+  OwnerCell,
+  StageAndTags,
+  TrendCell,
+  dash,
+  interactionLabel,
+} from "@/features/accounts/record-cells";
 import CsvImportDialog, {
   type ImportConfig,
 } from "@/features/accounts/csv-import-dialog";
@@ -39,28 +48,43 @@ import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
 import { downloadCsv } from "@/lib/csv";
 import { readError } from "@/lib/errors";
-import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
-import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
-import EyeIcon from "@/public/assets/icons/eye.svg";
 import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
+import TrashIcon from "@/public/assets/icons/trash.svg";
 
-type PersonRow = FunctionReturnType<typeof api.people.list>[number];
+type Stats = FunctionReturnType<typeof api.people.listStats>[number];
+type PersonRow = FunctionReturnType<typeof api.people.list>[number] &
+  Omit<Stats, "personId">;
 
 const ALL = "all";
 const MINE = "mine";
-const DEFAULT_SORT: SortState = { id: "activity", dir: "desc" };
+const DEFAULT_SORT: SortState = { id: "lastInteraction", dir: "desc" };
+const DAY = 24 * 60 * 60_000;
 
-const dash = <span className="text-fg-tertiary">—</span>;
+const VIEWS = [
+  { id: "all", label: "All" },
+  { id: "mine", label: "My people" },
+  { id: "unlinked", label: "No account" },
+] as const;
+type View = (typeof VIEWS)[number]["id"];
+
+function inView(row: PersonRow, view: View, viewerId: string) {
+  if (view === "mine") return row.owner?._id === viewerId;
+  if (view === "unlinked") return row.account === null;
+  return true;
+}
+
+const trendTotal = (row: PersonRow) =>
+  row.trend.reduce((sum, value) => sum + value, 0);
 
 const COLUMNS: Column<PersonRow>[] = [
   {
     id: "name",
     header: "Name",
-    width: "minmax(12rem,1.3fr)",
+    width: "minmax(11rem,1.3fr)",
     sortValue: (row) => personName(row),
     cell: (row) => (
       <>
@@ -72,15 +96,30 @@ const COLUMNS: Column<PersonRow>[] = [
     ),
   },
   {
+    id: "title",
+    header: "Title",
+    width: "minmax(8rem,1fr)",
+    minViewport: 768,
+    sortValue: (row) => row.title,
+    cell: (row) =>
+      row.title ? (
+        <span className="text-fg-secondary truncate" title={row.title}>
+          {row.title}
+        </span>
+      ) : (
+        dash
+      ),
+  },
+  {
     id: "account",
     header: "Account",
-    width: "minmax(10rem,1.3fr)",
+    width: "minmax(10rem,1.2fr)",
     sortValue: (row) => row.account?.name ?? null,
     cell: (row) =>
       row.account ? (
         <Link
           href={`/accounts/${row.account._id}`}
-          className="hover:bg-overlay-2 -mx-1.5 flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1"
+          className="hover:bg-overlay-2 focus-visible:ring-ring -mx-1.5 flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 outline-none focus-visible:ring-2"
         >
           <AccountLogo account={row.account} size="xs" />
           <span className="truncate">{row.account.name}</span>
@@ -90,88 +129,60 @@ const COLUMNS: Column<PersonRow>[] = [
       ),
   },
   {
-    id: "title",
-    header: "Title",
-    width: "minmax(9rem,1fr)",
-    minViewport: 768,
-    sortValue: (row) => row.title,
-    cell: (row) =>
-      row.title ? (
-        <span className="text-fg-secondary truncate">{row.title}</span>
-      ) : (
-        dash
-      ),
-  },
-  {
-    id: "email",
-    header: "Email",
-    width: "minmax(12rem,1.3fr)",
-    minViewport: 1024,
-    sortValue: (row) => row.email,
-    cell: (row) =>
-      row.email ? (
-        <a
-          href={`mailto:${row.email}`}
-          className="text-fg-secondary hover:text-foreground truncate"
-        >
-          {row.email}
-        </a>
-      ) : (
-        dash
-      ),
-  },
-  {
-    id: "phone",
-    header: "Phone",
-    width: "9.5rem",
-    minViewport: 1280,
-    cell: (row) =>
-      row.phone ? (
-        <a
-          href={`tel:${row.phone}`}
-          className="text-fg-secondary hover:text-foreground tabular-nums"
-        >
-          {formatPhone(row.phone)}
-        </a>
-      ) : (
-        dash
-      ),
+    id: "tags",
+    header: "Tags",
+    width: "minmax(8rem,1fr)",
+    minViewport: 1360,
+    cell: (row) => (row.tags.length ? <StageAndTags tags={row.tags} /> : dash),
   },
   {
     id: "owner",
     header: "Owner",
-    width: "minmax(9.5rem,1fr)",
-    minViewport: 1100,
+    width: "minmax(9rem,1fr)",
+    minViewport: 1024,
     sortValue: (row) => row.owner?.name ?? null,
-    cell: (row) =>
-      row.owner ? (
-        <span className="flex min-w-0 items-center gap-2">
-          <Avatar name={row.owner.name} />
-          <span className="truncate">{row.owner.name}</span>
-        </span>
-      ) : (
-        dash
-      ),
+    cell: (row) => <OwnerCell owner={row.owner} />,
   },
   {
-    id: "activity",
-    header: "Last activity",
-    width: "8.5rem",
-    align: "end",
+    id: "trend",
+    header: "Activity trend",
+    width: "7rem",
+    minViewport: 1180,
+    cell: (row) => <TrendCell values={row.trend} />,
+  },
+  {
+    id: "lastInteraction",
+    header: "Last interaction",
+    width: "minmax(9rem,1fr)",
     defaultDir: "desc",
-    sortValue: (row) => row.lastActivityAt,
-    cell: (row) =>
-      row.lastActivityAt ? (
-        <Tooltip content={dateTime(row.lastActivityAt)}>
-          <span className="text-fg-secondary">
-            {relativeTime(row.lastActivityAt)}
-          </span>
-        </Tooltip>
-      ) : (
-        dash
-      ),
+    minViewport: 900,
+    sortValue: (row) => row.lastInteraction?.at ?? null,
+    cell: (row) => <LastInteractionCell last={row.lastInteraction} />,
   },
 ];
+
+const SORT_OPTIONS = [
+  { value: "lastInteraction", label: "Last interaction" },
+  { value: "name", label: "Name" },
+  { value: "account", label: "Account" },
+  { value: "owner", label: "Owner" },
+];
+const SORT_DIR: Record<string, "asc" | "desc"> = { lastInteraction: "desc" };
+
+const ACTIVITY_OPTIONS = [
+  { value: ALL, label: "Any time" },
+  { value: "7", label: "7 days" },
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+  { value: "stale", label: "Over 30 days ago" },
+];
+
+function activeWithin(row: PersonRow, window: string, now: number) {
+  if (window === ALL) return true;
+  const at = row.lastActivityAt;
+  if (window === "stale") return !at || now - at > 30 * DAY;
+  return at !== null && now - at <= Number(window) * DAY;
+}
 
 function exportRows(rows: PersonRow[]) {
   const day = new Date().toISOString().slice(0, 10);
@@ -186,6 +197,7 @@ function exportRows(rows: PersonRow[]) {
       "LinkedIn",
       "Owner",
       "Tags",
+      "Last interaction",
       "Last activity",
     ],
     ...rows.map((row) => [
@@ -198,6 +210,9 @@ function exportRows(rows: PersonRow[]) {
       row.linkedinUrl ?? "",
       row.owner?.name ?? "",
       row.tags.join(", "),
+      row.lastInteraction
+        ? `${new Date(row.lastInteraction.at).toISOString()} ${interactionLabel(row.lastInteraction)}`
+        : "",
       row.lastActivityAt ? new Date(row.lastActivityAt).toISOString() : "",
     ]),
   ]);
@@ -222,18 +237,19 @@ function matches(row: PersonRow, query: string) {
 }
 
 export default function PeoplePage() {
-  const router = useRouter();
   const viewer = useViewer();
   const members = useMembers();
   const people = useQuery(api.people.list, {});
+  const stats = useQuery(api.people.listStats, {});
   const setArchived = useMutation(api.people.setArchived);
   const importRows = useMutation(api.people.importRows);
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
 
+  const [viewParam, setView] = useUrlState("view", "all");
   const [search, setSearch] = useUrlState("q", "");
   const [owner, setOwner] = useUrlState("owner", ALL);
-  const [account, setAccount] = useUrlState("account", ALL);
+  const [activity, setActivity] = useUrlState("activity", ALL);
   const [importing, setImporting] = useState(false);
   const [call, setCall] = useState<{
     target: TimelineTarget;
@@ -244,29 +260,57 @@ export default function PeoplePage() {
     `${DEFAULT_SORT.id}:${DEFAULT_SORT.dir}`,
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [now] = useState(() => Date.now());
+
+  const view: View = VIEWS.some((item) => item.id === viewParam)
+    ? (viewParam as View)
+    : "all";
 
   const [sortId, sortDir] = sortParam.split(":");
   const sort: SortState = {
-    id: COLUMNS.some((column) => column.id === sortId)
+    id: COLUMNS.some((column) => column.id === sortId && column.sortValue)
       ? sortId
       : DEFAULT_SORT.id,
     dir: sortDir === "asc" ? "asc" : "desc",
   };
 
+  const all = useMemo(() => {
+    if (!people || !stats) return undefined;
+    const byId = new Map(stats.map((item) => [item.personId, item]));
+    return people.map(
+      (person): PersonRow => ({
+        ...person,
+        trend: byId.get(person._id)?.trend ?? [],
+        lastInteraction: byId.get(person._id)?.lastInteraction ?? null,
+      }),
+    );
+  }, [people, stats]);
+
+  const counts = useMemo(() => {
+    if (!all) return undefined;
+    return Object.fromEntries(
+      VIEWS.map((item) => [
+        item.id,
+        all.filter((row) => inView(row, item.id, viewer._id)).length,
+      ]),
+    ) as Record<View, number>;
+  }, [all, viewer._id]);
+
   const rows = useMemo(() => {
-    if (!people) return undefined;
-    return people.filter(
+    if (!all) return undefined;
+    return all.filter(
       (row) =>
+        inView(row, view, viewer._id) &&
         (owner === ALL ||
           (owner === MINE
             ? row.owner?._id === viewer._id
             : row.owner?._id === owner)) &&
-        (account === ALL || (account === "none") === (row.account === null)) &&
+        activeWithin(row, activity, now) &&
         (!search.trim() || matches(row, search)),
     );
-  }, [people, owner, account, search, viewer._id]);
+  }, [all, view, owner, activity, search, viewer._id, now]);
 
-  const filtered = owner !== ALL || account !== ALL || search.trim() !== "";
+  const filtered = owner !== ALL || activity !== ALL || search.trim() !== "";
   const selectedIds = [...selected].filter((id) =>
     rows?.some((row) => row._id === id),
   ) as Id<"people">[];
@@ -274,7 +318,19 @@ export default function PeoplePage() {
   function clearFilters() {
     setSearch("");
     setOwner(ALL);
-    setAccount(ALL);
+    setActivity(ALL);
+  }
+
+  async function toggleArchived(row: PersonRow) {
+    try {
+      await setArchived({ ids: [row._id], archived: true });
+      toast(
+        `${personName(row)} archived`,
+        () => void setArchived({ ids: [row._id], archived: false }),
+      );
+    } catch (error) {
+      toast(readError(error).message, { tone: "danger" });
+    }
   }
 
   function exportView() {
@@ -387,10 +443,10 @@ export default function PeoplePage() {
       <PageHeader
         title="People"
         meta={
-          people && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {people.length}
-            </span>
+          counts && (
+            <PageStatus>
+              <span className="tabular-nums">{counts.all} people</span>
+            </PageStatus>
           )
         }
         actions={
@@ -398,30 +454,42 @@ export default function PeoplePage() {
             label="People list actions"
             actions={[
               { label: "Import CSV", onSelect: () => setImporting(true) },
-              {
-                label: filtered ? "Export this view" : "Export CSV",
-                disabled: !rows?.length,
-                onSelect: exportView,
-              },
             ]}
-            primary={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setCreate({ type: "person" })}
-              >
-                <PlusIcon aria-hidden className="size-3" />
-                New person
-              </Button>
-            }
           />
         }
       />
-      <PageToolbar>
+      <PageViews
+        value={view}
+        onChange={(next) => {
+          setView(next);
+          setSelected(new Set());
+        }}
+        views={VIEWS.map((item) => ({ ...item, count: counts?.[item.id] }))}
+      />
+      <PageToolbar
+        actions={
+          <>
+            <ExportButton disabled={!rows?.length} onClick={exportView} />
+            <CreateButton onClick={() => setCreate({ type: "person" })}>
+              New person
+            </CreateButton>
+          </>
+        }
+      >
         <SearchInput
           value={search}
           onChange={setSearch}
           placeholder="Search people"
+        />
+        <FilterMenu
+          label="Sort by"
+          value={
+            SORT_OPTIONS.some((option) => option.value === sort.id)
+              ? sort.id
+              : DEFAULT_SORT.id
+          }
+          options={SORT_OPTIONS}
+          onChange={(id) => setSortParam(`${id}:${SORT_DIR[id] ?? "asc"}`)}
         />
         <FilterMenu
           label="Owner"
@@ -436,24 +504,15 @@ export default function PeoplePage() {
           ]}
         />
         <FilterMenu
-          label="Account"
-          value={account}
-          onChange={setAccount}
-          options={[
-            { value: ALL, label: "Any" },
-            { value: "some", label: "Has an account" },
-            { value: "none", label: "No account" },
-          ]}
+          label="Last activity"
+          value={activity}
+          onChange={setActivity}
+          options={ACTIVITY_OPTIONS}
         />
         {filtered && (
           <Button variant="ghost" size="xs" onClick={clearFilters}>
             Clear
           </Button>
-        )}
-        {rows && filtered && (
-          <span className="caption-style text-fg-tertiary ml-auto tabular-nums">
-            {rows.length} of {people?.length}
-          </span>
         )}
       </PageToolbar>
 
@@ -470,32 +529,38 @@ export default function PeoplePage() {
           selected={selected}
           onSelectedChange={setSelected}
           onPeek={(row) => setPeek({ type: "person", id: row._id })}
-          rowActions={(row) => (
-            <>
-              <RowAction
-                label="Log call"
-                icon={PhoneCallIcon}
-                onClick={() =>
-                  setCall({
-                    target: { personId: row._id },
-                    name: personName(row),
-                  })
-                }
-              />
-              <RowAction
-                label="Peek"
-                shortcut="Space"
-                icon={EyeIcon}
-                onClick={() => setPeek({ type: "person", id: row._id })}
-              />
-              <RowAction
-                label="Open"
-                shortcut="↵"
-                icon={ArrowRightIcon}
-                onClick={() => router.push(`/people/${row._id}`)}
-              />
-            </>
-          )}
+          rowMenu={(row) => [
+            {
+              label: "Log call",
+              icon: PhoneCallIcon,
+              onSelect: () =>
+                setCall({
+                  target: { personId: row._id },
+                  name: personName(row),
+                }),
+            },
+            {
+              label: "Archive",
+              icon: TrashIcon,
+              tone: "danger",
+              onSelect: () => void toggleArchived(row),
+            },
+          ]}
+          footer={[
+            { label: "People in view", value: rows?.length ?? 0 },
+            {
+              label: "With an account",
+              value: rows?.filter((row) => row.account).length ?? 0,
+            },
+            {
+              label: "Active in 14 days",
+              value: rows?.filter((row) => trendTotal(row) > 0).length ?? 0,
+            },
+            {
+              label: "Timeline entries, 14 days",
+              value: rows?.reduce((sum, row) => sum + trendTotal(row), 0) ?? 0,
+            },
+          ]}
           renderCard={(row) => (
             <span className="flex items-center gap-3">
               <Avatar name={personName(row)} size="md" />
@@ -503,10 +568,23 @@ export default function PeoplePage() {
                 <span className="lead-style truncate font-medium">
                   {personName(row)}
                 </span>
-                <span className="caption-style text-fg-tertiary truncate">
-                  {[row.title, row.account?.name].filter(Boolean).join(" · ") ||
-                    "No details yet"}
+                <span className="caption-style text-fg-tertiary flex min-w-0 items-center gap-1.5">
+                  {row.account && (
+                    <AccountLogo
+                      account={row.account}
+                      size="xs"
+                      className="size-4"
+                    />
+                  )}
+                  <span className="truncate">
+                    {[row.title, row.account?.name]
+                      .filter(Boolean)
+                      .join(" · ") || "No details yet"}
+                  </span>
                 </span>
+              </span>
+              <span className="caption-style text-fg-secondary shrink-0">
+                <LastInteractionCell last={row.lastInteraction} />
               </span>
             </span>
           )}
@@ -519,6 +597,29 @@ export default function PeoplePage() {
                 action={
                   <Button variant="secondary" size="sm" onClick={clearFilters}>
                     Clear filters
+                  </Button>
+                }
+              />
+            ) : view !== "all" ? (
+              <EmptyState
+                icon={UsersIcon}
+                title={
+                  view === "mine"
+                    ? "Nobody assigned to you yet"
+                    : "Everyone has an account"
+                }
+                description={
+                  view === "mine"
+                    ? "People you own show up here."
+                    : "People without an account show up here, so you can link them to the brand they work for."
+                }
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setView("all")}
+                  >
+                    Show everyone
                   </Button>
                 }
               />

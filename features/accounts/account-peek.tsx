@@ -15,21 +15,29 @@ import Skeleton from "@/components/_ui/skeleton";
 import InlineText from "@/components/fields/inline-text";
 import OptionPicker from "@/components/fields/option-picker";
 import TagsField from "@/components/fields/tags-field";
+import { DetailHero, DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
-import { formatTotals } from "@/features/deals/format";
-import { isOpenStage } from "@/features/deals/stage";
+import AccountVerification from "@/features/enrichment/account-verification";
 import MemberPicker from "@/features/members/member-picker";
+import AccountPlatform from "@/features/platform/account-platform";
 import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import type { LifecycleStage } from "@/lib/domain/enums";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
+import BuildingIcon from "@/public/assets/icons/building-sm.svg";
 import XIcon from "@/public/assets/icons/x.svg";
 import AccountLogo from "./account-logo";
+import {
+  AccountSummary,
+  ActivityTrend,
+  PipelineHealth,
+} from "./account-insights";
+import { StageAndTags } from "./record-cells";
 import { STAGE_OPTIONS } from "./stage";
 
 type Account = NonNullable<FunctionReturnType<typeof api.accounts.get>>;
 
-/** Quick look at an account from a list: key properties and recent activity. */
+/** Quick look at an account from a list: summary, pipeline, activity and key properties. */
 export default function AccountPeek({
   id,
   onClose,
@@ -42,9 +50,12 @@ export default function AccountPeek({
   return (
     <>
       <SheetHeader>
-        <SheetTitle>Account</SheetTitle>
+        <div className="flex min-w-0 items-center gap-2">
+          <BuildingIcon aria-hidden className="text-icon size-3.5 shrink-0" />
+          <SheetTitle>Account details</SheetTitle>
+        </div>
         <SheetDescription className="sr-only">
-          Stage, owner and recent activity for this account
+          Summary, pipeline health, activity and properties for this account
         </SheetDescription>
         <div className="-mr-2 flex items-center gap-1">
           {account && (
@@ -83,49 +94,29 @@ function PeekBody({ account }: { account: Account }) {
   const save = useRecordUpdate(update, account._id);
   const people = useQuery(api.people.list, { accountId: account._id });
   const deals = useQuery(api.deals.list, { accountId: account._id });
-  const open = deals?.filter((deal) => isOpenStage(deal.stage));
-  const pipeline = open
-    ? formatTotals(
-        open.map((deal) => deal.amount),
-        "",
-      )
-    : "";
-
-  const summary = [
-    people && `${people.length} ${people.length === 1 ? "person" : "people"}`,
-    open &&
-      `${open.length} open ${open.length === 1 ? "deal" : "deals"}${pipeline ? ` · ${pipeline}` : ""}`,
-  ].filter(Boolean);
 
   return (
     <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
-      <div className="flex items-start gap-3.5 px-6 pt-6 pb-5">
-        <AccountLogo account={account} size="lg" />
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h2
-            title={account.name}
-            className="truncate text-lg leading-6 font-semibold"
+      <DetailHero
+        visual={<AccountLogo account={account} size="lg" />}
+        title={account.name}
+      >
+        <StageAndTags stage={account.stage} tags={account.tags} max={6} />
+        {account.domain && (
+          <a
+            href={`https://${account.domain}`}
+            target="_blank"
+            rel="noreferrer"
+            className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring ml-1.5 truncate rounded-sm outline-none focus-visible:ring-2"
           >
-            {account.name}
-          </h2>
-          <p className="caption-style text-fg-secondary flex min-h-4 items-center gap-1.5">
-            {account.domain && (
-              <a
-                href={`https://${account.domain}`}
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-foreground focus-visible:ring-ring truncate rounded-sm outline-none focus-visible:ring-2"
-              >
-                {account.domain}
-              </a>
-            )}
-            {account.domain && summary.length > 0 && <span aria-hidden>·</span>}
-            <span className="truncate tabular-nums">{summary.join(" · ")}</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="border-border border-t px-6 py-5">
+            {account.domain}
+          </a>
+        )}
+      </DetailHero>
+      <AccountSummary account={account} people={people} />
+      <PipelineHealth accountId={account._id} deals={deals} />
+      <ActivityTrend target={{ accountId: account._id }} />
+      <DetailSection title="Details" className="gap-2">
         <Properties>
           <Property label="Stage">
             <OptionPicker
@@ -163,32 +154,36 @@ function PeekBody({ account }: { account: Account }) {
             />
           </Property>
         </Properties>
-      </div>
-
-      <div className="border-border flex flex-col gap-3 border-t px-6 py-5">
-        <h3 className="caption-style text-fg-tertiary font-medium">Activity</h3>
+      </DetailSection>
+      <AccountVerification accountId={account._id} />
+      <AccountPlatform accountId={account._id} />
+      <DetailSection title="Recent activity" divider={false}>
         <Timeline target={{ accountId: account._id }} compact />
-      </div>
+      </DetailSection>
     </div>
   );
 }
 
 export function PeekSkeleton() {
   return (
-    <div aria-busy className="flex flex-col gap-5 px-6 py-6">
-      <div className="flex items-center gap-3.5">
+    <div aria-busy className="flex flex-col">
+      <div className="shadow-divider flex items-center gap-3 px-6 py-5">
         <Skeleton className="size-12 rounded-xl" />
-        <span className="flex flex-col gap-2">
+        <span className="flex flex-col gap-2.5">
           <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-4 w-28 rounded-full" />
         </span>
       </div>
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-5 w-full" />
-        <Skeleton className="h-5 w-full" />
-        <Skeleton className="h-5 w-3/4" />
-      </div>
-      <Skeleton className="h-24 w-full rounded-xl" />
+      {[0, 1, 2].map((index) => (
+        <div
+          key={index}
+          className="shadow-divider flex flex-col gap-4 px-6 py-5"
+        >
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-3 w-full" />
+        </div>
+      ))}
     </div>
   );
 }

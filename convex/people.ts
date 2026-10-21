@@ -24,6 +24,7 @@ import {
   type ImportResult,
 } from "./lib/records";
 import { diff, logChanges, logSystem } from "./lib/timeline";
+import { bucketCounts, isInteraction, windowStart } from "./timeline";
 
 const MAX_TEXT = 120;
 
@@ -170,7 +171,12 @@ function toClient(
     tags: person.tags,
     platformUserId: person.platformUserId ?? null,
     account: account
-      ? { _id: account._id, name: account.name, domain: account.domain ?? null }
+      ? {
+          _id: account._id,
+          name: account.name,
+          domain: account.domain ?? null,
+          logoUrl: account.logoUrl ?? null,
+        }
       : null,
     owner: memberRef(members, person.ownerId),
     lastActivityAt: person.lastActivityAt ?? null,
@@ -201,6 +207,59 @@ export const list = memberQuery({
     return people
       .filter((person) => !person.archivedAt)
       .map((person) => toClient(person, members, accountById));
+  },
+});
+
+const TREND_DAYS = 14;
+
+/**
+ * Per-person rollups for the list: timeline entries per day for the last two
+ * weeks and the latest logged interaction. Apart from `list` so timeline churn
+ * doesn't re-run it.
+ */
+export const listStats = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const since = windowStart(TREND_DAYS, now);
+    const people = await ctx.db.query("people").collect();
+    return await Promise.all(
+      people
+        .filter((person) => !person.archivedAt)
+        .map(async (person) => {
+          const recent = await ctx.db
+            .query("timeline")
+            .withIndex("by_person", (q) =>
+              q.eq("personId", person._id).gte("occurredAt", since),
+            )
+            .collect();
+          let last: Doc<"timeline"> | null = null;
+          for await (const entry of ctx.db
+            .query("timeline")
+            .withIndex("by_person", (q) => q.eq("personId", person._id))
+            .order("desc")) {
+            if (isInteraction(entry.kind)) {
+              last = entry;
+              break;
+            }
+          }
+          return {
+            personId: person._id,
+            trend: bucketCounts(
+              recent.map((entry) => entry.occurredAt),
+              TREND_DAYS,
+              now,
+            ),
+            lastInteraction: last
+              ? {
+                  at: last.occurredAt,
+                  kind: last.kind,
+                  subject: last.subject ?? null,
+                }
+              : null,
+          };
+        }),
+    );
   },
 });
 

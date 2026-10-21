@@ -100,7 +100,7 @@ export default function TimelineComposer({
   return (
     <form
       onSubmit={submit}
-      className="border-border bg-card focus-within:border-line-strong duration-fast rounded-xl border transition-colors"
+      className="bg-card shadow-card focus-within:ring-line-strong duration-fast rounded-xl ring-1 ring-transparent transition-shadow"
     >
       <div
         role="tablist"
@@ -117,8 +117,8 @@ export default function TimelineComposer({
               aria-selected={kind === value}
               onClick={() => setKind(value)}
               className={cn(
-                "caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 transition-colors outline-none focus-visible:ring-2",
-                kind === value && "bg-overlay-2 text-foreground",
+                "caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 transition-colors outline-none focus-visible:ring-2",
+                kind === value && "bg-raised text-foreground shadow-hairline",
               )}
             >
               <meta.icon aria-hidden className="size-3" />

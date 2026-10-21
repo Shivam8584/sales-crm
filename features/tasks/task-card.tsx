@@ -4,6 +4,7 @@ import Link from "next/link";
 import Avatar from "@/components/_ui/avatar";
 import Tag from "@/components/_ui/tag";
 import AccountLogo from "@/features/accounts/account-logo";
+import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
@@ -57,10 +58,13 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
 export function RecordChip({
   task,
   hide,
+  meta = false,
   className,
 }: {
   task: ChipRecord;
   hide?: HiddenRecord;
+  /** Inline in a card's meta line rather than on its own. */
+  meta?: boolean;
   className?: string;
 }) {
   const target = chipTarget(task, hide);
@@ -70,7 +74,8 @@ export function RecordChip({
       <Link
         href={target.href}
         className={cn(
-          "caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast ease-power3-out -mx-1 -my-0.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors outline-none focus-visible:ring-2",
+          "hover:text-foreground focus-visible:ring-ring duration-fast ease-power3-out -mx-1 -my-0.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors outline-none focus-visible:ring-2",
+          meta ? "text-fg-tertiary" : "caption-style text-fg-secondary",
           className,
         )}
       >
@@ -138,24 +143,45 @@ export function AutoTag({ className }: { className?: string }) {
   );
 }
 
+/** Board card body: status and title, created date and record, then property chips. */
 export default function TaskCard({ task }: { task: TaskRow }) {
   const done = task.status === "done";
+  const hasRecord = Boolean(
+    task.person || task.account || task.deal || task.lead,
+  );
   return (
-    <div className="group/card flex flex-col gap-2.5">
-      <div className="flex items-start gap-2">
-        <DoneToggle task={task} className="mt-px" />
-        <h3
-          className={cn(
-            "lead-style line-clamp-2 min-w-0 flex-1 leading-snug font-medium break-words",
-            done && "text-fg-secondary",
+    <>
+      <div className="flex flex-col gap-2 p-4">
+        <div className="flex items-start gap-2">
+          <DoneToggle task={task} className="mt-0.75" />
+          <h3
+            className={cn(
+              "lead-style line-clamp-2 min-w-0 flex-1 leading-5 font-medium break-words",
+              done && "text-fg-secondary",
+            )}
+          >
+            {task.title}
+          </h3>
+          {task.automated && <AutoTag className="mt-0.5" />}
+        </div>
+        <div className="text-fg-tertiary flex min-w-0 items-center gap-2 text-[13px] leading-5">
+          <span className="shrink-0 whitespace-nowrap">
+            Created {shortDate(task._creationTime)}
+          </span>
+          {hasRecord && (
+            <>
+              <span
+                aria-hidden
+                className="bg-fg-disabled size-0.75 shrink-0 rounded-full"
+              />
+              <RecordChip task={task} meta className="min-w-0" />
+            </>
           )}
-        >
-          {task.title}
-        </h3>
-        {task.automated && <AutoTag className="-my-px" />}
+        </div>
       </div>
-      <RecordChip task={task} />
-      <TaskChips task={task} />
-    </div>
+      <div className="border-border border-t px-4 py-3">
+        <TaskChips task={task} />
+      </div>
+    </>
   );
 }

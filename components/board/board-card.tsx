@@ -27,9 +27,9 @@ export function CardSurface({
   return (
     <div
       className={cn(
-        "bg-card shadow-card relative flex w-full flex-col gap-2.5 rounded-xl p-3",
+        "bg-card shadow-card relative flex w-full flex-col overflow-clip rounded-2xl",
         lifted &&
-          "shadow-overlay ring-selected/40 animate-card-lift -rotate-3 ring-2 motion-reduce:animate-none",
+          "shadow-overlay animate-card-lift -rotate-4 motion-reduce:animate-none",
         invisible && "invisible",
         className,
       )}
@@ -123,13 +123,13 @@ export default function BoardCard({
         onClick={onClick}
         onKeyDown={onKeyDown}
         className={cn(
-          "focus-visible:ring-ring cursor-grab touch-manipulation rounded-xl outline-none focus-visible:ring-2",
+          "group/card focus-visible:ring-ring cursor-grab touch-manipulation rounded-2xl outline-none focus-visible:ring-2",
           isDragging && "cursor-grabbing",
         )}
       >
         <CardSurface
           invisible={hidden}
-          className="hover:bg-raised duration-fast ease-power3-out transition-colors"
+          className="duration-fast ease-power3-out group-hover/card:bg-raised transition-[translate,background-color] group-hover/card:-translate-y-0.5 motion-reduce:group-hover/card:translate-y-0"
         >
           {children}
         </CardSurface>

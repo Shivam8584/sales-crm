@@ -8,6 +8,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import FilterMenu from "@/components/_common/filter-menu";
+import { useBoardPrefs } from "@/components/board/board-prefs";
+import { HiddenColumnsToggle } from "@/components/board/hidden-columns";
 import SearchInput from "@/components/data-table/search-input";
 import type { SortState } from "@/components/data-table/types";
 import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
@@ -72,6 +74,7 @@ export default function TasksPage() {
   const [group, setGroup] = useUrlState("group", "due");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const boardPrefs = useBoardPrefs("tasks");
 
   useEffect(() => {
     if (!taskParam) return;
@@ -285,6 +288,7 @@ export default function TasksPage() {
           ]}
           className={view === "list" ? "max-sm:ml-auto" : "ml-auto"}
         />
+        {view !== "list" && <HiddenColumnsToggle prefs={boardPrefs} />}
       </PageToolbar>
       <div className="relative flex min-h-0 flex-1 flex-col">
         {view === "list" ? (
@@ -309,6 +313,7 @@ export default function TasksPage() {
         ) : rows ? (
           <TasksBoard
             tasks={rows}
+            prefs={boardPrefs}
             assigneeId={(assigneeFilter as Id<"members"> | null) ?? undefined}
             overlay={boardOverlay}
           />

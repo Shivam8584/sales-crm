@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
 import Avatar from "@/components/_ui/avatar";
+import Button from "@/components/_ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +23,6 @@ import {
   type ThemePreference,
 } from "@/lib/theme";
 import { useUiStore } from "@/stores/ui-store";
-import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
 import SunIcon from "@/public/assets/icons/sun.svg";
 import MoonIcon from "@/public/assets/icons/moon.svg";
 import MonitorIcon from "@/public/assets/icons/monitor.svg";
@@ -34,58 +34,47 @@ const THEMES = [
   { value: "dark", label: "Dark", icon: MoonIcon },
 ] as const;
 
-export default function UserMenu({
-  collapsed = false,
-}: {
-  collapsed?: boolean;
-}) {
+/** Avatar pill in the page header: profile, theme, shortcuts and sign out. */
+export default function UserMenu() {
   const router = useRouter();
   const viewer = useViewer();
   const theme = useThemePreference();
   const { signOut } = useAuthActions();
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen);
-  const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={`Account menu for ${viewer.name}`}
-        className="group hover:bg-overlay-2 data-[state=open]:bg-overlay-2 focus-visible:ring-ring duration-fast collapsed:size-8 collapsed:justify-center collapsed:p-0 flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors outline-none focus-visible:ring-2"
-      >
-        <Avatar
-          name={viewer.name}
-          size="md"
-          className="collapsed:size-6 collapsed:text-[10px]"
-        />
-        <span className="collapsed:hidden flex min-w-0 flex-1 flex-col gap-1">
-          <span className="lead-style truncate font-medium">{viewer.name}</span>
-          <span className="caption-style text-fg-tertiary truncate">
-            {ROLE_LABEL[viewer.role]}
-          </span>
-        </span>
-        <ChevronDownIcon
-          aria-hidden
-          className="text-fg-tertiary duration-base collapsed:hidden size-3 shrink-0 transition-transform group-data-[state=open]:rotate-180"
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        side={collapsed ? "right" : "top"}
-        align={collapsed ? "end" : "start"}
-        className={
-          collapsed ? "w-56" : "w-(--radix-dropdown-menu-trigger-width)"
-        }
-      >
-        <DropdownMenuLabel className="truncate">
-          {viewer.email}
-        </DropdownMenuLabel>
-        <DropdownMenuItem
-          onSelect={() => {
-            setSidebarOpen(false);
-            router.push("/settings/profile");
-          }}
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="secondary"
+          size="avatar"
+          aria-label={`Account menu for ${viewer.name}`}
+          className="data-[state=open]:bg-muted max-sm:size-control-md max-sm:p-0"
         >
+          <Avatar name={viewer.name} />
+          <span className="max-w-32 truncate max-sm:hidden">{viewer.name}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        <div className="flex items-center gap-2.5 px-2 py-2">
+          <Avatar name={viewer.name} size="md" />
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="lead-style truncate font-medium">
+              {viewer.name}
+            </span>
+            <span className="caption-style text-fg-tertiary truncate">
+              {ROLE_LABEL[viewer.role]} · {viewer.email}
+            </span>
+          </span>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => router.push("/settings/profile")}>
           <SettingsIcon aria-hidden className="text-fg-tertiary size-3.5" />
           Profile settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setShortcutsOpen(true)}>
+          Keyboard shortcuts
+          <Kbd className="ml-auto h-4 min-w-4 px-1">?</Kbd>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Theme</DropdownMenuLabel>
@@ -103,15 +92,6 @@ export default function UserMenu({
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() => {
-            setSidebarOpen(false);
-            setShortcutsOpen(true);
-          }}
-        >
-          Keyboard shortcuts
-          <Kbd className="ml-auto h-4 min-w-4 px-1">?</Kbd>
-        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void signOut()}>
           Sign out
         </DropdownMenuItem>

@@ -7,7 +7,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentType,
   type ReactNode,
+  type SVGProps,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -26,7 +28,10 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { motion } from "motion/react";
+import Button from "@/components/_ui/button";
 import type { TagTone } from "@/components/_ui/tag";
+import type { BadgeTone } from "@/components/_common/status-badge";
+import { toast } from "@/stores/toast-store";
 import { useMobileBreakpoints } from "@/hooks/use-mobile-breakpoints";
 import { useMounted } from "@/hooks/use-mounted";
 import { cn } from "@/lib/utils";
@@ -37,12 +42,23 @@ import {
   markDragEnd,
   type Placement,
 } from "./board-drag";
+import type { BoardPrefs } from "./board-prefs";
+import HiddenColumnsPanel from "./hidden-columns";
 
+type Icon = ComponentType<SVGProps<SVGSVGElement>>;
+
+/** A column shows a StatusBadge when it has an icon, a tone dot otherwise. */
 export type BoardColumnDef = {
   id: string;
   name: string;
-  tone: TagTone;
+  /** Shown under the header, e.g. column totals. */
   summary?: ReactNode;
+} & ({ icon: Icon; tone: BadgeTone } | { icon?: undefined; tone: TagTone });
+
+export type BoardSort<T> = {
+  id: string;
+  label: string;
+  compare: (a: T, b: T) => number;
 };
 
 type Point = { x: number; y: number };
@@ -83,12 +99,24 @@ type BoardProps<T extends { id: string }> = {
   columnOf: (item: T) => string;
   renderCard: (item: T) => ReactNode;
   getLabel: (item: T) => string;
-  onMove: (id: string, columnId: string, beforeId: string | null) => void;
+  /** Return `false` when the move waits on the user (e.g. a reason dialog). */
+  onMove: (
+    id: string,
+    columnId: string,
+    beforeId: string | null,
+  ) => void | boolean;
   /** Enter, or a click with ⌘/Ctrl held (plain click when there's no `onPeek`). */
   onOpen: (id: string) => void;
   /** Plain click; when set, the card opens a peek and ⌘/Ctrl-click or Enter opens the page. */
   onPeek?: (id: string) => void;
   onAdd?: (columnId: string) => void;
+  /** Inline content above a column's cards, e.g. a composer; not counted. */
+  renderColumnTop?: (columnId: string) => ReactNode;
+  /** Column menu sorts; `onReorder` persists the new order. */
+  sorts?: BoardSort<T>[];
+  onReorder?: (columnId: string, ids: string[], sort: BoardSort<T>) => void;
+  /** Hidden columns and panel state from `useBoardPrefs`. */
+  prefs?: BoardPrefs;
   addLabel?: string;
   emptyLabel?: string;
   overlay?: ReactNode;
@@ -104,6 +132,10 @@ export default function Board<T extends { id: string }>({
   onOpen,
   onPeek,
   onAdd,
+  renderColumnTop,
+  sorts = [],
+  onReorder,
+  prefs,
   addLabel = "Add",
   emptyLabel = "Nothing here yet",
   overlay,
@@ -179,6 +211,38 @@ export default function Board<T extends { id: string }>({
   const activeItem = activeId
     ? (items.find((item) => item.id === activeId) ?? null)
     : null;
+
+  const hiddenIds = prefs?.hidden;
+  const visibleColumns = hiddenIds
+    ? columns.filter((column) => !hiddenIds.has(column.id))
+    : columns;
+  const hiddenColumns = hiddenIds
+    ? columns.filter((column) => hiddenIds.has(column.id))
+    : [];
+  const counts = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(byColumn).map(([id, list]) => [id, list.length]),
+      ),
+    [byColumn],
+  );
+
+  const hideColumn = (column: BoardColumnDef) => {
+    if (!prefs) return;
+    prefs.setHidden(column.id, true);
+    toast(`${column.name} moved to hidden columns`, () =>
+      prefs.setHidden(column.id, false),
+    );
+  };
+  const showColumn = (column: BoardColumnDef) => {
+    prefs?.setHidden(column.id, false);
+  };
+  const sortColumn = (column: BoardColumnDef, sort: BoardSort<T>) => {
+    const ids = [...(byColumn[column.id] ?? [])]
+      .sort(sort.compare)
+      .map((item) => item.id);
+    onReorder?.(column.id, ids, sort);
+  };
 
   const updatePlacement = useCallback((next: Placement | null) => {
     placementRef.current = next;
@@ -290,6 +354,16 @@ export default function Board<T extends { id: string }>({
   const computePlacement = (pointer: Point, id: string): Placement | null => {
     const hit = document.elementFromPoint(pointer.x, pointer.y);
     updateEdge(pointer, hit);
+    const hiddenRow = hit?.closest<HTMLElement>("[data-hidden-column]");
+    if (hiddenRow?.dataset.hiddenColumn) {
+      lockRef.current = null;
+      return {
+        columnId: hiddenRow.dataset.hiddenColumn,
+        index: Number.MAX_SAFE_INTEGER,
+        beforeId: null,
+        hidden: true,
+      };
+    }
     const lock = lockRef.current;
     if (
       lock &&
@@ -316,6 +390,7 @@ export default function Board<T extends { id: string }>({
       columnId,
       index,
       beforeId: cards[index]?.dataset.boardCard ?? null,
+      hidden: false,
     };
   };
 
@@ -324,7 +399,8 @@ export default function Board<T extends { id: string }>({
     (a !== null &&
       b !== null &&
       a.columnId === b.columnId &&
-      a.index === b.index);
+      a.index === b.index &&
+      a.hidden === b.hidden);
 
   const onDragStart = ({ active, activatorEvent }: DragStartEvent) => {
     if (snapTimerRef.current) window.clearTimeout(snapTimerRef.current);
@@ -371,7 +447,15 @@ export default function Board<T extends { id: string }>({
       if (!unchanged) {
         setSettledId(id);
         window.setTimeout(() => setSettledId(null), 150);
-        onMove(id, target.columnId, target.beforeId);
+        const moved = onMove(id, target.columnId, target.beforeId);
+        if (
+          moved !== false &&
+          target.hidden &&
+          columnOf(item) !== target.columnId
+        ) {
+          const name = columns.find((c) => c.id === target.columnId)?.name;
+          toast(`Moved to ${name ?? "a hidden column"}`);
+        }
       }
     }
     finish();
@@ -394,48 +478,79 @@ export default function Board<T extends { id: string }>({
         },
       }}
     >
-      <div className="relative flex min-h-0 flex-1">
-        <motion.div
-          ref={scrollerRef}
-          layoutScroll
-          className={cn(
-            "scrollbar-none flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden lg:snap-none",
-            !snapping && "snap-none",
-          )}
-        >
-          {columns.map((column) => (
-            <BoardColumn
-              key={column.id}
-              column={column}
-              items={byColumn[column.id] ?? []}
-              activeItem={activeItem}
-              placement={placement}
-              settledId={settledId}
-              renderCard={renderCard}
-              getLabel={getLabel}
-              onOpen={onOpen}
-              onPeek={onPeek}
-              onAdd={onAdd}
-              addLabel={addLabel}
-              emptyLabel={emptyLabel}
-            />
-          ))}
-        </motion.div>
-        <div
-          aria-hidden
-          className={cn(
-            "from-selected/15 z-sticky-header duration-fast pointer-events-none absolute inset-y-0 left-0 w-16 bg-linear-to-r to-transparent transition-opacity",
-            edgeDir === -1 ? "opacity-100" : "opacity-0",
-          )}
-        />
-        <div
-          aria-hidden
-          className={cn(
-            "from-selected/15 z-sticky-header duration-fast pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent transition-opacity",
-            edgeDir === 1 ? "opacity-100" : "opacity-0",
-          )}
-        />
-        {overlay}
+      <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 min-w-0 flex-1">
+          <motion.div
+            ref={scrollerRef}
+            layoutScroll
+            className={cn(
+              "scrollbar-none flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden lg:snap-none",
+              !snapping && "snap-none",
+            )}
+          >
+            {visibleColumns.map((column) => (
+              <BoardColumn
+                key={column.id}
+                column={column}
+                items={byColumn[column.id] ?? []}
+                activeItem={activeItem}
+                placement={placement}
+                settledId={settledId}
+                renderCard={renderCard}
+                getLabel={getLabel}
+                onOpen={onOpen}
+                onPeek={onPeek}
+                onAdd={onAdd}
+                onHide={hideColumn}
+                sorts={sorts}
+                onSort={onReorder ? sortColumn : undefined}
+                top={renderColumnTop?.(column.id)}
+                addLabel={addLabel}
+                emptyLabel={emptyLabel}
+              />
+            ))}
+            {visibleColumns.length === 0 && (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+                <h2 className="lead-style font-medium">
+                  Every column is hidden
+                </h2>
+                <p className="caption-style text-fg-tertiary max-w-64 leading-snug">
+                  Bring a column back from the hidden columns panel.
+                </p>
+                {prefs && (
+                  <Button variant="secondary" size="sm" onClick={prefs.showAll}>
+                    Show all columns
+                  </Button>
+                )}
+              </div>
+            )}
+          </motion.div>
+          <div
+            aria-hidden
+            className={cn(
+              "from-selected/15 z-sticky-header duration-fast pointer-events-none absolute inset-y-0 left-0 w-16 bg-linear-to-r to-transparent transition-opacity",
+              edgeDir === -1 ? "opacity-100" : "opacity-0",
+            )}
+          />
+          <div
+            aria-hidden
+            className={cn(
+              "from-selected/15 z-sticky-header duration-fast pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent transition-opacity",
+              edgeDir === 1 ? "opacity-100" : "opacity-0",
+            )}
+          />
+          {overlay}
+        </div>
+        {prefs && (
+          <HiddenColumnsPanel
+            prefs={prefs}
+            columns={hiddenColumns}
+            counts={counts}
+            overId={placement?.hidden ? placement.columnId : null}
+            onShow={showColumn}
+            onShowAll={prefs.showAll}
+          />
+        )}
       </div>
       {mounted &&
         createPortal(

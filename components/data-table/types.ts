@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
 
 export type SortDir = "asc" | "desc";
 export type SortState = { id: string; dir: SortDir };
@@ -17,6 +17,19 @@ export type Column<T> = {
   /** Hidden when the viewport is narrower than this many pixels. */
   minViewport?: number;
 };
+
+/** An entry in a row's "…" menu, after the built-in Open / Peek / Select items. */
+export type RowMenuItem = {
+  label: string;
+  onSelect: () => void;
+  icon?: ComponentType<SVGProps<SVGSVGElement>>;
+  shortcut?: string;
+  tone?: "danger";
+  disabled?: boolean;
+};
+
+/** One cell of the calculation bar under a table, e.g. `{ label: "Pipeline", value: "₹4.3L" }`. */
+export type FooterStat = { label: string; value: ReactNode };
 
 export function compareBy<T>(column: Column<T>, dir: SortDir) {
   const factor = dir === "asc" ? 1 : -1;

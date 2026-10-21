@@ -11,7 +11,8 @@ import { literals, vCallOutcome } from "./lib/validators";
 const MAX_BODY = 10_000;
 const PAGE = 200;
 
-const vLoggable = literals(["note", "call", "email", "meeting", "whatsapp"]);
+const LOGGABLE = ["note", "call", "email", "meeting", "whatsapp"] as const;
+const vLoggable = literals(LOGGABLE);
 
 const vTarget = v.union(
   v.object({ accountId: v.id("accounts") }),
@@ -30,23 +31,91 @@ async function touch(ctx: MutationCtx, refs: RecordRefs, at: number) {
   }
 }
 
-function entriesFor(ctx: QueryCtx, target: typeof vTarget.type) {
+function entriesFor(ctx: QueryCtx, target: typeof vTarget.type, since = 0) {
   const timeline = ctx.db.query("timeline");
   if ("accountId" in target) {
     return timeline.withIndex("by_account", (q) =>
-      q.eq("accountId", target.accountId),
+      q.eq("accountId", target.accountId).gte("occurredAt", since),
     );
   }
   if ("personId" in target) {
     return timeline.withIndex("by_person", (q) =>
-      q.eq("personId", target.personId),
+      q.eq("personId", target.personId).gte("occurredAt", since),
     );
   }
   if ("dealId" in target) {
-    return timeline.withIndex("by_deal", (q) => q.eq("dealId", target.dealId));
+    return timeline.withIndex("by_deal", (q) =>
+      q.eq("dealId", target.dealId).gte("occurredAt", since),
+    );
   }
-  return timeline.withIndex("by_lead", (q) => q.eq("leadId", target.leadId));
+  return timeline.withIndex("by_lead", (q) =>
+    q.eq("leadId", target.leadId).gte("occurredAt", since),
+  );
 }
+
+const DAY = 24 * 60 * 60_000;
+// Days are counted in India time, where the team works.
+const IST_OFFSET = 330 * 60_000;
+const INTERACTIONS = new Set<string>(LOGGABLE);
+
+export function isInteraction(kind: string) {
+  return INTERACTIONS.has(kind);
+}
+
+/** Start of the window that holds `days` India-time days, today included. */
+export function windowStart(days: number, now: number) {
+  const today = Math.floor((now + IST_OFFSET) / DAY);
+  return (today - days + 1) * DAY - IST_OFFSET;
+}
+
+/** Counts per bucket of `size` days across the window, oldest first. */
+export function bucketCounts(
+  times: number[],
+  days: number,
+  now: number,
+  size = 1,
+) {
+  const start = windowStart(days, now);
+  const buckets = Array.from({ length: Math.ceil(days / size) }, () => 0);
+  for (const at of times) {
+    if (at < start) continue;
+    const index = Math.floor((at - start) / DAY / size);
+    if (index < buckets.length) buckets[index]++;
+  }
+  return buckets;
+}
+
+const WINDOW_BUCKET = { 7: 1, 30: 1, 90: 3 } as const;
+
+/** Interactions logged on a record in the last 7, 30 or 90 days, by kind and over time. */
+export const activity = memberQuery({
+  args: {
+    target: vTarget,
+    days: v.union(v.literal(7), v.literal(30), v.literal(90)),
+  },
+  handler: async (ctx, { target, days }) => {
+    const now = Date.now();
+    const entries = (
+      await entriesFor(ctx, target, windowStart(days, now)).collect()
+    ).filter((entry) => isInteraction(entry.kind));
+    const count = (...kinds: string[]) =>
+      entries.filter((entry) => kinds.includes(entry.kind)).length;
+    return {
+      touches: entries.length,
+      emails: count("email"),
+      meetings: count("meeting"),
+      calls: count("call", "whatsapp"),
+      notes: count("note"),
+      bucketDays: WINDOW_BUCKET[days],
+      buckets: bucketCounts(
+        entries.map((entry) => entry.occurredAt),
+        days,
+        now,
+        WINDOW_BUCKET[days],
+      ),
+    };
+  },
+});
 
 /**
  * Newest first. An account's timeline includes entries logged on its people
