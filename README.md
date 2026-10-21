@@ -162,8 +162,12 @@ From the repo, with `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY` 
 set -a; . ./.env.production.local; set +a
 npx convex deploy                                    # functions, schema, crons
 git ls-files -co --exclude-standard > /tmp/files.txt
-rsync -a --delete --files-from=/tmp/files.txt --rsync-path="sudo rsync" ./ ampere2:/opt/hypedrive-crm/src/
-ssh ampere2 'cd /opt/hypedrive-crm && sudo docker compose build web && sudo docker compose up -d web'
+rsync -a --files-from=/tmp/files.txt --rsync-path="sudo rsync" ./ ampere2:/opt/hypedrive-crm/src/
+# --files-from never deletes, so remove files deleted from the repo by hand
+ssh ampere2 "sudo find /opt/hypedrive-crm/src -path '*/node_modules' -prune -o -path '*/.next' -prune -o -type f -printf '%P\n'" \
+  | LC_ALL=C sort | LC_ALL=C comm -23 - <(LC_ALL=C sort /tmp/files.txt) | grep -v '^\.env' \
+  | ssh ampere2 "sudo sh -c 'cd /opt/hypedrive-crm/src && xargs -r -d \"\\n\" rm -f'"
+ssh ampere2 "sudo sh -c 'cd /opt/hypedrive-crm && docker compose build web && docker compose up -d web'"
 ```
 
 The production workspace is a demo for now (`DEMO_DEPLOYMENT=1`), so it can be reset to fresh demo data:
