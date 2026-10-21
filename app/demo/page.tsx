@@ -8,7 +8,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function Page({ searchParams }: PageProps<"/demo">) {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const params = await searchParams;
   const theme =
     params.theme === "light" || params.theme === "dark" ? params.theme : null;

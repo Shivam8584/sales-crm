@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type RecordType = "account" | "person";
+export type RecordType = "account" | "person" | "lead" | "deal";
 
 export type Peek = { type: RecordType; id: string } | null;
 

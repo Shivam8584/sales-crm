@@ -158,7 +158,7 @@ export default function TeamPage() {
             memberHref={(member) => {
               const query = new URLSearchParams(params);
               query.set("member", member._id);
-              return `/team?${query}`;
+              return `/settings/team?${query}`;
             }}
             empty={
               <EmptyState

@@ -19,7 +19,7 @@ import AccountLogo from "@/features/accounts/account-logo";
 import { personName } from "@/lib/domain/labels";
 import { useUiStore } from "@/stores/ui-store";
 import PlusIcon from "@/public/assets/icons/plus.svg";
-import { NAV_ITEMS } from "./navigation";
+import { ALL_NAV_ITEMS } from "./navigation";
 
 export default function CommandMenu() {
   const router = useRouter();
@@ -81,7 +81,7 @@ export default function CommandMenu() {
             </CommandItem>
           </CommandGroup>
           <CommandGroup heading="Go to">
-            {NAV_ITEMS.map((item) => (
+            {ALL_NAV_ITEMS.map((item) => (
               <CommandItem
                 key={item.href}
                 value={`Go to ${item.label}`}

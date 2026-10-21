@@ -10,14 +10,14 @@ import {
 import Kbd from "@/components/_ui/kbd";
 import { MOD_KEY } from "@/lib/keyboard";
 import { useUiStore } from "@/stores/ui-store";
-import { NAV_ITEMS, TEAM_ITEM } from "./navigation";
+import { ALL_NAV_ITEMS } from "./navigation";
 
 const GROUPS = [
   {
     title: "General",
     items: [
       { keys: [MOD_KEY, "K"], label: "Search and commands" },
-      ...[...NAV_ITEMS, TEAM_ITEM].map((item) => ({
+      ...ALL_NAV_ITEMS.map((item) => ({
         keys: ["G", item.shortcut],
         label: `Go to ${item.label.toLowerCase()}`,
       })),

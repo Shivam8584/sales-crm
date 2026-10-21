@@ -7,7 +7,7 @@ import { MOD_KEY } from "@/lib/keyboard";
 import { useUiStore } from "@/stores/ui-store";
 import Logo from "@/public/assets/images/_common/logo.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
-import { NAV_ITEMS, TEAM_ITEM, isActive } from "../navigation";
+import { NAV_SECTIONS, SETTINGS_ITEM, isActive } from "../navigation";
 import SidebarNavItem from "./sidebar-nav-item";
 import UserMenu from "./user-menu";
 import NotificationBell from "@/features/notifications/notification-bell";
@@ -47,29 +47,38 @@ export default function SidebarContent() {
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <nav aria-label="Primary" className="px-3 py-2">
-          <ul className="flex flex-col gap-0.5">
-            {NAV_ITEMS.map((item) => (
-              <SidebarNavItem
-                key={item.href}
-                href={item.href}
-                icon={item.icon}
-                label={item.label}
-                active={isActive(pathname, item.href)}
-                onNavigate={close}
-              />
-            ))}
-          </ul>
+        <nav aria-label="Primary" className="flex flex-col gap-4 px-3 py-2">
+          {NAV_SECTIONS.map((section, index) => (
+            <div key={section.title ?? index} className="flex flex-col gap-1">
+              {section.title && (
+                <h2 className="caption-style text-fg-tertiary px-2 pb-0.5 font-medium">
+                  {section.title}
+                </h2>
+              )}
+              <ul className="flex flex-col gap-0.5">
+                {section.items.map((item) => (
+                  <SidebarNavItem
+                    key={item.href}
+                    href={item.href}
+                    icon={item.icon}
+                    label={item.label}
+                    active={isActive(pathname, item.href)}
+                    onNavigate={close}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
       </ScrollArea>
 
       <div className="border-sidebar-border shrink-0 border-t p-2">
         <ul className="mb-1 px-1">
           <SidebarNavItem
-            href={TEAM_ITEM.href}
-            icon={TEAM_ITEM.icon}
-            label={TEAM_ITEM.label}
-            active={isActive(pathname, TEAM_ITEM.href)}
+            href={SETTINGS_ITEM.href}
+            icon={SETTINGS_ITEM.icon}
+            label={SETTINGS_ITEM.label}
+            active={isActive(pathname, SETTINGS_ITEM.href)}
             onNavigate={close}
           />
         </ul>
