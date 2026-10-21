@@ -200,7 +200,7 @@ function AccountView({ account }: { account: Account }) {
               }
               subtitle={
                 <>
-                  <span className="flex min-w-0 items-center gap-0.75">
+                  <span className="flex min-w-0 flex-wrap items-center gap-0.75 gap-y-1">
                     <OptionPicker
                       value={account.stage}
                       label="Stage"
@@ -213,7 +213,7 @@ function AccountView({ account }: { account: Account }) {
                     >
                       <StageTag stage={account.stage} />
                     </OptionPicker>
-                    <StageAndTags tags={account.tags} max={4} />
+                    <StageAndTags tags={account.tags} max={4} wrap />
                   </span>
                   {account.domain && (
                     <a

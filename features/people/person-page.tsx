@@ -261,7 +261,7 @@ function PersonView({ person }: { person: Person }) {
                       <span className="truncate">{person.account.name}</span>
                     </Link>
                   )}
-                  <StageAndTags tags={person.tags} max={4} />
+                  <StageAndTags tags={person.tags} max={4} wrap />
                 </span>
                 {person.owner && (
                   <span className="flex min-w-0 items-center gap-1.5">

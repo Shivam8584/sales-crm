@@ -607,7 +607,12 @@ function KitDemoContent() {
             columnOf={(card) => card.column}
             getLabel={(card) => card.title}
             renderCard={(card) => (
-              <span className="lead-style">{card.title}</span>
+              <span className="flex flex-col gap-1.5 p-3">
+                <span className="lead-style font-medium">{card.title}</span>
+                <span className="caption-style text-fg-tertiary">
+                  Drag to move · Enter to open
+                </span>
+              </span>
             )}
             onMove={(id, column) =>
               setCards((current) =>

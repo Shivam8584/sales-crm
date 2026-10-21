@@ -392,10 +392,7 @@ export function DuePicker({
           )}
         >
           {overdue && label ? (
-            <>
-              Overdue
-              <span className="text-fg-tertiary tabular-nums">{label}</span>
-            </>
+            "Overdue"
           ) : (
             <>
               <CalendarIcon

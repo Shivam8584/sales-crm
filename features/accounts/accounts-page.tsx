@@ -103,7 +103,7 @@ const COLUMNS: Column<AccountRow>[] = [
   {
     id: "name",
     header: "Account",
-    width: "minmax(9.5rem,1.3fr)",
+    width: "minmax(10.5rem,1.3fr)",
     sortValue: (row) => row.name,
     cell: (row) => (
       <>
@@ -117,14 +117,14 @@ const COLUMNS: Column<AccountRow>[] = [
   {
     id: "stage",
     header: "Stage & tags",
-    width: "minmax(12rem,1.2fr)",
+    width: "minmax(12.5rem,1.3fr)",
     sortValue: (row) => LIFECYCLE_STAGES.indexOf(row.stage),
     cell: (row) => <StageAndTags stage={row.stage} tags={row.tags} />,
   },
   {
     id: "owner",
     header: "Owner",
-    width: "minmax(9rem,1fr)",
+    width: "minmax(8.75rem,1fr)",
     minViewport: 900,
     sortValue: (row) => row.owner?.name ?? null,
     cell: (row) => <OwnerCell owner={row.owner} />,
@@ -132,7 +132,7 @@ const COLUMNS: Column<AccountRow>[] = [
   {
     id: "deals",
     header: "Open deals",
-    width: "6.75rem",
+    width: "6.5rem",
     align: "end",
     defaultDir: "desc",
     minViewport: 1100,
@@ -162,7 +162,7 @@ const COLUMNS: Column<AccountRow>[] = [
   {
     id: "trend",
     header: "Activity trend",
-    width: "7rem",
+    width: "6.5rem",
     minViewport: 1400,
     cell: (row) => <TrendCell values={row.trend} />,
   },

@@ -124,7 +124,9 @@ export function BigNumber({
         <span
           className={cn(
             "block leading-none",
-            size === "display" ? "text-display font-semibold" : "text-2xl",
+            size === "display"
+              ? "text-display font-semibold"
+              : "text-2xl font-semibold",
           )}
         >
           {value}

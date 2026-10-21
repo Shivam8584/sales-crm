@@ -101,13 +101,13 @@ function PeekBody({ account }: { account: Account }) {
         visual={<AccountLogo account={account} size="lg" />}
         title={account.name}
       >
-        <StageAndTags stage={account.stage} tags={account.tags} max={6} />
+        <StageAndTags stage={account.stage} tags={account.tags} max={6} wrap />
         {account.domain && (
           <a
             href={`https://${account.domain}`}
             target="_blank"
             rel="noreferrer"
-            className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring ml-1.5 truncate rounded-sm outline-none focus-visible:ring-2"
+            className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring basis-full truncate rounded-sm outline-none focus-visible:ring-2"
           >
             {account.domain}
           </a>

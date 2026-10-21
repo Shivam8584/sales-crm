@@ -41,7 +41,7 @@ export function StatusIcon({
 
 export const PRIORITY_TEXT: Record<Priority, string> = {
   urgent: "text-warning",
-  high: "text-(--tag-orange-text)",
+  high: "text-warning",
   normal: "text-info",
   low: "text-success",
 };

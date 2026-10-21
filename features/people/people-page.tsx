@@ -45,7 +45,6 @@ import LogCallDialog from "@/features/timeline/log-call-dialog";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { personName } from "@/lib/domain/labels";
-import { formatPhone } from "@/lib/domain/normalize";
 import { downloadCsv } from "@/lib/csv";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
@@ -583,9 +582,11 @@ export default function PeoplePage() {
                   </span>
                 </span>
               </span>
-              <span className="caption-style text-fg-secondary shrink-0">
-                <LastInteractionCell last={row.lastInteraction} />
-              </span>
+              {row.lastInteraction && (
+                <span className="caption-style text-fg-secondary shrink-0">
+                  <LastInteractionCell last={row.lastInteraction} />
+                </span>
+              )}
             </span>
           )}
           empty={

@@ -123,7 +123,7 @@ function PeekBody({
             <span className="truncate">{person.account.name}</span>
           </Link>
         )}
-        <StageAndTags tags={person.tags} max={3} />
+        <StageAndTags tags={person.tags} max={3} wrap />
         {!person.title && !person.account && person.tags.length === 0 && (
           <span className="caption-style text-fg-tertiary">
             No title or account yet

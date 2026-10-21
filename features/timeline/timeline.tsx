@@ -163,7 +163,7 @@ export default function Timeline({
         <div className="flex flex-col gap-4">
           {groups.map((group) => (
             <section key={group.key} aria-label={group.label}>
-              <h3 className="eyebrow-style text-fg-secondary bg-background sticky top-0 z-1 flex items-center gap-3 py-2">
+              <h3 className="eyebrow-style text-fg-secondary flex items-center gap-3 py-2">
                 {group.label}
                 <span aria-hidden className="bg-line-strong h-px flex-1" />
               </h3>

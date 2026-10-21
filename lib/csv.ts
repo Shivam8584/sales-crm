@@ -2,7 +2,8 @@ export type CsvCell = string | number;
 
 function escapeCell(cell: CsvCell) {
   let value = String(cell);
-  if (/^[=+\-@\t\r]/.test(value)) value = `'${value}`;
+  // E.164 phone numbers start with "+" but cannot be formulas.
+  if (/^[=+\-@\t\r]/.test(value) && !/^\+\d+$/.test(value)) value = `'${value}`;
   if (/[",\r\n]/.test(value)) value = `"${value.replace(/"/g, '""')}"`;
   return value;
 }

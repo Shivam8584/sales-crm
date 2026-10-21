@@ -48,16 +48,24 @@ export function StageAndTags({
   stage,
   tags,
   max = 2,
+  wrap = false,
 }: {
   stage?: LifecycleStage;
   tags: string[];
   max?: number;
+  /** Wrap onto more lines instead of truncating long tags, for headers. */
+  wrap?: boolean;
 }) {
   const room = Math.max(0, max - (stage ? 1 : 0));
   const visible = tags.slice(0, room);
   const hidden = tags.slice(room);
   return (
-    <span className="flex min-w-0 items-center gap-0.75">
+    <span
+      className={cn(
+        "flex min-w-0 items-center gap-0.75",
+        wrap && "flex-wrap gap-y-1",
+      )}
+    >
       {stage && <StageTag stage={stage} />}
       {visible.map((tag) => (
         <Tag
@@ -65,7 +73,7 @@ export function StageAndTags({
           tone={tagTone(tag)}
           size="sm"
           title={tag}
-          className="max-w-28 min-w-0 shrink"
+          className={cn("min-w-0", !wrap && "max-w-28 shrink")}
         >
           <span className="truncate">{tag}</span>
         </Tag>
@@ -184,8 +192,8 @@ export function ActivationCell({ steps }: { steps: number | null }) {
           : `On Hypedrive · 0 of ${total} steps`
       }
     >
-      <span className="flex items-center gap-2 tabular-nums">
-        <SegmentBar percent={percent} segments={total * 3} className="w-18.5" />
+      <span className="flex items-center gap-1.5 tabular-nums">
+        <SegmentBar percent={percent} segments={total * 2} className="w-14" />
         <span className="w-[4ch] text-right">{percent}%</span>
       </span>
     </Tooltip>
@@ -207,7 +215,7 @@ export function TrendCell({
       <span
         role="img"
         aria-label={`${total} timeline entries in the last ${days} days`}
-        className="flex h-5 items-center pl-3"
+        className="flex h-5 items-center"
       >
         <Sparkline values={values} />
       </span>

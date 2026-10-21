@@ -97,10 +97,10 @@ export default function DealCard({
               className={cn(CHIP, "text-danger")}
               title={`Close date ${formatDay(deal.closeDate)} has passed`}
             >
-              Overdue
-              <span className="text-fg-tertiary tabular-nums">
-                {formatDay(deal.closeDate)}
+              <span className="sr-only">
+                Close date {formatDay(deal.closeDate)},{" "}
               </span>
+              Overdue
             </span>
           ) : (
             <span className={CHIP} title="Expected close date">

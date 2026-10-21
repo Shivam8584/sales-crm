@@ -117,7 +117,7 @@ export function DoneToggle({
         aria-pressed={done}
         onClick={() => void setDone(task, !done)}
         className={cn(
-          "group/done focus-visible:ring-ring relative -m-1 flex size-5.5 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none after:absolute after:-inset-1 after:content-[''] focus-visible:ring-2",
+          "group/done focus-visible:ring-ring relative flex size-3.5 shrink-0 cursor-pointer items-center justify-center rounded-xs outline-none after:absolute after:-inset-2 after:content-[''] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-(--card)",
           className,
         )}
       >
