@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -38,7 +39,13 @@ type DataTableProps<T> = {
   empty: ReactNode;
   /** Page-wide J/K/Enter shortcuts; turn off for secondary tables on a page. */
   keyboard?: boolean;
+  /** Quick actions shown on the right of a hovered or focused row; use `RowAction` buttons. */
+  rowActions?: (row: T) => ReactNode;
+  /** Keep the first column (and the checkbox) visible while scrolling sideways. */
+  stickyFirstColumn?: boolean;
 };
+
+const SKELETON_WIDTHS = ["w-36", "w-28", "w-44", "w-32", "w-24", "w-40"];
 
 /**
  * The list view used by every record type: sortable columns, row selection,
@@ -60,10 +67,13 @@ export default function DataTable<T>({
   onPeek,
   empty,
   keyboard = true,
+  rowActions,
+  stickyFirstColumn = true,
 }: DataTableProps<T>) {
   const router = useRouter();
   const { width, belowSm } = useMobileBreakpoints();
   const [cursor, setCursor] = useState<number | null>(null);
+  const [scrolled, setScrolled] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const selectable = selected !== undefined && onSelectedChange !== undefined;
 
@@ -169,9 +179,35 @@ export default function DataTable<T>({
       ?.scrollIntoView({ block: "nearest" });
   }, [activeCursor]);
 
+  function openRow(row: T, event: MouseEvent<HTMLDivElement>) {
+    if (
+      event.target instanceof Element &&
+      event.target.closest("a, button, input, [role=checkbox], [role=menu]")
+    )
+      return;
+    if (window.getSelection()?.toString()) return;
+    const href = getHref(row);
+    if (event.metaKey || event.ctrlKey) window.open(href, "_blank");
+    else router.push(href);
+  }
+
+  const stickyCell = (index: number) =>
+    stickyFirstColumn && index === 0
+      ? cn(
+          "bg-background group-data-[cursor=true]/row:bg-row-hover group-data-[selected=true]/row:bg-row-selected sticky z-sticky",
+          selectable ? "left-11" : "left-0",
+          "group-data-[scrolled=true]/table:shadow-[inset_-1px_0_0_var(--border)]",
+        )
+      : null;
+  const stickyCheckbox =
+    stickyFirstColumn &&
+    "bg-background group-data-[cursor=true]/row:bg-row-hover group-data-[selected=true]/row:bg-row-selected sticky left-0 z-sticky";
+
   if (sorted && sorted.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto">{empty}</div>
+      <div className="flex min-h-0 flex-1 flex-col justify-center overflow-auto pb-[8vh]">
+        {empty}
+      </div>
     );
   }
 
@@ -182,12 +218,18 @@ export default function DataTable<T>({
           Array.from({ length: SKELETON_ROWS }, (_, index) => (
             <li
               key={index}
+              aria-hidden
               className="border-border flex gap-3 border-b px-4 py-3.5"
             >
               <Skeleton className="size-8 rounded-lg" />
               <span className="flex flex-1 flex-col gap-2 pt-1">
-                <Skeleton className="h-3 w-32" />
-                <Skeleton className="h-3 w-48" />
+                <Skeleton
+                  className={cn(
+                    "h-3",
+                    SKELETON_WIDTHS[index % SKELETON_WIDTHS.length],
+                  )}
+                />
+                <Skeleton className="h-2.5 w-48" />
               </span>
             </li>
           ))}
@@ -211,7 +253,13 @@ export default function DataTable<T>({
       role="table"
       aria-label={label}
       aria-rowcount={sorted ? sorted.length + 1 : undefined}
-      className="scrollbar-none relative min-h-0 flex-1 overflow-auto"
+      aria-busy={!sorted || undefined}
+      data-scrolled={scrolled}
+      onScroll={(event) => {
+        const next = event.currentTarget.scrollLeft > 0;
+        if (next !== scrolled) setScrolled(next);
+      }}
+      className="group/table scrollbar-none relative min-h-0 flex-1 overflow-auto"
     >
       <div className="min-w-fit">
         <div
@@ -222,7 +270,10 @@ export default function DataTable<T>({
           {selectable && (
             <div
               role="columnheader"
-              className="flex items-center justify-center"
+              className={cn(
+                "flex items-center justify-center",
+                stickyFirstColumn && "bg-background z-sticky sticky left-0",
+              )}
             >
               <Checkbox
                 checked={
@@ -244,6 +295,14 @@ export default function DataTable<T>({
               column={column}
               sort={sort}
               first={index === 0 && !selectable}
+              className={cn(
+                stickyFirstColumn &&
+                  index === 0 &&
+                  cn(
+                    "bg-background z-sticky sticky group-data-[scrolled=true]/table:shadow-[inset_-1px_0_0_var(--border)]",
+                    selectable ? "left-11" : "left-0",
+                  ),
+              )}
               onSort={() =>
                 onSortChange(
                   sort.id === column.id
@@ -264,22 +323,35 @@ export default function DataTable<T>({
               <div
                 key={row}
                 role="row"
+                aria-hidden
                 style={template}
                 className="border-border grid h-11 border-b"
               >
-                {selectable && <span />}
+                {selectable && (
+                  <span className="flex items-center justify-center">
+                    <Skeleton className="size-3.5 rounded-sm" />
+                  </span>
+                )}
                 {visibleColumns.map((column, index) => (
                   <div
                     key={column.id}
                     role="cell"
                     className={cn(
-                      "flex items-center px-3",
+                      "flex items-center gap-2.5 px-3",
                       column.align === "end" && "justify-end",
                       index === 0 && !selectable && "pl-4",
                     )}
                   >
+                    {index === 0 && <Skeleton className="size-5 rounded-md" />}
                     <Skeleton
-                      className={cn("h-3", index === 0 ? "w-32" : "w-16")}
+                      className={cn(
+                        "h-3",
+                        index === 0
+                          ? SKELETON_WIDTHS[row % SKELETON_WIDTHS.length]
+                          : column.align === "end"
+                            ? "w-10"
+                            : "w-16",
+                      )}
                     />
                   </div>
                 ))}
@@ -289,6 +361,7 @@ export default function DataTable<T>({
           {sorted?.map((row, rowIndex) => {
             const id = getId(row);
             const isSelected = selectable && selected.has(id);
+            const actions = rowActions?.(row);
             return (
               <div
                 key={id}
@@ -301,12 +374,20 @@ export default function DataTable<T>({
                 onMouseMove={() =>
                   activeCursor !== rowIndex && setCursor(rowIndex)
                 }
-                className="group/row border-border data-[cursor=true]:bg-overlay-1 relative grid h-11 scroll-mt-10 border-b data-[selected=true]:bg-[color-mix(in_srgb,var(--primary)_10%,var(--background))]"
+                onClick={(event) => openRow(row, event)}
+                className="group/row border-border data-[cursor=true]:bg-row-hover data-[selected=true]:bg-row-selected relative grid h-11 cursor-pointer scroll-mt-10 border-b"
               >
                 {selectable && (
                   <div
                     role="cell"
-                    className="z-sticky relative flex items-center justify-center"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (event.target === event.currentTarget) toggle(id);
+                    }}
+                    className={cn(
+                      "flex items-center justify-center",
+                      stickyCheckbox,
+                    )}
                   >
                     <Checkbox
                       checked={isSelected}
@@ -323,22 +404,33 @@ export default function DataTable<T>({
                       "lead-style flex min-w-0 items-center px-3",
                       column.align === "end" && "justify-end tabular-nums",
                       index === 0 && !selectable && "pl-4",
+                      stickyCell(index),
                     )}
                   >
                     {index === 0 ? (
                       <Link
                         href={getHref(row)}
-                        className="focus-visible:after:ring-ring flex min-w-0 items-center gap-2.5 font-medium outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-inset"
+                        className="focus-visible:ring-ring -mx-1 flex min-w-0 items-center gap-2.5 rounded-sm px-1 py-1 font-medium outline-none focus-visible:ring-2"
                       >
                         {column.cell(row)}
                       </Link>
                     ) : (
-                      <div className="z-sticky relative flex min-w-0 items-center [&:not(:has(a,button))]:pointer-events-none">
+                      <div className="flex min-w-0 items-center">
                         {column.cell(row)}
                       </div>
                     )}
                   </div>
                 ))}
+                {actions && (
+                  <div
+                    role="cell"
+                    className="z-sticky pointer-events-none absolute inset-y-0 right-3 flex items-center opacity-0 group-focus-within/row:pointer-events-auto group-focus-within/row:opacity-100 group-data-[cursor=true]/row:pointer-events-auto group-data-[cursor=true]/row:opacity-100"
+                  >
+                    <div className="bg-popover shadow-raised flex items-center gap-0.5 rounded-lg p-0.5">
+                      {actions}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -352,11 +444,13 @@ function HeaderCell<T>({
   column,
   sort,
   first,
+  className,
   onSort,
 }: {
   column: Column<T>;
   sort: SortState;
   first: boolean;
+  className?: string;
   onSort: () => void;
 }) {
   const active = sort.id === column.id;
@@ -370,6 +464,7 @@ function HeaderCell<T>({
         "caption-style text-fg-tertiary flex h-9 items-center px-3",
         column.align === "end" && "justify-end",
         first && "pl-4",
+        className,
       )}
     >
       {column.sortValue ? (

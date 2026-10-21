@@ -93,6 +93,14 @@ async function endOfStage(ctx: QueryCtx, stage: DealStage) {
   return last ? last.position + 1 : 0;
 }
 
+async function startOfStage(ctx: QueryCtx, stage: DealStage) {
+  const first = await ctx.db
+    .query("deals")
+    .withIndex("by_stage_position", (q) => q.eq("stage", stage))
+    .first();
+  return first ? first.position - 1 : 0;
+}
+
 function snapshot(deal: Doc<"deals">): Required<Patch> {
   return {
     title: deal.title,
@@ -206,10 +214,12 @@ export const list = memberQuery({
   },
 });
 
+/** Takes a raw string because the id comes from the URL and may be stale or mistyped. */
 export const get = memberQuery({
-  args: { id: v.id("deals") },
-  handler: async (ctx, { id }) => {
-    const deal = await ctx.db.get(id);
+  args: { id: v.string() },
+  handler: async (ctx, args) => {
+    const id = ctx.db.normalizeId("deals", args.id);
+    const deal = id ? await ctx.db.get(id) : null;
     if (!deal) return null;
     const [row] = await toClient(ctx, [deal], await memberIndex(ctx));
     return row;
@@ -226,6 +236,8 @@ export const create = memberMutation({
     closeDate: v.optional(vDay),
     personIds: v.optional(v.array(v.id("people"))),
     lostReason: v.optional(v.string()),
+    /** Quick-add from the board puts the new card first in its column. */
+    atTop: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const title = cleanTitle(args.title);
@@ -250,7 +262,9 @@ export const create = memberMutation({
       ownerId,
       closeDate: cleanCloseDate(args.closeDate ?? null),
       personIds: await cleanPeople(ctx, args.personIds ?? [], account._id),
-      position: await endOfStage(ctx, stage),
+      position: args.atTop
+        ? await startOfStage(ctx, stage)
+        : await endOfStage(ctx, stage),
       lostReason: stage === "lost" ? lostReason : undefined,
       closedAt: isClosed(stage) ? now : undefined,
       updatedAt: now,
@@ -274,7 +288,6 @@ export const update = memberMutation({
     if (!deal) notFound("Deal");
     const before = snapshot(deal);
     const next: Partial<Doc<"deals">> = {};
-    const label = (field: string) => `${next.title ?? deal.title} · ${field}`;
     const changes: { field: string; from?: string; to?: string }[] = [];
 
     if (patch.title !== undefined) {
@@ -301,7 +314,7 @@ export const update = memberMutation({
       ) {
         next.amount = amount;
         changes.push({
-          field: label("Amount"),
+          field: "Amount",
           from: formatMoney(deal.amount),
           to: formatMoney(amount),
         });
@@ -312,7 +325,7 @@ export const update = memberMutation({
       const owner = await requireActiveMember(ctx, patch.ownerId, "ownerId");
       const from = await ctx.db.get(deal.ownerId);
       next.ownerId = patch.ownerId;
-      changes.push({ field: label("Owner"), from: from?.name, to: owner.name });
+      changes.push({ field: "Owner", from: from?.name, to: owner.name });
     }
 
     if (patch.closeDate !== undefined) {
@@ -320,7 +333,7 @@ export const update = memberMutation({
       if (closeDate !== deal.closeDate) {
         next.closeDate = closeDate;
         changes.push({
-          field: label("Close date"),
+          field: "Close date",
           from: deal.closeDate,
           to: closeDate,
         });
@@ -340,7 +353,7 @@ export const update = memberMutation({
       if (!same) {
         next.personIds = ids;
         changes.push({
-          field: label("Contacts"),
+          field: "Contacts",
           from: await peopleNames(ctx, deal.personIds),
           to: await peopleNames(ctx, ids),
         });
@@ -359,7 +372,7 @@ export const update = memberMutation({
       if (stageChanged) next.position = await endOfStage(ctx, stage);
       else if (effects.lostReason !== deal.lostReason) {
         changes.push({
-          field: label("Lost reason"),
+          field: "Lost reason",
           from: deal.lostReason,
           to: effects.lostReason,
         });

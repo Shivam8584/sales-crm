@@ -14,6 +14,7 @@ import type { TagTone } from "@/components/_ui/tag";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
 import FilterIcon from "@/public/assets/icons/filter.svg";
+import KitDemo from "./kit-demo";
 
 export const metadata: Metadata = {
   title: "Design system",
@@ -261,6 +262,16 @@ export default function DesignSystemPage() {
             ),
           )}
         </div>
+      </Section>
+
+      <Section title="Kit · page header, list, record, board">
+        <p className="text-fg-tertiary max-w-2xl">
+          PageHeader with one primary action and a PageActions overflow menu;
+          DataTable with sticky first column and hover rowActions; RecordTabs
+          with Properties; Board where a click peeks and ⌘/Ctrl-click or Enter
+          opens the page.
+        </p>
+        <KitDemo />
       </Section>
 
       <Section title="Feedback">

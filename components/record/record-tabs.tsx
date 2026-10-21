@@ -24,12 +24,14 @@ export default function RecordTabs({ tabs }: { tabs: RecordTab[] }) {
 
   return (
     <Tabs value={value} onValueChange={setParam}>
-      <TabsList className="border-border scrollbar-none -mx-1 overflow-x-auto border-b px-1">
+      <TabsList className="border-border bg-background z-sticky-header scrollbar-none sticky top-0 -mx-1 gap-5 overflow-x-auto border-b px-1">
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.id} value={tab.id} className="py-3">
+          <TabsTrigger key={tab.id} value={tab.id} className="py-3 text-sm">
             <span className="flex items-center gap-1.5 whitespace-nowrap">
               {tab.label}
-              {tab.count !== undefined && <CountBadge>{tab.count}</CountBadge>}
+              {tab.count !== undefined && tab.count > 0 && (
+                <CountBadge>{tab.count}</CountBadge>
+              )}
             </span>
           </TabsTrigger>
         ))}

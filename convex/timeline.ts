@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { fail, invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
@@ -16,6 +16,7 @@ const vLoggable = literals(["note", "call", "email", "meeting", "whatsapp"]);
 const vTarget = v.union(
   v.object({ accountId: v.id("accounts") }),
   v.object({ personId: v.id("people") }),
+  v.object({ dealId: v.id("deals") }),
   v.object({ leadId: v.id("leads") }),
 );
 
@@ -29,39 +30,52 @@ async function touch(ctx: MutationCtx, refs: RecordRefs, at: number) {
   }
 }
 
-/** Newest first. An account's timeline includes entries logged on its people. */
+function entriesFor(ctx: QueryCtx, target: typeof vTarget.type) {
+  const timeline = ctx.db.query("timeline");
+  if ("accountId" in target) {
+    return timeline.withIndex("by_account", (q) =>
+      q.eq("accountId", target.accountId),
+    );
+  }
+  if ("personId" in target) {
+    return timeline.withIndex("by_person", (q) =>
+      q.eq("personId", target.personId),
+    );
+  }
+  if ("dealId" in target) {
+    return timeline.withIndex("by_deal", (q) => q.eq("dealId", target.dealId));
+  }
+  return timeline.withIndex("by_lead", (q) => q.eq("leadId", target.leadId));
+}
+
+/**
+ * Newest first. An account's timeline includes entries logged on its people
+ * and deals.
+ */
 export const forRecord = memberQuery({
   args: { target: vTarget },
   handler: async (ctx, { target }) => {
-    const entries =
-      "accountId" in target
-        ? await ctx.db
-            .query("timeline")
-            .withIndex("by_account", (q) => q.eq("accountId", target.accountId))
-            .order("desc")
-            .take(PAGE)
-        : "personId" in target
-          ? await ctx.db
-              .query("timeline")
-              .withIndex("by_person", (q) => q.eq("personId", target.personId))
-              .order("desc")
-              .take(PAGE)
-          : await ctx.db
-              .query("timeline")
-              .withIndex("by_lead", (q) => q.eq("leadId", target.leadId))
-              .order("desc")
-              .take(PAGE);
+    const entries = await entriesFor(ctx, target).order("desc").take(PAGE);
     const members = await memberIndex(ctx);
     const personIds = [
       ...new Set(entries.map((entry) => entry.personId).filter(Boolean)),
     ] as Id<"people">[];
+    const dealIds = [
+      ...new Set(entries.map((entry) => entry.dealId).filter(Boolean)),
+    ] as Id<"deals">[];
     const people = new Map<Id<"people">, Doc<"people">>();
     for (const id of personIds) {
       const person = await ctx.db.get(id);
       if (person) people.set(id, person);
     }
+    const deals = new Map<Id<"deals">, Doc<"deals">>();
+    for (const id of dealIds) {
+      const deal = await ctx.db.get(id);
+      if (deal) deals.set(id, deal);
+    }
     return entries.map((entry) => {
       const person = entry.personId ? people.get(entry.personId) : undefined;
+      const deal = entry.dealId ? deals.get(entry.dealId) : undefined;
       return {
         ...entry,
         actor: memberRef(members, entry.actorId),
@@ -71,6 +85,7 @@ export const forRecord = memberQuery({
               name: `${person.firstName} ${person.lastName}`.trim(),
             }
           : null,
+        deal: deal ? { _id: deal._id, title: deal.title } : null,
       };
     });
   },
@@ -115,6 +130,10 @@ export const log = memberMutation({
         accountId: lead.accountId,
         personId: lead.personId,
       };
+    } else if ("dealId" in args.target) {
+      const deal = await ctx.db.get(args.target.dealId);
+      if (!deal) notFound("Deal");
+      refs = { dealId: deal._id, accountId: deal.accountId };
     } else if ("personId" in args.target) {
       const person = await ctx.db.get(args.target.personId);
       if (!person) notFound("Person");

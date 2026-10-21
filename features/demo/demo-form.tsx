@@ -28,6 +28,18 @@ import DemoBooking, { type SubmittedLead } from "./demo-booking";
 const ENDPOINT = `${process.env.NEXT_PUBLIC_CONVEX_SITE_URL ?? ""}/leads`;
 const NETWORK_ERROR =
   "We couldn't send your request. Check your connection and try again.";
+const SERVER_ERROR = "Something went wrong on our side. Try again in a moment.";
+const RATE_ERROR =
+  "You've sent a few requests in a row. Wait a minute and try again.";
+
+function fieldsToFix(found: LeadFieldErrors) {
+  const count = new Set(
+    Object.keys(found).map((field) => (field === "contact" ? "email" : field)),
+  ).size;
+  return count === 1
+    ? "Fix the highlighted field to send your request."
+    : `Fix the ${count} highlighted fields to send your request.`;
+}
 
 type FormState = {
   name: string;
@@ -110,11 +122,10 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
         ? [key, "contact"]
         : [key as LeadFormField];
     if (cleared.some((field) => errors[field])) {
-      setErrors((current) => {
-        const next = { ...current };
-        for (const field of cleared) delete next[field];
-        return next;
-      });
+      const next = { ...errors };
+      for (const field of cleared) delete next[field];
+      setErrors(next);
+      setFormError(Object.keys(next).length > 0 ? fieldsToFix(next) : null);
     }
   }
 
@@ -139,6 +150,7 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
     const check = parseLeadSubmission(payload);
     if (!check.ok) {
       setErrors(check.errors);
+      setFormError(fieldsToFix(check.errors));
       focusFirst(check.errors);
       return;
     }
@@ -157,15 +169,12 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
       };
       if (response.status === 422 && result.errors) {
         setErrors(result.errors);
+        setFormError(fieldsToFix(result.errors));
         focusFirst(result.errors);
         return;
       }
       if (!response.ok || !result.ok) {
-        setFormError(
-          response.status === 429
-            ? "You've sent a few requests in a row. Wait a minute and try again."
-            : NETWORK_ERROR,
-        );
+        setFormError(response.status === 429 ? RATE_ERROR : SERVER_ERROR);
         return;
       }
       setSubmitted({
@@ -201,7 +210,8 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
           Book a demo
         </h2>
         <p className="text-fg-secondary">
-          Takes under a minute. Fields marked * are required.
+          Takes under a minute. Fields marked{" "}
+          <span className="whitespace-nowrap">* are required.</span>
         </p>
       </div>
 

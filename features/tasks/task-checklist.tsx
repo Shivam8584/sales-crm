@@ -6,7 +6,7 @@ import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import { RecordChip } from "./task-card";
+import { AutoTag, RecordChip, type HiddenRecord } from "./task-card";
 import { DueChip } from "./task-chips";
 import { PriorityIcon, type TaskRow } from "./task-meta";
 import { useTaskActions } from "./use-task-actions";
@@ -14,7 +14,7 @@ import { useTaskActions } from "./use-task-actions";
 type TaskChecklistProps = {
   tasks: TaskRow[];
   /** Hide the linked record when the list already sits on that record. */
-  hideRecord?: "account" | "person" | false;
+  hideRecord?: HiddenRecord;
   showAssignee?: boolean;
   className?: string;
 };
@@ -22,7 +22,7 @@ type TaskChecklistProps = {
 /** Compact rows with a complete checkbox; the title opens the task. */
 export default function TaskChecklist({
   tasks,
-  hideRecord = false,
+  hideRecord,
   showAssignee = false,
   className,
 }: TaskChecklistProps) {
@@ -57,14 +57,6 @@ function TaskChecklistRow({
   const { setDone } = useTaskActions();
   const setEdit = useUiStore((state) => state.setEdit);
   const done = task.status === "done";
-  const record =
-    hideRecord === "person"
-      ? null
-      : hideRecord === "account"
-        ? task.person
-          ? { person: task.person, account: null }
-          : null
-        : task;
 
   return (
     <li className="group/card hover:bg-overlay-1 duration-fast flex items-start gap-3 px-3 py-2.5 transition-colors sm:items-center">
@@ -96,7 +88,8 @@ function TaskChecklistRow({
               </span>
             </Tooltip>
           )}
-          {record && <RecordChip task={record} className="max-w-48" />}
+          {task.automated && <AutoTag />}
+          <RecordChip task={task} hide={hideRecord} className="max-w-48" />
           <DueChip task={task} hideEmpty />
           {showAssignee && task.assignee && (
             <Tooltip content={task.assignee.name}>

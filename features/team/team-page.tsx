@@ -10,7 +10,7 @@ import EmptyState from "@/components/_ui/empty-state";
 import FilterMenu from "@/components/_common/filter-menu";
 import SearchInput from "@/components/data-table/search-input";
 import type { SortState } from "@/components/data-table/types";
-import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
+import { SettingsTitle } from "@/features/settings/settings-ui";
 import { useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { ROLES } from "@/lib/domain/enums";
@@ -86,16 +86,11 @@ export default function TeamPage() {
   }
 
   return (
-    <Page>
-      <PageHeader
+    <>
+      <SettingsTitle
         title="Team"
-        meta={
-          activeCount && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {activeCount.length} active
-            </span>
-          )
-        }
+        meta={activeCount && `${activeCount.length} active`}
+        description="Everyone in the workspace and what they can do."
         actions={
           isAdmin && (
             <Button
@@ -109,7 +104,7 @@ export default function TeamPage() {
           )
         }
       />
-      <PageToolbar>
+      <div className="flex flex-wrap items-center gap-2 pb-3">
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -144,44 +139,42 @@ export default function TeamPage() {
             {rows.length} of {team?.length}
           </span>
         )}
-      </PageToolbar>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="flex flex-col">
-          <MembersTable
-            members={rows}
-            team={team ?? []}
-            viewerId={viewer._id}
-            isAdmin={isAdmin}
-            sort={sort}
-            onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
-            memberHref={(member) => {
-              const query = new URLSearchParams(params);
-              query.set("member", member._id);
-              return `/settings/team?${query}`;
-            }}
-            empty={
-              <EmptyState
-                icon={UsersIcon}
-                title="No members match"
-                description="Try another search or clear the filters."
-                action={
-                  <Button variant="secondary" size="sm" onClick={clearFilters}>
-                    Clear filters
-                  </Button>
-                }
-              />
-            }
-          />
-        </div>
-        {isAdmin && (
-          <InvitesSection
-            links={links}
-            onLink={addLink}
-            onInvite={() => setInviteParam("1")}
-          />
-        )}
       </div>
+
+      <div className="border-border overflow-hidden rounded-xl border">
+        <MembersTable
+          members={rows}
+          team={team ?? []}
+          viewerId={viewer._id}
+          isAdmin={isAdmin}
+          sort={sort}
+          onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
+          memberHref={(member) => {
+            const query = new URLSearchParams(params);
+            query.set("member", member._id);
+            return `/settings/team?${query}`;
+          }}
+          empty={
+            <EmptyState
+              icon={UsersIcon}
+              title="No members match"
+              description="Try another search or clear the filters."
+              action={
+                <Button variant="secondary" size="sm" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              }
+            />
+          }
+        />
+      </div>
+      {isAdmin && (
+        <InvitesSection
+          links={links}
+          onLink={addLink}
+          onInvite={() => setInviteParam("1")}
+        />
+      )}
 
       {isAdmin && (
         <InviteDialog
@@ -197,6 +190,6 @@ export default function TeamPage() {
         isAdmin={isAdmin}
         onOpenChange={(open) => !open && setMemberParam("")}
       />
-    </Page>
+    </>
   );
 }

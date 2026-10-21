@@ -52,14 +52,19 @@ export default function AccountVerification({
   const headingId = useId();
 
   if (data === null) return null;
+  const loading = data === undefined || config === undefined;
+
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <h2 id={headingId} className="caption-style text-fg-tertiary font-medium">
+    <section aria-labelledby={headingId} className="flex flex-col gap-1">
+      <h2
+        id={headingId}
+        className="caption-style text-fg-tertiary mb-1.5 font-medium"
+      >
         Verified details
       </h2>
-      {data === undefined || config === undefined ? (
-        <div aria-busy className="flex flex-col gap-2.5">
-          <Skeleton className="h-9 w-full rounded-lg" />
+      {loading ? (
+        <div aria-busy className="flex flex-col gap-2.5 py-1">
+          <Skeleton className="h-8 w-full rounded-lg" />
           <Skeleton className="h-3 w-40" />
           <Skeleton className="h-3 w-56" />
         </div>
@@ -68,6 +73,17 @@ export default function AccountVerification({
       )}
     </section>
   );
+}
+
+function registryFacts(data: Data) {
+  const registry = new Map<string, Fact>();
+  for (const fact of data.facts) {
+    if (sourceFamily(fact.source) !== "gst") continue;
+    if (fact.status === "applied" || fact.status === "accepted") {
+      if (!registry.has(fact.field)) registry.set(fact.field, fact);
+    }
+  }
+  return registry;
 }
 
 function Verification({
@@ -79,13 +95,8 @@ function Verification({
   data: Data;
   config: Config;
 }) {
-  const registry = new Map<string, Fact>();
-  for (const fact of data.facts) {
-    if (sourceFamily(fact.source) !== "gst") continue;
-    if (fact.status === "applied" || fact.status === "accepted") {
-      if (!registry.has(fact.field)) registry.set(fact.field, fact);
-    }
-  }
+  const [editing, setEditing] = useState(false);
+  const registry = registryFacts(data);
   const gstinFact = registry.get("gstin");
   const suggestions = data.facts
     .filter(
@@ -97,23 +108,41 @@ function Verification({
         SUGGESTION_ORDER.indexOf(a.field) - SUGGESTION_ORDER.indexOf(b.field),
     );
   const lastRun = data.runs.find((run) => sourceFamily(run.provider) === "gst");
+  const running = lastRun?.status === "running";
+  const accountGstin = data.account.gstin;
+  const current =
+    gstinFact && accountGstin === gstinFact.value ? gstinFact : undefined;
 
   return (
-    <>
-      <GstinForm
-        key={data.account.gstin ?? ""}
-        accountId={accountId}
-        initial={data.account.gstin ?? ""}
-        verified={gstinFact}
-        running={lastRun?.status === "running"}
-        config={config}
-      />
+    <div className="flex flex-col gap-3">
+      {current && !editing ? (
+        <VerifiedGstin
+          accountId={accountId}
+          fact={current}
+          status={registry.get("gstStatus")?.value}
+          running={running}
+          config={config}
+          onChange={() => setEditing(true)}
+        />
+      ) : (
+        <GstinForm
+          key={accountGstin ?? ""}
+          accountId={accountId}
+          initial={accountGstin ?? ""}
+          verified={gstinFact}
+          running={running}
+          config={config}
+          onDone={() => setEditing(false)}
+          onCancel={current ? () => setEditing(false) : undefined}
+        />
+      )}
       <RunNotice run={lastRun} runningLabel="Checking the GST registry…" />
       {gstinFact && (
         <RegistryDetails
           registry={registry}
           gstinFact={gstinFact}
-          accountGstin={data.account.gstin}
+          accountGstin={accountGstin}
+          showMeta={!current || editing}
         />
       )}
       <Suggestions
@@ -125,7 +154,95 @@ function Verification({
           field === "phone" ? formatPhone(value) : value
         }
       />
-    </>
+    </div>
+  );
+}
+
+function VerifiedGstin({
+  accountId,
+  fact,
+  status,
+  running,
+  config,
+  onChange,
+}: {
+  accountId: Id<"accounts">;
+  fact: Fact;
+  status: string | undefined;
+  running: boolean;
+  config: Config;
+  onChange: () => void;
+}) {
+  const verify = useAction(api.enrichment.verifyGst);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inactive = status ? isInactiveGstStatus(status) : false;
+
+  async function reverify() {
+    setBusy(true);
+    setError(null);
+    try {
+      const outcome = await verify({ accountId, gstin: fact.value });
+      if (outcome.ok) toast("GSTIN re-verified");
+    } catch (caught) {
+      setError(readError(caught, "Couldn't start the lookup").message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <dl className="flex flex-col">
+      <Property
+        label="GSTIN"
+        action={
+          <Tooltip
+            content={
+              config.gst === null
+                ? `GST lookup isn't configured. ${config.envHint}`
+                : `Last verified ${relativeTime(fact.observedAt)}`
+            }
+            className="max-w-72 leading-snug"
+          >
+            <Button
+              variant="ghost"
+              size="xs"
+              loading={busy}
+              disabled={running || config.gst === null}
+              onClick={() => void reverify()}
+            >
+              Re-verify
+            </Button>
+          </Tooltip>
+        }
+      >
+        <button
+          type="button"
+          onClick={onChange}
+          aria-label={`Change GSTIN ${fact.value}`}
+          className="hover:bg-overlay-1 focus-visible:ring-ring -mx-1.5 flex h-7 min-w-0 items-center gap-2 rounded-md px-1.5 outline-none focus-visible:ring-2"
+        >
+          <span className="truncate font-mono text-xs tabular-nums">
+            {fact.value}
+          </span>
+        </button>
+      </Property>
+      {status && (
+        <Property label="GST status">
+          <Tag tone={inactive ? "red" : "green"} size="xs">
+            {status}
+          </Tag>
+        </Property>
+      )}
+      <Property label="Source">
+        <SourceBadge source={fact.source} observedAt={fact.observedAt} />
+      </Property>
+      {error && (
+        <p role="alert" className="caption-style text-danger leading-snug">
+          {error}
+        </p>
+      )}
+    </dl>
   );
 }
 
@@ -135,12 +252,16 @@ function GstinForm({
   verified,
   running,
   config,
+  onDone,
+  onCancel,
 }: {
   accountId: Id<"accounts">;
   initial: string;
   verified: Fact | undefined;
   running: boolean;
   config: Config;
+  onDone: () => void;
+  onCancel?: () => void;
 }) {
   const id = useId();
   const verify = useAction(api.enrichment.verifyGst);
@@ -162,7 +283,10 @@ function GstinForm({
     setError(null);
     try {
       const outcome = await verify({ accountId, gstin: check.gstin });
-      if (outcome.ok) toast(reverify ? "GSTIN re-verified" : "GSTIN verified");
+      if (outcome.ok) {
+        toast(reverify ? "GSTIN re-verified" : "GSTIN verified");
+        onDone();
+      }
     } catch (caught) {
       setError(readError(caught, "Couldn't start the lookup").message);
     } finally {
@@ -227,6 +351,13 @@ function GstinForm({
             setError(null);
           }}
           placeholder="15-character GSTIN"
+          autoFocus={Boolean(onCancel)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && onCancel) {
+              event.stopPropagation();
+              onCancel();
+            }
+          }}
           autoComplete="off"
           autoCapitalize="characters"
           spellCheck={false}
@@ -265,6 +396,16 @@ function GstinForm({
           {status.text}
         </span>
       )}
+      {onCancel && (
+        <Button
+          variant="ghost"
+          size="xs"
+          className="-ml-2 w-fit"
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+      )}
     </form>
   );
 }
@@ -273,10 +414,13 @@ function RegistryDetails({
   registry,
   gstinFact,
   accountGstin,
+  showMeta,
 }: {
   registry: Map<string, Fact>;
   gstinFact: Fact;
   accountGstin: string | null;
+  /** Status and source, when the compact GSTIN row above isn't showing them. */
+  showMeta: boolean;
 }) {
   const value = (field: string) => registry.get(field)?.value;
   const status = value("gstStatus");
@@ -287,17 +431,20 @@ function RegistryDetails({
   const address = [
     value("address"),
     [value("city"), value("pinCode")].filter(Boolean).join(" "),
+    state,
   ]
     .filter(Boolean)
     .join(", ");
   const registered = value("registrationDate");
+  const legalName = value("legalName");
+  const tradeName = value("tradeName");
   const differs = (fact: Fact | undefined) =>
     fact &&
     (fact.status === "accepted" ||
       fact.source !== gstinFact.source ||
       fact.observedAt !== gstinFact.observedAt);
 
-  const text = (field: string, content?: string) =>
+  const text = (content?: string) =>
     content ? (
       <span className="py-1.5 text-sm leading-snug break-words">{content}</span>
     ) : null;
@@ -305,47 +452,52 @@ function RegistryDetails({
     {
       field: "gstStatus",
       label: "GST status",
-      content: status ? (
-        <Tag tone={inactive ? "red" : "green"} size="xs">
-          {status}
-        </Tag>
-      ) : null,
+      content:
+        showMeta && status ? (
+          <Tag tone={inactive ? "red" : "green"} size="xs">
+            {status}
+          </Tag>
+        ) : null,
     },
     {
-      field: "legalName",
-      label: "Legal name",
-      content: text("legalName", value("legalName")),
+      field: "source",
+      label: "Source",
+      content: showMeta ? (
+        <SourceBadge
+          source={gstinFact.source}
+          observedAt={gstinFact.observedAt}
+        />
+      ) : null,
     },
+    { field: "legalName", label: "Legal name", content: text(legalName) },
     {
       field: "tradeName",
       label: "Trade name",
-      content: text("tradeName", value("tradeName")),
+      content: tradeName !== legalName ? text(tradeName) : null,
     },
     {
       field: "businessType",
       label: "Constitution",
-      content: text("businessType", value("businessType")),
+      content: text(value("businessType")),
     },
     {
       field: "registrationDate",
       label: "Registered",
-      content: text(
-        "registrationDate",
-        registered && formatRegistryDate(registered),
-      ),
+      content: text(registered && formatRegistryDate(registered)),
     },
-    { field: "state", label: "State", content: text("state", state) },
-    { field: "address", label: "Address", content: text("address", address) },
+    { field: "address", label: "Address", content: text(address) },
     {
       field: "panRoot",
       label: "PAN",
       content: pan ? (
-        <span className="flex flex-col gap-1 py-1.5">
-          <span className="font-mono text-sm tracking-wide">{pan}</span>
-          <span className="caption-style text-fg-tertiary leading-snug">
-            Shared by every GSTIN of this entity
+        <Tooltip content="Shared by every GSTIN of this entity">
+          <span
+            tabIndex={0}
+            className="focus-visible:ring-ring rounded-sm font-mono text-[13px] tracking-wide outline-none focus-visible:ring-2"
+          >
+            {pan}
           </span>
-        </span>
+        </Tooltip>
       ) : null,
     },
   ];
@@ -355,45 +507,29 @@ function RegistryDetails({
     rows.push({
       field,
       label: field === "phone" ? "Phone" : "Email",
-      content: text(
-        field,
-        field === "phone" ? formatPhone(fact.value) : fact.value,
-      ),
+      content: text(field === "phone" ? formatPhone(fact.value) : fact.value),
     });
   }
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex flex-col gap-2">
-        {stale && (
-          <span className="caption-style text-fg-tertiary">
-            Details for{" "}
-            <span className="text-fg-secondary font-mono tracking-wide">
-              {gstinFact.value}
-            </span>
+    <div className="flex flex-col gap-2">
+      {stale && (
+        <p className="caption-style text-warning leading-snug">
+          {accountGstin
+            ? "The GSTIN changed. Verify it to replace the details below, which are for "
+            : "The GSTIN was removed. The details below are for "}
+          <span className="font-mono tracking-wide">{gstinFact.value}</span>.
+        </p>
+      )}
+      {inactive && (
+        <p className="caption-style text-danger flex gap-1.5 leading-snug">
+          <AlertIcon aria-hidden className="mt-px size-3 shrink-0" />
+          <span>
+            This registration is {status!.toLowerCase()}. Confirm with the
+            account before invoicing.
           </span>
-        )}
-        <SourceBadge
-          source={gstinFact.source}
-          observedAt={gstinFact.observedAt}
-        />
-        {stale && (
-          <p className="caption-style text-warning leading-snug">
-            {accountGstin
-              ? "The account's GSTIN has changed. Verify it to replace these details."
-              : "The GSTIN was removed from the account."}
-          </p>
-        )}
-        {inactive && (
-          <p className="caption-style text-danger flex gap-1.5 leading-snug">
-            <AlertIcon aria-hidden className="mt-px size-3 shrink-0" />
-            <span>
-              This registration is {status!.toLowerCase()} in the GST registry.
-              Confirm with the account before invoicing.
-            </span>
-          </p>
-        )}
-      </div>
+        </p>
+      )}
       <dl className="flex flex-col">
         {rows.map((row) => {
           if (!row.content) return null;
@@ -420,7 +556,7 @@ function RegistryDetails({
           );
         })}
       </dl>
-      <Evidence evidence={gstinFact.evidence} />
+      <Evidence evidence={gstinFact.evidence} label="Registry response" />
     </div>
   );
 }

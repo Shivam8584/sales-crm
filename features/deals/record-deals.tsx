@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -16,8 +17,9 @@ import { useUiStore } from "@/stores/ui-store";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import { formatDay, formatTotals, today as todayDay } from "./format";
 import { DealStageTag, isOpenStage } from "./stage";
+import { isPlainClick } from "./use-deal-actions";
 
-/** Deals section on an account page. */
+/** Deals section on an account page; a click peeks, a modified click opens the page. */
 export default function RecordDeals({
   accountId,
 }: {
@@ -25,7 +27,7 @@ export default function RecordDeals({
 }) {
   const deals = useQuery(api.deals.list, { accountId });
   const setCreate = useUiStore((state) => state.setCreate);
-  const setEdit = useUiStore((state) => state.setEdit);
+  const setPeek = useUiStore((state) => state.setPeek);
   const today = todayDay();
 
   const sorted = useMemo(
@@ -91,9 +93,14 @@ export default function RecordDeals({
               open && deal.closeDate !== null && deal.closeDate < today;
             return (
               <li key={deal._id}>
-                <button
-                  type="button"
-                  onClick={() => setEdit({ type: "deal", id: deal._id })}
+                <Link
+                  href={`/deals/${deal._id}`}
+                  onClick={(event) => {
+                    if (isPlainClick(event)) {
+                      event.preventDefault();
+                      setPeek({ type: "deal", id: deal._id });
+                    }
+                  }}
                   className="hover:bg-overlay-1 focus-visible:ring-ring flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
                 >
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -146,7 +153,7 @@ export default function RecordDeals({
                     </span>
                     <DealStageTag stage={deal.stage} />
                   </span>
-                </button>
+                </Link>
               </li>
             );
           })}

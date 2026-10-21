@@ -84,7 +84,17 @@ export default function DemoBooking({
 
       {src ? (
         <div className="flex flex-col gap-3">
-          <h3>Pick a time that suits you</h3>
+          <div className="flex flex-col gap-1">
+            <h3 className="lead-style font-medium">
+              Pick a time for your walkthrough
+            </h3>
+            <p className="caption-style text-fg-secondary leading-snug">
+              20 minutes, built around your catalogue.{" "}
+              {lead.phone
+                ? `Rather talk now? We'll call ${formatPhone(lead.phone)} within one business hour.`
+                : "Rather not book? We'll write to you within one business hour."}
+            </p>
+          </div>
           <div className="border-border relative h-[min(720px,80dvh)] overflow-hidden rounded-xl border">
             {!loaded && (
               <div className="absolute inset-0 flex flex-col gap-3 p-4">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
 import Avatar from "@/components/_ui/avatar";
 import {
@@ -12,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/_ui/dropdown-menu";
+import Kbd from "@/components/_ui/kbd";
 import { useViewer } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import {
@@ -24,6 +26,7 @@ import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
 import SunIcon from "@/public/assets/icons/sun.svg";
 import MoonIcon from "@/public/assets/icons/moon.svg";
 import MonitorIcon from "@/public/assets/icons/monitor.svg";
+import SettingsIcon from "@/public/assets/icons/settings.svg";
 
 const THEMES = [
   { value: "system", label: "System", icon: MonitorIcon },
@@ -31,7 +34,12 @@ const THEMES = [
   { value: "dark", label: "Dark", icon: MoonIcon },
 ] as const;
 
-export default function UserMenu() {
+export default function UserMenu({
+  collapsed = false,
+}: {
+  collapsed?: boolean;
+}) {
+  const router = useRouter();
   const viewer = useViewer();
   const theme = useThemePreference();
   const { signOut } = useAuthActions();
@@ -40,9 +48,16 @@ export default function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="group hover:bg-overlay-1 data-[state=open]:bg-overlay-2 focus-visible:ring-ring duration-fast flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors outline-none focus-visible:ring-2">
-        <Avatar name={viewer.name} size="md" />
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
+      <DropdownMenuTrigger
+        aria-label={`Account menu for ${viewer.name}`}
+        className="group hover:bg-overlay-2 data-[state=open]:bg-overlay-2 focus-visible:ring-ring duration-fast collapsed:size-8 collapsed:justify-center collapsed:p-0 flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors outline-none focus-visible:ring-2"
+      >
+        <Avatar
+          name={viewer.name}
+          size="md"
+          className="collapsed:size-6 collapsed:text-[10px]"
+        />
+        <span className="collapsed:hidden flex min-w-0 flex-1 flex-col gap-1">
           <span className="lead-style truncate font-medium">{viewer.name}</span>
           <span className="caption-style text-fg-tertiary truncate">
             {ROLE_LABEL[viewer.role]}
@@ -50,17 +65,28 @@ export default function UserMenu() {
         </span>
         <ChevronDownIcon
           aria-hidden
-          className="text-fg-tertiary duration-base size-3 shrink-0 transition-transform group-data-[state=open]:rotate-180"
+          className="text-fg-tertiary duration-base collapsed:hidden size-3 shrink-0 transition-transform group-data-[state=open]:rotate-180"
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        side="top"
-        align="start"
-        className="w-(--radix-dropdown-menu-trigger-width)"
+        side={collapsed ? "right" : "top"}
+        align={collapsed ? "end" : "start"}
+        className={
+          collapsed ? "w-56" : "w-(--radix-dropdown-menu-trigger-width)"
+        }
       >
         <DropdownMenuLabel className="truncate">
           {viewer.email}
         </DropdownMenuLabel>
+        <DropdownMenuItem
+          onSelect={() => {
+            setSidebarOpen(false);
+            router.push("/settings/profile");
+          }}
+        >
+          <SettingsIcon aria-hidden className="text-fg-tertiary size-3.5" />
+          Profile settings
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Theme</DropdownMenuLabel>
         <DropdownMenuRadioGroup
@@ -84,6 +110,7 @@ export default function UserMenu() {
           }}
         >
           Keyboard shortcuts
+          <Kbd className="ml-auto h-4 min-w-4 px-1">?</Kbd>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void signOut()}>
           Sign out

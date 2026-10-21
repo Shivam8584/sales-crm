@@ -1,28 +1,37 @@
 "use client";
 
-import { useMemo } from "react";
-import { useQuery } from "convex/react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import FilterMenu from "@/components/_common/filter-menu";
-import DataTable from "@/components/data-table/data-table";
-import type { Column, SortState } from "@/components/data-table/types";
+import type { Column } from "@/components/data-table/types";
 import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
 import { StageTag } from "@/features/accounts/stage";
+import GroupedTable, { type RowGroup } from "@/features/tasks/grouped-table";
 import { PriorityIcon, StatusIcon } from "@/features/tasks/task-meta";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { ACTIVATION_STAGES } from "@/lib/domain/platform";
-import { PRIORITY_LABEL, TASK_STATUS_LABEL } from "@/lib/domain/labels";
-import { relativeTime } from "@/lib/time";
+import {
+  PRIORITY_LABEL,
+  STAGE_LABEL,
+  TASK_STATUS_LABEL,
+} from "@/lib/domain/labels";
+import { readError } from "@/lib/errors";
+import { dateTime, relativeTime } from "@/lib/time";
+import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
+import PlusIcon from "@/public/assets/icons/plus.svg";
+import XIcon from "@/public/assets/icons/x.svg";
 import FunnelStrip from "./funnel-strip";
 import RunChecksButton from "./run-checks-button";
+import { firstSentence, stuckFor } from "./stall";
 
 type Desk = FunctionReturnType<typeof api.activation.desk>;
 type Rule = Desk["rules"][number];
@@ -30,34 +39,53 @@ type Row = Desk["rows"][number] & { rule: Rule };
 
 const ALL = "all";
 const MINE = "mine";
-const DEFAULT_SORT: SortState = { id: "stall", dir: "asc" };
-const HOUR = 60 * 60_000;
 
-function stuckFor(since: number) {
-  const ms = Date.now() - since;
-  const hours = Math.max(1, Math.floor(ms / HOUR));
-  if (hours < 48) return hours === 1 ? "1 hour" : `${hours} hours`;
-  return `${Math.floor(ms / (24 * HOUR))} days`;
-}
-
-function TaskStatus({ task }: { task: Row["task"] }) {
+function TaskAction({ row }: { row: Row }) {
   const setEdit = useUiStore((state) => state.setEdit);
+  const ensureTask = useMutation(api.activation.ensureTask);
+  const [busy, setBusy] = useState(false);
+  const task = row.task;
+
+  async function create() {
+    setBusy(true);
+    try {
+      const id = await ensureTask({ accountId: row._id });
+      if (id) setEdit({ type: "task", id });
+      else toast(`${row.account.name} isn't stuck any more`);
+    } catch (error) {
+      toast(readError(error, "Couldn't open the task").message, {
+        tone: "danger",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!task) {
-    return <span className="text-fg-tertiary truncate">Not created yet</span>;
+    return (
+      <Button
+        variant="ghost"
+        size="xs"
+        loading={busy}
+        className="-ml-2"
+        onClick={() => void create()}
+      >
+        <PlusIcon aria-hidden className="size-2.5" />
+        Create task
+      </Button>
+    );
   }
   return (
     <Button
       variant="ghost"
-      size="inline"
-      className="text-fg-secondary min-w-0"
+      size="xs"
+      className="text-fg-secondary -ml-2 min-w-0"
       onClick={() => setEdit({ type: "task", id: task._id })}
+      aria-label={`Open task for ${row.account.name}: ${TASK_STATUS_LABEL[task.status]}${task.assignee ? `, assigned to ${task.assignee.name}` : ""}`}
     >
-      <StatusIcon status={task.status} />
+      <StatusIcon status={task.status} className="size-3" />
       <span className="truncate">
-        {TASK_STATUS_LABEL[task.status]}
-        {task.assignee && task.status !== "done" && (
-          <span className="sr-only">, assigned to {task.assignee.name}</span>
-        )}
+        {task.status === "done" ? "Followed up" : "Open task"}
       </span>
     </Button>
   );
@@ -67,8 +95,7 @@ const COLUMNS: Column<Row>[] = [
   {
     id: "name",
     header: "Account",
-    width: "minmax(12rem,1.6fr)",
-    sortValue: (row) => row.account.name,
+    width: "minmax(12rem,1.8fr)",
     cell: (row) => (
       <>
         <AccountLogo account={row.account} size="xs" />
@@ -77,35 +104,14 @@ const COLUMNS: Column<Row>[] = [
     ),
   },
   {
-    id: "stage",
-    header: "Stage",
-    width: "8.5rem",
-    sortValue: (row) => ACTIVATION_STAGES.indexOf(row.stage),
-    cell: (row) => <StageTag stage={row.stage} />,
-  },
-  {
-    id: "stall",
-    header: "Stuck on",
-    width: "minmax(11rem,1.3fr)",
-    sortValue: (row) => row.severity * 1e13 + row.since,
-    cell: (row) => (
-      <span className="flex min-w-0 items-center gap-2">
-        <PriorityIcon priority={row.rule.priority} />
-        <span className="sr-only">{PRIORITY_LABEL[row.rule.priority]}: </span>
-        <span className="truncate" title={row.rule.description}>
-          {row.rule.label}
-        </span>
-      </span>
-    ),
-  },
-  {
     id: "since",
-    header: "For",
-    width: "6.5rem",
-    defaultDir: "asc",
-    sortValue: (row) => row.since,
+    header: "Stuck for",
+    width: "7rem",
     cell: (row) => (
-      <span className="text-fg-secondary tabular-nums">
+      <span
+        className="text-fg-secondary tabular-nums"
+        title={`Since ${dateTime(row.since)}`}
+      >
         {stuckFor(row.since)}
       </span>
     ),
@@ -115,7 +121,6 @@ const COLUMNS: Column<Row>[] = [
     header: "Owner",
     width: "minmax(9rem,1fr)",
     minViewport: 900,
-    sortValue: (row) => row.owner?.name ?? null,
     cell: (row) =>
       row.owner ? (
         <span className="flex min-w-0 items-center gap-2">
@@ -127,30 +132,28 @@ const COLUMNS: Column<Row>[] = [
       ),
   },
   {
-    id: "task",
-    header: "Task",
-    width: "minmax(7.5rem,0.8fr)",
-    sortValue: (row) =>
-      row.task ? ["todo", "in_progress", "done"].indexOf(row.task.status) : -1,
-    cell: (row) => <TaskStatus task={row.task} />,
-  },
-  {
     id: "activity",
     header: "Last on Hypedrive",
     width: "9.5rem",
-    align: "end",
-    defaultDir: "desc",
     minViewport: 1100,
-    sortValue: (row) => row.lastEventAt,
     cell: (row) => (
-      <span className="text-fg-secondary">
+      <span
+        className="text-fg-secondary"
+        title={row.lastEventAt ? dateTime(row.lastEventAt) : undefined}
+      >
         {row.lastEventAt ? relativeTime(row.lastEventAt) : "—"}
       </span>
     ),
   },
+  {
+    id: "task",
+    header: "Task",
+    width: "minmax(8rem,0.8fr)",
+    cell: (row) => <TaskAction row={row} />,
+  },
 ];
 
-/** Brands stuck between signup and their first approved result, each with a rep task. */
+/** Brands stuck between signup and their first approved result, grouped by the step they're stuck on. */
 export default function ActivationPage() {
   const viewer = useViewer();
   const members = useMembers();
@@ -158,19 +161,9 @@ export default function ActivationPage() {
   const canRun = viewer.role !== "rep";
 
   const [stall, setStall] = useUrlState("stall", ALL);
+  const [stage, setStage] = useUrlState("stage", ALL);
   const defaultOwner = canRun ? ALL : MINE;
   const [owner, setOwner] = useUrlState("owner", defaultOwner);
-  const [sortParam, setSortParam] = useUrlState(
-    "sort",
-    `${DEFAULT_SORT.id}:${DEFAULT_SORT.dir}`,
-  );
-  const [sortId, sortDir] = sortParam.split(":");
-  const sort: SortState = {
-    id: COLUMNS.some((column) => column.id === sortId)
-      ? sortId
-      : DEFAULT_SORT.id,
-    dir: sortDir === "desc" ? "desc" : "asc",
-  };
 
   const all = useMemo(() => {
     if (!desk) return undefined;
@@ -183,22 +176,45 @@ export default function ActivationPage() {
       all?.filter(
         (row) =>
           (stall === ALL || row.ruleId === stall) &&
+          (stage === ALL || row.stage === stage) &&
           (owner === ALL ||
             row.owner?._id === (owner === MINE ? viewer._id : owner)),
       ),
-    [all, stall, owner, viewer._id],
+    [all, stall, stage, owner, viewer._id],
   );
 
-  const filtered = stall !== ALL || owner !== defaultOwner;
-  const onlyMine = stall === ALL && owner === MINE;
+  const groups = useMemo((): RowGroup<Row>[] | undefined => {
+    if (!desk || !rows) return undefined;
+    return desk.rules.map((rule) => ({
+      id: rule.id,
+      label: rule.label,
+      icon: (
+        <span
+          role="img"
+          aria-label={`${PRIORITY_LABEL[rule.priority]} priority`}
+        >
+          <PriorityIcon priority={rule.priority} className="size-3" />
+        </span>
+      ),
+      description: firstSentence(rule.playbook),
+      rows: rows
+        .filter((row) => row.ruleId === rule.id)
+        .sort((a, b) => a.since - b.since),
+    }));
+  }, [desk, rows]);
+
+  const filtered = stall !== ALL || stage !== ALL || owner !== defaultOwner;
+  const onlyMine = stall === ALL && stage === ALL && owner === MINE;
 
   function clearFilters() {
     setStall(ALL);
+    setStage(ALL);
     setOwner(defaultOwner);
   }
 
   function showEveryone() {
     setStall(ALL);
+    setStage(ALL);
     setOwner(ALL);
   }
 
@@ -215,20 +231,12 @@ export default function ActivationPage() {
         }
         actions={canRun && <RunChecksButton />}
       />
-      <FunnelStrip desk={desk} />
+      <FunnelStrip
+        desk={desk}
+        selected={stage === ALL ? null : stage}
+        onSelect={(next) => setStage(next ?? ALL)}
+      />
       <PageToolbar>
-        <FilterMenu
-          label="Stuck on"
-          value={stall}
-          onChange={setStall}
-          options={[
-            { value: ALL, label: "Any step" },
-            ...(desk?.rules ?? []).map((rule) => ({
-              value: rule.id,
-              label: rule.label,
-            })),
-          ]}
-        />
         <FilterMenu
           label="Owner"
           value={owner}
@@ -241,6 +249,30 @@ export default function ActivationPage() {
               .map((member) => ({ value: member._id, label: member.name })),
           ]}
         />
+        <FilterMenu
+          label="Stuck on"
+          value={stall}
+          onChange={setStall}
+          options={[
+            { value: ALL, label: "Any step" },
+            ...(desk?.rules ?? []).map((rule) => ({
+              value: rule.id,
+              label: rule.label,
+            })),
+          ]}
+        />
+        {stage !== ALL && (
+          <Button
+            variant="secondary"
+            size="control"
+            className="px-2.5"
+            onClick={() => setStage(ALL)}
+            aria-label={`Stage: ${STAGE_LABEL[stage as keyof typeof STAGE_LABEL] ?? stage}. Remove filter`}
+          >
+            <StageTag stage={stage as (typeof ACTIVATION_STAGES)[number]} />
+            <XIcon aria-hidden className="text-fg-tertiary size-3" />
+          </Button>
+        )}
         {filtered && (
           <Button variant="ghost" size="xs" onClick={clearFilters}>
             Clear
@@ -253,15 +285,13 @@ export default function ActivationPage() {
         )}
       </PageToolbar>
 
-      <DataTable
+      <GroupedTable
         label="Stuck brands"
         columns={COLUMNS}
-        rows={rows}
+        groups={groups}
         getId={(row) => row._id}
         getHref={(row) => `/accounts/${row._id}`}
         getLabel={(row) => row.account.name}
-        sort={sort}
-        onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
         renderCard={(row) => (
           <span className="flex items-center gap-3">
             <AccountLogo account={row.account} size="md" />
@@ -269,12 +299,10 @@ export default function ActivationPage() {
               <span className="lead-style truncate font-medium">
                 {row.account.name}
               </span>
-              <span className="caption-style text-fg-tertiary flex min-w-0 items-center gap-1.5">
-                <PriorityIcon priority={row.rule.priority} />
-                <span className="truncate">
-                  {row.rule.label} · {stuckFor(row.since)}
-                  {row.task ? ` · ${TASK_STATUS_LABEL[row.task.status]}` : ""}
-                </span>
+              <span className="caption-style text-fg-tertiary truncate">
+                {stuckFor(row.since)}
+                {row.owner ? ` · ${row.owner.name}` : ""}
+                {row.task ? ` · ${TASK_STATUS_LABEL[row.task.status]}` : ""}
               </span>
             </span>
             <StageTag stage={row.stage} />

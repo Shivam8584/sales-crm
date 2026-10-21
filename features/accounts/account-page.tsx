@@ -5,15 +5,11 @@ import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/_ui/dropdown-menu";
+import Tooltip from "@/components/_ui/tooltip";
 import InlineText from "@/components/fields/inline-text";
 import OptionPicker from "@/components/fields/option-picker";
 import TagsField from "@/components/fields/tags-field";
@@ -22,25 +18,36 @@ import RecordLayout, {
   RecordHeader,
   RecordSection,
 } from "@/components/record/record-layout";
-import { Page, PageHeader } from "@/components/shell/page";
+import RecordTabs from "@/components/record/record-tabs";
+import { useCommandActions } from "@/components/shell/command-actions";
+import { Page, PageActions, PageHeader } from "@/components/shell/page";
+import AccountStallBanner from "@/features/activation/account-stall-banner";
+import RecordDeals from "@/features/deals/record-deals";
+import AccountVerification from "@/features/enrichment/account-verification";
 import MemberPicker from "@/features/members/member-picker";
 import PeopleList from "@/features/people/people-list";
-import RecordDeals from "@/features/deals/record-deals";
-import RecordTasks from "@/features/tasks/record-tasks";
-import AccountVerification from "@/features/enrichment/account-verification";
 import AccountPlatform from "@/features/platform/account-platform";
+import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import type { LifecycleStage } from "@/lib/domain/enums";
 import { readError } from "@/lib/errors";
-import { relativeTime, shortDate } from "@/lib/time";
+import { dateTime, relativeTime, shortDate } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import BuildingIcon from "@/public/assets/icons/building.svg";
-import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
+import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
+import EditIcon from "@/public/assets/icons/edit.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import TargetIcon from "@/public/assets/icons/target-05.svg";
+import TrashIcon from "@/public/assets/icons/trash.svg";
+import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import AccountLogo from "./account-logo";
+import ActivationPath from "./activation-path";
 import { STAGE_OPTIONS, StageTag } from "./stage";
+import { editRecordTitle, useTitleShortcut } from "./use-title-shortcut";
+
+const CRUMBS = [{ label: "Accounts", href: "/accounts" }];
 
 export default function AccountPage({ id }: { id: Id<"accounts"> }) {
   const account = useQuery(api.accounts.get, { id });
@@ -49,10 +56,7 @@ export default function AccountPage({ id }: { id: Id<"accounts"> }) {
   if (account === null) {
     return (
       <Page>
-        <PageHeader
-          crumbs={[{ label: "Accounts", href: "/accounts" }]}
-          title="Not found"
-        />
+        <PageHeader crumbs={CRUMBS} title="Not found" />
         <EmptyState
           icon={BuildingIcon}
           title="This account doesn't exist"
@@ -78,7 +82,18 @@ function AccountView({ account }: { account: Account }) {
   const setArchived = useMutation(api.accounts.setArchived);
   const save = useRecordUpdate(update, account._id);
   const setCreate = useUiStore((state) => state.setCreate);
+  const people = useQuery(api.people.list, { accountId: account._id });
+  const deals = useQuery(api.deals.list, { accountId: account._id });
+  const tasks = useQuery(api.tasks.list, {
+    accountId: account._id,
+    done: "none",
+  });
   const archived = Boolean(account.archivedAt);
+  useTitleShortcut();
+
+  const addPerson = () => setCreate({ type: "person", accountId: account._id });
+  const newDeal = () => setCreate({ type: "deal", accountId: account._id });
+  const newTask = () => setCreate({ type: "task", accountId: account._id });
 
   async function toggleArchived() {
     try {
@@ -97,82 +112,121 @@ function AccountView({ account }: { account: Account }) {
     }
   }
 
+  useCommandActions([
+    {
+      id: "account-rename",
+      label: "Rename account",
+      icon: EditIcon,
+      shortcut: "E",
+      perform: editRecordTitle,
+    },
+    {
+      id: "account-person",
+      label: "Add person to account",
+      icon: UserPlusIcon,
+      perform: addPerson,
+    },
+    {
+      id: "account-deal",
+      label: "New deal for account",
+      icon: TargetIcon,
+      perform: newDeal,
+    },
+    {
+      id: "account-task",
+      label: "New task for account",
+      icon: CheckSquareIcon,
+      perform: newTask,
+    },
+    {
+      id: "account-archive",
+      label: archived ? "Restore account" : "Archive account",
+      icon: TrashIcon,
+      perform: () => void toggleArchived(),
+    },
+  ]);
+
   return (
     <Page>
       <PageHeader
-        crumbs={[{ label: "Accounts", href: "/accounts" }]}
+        crumbs={CRUMBS}
         title={account.name}
         meta={
           archived && (
-            <span className="caption-style text-warning ml-1">Archived</span>
+            <span className="caption-style text-warning">Archived</span>
           )
         }
         actions={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Account actions"
-              >
-                <DotsIcon aria-hidden className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={() =>
-                  setCreate({ type: "person", accountId: account._id })
-                }
-              >
-                Add person
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void toggleArchived()}>
-                {archived ? "Restore account" : "Archive account"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <PageActions
+            label="Account actions"
+            actions={[
+              { label: "Add person", icon: UserPlusIcon, onSelect: addPerson },
+              { label: "New deal", icon: TargetIcon, onSelect: newDeal },
+              { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
+              {
+                label: archived ? "Restore account" : "Archive account",
+                icon: TrashIcon,
+                tone: archived ? undefined : "danger",
+                separated: true,
+                onSelect: () => void toggleArchived(),
+              },
+            ]}
+          />
         }
       />
       <RecordLayout
         header={
-          <RecordHeader
-            visual={<AccountLogo account={account} size="lg" />}
-            title={
-              <InlineText
-                value={account.name}
-                label="Account name"
-                onSave={(name) => save({ name }, "Name")}
-                inputClassName="h-8 text-xl font-semibold"
-              />
-            }
-            subtitle={
-              <>
-                <OptionPicker
-                  value={account.stage}
-                  label="Stage"
-                  options={STAGE_OPTIONS}
-                  onChange={(stage) =>
-                    stage &&
-                    void save({ stage: stage as LifecycleStage }, "Stage")
-                  }
-                  className="mx-0 h-auto px-0 hover:bg-transparent data-[state=open]:bg-transparent"
-                >
-                  <StageTag stage={account.stage} />
-                </OptionPicker>
-                {account.domain && (
-                  <a
-                    href={`https://${account.domain}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-foreground truncate"
+          <div className="flex flex-col gap-5">
+            <RecordHeader
+              visual={<AccountLogo account={account} size="lg" />}
+              title={
+                <span data-record-title className="flex min-w-0">
+                  <InlineText
+                    value={account.name}
+                    label="Account name"
+                    onSave={(name) => save({ name }, "Name")}
+                    inputClassName="h-8 text-xl font-semibold"
+                  />
+                </span>
+              }
+              subtitle={
+                <>
+                  <OptionPicker
+                    value={account.stage}
+                    label="Stage"
+                    options={STAGE_OPTIONS}
+                    onChange={(stage) =>
+                      stage &&
+                      void save({ stage: stage as LifecycleStage }, "Stage")
+                    }
+                    className="mx-0 h-auto px-0 hover:bg-transparent data-[state=open]:bg-transparent"
                   >
-                    {account.domain}
-                  </a>
-                )}
-                {account.owner && <span>Owned by {account.owner.name}</span>}
-              </>
-            }
-          />
+                    <StageTag stage={account.stage} />
+                  </OptionPicker>
+                  {account.domain && (
+                    <a
+                      href={`https://${account.domain}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:text-foreground focus-visible:ring-ring min-w-0 truncate rounded-sm outline-none focus-visible:ring-2"
+                    >
+                      {account.domain}
+                    </a>
+                  )}
+                  {account.owner && (
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <Avatar name={account.owner.name} size="xs" />
+                      <span className="truncate">{account.owner.name}</span>
+                    </span>
+                  )}
+                </>
+              }
+            />
+            {account.platformOrgId && (
+              <ActivationPath accountId={account._id} />
+            )}
+            <AccountStallBanner accountId={account._id} />
+          </div>
         }
         aside={
           <>
@@ -183,6 +237,17 @@ function AccountView({ account }: { account: Account }) {
                   currentName={account.owner?.name}
                   onChange={(ownerId) =>
                     void save({ ownerId: ownerId as Id<"members"> }, "Owner")
+                  }
+                />
+              </Property>
+              <Property label="Stage">
+                <OptionPicker
+                  value={account.stage}
+                  label="Stage"
+                  options={STAGE_OPTIONS}
+                  onChange={(stage) =>
+                    stage &&
+                    void save({ stage: stage as LifecycleStage }, "Stage")
                   }
                 />
               </Property>
@@ -209,43 +274,66 @@ function AccountView({ account }: { account: Account }) {
             <AccountVerification accountId={account._id} />
             <Properties title="Activity">
               <Property label="Last activity">
-                <span className="text-sm">
-                  {account.lastActivityAt
-                    ? relativeTime(account.lastActivityAt)
-                    : "—"}
-                </span>
+                {account.lastActivityAt ? (
+                  <Tooltip content={dateTime(account.lastActivityAt)}>
+                    <span className="text-sm">
+                      {relativeTime(account.lastActivityAt)}
+                    </span>
+                  </Tooltip>
+                ) : (
+                  <span className="text-fg-tertiary text-sm">None yet</span>
+                )}
               </Property>
               <Property label="Created">
-                <span className="text-sm">
-                  {shortDate(account._creationTime)}
-                </span>
+                <Tooltip content={dateTime(account._creationTime)}>
+                  <span className="text-sm">
+                    {shortDate(account._creationTime)}
+                  </span>
+                </Tooltip>
               </Property>
             </Properties>
           </>
         }
       >
-        <RecordSection
-          title="People"
-          action={
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() =>
-                setCreate({ type: "person", accountId: account._id })
-              }
-            >
-              <PlusIcon aria-hidden className="size-2.5" />
-              Add person
-            </Button>
-          }
-        >
-          <PeopleList accountId={account._id} />
-        </RecordSection>
-        <RecordTasks target={{ accountId: account._id }} />
-        <RecordDeals accountId={account._id} />
-        <RecordSection title="Timeline">
-          <Timeline target={{ accountId: account._id }} />
-        </RecordSection>
+        <RecordTabs
+          tabs={[
+            {
+              id: "activity",
+              label: "Activity",
+              content: <Timeline target={{ accountId: account._id }} />,
+            },
+            {
+              id: "people",
+              label: "People",
+              count: people?.length,
+              content: (
+                <RecordSection
+                  title="People"
+                  action={
+                    <Button variant="ghost" size="xs" onClick={addPerson}>
+                      <PlusIcon aria-hidden className="size-2.5" />
+                      Add person
+                    </Button>
+                  }
+                >
+                  <PeopleList accountId={account._id} onAdd={addPerson} />
+                </RecordSection>
+              ),
+            },
+            {
+              id: "deals",
+              label: "Deals",
+              count: deals?.length,
+              content: <RecordDeals accountId={account._id} />,
+            },
+            {
+              id: "tasks",
+              label: "Tasks",
+              count: tasks?.length,
+              content: <RecordTasks target={{ accountId: account._id }} />,
+            },
+          ]}
+        />
       </RecordLayout>
     </Page>
   );
@@ -254,22 +342,28 @@ function AccountView({ account }: { account: Account }) {
 function AccountPageSkeleton() {
   return (
     <Page>
-      <PageHeader
-        crumbs={[{ label: "Accounts", href: "/accounts" }]}
-        title=""
-      />
+      <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8"
+        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:py-8"
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 lg:col-span-2">
           <Skeleton className="size-12 rounded-xl" />
           <span className="flex flex-col gap-2">
             <Skeleton className="h-5 w-48" />
             <Skeleton className="h-3 w-32" />
           </span>
         </div>
-        <Skeleton className="h-28 w-full max-w-2xl rounded-xl" />
+        <div className="flex flex-col gap-5 lg:order-1">
+          <Skeleton className="h-9 w-72" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+        </div>
+        <div className="flex flex-col gap-3 lg:order-2">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-6 w-full" />
+          <Skeleton className="h-6 w-full" />
+          <Skeleton className="h-6 w-full" />
+        </div>
       </div>
     </Page>
   );

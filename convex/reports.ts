@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { memberQuery } from "./lib/functions";
 import { memberIndex } from "./lib/records";
-import { slaSeconds } from "./lib/leads";
+import { leadSlaSeconds } from "./lib/leads";
 import { PERIODS, UNASSIGNED, buildReport } from "./lib/reports";
 import { literals } from "./lib/validators";
 
@@ -33,7 +33,7 @@ export const overview = memberQuery({
       people,
       events,
       deals,
-      slaMs: slaSeconds() * 1000,
+      slaMs: (await leadSlaSeconds(ctx)) * 1000,
       now: Date.now(),
       period: args.period,
       filters: { source: args.source, owner: args.owner },

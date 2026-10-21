@@ -1,40 +1,59 @@
 "use client";
 
-import { useState, type FocusEvent, type FormEvent } from "react";
+import { useId, useState, type FocusEvent, type FormEvent } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import { Input } from "@/components/_ui/input";
 import Kbd from "@/components/_ui/kbd";
-import type { TaskStatus } from "@/lib/domain/enums";
+import type { Priority, TaskStatus } from "@/lib/domain/enums";
 import { TASK_STATUS_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
+import { DuePicker, PriorityPicker } from "./task-chips";
 
 type TaskComposerProps = {
   status?: TaskStatus;
   assigneeId?: Id<"members">;
   accountId?: Id<"accounts">;
   personId?: Id<"people">;
+  dealId?: Id<"deals">;
+  leadId?: Id<"leads">;
+  defaultDueDate?: string;
   /** Accessible name, e.g. "New task in To do". */
   label?: string;
   onClose: () => void;
   className?: string;
 };
 
-/** One-line task entry: Enter adds and keeps it open for the next, Esc closes. */
+// Menus and popovers portal out of the form, so focus moving into them must not count as leaving.
+const inPopup = (node: Node | null) =>
+  node instanceof Element &&
+  Boolean(
+    node.closest(
+      "[role=menu], [role=dialog], [data-radix-popper-content-wrapper]",
+    ),
+  );
+
+/** One-line task entry with due date and priority chips: Enter adds and stays open, Esc closes. */
 export default function TaskComposer({
   status = "todo",
   assigneeId,
   accountId,
   personId,
+  dealId,
+  leadId,
+  defaultDueDate,
   label = `New task in ${TASK_STATUS_LABEL[status]}`,
   onClose,
   className,
 }: TaskComposerProps) {
   const create = useMutation(api.tasks.create);
+  const errorId = useId();
   const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState<string | null>(defaultDueDate ?? null);
+  const [priority, setPriority] = useState<Priority>("normal");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -44,7 +63,17 @@ export default function TaskComposer({
     if (!trimmed || saving) return;
     setSaving(true);
     try {
-      await create({ title: trimmed, status, assigneeId, accountId, personId });
+      await create({
+        title: trimmed,
+        status,
+        priority,
+        dueDate: dueDate ?? undefined,
+        assigneeId,
+        accountId,
+        personId,
+        dealId,
+        leadId,
+      });
       setTitle("");
       setError(null);
     } catch (caught) {
@@ -55,9 +84,11 @@ export default function TaskComposer({
   }
 
   function onBlur(event: FocusEvent<HTMLFormElement>) {
+    const next = event.relatedTarget as Node | null;
     if (
       !title.trim() &&
-      !event.currentTarget.contains(event.relatedTarget as Node | null)
+      !event.currentTarget.contains(next) &&
+      !inPopup(next)
     ) {
       onClose();
     }
@@ -91,23 +122,21 @@ export default function TaskComposer({
         placeholder="What needs to happen?"
         aria-label={label}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? "task-composer-error" : undefined}
+        aria-describedby={error ? errorId : undefined}
         className="h-control-md aria-invalid:border-danger"
       />
       {error && (
-        <p
-          id="task-composer-error"
-          role="alert"
-          className="caption-style text-danger px-1"
-        >
+        <p id={errorId} role="alert" className="caption-style text-danger px-1">
           {error}
         </p>
       )}
-      <div className="flex items-center justify-between gap-2">
-        <span className="caption-style text-fg-tertiary flex items-center gap-1 max-sm:hidden">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <DuePicker value={dueDate} onChange={setDueDate} />
+        <PriorityPicker value={priority} onChange={setPriority} />
+        <span className="caption-style text-fg-tertiary ml-auto flex items-center gap-1 max-sm:hidden">
           <Kbd>Enter</Kbd> to add
         </span>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="flex items-center gap-1 max-sm:ml-auto">
           <Button variant="ghost" size="xs" onClick={onClose}>
             Cancel
           </Button>

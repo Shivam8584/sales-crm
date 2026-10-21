@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
@@ -11,21 +12,41 @@ import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
+import RowAction from "@/components/data-table/row-action";
 import SearchInput from "@/components/data-table/search-input";
 import SelectionBar from "@/components/data-table/selection-bar";
-import type { Column, SortState } from "@/components/data-table/types";
-import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
+import Tooltip from "@/components/_ui/tooltip";
+import {
+  compareBy,
+  type Column,
+  type SortState,
+} from "@/components/data-table/types";
+import {
+  Page,
+  PageActions,
+  PageHeader,
+  PageToolbar,
+} from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
+import CsvImportDialog, {
+  type ImportConfig,
+} from "@/features/accounts/csv-import-dialog";
+import type { TimelineTarget } from "@/features/timeline/kinds";
+import LogCallDialog from "@/features/timeline/log-call-dialog";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
+import { downloadCsv } from "@/lib/csv";
 import { readError } from "@/lib/errors";
-import { relativeTime } from "@/lib/time";
+import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
+import EyeIcon from "@/public/assets/icons/eye.svg";
+import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 
 type PersonRow = FunctionReturnType<typeof api.people.list>[number];
 
@@ -39,32 +60,21 @@ const COLUMNS: Column<PersonRow>[] = [
   {
     id: "name",
     header: "Name",
-    width: "minmax(13rem,1.6fr)",
+    width: "minmax(12rem,1.3fr)",
     sortValue: (row) => personName(row),
     cell: (row) => (
       <>
         <Avatar name={personName(row)} />
-        <span className="truncate">{personName(row)}</span>
+        <span className="truncate" title={personName(row)}>
+          {personName(row)}
+        </span>
       </>
     ),
   },
   {
-    id: "title",
-    header: "Title",
-    width: "minmax(9rem,1fr)",
-    minViewport: 900,
-    sortValue: (row) => row.title,
-    cell: (row) =>
-      row.title ? (
-        <span className="text-fg-secondary truncate">{row.title}</span>
-      ) : (
-        dash
-      ),
-  },
-  {
     id: "account",
     header: "Account",
-    width: "minmax(10rem,1.2fr)",
+    width: "minmax(10rem,1.3fr)",
     sortValue: (row) => row.account?.name ?? null,
     cell: (row) =>
       row.account ? (
@@ -75,6 +85,19 @@ const COLUMNS: Column<PersonRow>[] = [
           <AccountLogo account={row.account} size="xs" />
           <span className="truncate">{row.account.name}</span>
         </Link>
+      ) : (
+        dash
+      ),
+  },
+  {
+    id: "title",
+    header: "Title",
+    width: "minmax(9rem,1fr)",
+    minViewport: 768,
+    sortValue: (row) => row.title,
+    cell: (row) =>
+      row.title ? (
+        <span className="text-fg-secondary truncate">{row.title}</span>
       ) : (
         dash
       ),
@@ -117,7 +140,7 @@ const COLUMNS: Column<PersonRow>[] = [
   {
     id: "owner",
     header: "Owner",
-    width: "minmax(8rem,1fr)",
+    width: "minmax(9.5rem,1fr)",
     minViewport: 1100,
     sortValue: (row) => row.owner?.name ?? null,
     cell: (row) =>
@@ -137,13 +160,48 @@ const COLUMNS: Column<PersonRow>[] = [
     align: "end",
     defaultDir: "desc",
     sortValue: (row) => row.lastActivityAt,
-    cell: (row) => (
-      <span className="text-fg-secondary">
-        {row.lastActivityAt ? relativeTime(row.lastActivityAt) : "—"}
-      </span>
-    ),
+    cell: (row) =>
+      row.lastActivityAt ? (
+        <Tooltip content={dateTime(row.lastActivityAt)}>
+          <span className="text-fg-secondary">
+            {relativeTime(row.lastActivityAt)}
+          </span>
+        </Tooltip>
+      ) : (
+        dash
+      ),
   },
 ];
+
+function exportRows(rows: PersonRow[]) {
+  const day = new Date().toISOString().slice(0, 10);
+  downloadCsv(`people-${day}.csv`, [
+    [
+      "First name",
+      "Last name",
+      "Email",
+      "Phone",
+      "Title",
+      "Account",
+      "LinkedIn",
+      "Owner",
+      "Tags",
+      "Last activity",
+    ],
+    ...rows.map((row) => [
+      row.firstName,
+      row.lastName,
+      row.email ?? "",
+      row.phone ?? "",
+      row.title ?? "",
+      row.account?.name ?? "",
+      row.linkedinUrl ?? "",
+      row.owner?.name ?? "",
+      row.tags.join(", "),
+      row.lastActivityAt ? new Date(row.lastActivityAt).toISOString() : "",
+    ]),
+  ]);
+}
 
 function matches(row: PersonRow, query: string) {
   const text = [
@@ -164,15 +222,23 @@ function matches(row: PersonRow, query: string) {
 }
 
 export default function PeoplePage() {
+  const router = useRouter();
   const viewer = useViewer();
   const members = useMembers();
   const people = useQuery(api.people.list, {});
   const setArchived = useMutation(api.people.setArchived);
+  const importRows = useMutation(api.people.importRows);
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useUrlState("q", "");
   const [owner, setOwner] = useUrlState("owner", ALL);
+  const [account, setAccount] = useUrlState("account", ALL);
+  const [importing, setImporting] = useState(false);
+  const [call, setCall] = useState<{
+    target: TimelineTarget;
+    name: string;
+  } | null>(null);
   const [sortParam, setSortParam] = useUrlState(
     "sort",
     `${DEFAULT_SORT.id}:${DEFAULT_SORT.dir}`,
@@ -195,11 +261,12 @@ export default function PeoplePage() {
           (owner === MINE
             ? row.owner?._id === viewer._id
             : row.owner?._id === owner)) &&
+        (account === ALL || (account === "none") === (row.account === null)) &&
         (!search.trim() || matches(row, search)),
     );
-  }, [people, owner, search, viewer._id]);
+  }, [people, owner, account, search, viewer._id]);
 
-  const filtered = owner !== ALL || search.trim() !== "";
+  const filtered = owner !== ALL || account !== ALL || search.trim() !== "";
   const selectedIds = [...selected].filter((id) =>
     rows?.some((row) => row._id === id),
   ) as Id<"people">[];
@@ -207,7 +274,97 @@ export default function PeoplePage() {
   function clearFilters() {
     setSearch("");
     setOwner(ALL);
+    setAccount(ALL);
   }
+
+  function exportView() {
+    if (!rows) return;
+    const column = COLUMNS.find((item) => item.id === sort.id);
+    const sorted = column?.sortValue
+      ? [...rows].sort(compareBy(column, sort.dir))
+      : rows;
+    exportRows(sorted);
+    toast(
+      `Exported ${sorted.length} ${sorted.length === 1 ? "person" : "people"}`,
+    );
+  }
+
+  const importConfig: ImportConfig = {
+    noun: ["person", "people"],
+    fields: [
+      {
+        key: "firstName",
+        label: "First name",
+        required: true,
+        aliases: ["first", "given name", "name", "full name", "contact name"],
+      },
+      {
+        key: "lastName",
+        label: "Last name",
+        aliases: ["last", "surname", "family name"],
+      },
+      {
+        key: "email",
+        label: "Email",
+        aliases: ["email address", "e mail", "mail"],
+      },
+      {
+        key: "phone",
+        label: "Phone",
+        aliases: [
+          "mobile",
+          "phone number",
+          "mobile number",
+          "whatsapp",
+          "contact",
+        ],
+      },
+      {
+        key: "title",
+        label: "Title",
+        aliases: ["job title", "role", "designation", "position"],
+      },
+      {
+        key: "account",
+        label: "Account",
+        aliases: [
+          "company",
+          "company name",
+          "account name",
+          "brand",
+          "website",
+          "domain",
+        ],
+      },
+      {
+        key: "linkedinUrl",
+        label: "LinkedIn",
+        aliases: ["linkedin url", "linkedin profile"],
+      },
+      { key: "owner", label: "Owner", aliases: ["owner email", "rep"] },
+      { key: "tags", label: "Tags", aliases: ["labels", "tag"] },
+    ],
+    example: [
+      "Priya",
+      "Sharma",
+      "priya@kesarleaf.in",
+      "98765 43210",
+      "Founder",
+      "kesarleaf.in",
+      "",
+      viewer.email,
+      "Decision maker",
+    ],
+    run: (rows, dryRun) =>
+      importRows({
+        dryRun,
+        rows: rows.map((row) => ({ ...row, firstName: row.firstName ?? "" })),
+      }),
+    describe: (row) => [
+      [row.firstName, row.lastName].filter(Boolean).join(" "),
+      [row.email, row.phone, row.account].filter(Boolean).join(" · "),
+    ],
+  };
 
   async function archive() {
     const ids = selectedIds;
@@ -237,14 +394,27 @@ export default function PeoplePage() {
           )
         }
         actions={
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setCreate({ type: "person" })}
-          >
-            <PlusIcon aria-hidden className="size-3" />
-            New person
-          </Button>
+          <PageActions
+            label="People list actions"
+            actions={[
+              { label: "Import CSV", onSelect: () => setImporting(true) },
+              {
+                label: filtered ? "Export this view" : "Export CSV",
+                disabled: !rows?.length,
+                onSelect: exportView,
+              },
+            ]}
+            primary={
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setCreate({ type: "person" })}
+              >
+                <PlusIcon aria-hidden className="size-3" />
+                New person
+              </Button>
+            }
+          />
         }
       />
       <PageToolbar>
@@ -263,6 +433,16 @@ export default function PeoplePage() {
             ...(members ?? [])
               .filter((member) => member._id !== viewer._id)
               .map((member) => ({ value: member._id, label: member.name })),
+          ]}
+        />
+        <FilterMenu
+          label="Account"
+          value={account}
+          onChange={setAccount}
+          options={[
+            { value: ALL, label: "Any" },
+            { value: "some", label: "Has an account" },
+            { value: "none", label: "No account" },
           ]}
         />
         {filtered && (
@@ -290,6 +470,32 @@ export default function PeoplePage() {
           selected={selected}
           onSelectedChange={setSelected}
           onPeek={(row) => setPeek({ type: "person", id: row._id })}
+          rowActions={(row) => (
+            <>
+              <RowAction
+                label="Log call"
+                icon={PhoneCallIcon}
+                onClick={() =>
+                  setCall({
+                    target: { personId: row._id },
+                    name: personName(row),
+                  })
+                }
+              />
+              <RowAction
+                label="Peek"
+                shortcut="Space"
+                icon={EyeIcon}
+                onClick={() => setPeek({ type: "person", id: row._id })}
+              />
+              <RowAction
+                label="Open"
+                shortcut="↵"
+                icon={ArrowRightIcon}
+                onClick={() => router.push(`/people/${row._id}`)}
+              />
+            </>
+          )}
           renderCard={(row) => (
             <span className="flex items-center gap-3">
               <Avatar name={personName(row)} size="md" />
@@ -320,16 +526,25 @@ export default function PeoplePage() {
               <EmptyState
                 icon={UsersIcon}
                 title="No people yet"
-                description="Add the founders, marketplace managers and marketers you talk to."
+                description="Add the founders, marketplace managers and marketers you talk to, or import them from a CSV."
                 action={
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setCreate({ type: "person" })}
-                  >
-                    <PlusIcon aria-hidden className="size-3" />
-                    New person
-                  </Button>
+                  <span className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setImporting(true)}
+                    >
+                      Import CSV
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setCreate({ type: "person" })}
+                    >
+                      <PlusIcon aria-hidden className="size-3" />
+                      New person
+                    </Button>
+                  </span>
                 }
               />
             )
@@ -345,6 +560,12 @@ export default function PeoplePage() {
           </Button>
         </SelectionBar>
       </div>
+      <CsvImportDialog
+        open={importing}
+        onOpenChange={setImporting}
+        config={importConfig}
+      />
+      <LogCallDialog call={call} onClose={() => setCall(null)} />
     </Page>
   );
 }

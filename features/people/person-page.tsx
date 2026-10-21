@@ -10,35 +10,39 @@ import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/_ui/dropdown-menu";
+import Tooltip from "@/components/_ui/tooltip";
 import InlineText from "@/components/fields/inline-text";
 import TagsField from "@/components/fields/tags-field";
 import { Properties, Property } from "@/components/record/properties";
-import RecordLayout, {
-  RecordHeader,
-  RecordSection,
-} from "@/components/record/record-layout";
-import { Page, PageHeader } from "@/components/shell/page";
+import RecordLayout, { RecordHeader } from "@/components/record/record-layout";
+import RecordTabs from "@/components/record/record-tabs";
+import { useCommandActions } from "@/components/shell/command-actions";
+import { Page, PageActions, PageHeader } from "@/components/shell/page";
+import AccountLogo from "@/features/accounts/account-logo";
 import AccountPicker from "@/features/accounts/account-picker";
+import {
+  editRecordTitle,
+  useTitleShortcut,
+} from "@/features/accounts/use-title-shortcut";
 import DinLookup from "@/features/enrichment/din-lookup";
 import MemberPicker from "@/features/members/member-picker";
-import Timeline from "@/features/timeline/timeline";
 import RecordTasks from "@/features/tasks/record-tasks";
+import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
 import { readError } from "@/lib/errors";
-import { relativeTime, shortDate } from "@/lib/time";
+import { dateTime, relativeTime, shortDate } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
+import { useUiStore } from "@/stores/ui-store";
+import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
+import EditIcon from "@/public/assets/icons/edit.svg";
+import TargetIcon from "@/public/assets/icons/target-05.svg";
+import TrashIcon from "@/public/assets/icons/trash.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
-import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
-import MailIcon from "@/public/assets/icons/mail-04.svg";
-import PhoneIcon from "@/public/assets/icons/phone.svg";
+import ConsentRecords from "./consent-records";
+import ContactActions from "./contact-actions";
+import PersonDeals from "./person-deals";
 
 type Person = NonNullable<FunctionReturnType<typeof api.people.get>>;
 
@@ -53,13 +57,24 @@ export default function PersonPage({ id }: { id: Id<"people"> }) {
         <PageHeader crumbs={CRUMBS} title="" />
         <div
           aria-busy
-          className="mx-auto flex w-full max-w-6xl items-center gap-4 px-6 py-8"
+          className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:py-8"
         >
-          <Skeleton className="size-12 rounded-full" />
-          <span className="flex flex-col gap-2">
-            <Skeleton className="h-5 w-48" />
-            <Skeleton className="h-3 w-32" />
-          </span>
+          <div className="flex items-center gap-4 lg:col-span-2">
+            <Skeleton className="size-12 rounded-full" />
+            <span className="flex flex-col gap-2">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-3 w-32" />
+            </span>
+          </div>
+          <div className="flex flex-col gap-5 lg:order-1">
+            <Skeleton className="h-9 w-56" />
+            <Skeleton className="h-28 w-full rounded-xl" />
+          </div>
+          <div className="flex flex-col gap-3 lg:order-2">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+          </div>
         </div>
       </Page>
     );
@@ -90,8 +105,25 @@ function PersonView({ person }: { person: Person }) {
   const update = useMutation(api.people.update);
   const setArchived = useMutation(api.people.setArchived);
   const save = useRecordUpdate(update, person._id);
+  const setCreate = useUiStore((state) => state.setCreate);
+  const deals = useQuery(api.people.deals, { personId: person._id });
+  const tasks = useQuery(api.tasks.list, {
+    personId: person._id,
+    done: "none",
+  });
   const name = personName(person);
   const archived = Boolean(person.archivedAt);
+  useTitleShortcut();
+
+  const newTask = () =>
+    setCreate({
+      type: "task",
+      personId: person._id,
+      accountId: person.account?._id,
+    });
+  const newDeal = person.account
+    ? () => setCreate({ type: "deal", accountId: person.account!._id })
+    : null;
 
   async function toggleArchived() {
     try {
@@ -110,6 +142,38 @@ function PersonView({ person }: { person: Person }) {
     }
   }
 
+  useCommandActions([
+    {
+      id: "person-rename",
+      label: "Edit first name",
+      icon: EditIcon,
+      shortcut: "E",
+      perform: editRecordTitle,
+    },
+    {
+      id: "person-task",
+      label: `New task for ${name}`,
+      icon: CheckSquareIcon,
+      perform: newTask,
+    },
+    ...(newDeal
+      ? [
+          {
+            id: "person-deal",
+            label: `New deal for ${person.account!.name}`,
+            icon: TargetIcon,
+            perform: newDeal,
+          },
+        ]
+      : []),
+    {
+      id: "person-archive",
+      label: archived ? "Restore person" : "Archive person",
+      icon: TrashIcon,
+      perform: () => void toggleArchived(),
+    },
+  ]);
+
   return (
     <Page>
       <PageHeader
@@ -117,67 +181,70 @@ function PersonView({ person }: { person: Person }) {
         title={name}
         meta={
           archived && (
-            <span className="caption-style text-warning ml-1">Archived</span>
+            <span className="caption-style text-warning">Archived</span>
           )
         }
         actions={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Person actions"
-              >
-                <DotsIcon aria-hidden className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => void toggleArchived()}>
-                {archived ? "Restore person" : "Archive person"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <PageActions
+            label="Person actions"
+            actions={[
+              { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
+              newDeal && {
+                label: "New deal",
+                icon: TargetIcon,
+                onSelect: newDeal,
+              },
+              {
+                label: archived ? "Restore person" : "Archive person",
+                icon: TrashIcon,
+                tone: archived ? undefined : "danger",
+                separated: true,
+                onSelect: () => void toggleArchived(),
+              },
+            ]}
+          />
         }
       />
       <RecordLayout
         header={
           <RecordHeader
             visual={<Avatar name={name} size="xl" />}
-            title={name}
+            title={
+              <span data-record-title className="flex min-w-0 gap-1.5">
+                <InlineText
+                  value={person.firstName}
+                  label="First name"
+                  onSave={(firstName) => save({ firstName }, "First name")}
+                  className="shrink-0"
+                  inputClassName="h-8 text-xl font-semibold"
+                />
+                {person.lastName && (
+                  <InlineText
+                    value={person.lastName}
+                    label="Last name"
+                    onSave={(lastName) => save({ lastName }, "Last name")}
+                    inputClassName="h-8 text-xl font-semibold"
+                  />
+                )}
+              </span>
+            }
             subtitle={
               <>
                 {person.title && <span>{person.title}</span>}
                 {person.account && (
                   <Link
                     href={`/accounts/${person.account._id}`}
-                    className="hover:text-foreground"
+                    className="hover:text-foreground focus-visible:ring-ring flex min-w-0 items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2"
                   >
-                    {person.account.name}
+                    <AccountLogo account={person.account} size="xs" />
+                    <span className="truncate">{person.account.name}</span>
                   </Link>
                 )}
-              </>
-            }
-            actions={
-              <>
-                {person.email && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    href={`mailto:${person.email}`}
-                  >
-                    <MailIcon aria-hidden className="size-3" />
-                    Email
-                  </Button>
-                )}
-                {person.phone && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    href={`tel:${person.phone}`}
-                  >
-                    <PhoneIcon aria-hidden className="size-3" />
-                    Call
-                  </Button>
+                {person.owner && (
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <Avatar name={person.owner.name} size="xs" />
+                    <span className="truncate">{person.owner.name}</span>
+                  </span>
                 )}
               </>
             }
@@ -230,8 +297,16 @@ function PersonView({ person }: { person: Person }) {
                   }
                 />
               </Property>
+              <Property label="Tags">
+                <TagsField
+                  value={person.tags}
+                  label="Tags"
+                  onChange={(tags) => void save({ tags }, "Tags")}
+                />
+              </Property>
             </Properties>
             <Properties title="Contact">
+              <ContactActions person={person} className="mb-2" />
               <Property label="Email">
                 <InlineText
                   value={person.email}
@@ -265,36 +340,53 @@ function PersonView({ person }: { person: Person }) {
                   }
                 />
               </Property>
-              <Property label="Tags">
-                <TagsField
-                  value={person.tags}
-                  label="Tags"
-                  onChange={(tags) => void save({ tags }, "Tags")}
-                />
-              </Property>
             </Properties>
+            <ConsentRecords personId={person._id} />
             <DinLookup personId={person._id} />
             <Properties title="Activity">
               <Property label="Last activity">
-                <span className="text-sm">
-                  {person.lastActivityAt
-                    ? relativeTime(person.lastActivityAt)
-                    : "—"}
-                </span>
+                {person.lastActivityAt ? (
+                  <Tooltip content={dateTime(person.lastActivityAt)}>
+                    <span className="text-sm">
+                      {relativeTime(person.lastActivityAt)}
+                    </span>
+                  </Tooltip>
+                ) : (
+                  <span className="text-fg-tertiary text-sm">None yet</span>
+                )}
               </Property>
               <Property label="Added">
-                <span className="text-sm">
-                  {shortDate(person._creationTime)}
-                </span>
+                <Tooltip content={dateTime(person._creationTime)}>
+                  <span className="text-sm">
+                    {shortDate(person._creationTime)}
+                  </span>
+                </Tooltip>
               </Property>
             </Properties>
           </>
         }
       >
-        <RecordTasks target={{ personId: person._id }} />
-        <RecordSection title="Timeline">
-          <Timeline target={{ personId: person._id }} />
-        </RecordSection>
+        <RecordTabs
+          tabs={[
+            {
+              id: "activity",
+              label: "Activity",
+              content: <Timeline target={{ personId: person._id }} />,
+            },
+            {
+              id: "deals",
+              label: "Deals",
+              count: deals?.length,
+              content: <PersonDeals personId={person._id} onAdd={newDeal} />,
+            },
+            {
+              id: "tasks",
+              label: "Tasks",
+              count: tasks?.length,
+              content: <RecordTasks target={{ personId: person._id }} />,
+            },
+          ]}
+        />
       </RecordLayout>
     </Page>
   );

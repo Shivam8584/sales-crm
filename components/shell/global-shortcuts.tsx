@@ -3,13 +3,15 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isEditableTarget } from "@/lib/keyboard";
+import { toggleSidebarCollapsed } from "@/lib/sidebar-collapse";
 import { useUiStore } from "@/stores/ui-store";
 import { ALL_NAV_ITEMS } from "./navigation";
 
 const SEQUENCE_TIMEOUT = 900;
+const DESKTOP_WIDTH = 1024;
 const OVERLAY = "[role=dialog], [role=menu], [role=listbox]";
 
-/** App-wide keys: ⌘K search, `?` help, `C` create, and `G` then a letter to navigate. */
+/** App-wide keys: ⌘K search, `?` help, `C` create, `[` sidebar, and `G` then a letter to navigate. */
 export default function GlobalShortcuts({
   onCreate,
 }: {
@@ -51,6 +53,9 @@ export default function GlobalShortcuts({
       } else if (key === "c") {
         event.preventDefault();
         onCreate();
+      } else if (event.key === "[" && window.innerWidth >= DESKTOP_WIDTH) {
+        event.preventDefault();
+        toggleSidebarCollapsed();
       }
     }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
+import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -16,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
+import Kbd from "@/components/_ui/kbd";
 import { Input } from "@/components/_ui/input";
 import Skeleton from "@/components/_ui/skeleton";
 import OptionPicker, { type Option } from "@/components/fields/option-picker";
@@ -34,6 +36,7 @@ import {
   personName,
 } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
+import { MOD_KEY } from "@/lib/keyboard";
 import { relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
@@ -321,8 +324,19 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
     });
   }
 
+  const canSave = valid && !saving && (task ? dirty : true);
+
   return (
-    <form onSubmit={submit} noValidate>
+    <form
+      onSubmit={submit}
+      noValidate
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          if (canSave) void submit();
+        }
+      }}
+    >
       <DialogHeader>
         <DialogTitle>{task ? "Edit task" : "New task"}</DialogTitle>
         <DialogDescription>
@@ -337,12 +351,40 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
                 .join(" · ")
             : "Something to follow up on, for you or a teammate."}
         </DialogDescription>
+        {task && (task.deal || task.lead) && (
+          <p className="caption-style text-fg-tertiary flex flex-wrap items-center gap-x-1.5">
+            {task.deal && (
+              <>
+                For the deal
+                <Link
+                  href={`/deals/${task.deal._id}`}
+                  onClick={onClose}
+                  className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
+                >
+                  {task.deal.title}
+                </Link>
+              </>
+            )}
+            {!task.deal && task.lead && (
+              <>
+                For the lead
+                <Link
+                  href={`/leads/${task.lead._id}`}
+                  onClick={onClose}
+                  className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
+                >
+                  {task.lead.name}
+                </Link>
+              </>
+            )}
+          </p>
+        )}
       </DialogHeader>
       <div className="flex flex-col gap-5 px-6 py-5">
         <Field label="Title" htmlFor="task-title" required error={errors.title}>
           <Input
             id="task-title"
-            autoFocus={!task}
+            autoFocus
             autoComplete="off"
             maxLength={200}
             value={draft.title}
@@ -534,8 +576,12 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
           size="sm"
           loading={saving}
           disabled={!valid || (task ? !dirty : false)}
+          aria-keyshortcuts="Meta+Enter Control+Enter"
         >
           {task ? "Save" : "Add task"}
+          <Kbd className="-mr-1 border-current/25 bg-transparent text-current opacity-75 max-sm:hidden">
+            {MOD_KEY}↵
+          </Kbd>
         </Button>
       </DialogFooter>
     </form>

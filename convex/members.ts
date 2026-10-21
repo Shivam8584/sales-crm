@@ -3,10 +3,15 @@ import { v } from "convex/values";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import type { Role } from "../lib/domain/enums";
-import { normalizeEmail } from "../lib/domain/normalize";
+import { cleanText, normalizeEmail } from "../lib/domain/normalize";
 import { sha256Hex } from "./lib/crypto";
-import { fail, notFound } from "./lib/errors";
-import { adminMutation, getViewer, memberQuery } from "./lib/functions";
+import { fail, invalid, notFound } from "./lib/errors";
+import {
+  adminMutation,
+  getViewer,
+  memberMutation,
+  memberQuery,
+} from "./lib/functions";
 import { vMemberStatus, vRole } from "./lib/validators";
 
 /** Comma-separated domains such as "hypedrive.in"; empty allows any email. */
@@ -111,6 +116,23 @@ export const team = memberQuery({
         joinedAt,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  },
+});
+
+const MAX_NAME = 80;
+
+/** Renames the signed-in member; names are resolved from member ids, so it shows everywhere at once. */
+export const updateProfile = memberMutation({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    const name = cleanText(args.name);
+    if (!name) invalid("name", "Enter your name");
+    if (name.length > MAX_NAME) {
+      invalid("name", `Keep it under ${MAX_NAME} characters`);
+    }
+    const previous = ctx.viewer.name;
+    if (name !== previous) await ctx.db.patch(ctx.viewer._id, { name });
+    return { name: previous };
   },
 });
 

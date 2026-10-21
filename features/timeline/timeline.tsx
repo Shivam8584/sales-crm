@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
-import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
@@ -17,18 +16,122 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
-import { KIND_META, type TimelineTarget } from "./kinds";
+import {
+  FILTERS,
+  KIND_META,
+  filterOf,
+  type TimelineFilter,
+  type TimelineTarget,
+} from "./kinds";
 import TimelineComposer from "./timeline-composer";
 
 type Entry = FunctionReturnType<typeof api.timeline.forRecord>[number];
 
-/** Composer plus the record's history: interactions, field changes and system events. */
-export default function Timeline({ target }: { target: TimelineTarget }) {
+const WEEKDAY_DATE = new Intl.DateTimeFormat("en-IN", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+const FULL_DATE = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+function dayKey(at: number) {
+  const date = new Date(at);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function dayLabel(at: number) {
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (dayKey(at) === dayKey(now.getTime())) return "Today";
+  if (dayKey(at) === dayKey(yesterday.getTime())) return "Yesterday";
+  const date = new Date(at);
+  return date.getFullYear() === now.getFullYear()
+    ? WEEKDAY_DATE.format(date)
+    : FULL_DATE.format(date);
+}
+
+function groupByDay(entries: Entry[]) {
+  const groups: { key: string; label: string; entries: Entry[] }[] = [];
+  for (const entry of entries) {
+    const key = dayKey(entry.occurredAt);
+    const last = groups.at(-1);
+    if (last?.key === key) last.entries.push(entry);
+    else
+      groups.push({ key, label: dayLabel(entry.occurredAt), entries: [entry] });
+  }
+  return groups;
+}
+
+/** Composer plus the record's history: interactions, field changes and platform events. */
+export default function Timeline({
+  target,
+  compact = false,
+}: {
+  target: TimelineTarget;
+  /** Peek layout: no filter chips. */
+  compact?: boolean;
+}) {
   const entries = useQuery(api.timeline.forRecord, { target });
+  const [filter, setFilter] = useState<TimelineFilter>("all");
+
+  const counts = useMemo(() => {
+    const result = new Map<TimelineFilter, number>();
+    for (const entry of entries ?? []) {
+      const key = filterOf(entry);
+      result.set(key, (result.get(key) ?? 0) + 1);
+    }
+    return result;
+  }, [entries]);
+
+  const visible = useMemo(
+    () =>
+      entries?.filter(
+        (entry) => filter === "all" || filterOf(entry) === filter,
+      ),
+    [entries, filter],
+  );
+  const groups = useMemo(() => groupByDay(visible ?? []), [visible]);
+  const onAccount = "accountId" in target;
 
   return (
     <div className="flex flex-col gap-5">
       <TimelineComposer target={target} />
+      {!compact && entries !== undefined && entries.length > 0 && (
+        <div
+          role="group"
+          aria-label="Show"
+          className="scrollbar-none -mx-1 -mb-1 flex gap-1 overflow-x-auto px-1 py-1"
+        >
+          {FILTERS.map((item) => {
+            const count =
+              item.id === "all" ? entries.length : (counts.get(item.id) ?? 0);
+            if (item.id !== "all" && count === 0 && filter !== item.id)
+              return null;
+            const active = filter === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setFilter(item.id)}
+                className={cn(
+                  "caption-style text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 transition-colors outline-none focus-visible:ring-2",
+                  active &&
+                    "bg-raised text-foreground shadow-hairline hover:bg-raised",
+                )}
+              >
+                {item.label}
+                <span className="text-fg-tertiary tabular-nums">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       {entries === undefined ? (
         <ol className="flex flex-col gap-5" aria-busy>
           {Array.from({ length: 3 }, (_, index) => (
@@ -45,30 +148,200 @@ export default function Timeline({ target }: { target: TimelineTarget }) {
         <p className="caption-style text-fg-tertiary py-6 text-center">
           Nothing logged yet. Notes, calls and changes will appear here.
         </p>
+      ) : groups.length === 0 ? (
+        <p className="caption-style text-fg-tertiary py-6 text-center">
+          Nothing in this view.{" "}
+          <button
+            type="button"
+            onClick={() => setFilter("all")}
+            className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2"
+          >
+            Show everything
+          </button>
+        </p>
       ) : (
-        <ol className="flex flex-col">
-          {entries.map((entry, index) => (
-            <TimelineItem
-              key={entry._id}
-              entry={entry}
-              last={index === entries.length - 1}
-              showPerson={"accountId" in target}
-            />
+        <div className="flex flex-col gap-4">
+          {groups.map((group) => (
+            <section key={group.key} aria-label={group.label}>
+              <h3 className="caption-style text-fg-tertiary bg-background sticky top-0 z-1 flex items-center gap-3 py-1.5 font-medium">
+                {group.label}
+                <span aria-hidden className="bg-border h-px flex-1" />
+              </h3>
+              <ol className="flex flex-col pt-2">
+                {group.entries.map((entry, index) => (
+                  <TimelineItem
+                    key={entry._id}
+                    entry={entry}
+                    last={index === group.entries.length - 1}
+                    showContext={onAccount}
+                  />
+                ))}
+              </ol>
+            </section>
           ))}
-        </ol>
+        </div>
       )}
     </div>
+  );
+}
+
+function Rail({ last, compact }: { last: boolean; compact: boolean }) {
+  if (last) return null;
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "bg-border absolute bottom-0 left-3 w-px -translate-x-1/2",
+        compact ? "top-5" : "top-7",
+      )}
+    />
+  );
+}
+
+function Time({ at, edited }: { at: number; edited?: boolean }) {
+  return (
+    <Tooltip content={dateTime(at)}>
+      <time
+        dateTime={new Date(at).toISOString()}
+        className="caption-style text-fg-tertiary shrink-0 whitespace-nowrap"
+      >
+        {relativeTime(at)}
+        {edited && " · edited"}
+      </time>
+    </Tooltip>
   );
 }
 
 function TimelineItem({
   entry,
   last,
-  showPerson,
+  showContext,
 }: {
   entry: Entry;
   last: boolean;
-  showPerson: boolean;
+  showContext: boolean;
+}) {
+  if (entry.kind === "change" || entry.kind === "system") {
+    return <AutomaticItem entry={entry} last={last} />;
+  }
+  return <LoggedItem entry={entry} last={last} showContext={showContext} />;
+}
+
+function AutomaticItem({ entry, last }: { entry: Entry; last: boolean }) {
+  const meta = KIND_META[entry.kind];
+  const actorName = entry.actor?.name ?? "Hypedrive";
+  const changes = entry.changes ?? [];
+
+  return (
+    <li className="relative flex gap-3 pb-3.5">
+      <Rail last={last} compact />
+      <span className="text-fg-tertiary bg-background flex h-5 w-6 shrink-0 items-center justify-center">
+        <meta.icon aria-hidden className="size-3" />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="caption-style flex min-h-5 items-baseline gap-2 leading-5">
+          <p className="text-fg-secondary min-w-0 flex-1">
+            <span className="text-foreground font-medium">{actorName}</span>{" "}
+            {entry.kind === "system" ? (
+              entry.subject
+            ) : changes.length === 1 ? (
+              <ChangeText change={changes[0]} />
+            ) : (
+              `changed ${changes.length} fields`
+            )}
+          </p>
+          <Time at={entry.occurredAt} />
+        </div>
+        {entry.kind === "change" && changes.length > 1 && (
+          <ul className="flex flex-col gap-0.5">
+            {changes.map((change) => (
+              <li
+                key={change.field}
+                className="caption-style text-fg-secondary leading-5"
+              >
+                <ChangeText change={change} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {entry.kind === "system" && entry.body && (
+          <p className="caption-style text-fg-tertiary leading-snug break-words whitespace-pre-line">
+            {entry.body}
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ChangeText({
+  change,
+}: {
+  change: { field: string; from?: string; to?: string };
+}) {
+  const field = change.field.toLowerCase();
+  if (change.field === "Tags") {
+    const before = change.from?.split(", ") ?? [];
+    const after = change.to?.split(", ") ?? [];
+    const added = after.filter((tag) => !before.includes(tag));
+    const removed = before.filter((tag) => !after.includes(tag));
+    return (
+      <>
+        {added.length > 0 && (
+          <>
+            added {added.length === 1 ? "tag" : "tags"}{" "}
+            <span className="text-foreground">{added.join(", ")}</span>
+          </>
+        )}
+        {added.length > 0 && removed.length > 0 && " and "}
+        {removed.length > 0 && (
+          <>
+            removed {removed.length === 1 ? "tag" : "tags"}{" "}
+            <span className="text-foreground">{removed.join(", ")}</span>
+          </>
+        )}
+        {added.length === 0 && removed.length === 0 && "reordered tags"}
+      </>
+    );
+  }
+  if (!change.to) {
+    return (
+      <>
+        cleared {field}
+        {change.from && (
+          <span className="text-fg-tertiary line-through decoration-1">
+            {" "}
+            {change.from}
+          </span>
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      {change.from ? "changed" : "set"} {field}{" "}
+      {change.from && (
+        <>
+          <span className="text-fg-tertiary">{change.from}</span>{" "}
+          <span aria-label="to" className="text-fg-tertiary">
+            →
+          </span>{" "}
+        </>
+      )}
+      {!change.from && "to "}
+      <span className="text-foreground break-words">{change.to}</span>
+    </>
+  );
+}
+
+function LoggedItem({
+  entry,
+  last,
+  showContext,
+}: {
+  entry: Entry;
+  last: boolean;
+  showContext: boolean;
 }) {
   const viewer = useViewer();
   const remove = useMutation(api.timeline.remove);
@@ -77,10 +350,12 @@ function TimelineItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.body ?? "");
   const meta = KIND_META[entry.kind];
-  const automatic = entry.kind === "change" || entry.kind === "system";
-  const canManage =
-    !automatic && (entry.actorId === viewer._id || viewer.role === "admin");
+  const canManage = entry.actorId === viewer._id || viewer.role === "admin";
   const actorName = entry.actor?.name ?? "Hypedrive";
+  const details = [
+    entry.outcome && CALL_OUTCOME_LABEL[entry.outcome],
+    entry.durationMin ? `${entry.durationMin} min` : null,
+  ].filter(Boolean);
 
   async function onDelete() {
     try {
@@ -105,59 +380,56 @@ function TimelineItem({
   }
 
   return (
-    <li className="group/item relative flex gap-3 pb-6 last:pb-0">
-      {!last && (
-        <span
-          aria-hidden
-          className="bg-border absolute top-7 bottom-1 left-3 w-px"
-        />
-      )}
-      <span
-        className={cn(
-          "bg-raised shadow-hairline text-fg-secondary flex size-6 shrink-0 items-center justify-center rounded-full",
-          automatic && "text-fg-tertiary bg-transparent shadow-none",
-        )}
-      >
+    <li className="group/item relative flex gap-3 pb-5">
+      <Rail last={last} compact={false} />
+      <span className="bg-raised shadow-hairline text-fg-secondary flex size-6 shrink-0 items-center justify-center rounded-full">
         <meta.icon aria-hidden className="size-3" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-0.5">
-        <div className="flex min-h-5 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-snug">
-          {entry.actor && <Avatar name={actorName} size="xs" />}
-          <span className="font-medium">{actorName}</span>
-          <span className="text-fg-secondary">
-            {entry.kind === "change"
-              ? "updated"
-              : entry.kind === "system"
-                ? entry.subject
-                : `logged a ${meta.label.toLowerCase()}`}
-          </span>
-          {showPerson && entry.person && !automatic && (
-            <span className="text-fg-secondary">
-              with{" "}
-              <Link
-                href={`/people/${entry.person._id}`}
-                className="text-foreground hover:underline"
-              >
-                {entry.person.name}
-              </Link>
-            </span>
-          )}
-          <Tooltip content={dateTime(entry.occurredAt)}>
-            <time
-              dateTime={new Date(entry.occurredAt).toISOString()}
-              className="caption-style text-fg-tertiary"
-            >
-              · {relativeTime(entry.occurredAt)}
-              {entry.editedAt && " · edited"}
-            </time>
-          </Tooltip>
+        <div className="flex min-h-5 items-baseline gap-2 text-sm leading-5">
+          <p className="text-fg-secondary min-w-0 flex-1">
+            <span className="text-foreground font-medium">{actorName}</span>{" "}
+            {entry.kind === "note"
+              ? "added a note"
+              : `logged ${entry.kind === "email" ? "an" : "a"} ${meta.label.toLowerCase()}`}
+            {showContext && entry.person && (
+              <>
+                {" "}
+                with{" "}
+                <Link
+                  href={`/people/${entry.person._id}`}
+                  className="text-foreground hover:underline"
+                >
+                  {entry.person.name}
+                </Link>
+              </>
+            )}
+            {showContext && entry.deal && (
+              <>
+                {" "}
+                on{" "}
+                <Link
+                  href={`/deals/${entry.deal._id}`}
+                  className="text-foreground hover:underline"
+                >
+                  {entry.deal.title}
+                </Link>
+              </>
+            )}
+            {details.length > 0 && (
+              <span className="text-fg-tertiary"> · {details.join(" · ")}</span>
+            )}
+          </p>
           {canManage && !editing && (
-            <span className="ml-auto flex gap-0.5 opacity-0 group-focus-within/item:opacity-100 group-hover/item:opacity-100 max-sm:opacity-100">
+            <span className="flex gap-0.5 self-center opacity-0 group-focus-within/item:opacity-100 group-hover/item:opacity-100 pointer-coarse:opacity-100">
               <Button
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Edit entry"
-                onClick={() => setEditing(true)}
+                onClick={() => {
+                  setDraft(entry.body ?? "");
+                  setEditing(true);
+                }}
               >
                 <EditIcon aria-hidden className="size-3" />
               </Button>
@@ -171,40 +443,8 @@ function TimelineItem({
               </Button>
             </span>
           )}
+          <Time at={entry.occurredAt} edited={Boolean(entry.editedAt)} />
         </div>
-
-        {entry.kind === "change" && entry.changes && (
-          <ul className="flex flex-col gap-1">
-            {entry.changes.map((change) => (
-              <li
-                key={change.field}
-                className="caption-style text-fg-secondary leading-snug"
-              >
-                <span className="text-fg-tertiary">{change.field}</span>{" "}
-                {change.from && (
-                  <span className="line-through decoration-1">
-                    {change.from}
-                  </span>
-                )}
-                {change.from && " → "}
-                <span className="text-foreground">
-                  {change.to ?? "cleared"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {(entry.outcome || entry.durationMin) && (
-          <span className="caption-style text-fg-tertiary">
-            {[
-              entry.outcome && CALL_OUTCOME_LABEL[entry.outcome],
-              entry.durationMin ? `${entry.durationMin} min` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        )}
 
         {editing ? (
           <div className="flex flex-col gap-2">
@@ -212,6 +452,16 @@ function TimelineItem({
               autoFocus
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setEditing(false);
+                }
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  void onSave();
+                }
+              }}
               aria-label="Edit entry"
               className="border-selected ring-selected/20 bg-secondary field-sizing-content min-h-16 w-full resize-none rounded-lg border px-3 py-2 text-sm leading-snug ring-3 outline-none"
             />
@@ -229,16 +479,11 @@ function TimelineItem({
             </div>
           </div>
         ) : (
-          entry.body &&
-          (entry.kind === "system" ? (
-            <p className="caption-style text-fg-secondary leading-snug break-words">
-              {entry.body}
-            </p>
-          ) : (
+          entry.body && (
             <p className="bg-card border-border rounded-lg border px-3 py-2.5 text-sm leading-relaxed break-words whitespace-pre-wrap">
               {entry.body}
             </p>
-          ))
+          )
         )}
       </div>
     </li>

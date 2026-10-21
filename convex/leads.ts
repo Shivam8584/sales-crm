@@ -9,7 +9,15 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { checkGstin, panRoot } from "../lib/domain/gstin";
-import type { LeadKind, LeadStatus } from "../lib/domain/enums";
+import type {
+  DisqualifyReason,
+  LeadKind,
+  LeadStatus,
+} from "../lib/domain/enums";
+import {
+  DISQUALIFY_REASON_LABEL,
+  LEAD_STATUS_LABEL,
+} from "../lib/domain/labels";
 import {
   CONSENT_TEXT,
   LEAD_LIMITS,
@@ -48,7 +56,7 @@ import {
   leadHref,
   leadSummary,
   recordConsents,
-  slaSeconds,
+  leadSlaSeconds,
 } from "./lib/leads";
 import {
   memberIndex,
@@ -56,7 +64,7 @@ import {
   personSearchText,
   requireActiveMember,
 } from "./lib/records";
-import { logSystem } from "./lib/timeline";
+import { diff, logChanges, logSystem } from "./lib/timeline";
 import { vDisqualifyReason, vLeadStatus, vUtm } from "./lib/validators";
 import { leadershipIds, notify, notifyMany } from "./notifications";
 
@@ -89,7 +97,7 @@ export const list = memberQuery({
       memberIndex(ctx),
     ]);
     return {
-      slaMs: slaSeconds() * 1000,
+      slaMs: (await leadSlaSeconds(ctx)) * 1000,
       leads: leads.map((lead) => ({
         _id: lead._id,
         _creationTime: lead._creationTime,
@@ -122,7 +130,7 @@ export const waiting = memberQuery({
       )
       .take(100);
     return {
-      slaMs: slaSeconds() * 1000,
+      slaMs: (await leadSlaSeconds(ctx)) * 1000,
       leads: leads
         .sort(
           (a, b) =>
@@ -153,7 +161,7 @@ export const get = memberQuery({
     const lead = id ? await ctx.db.get(id) : null;
     if (!id || !lead) return null;
     const converted = lead.status === "converted";
-    const [members, consents, account, matchedAccount, matchedPerson] =
+    const [members, consents, account, person, matchedAccount, matchedPerson] =
       await Promise.all([
         memberIndex(ctx),
         ctx.db
@@ -161,15 +169,22 @@ export const get = memberQuery({
           .withIndex("by_lead", (q) => q.eq("leadId", id))
           .collect(),
         lead.accountId ? ctx.db.get(lead.accountId) : null,
+        lead.personId ? ctx.db.get(lead.personId) : null,
         converted ? null : matchAccount(ctx, lead),
         converted ? null : matchPerson(ctx, lead),
       ]);
     return {
       ...lead,
       channel: leadChannel(lead),
-      slaMs: slaSeconds() * 1000,
+      slaMs: (await leadSlaSeconds(ctx)) * 1000,
       owner: memberRef(members, lead.ownerId),
       account: account ? { _id: account._id, name: account.name } : null,
+      person: person
+        ? {
+            _id: person._id,
+            name: `${person.firstName} ${person.lastName}`.trim(),
+          }
+        : null,
       matches: {
         account: matchedAccount
           ? { _id: matchedAccount._id, name: matchedAccount.name }
@@ -332,6 +347,56 @@ export const touch = memberMutation({
   },
 });
 
+const MAX_BULK = 500;
+
+function statusText(status: LeadStatus, reason?: DisqualifyReason) {
+  return status === "disqualified" && reason
+    ? `${LEAD_STATUS_LABEL[status]} (${DISQUALIFY_REASON_LABEL[reason]})`
+    : LEAD_STATUS_LABEL[status];
+}
+
+function checkStatus(status: LeadStatus, reason: DisqualifyReason | undefined) {
+  if (status === "converted") {
+    fail("invalid", "Use Convert to turn a lead into an account", "status");
+  }
+  if (status === "disqualified" && !reason) {
+    invalid("reason", "Pick a reason to disqualify this lead");
+  }
+}
+
+/** Moves an open lead to `status`, logging the change; returns what it was. */
+async function applyStatus(
+  ctx: MutationCtx & { viewer: Doc<"members"> },
+  lead: Doc<"leads">,
+  status: LeadStatus,
+  reason: DisqualifyReason | undefined,
+) {
+  const previous = {
+    id: lead._id,
+    status: lead.status,
+    reason: lead.disqualifyReason ?? undefined,
+  };
+  const nextReason = status === "disqualified" ? reason : undefined;
+  if (status === lead.status && nextReason === lead.disqualifyReason) {
+    return previous;
+  }
+  await ctx.db.patch(lead._id, {
+    ...(WORKED_STATUSES.includes(status)
+      ? touchPatch(lead, ctx.viewer._id)
+      : {}),
+    status,
+    disqualifyReason: nextReason,
+  });
+  await logChanges(ctx, { leadId: lead._id }, ctx.viewer._id, [
+    {
+      field: "Status",
+      from: statusText(lead.status, lead.disqualifyReason),
+      to: statusText(status, nextReason),
+    },
+  ]);
+  return previous;
+}
+
 /** Returns the previous status and reason so the client can offer undo. */
 export const setStatus = memberMutation({
   args: {
@@ -341,43 +406,101 @@ export const setStatus = memberMutation({
   },
   handler: async (ctx, { id, status, reason }) => {
     const lead = await requireLead(ctx, id);
-    const previous = {
-      status: lead.status,
-      reason: lead.disqualifyReason ?? undefined,
-    };
     if (lead.status === "converted") {
       fail("conflict", "This lead is already converted");
     }
-    if (status === "converted") {
-      fail("invalid", "Use Convert to turn a lead into an account", "status");
-    }
-    if (status === "disqualified" && !reason) {
-      invalid("reason", "Pick a reason to disqualify this lead");
-    }
-    await ctx.db.patch(id, {
-      ...(WORKED_STATUSES.includes(status)
-        ? touchPatch(lead, ctx.viewer._id)
-        : {}),
+    checkStatus(status, reason);
+    const { status: from, reason: fromReason } = await applyStatus(
+      ctx,
+      lead,
       status,
-      disqualifyReason: status === "disqualified" ? reason : undefined,
-    });
-    return previous;
+      reason,
+    );
+    return { status: from, reason: fromReason };
   },
 });
 
-/** Reassigning is not a touch. Returns the previous owner for undo. */
+function uniqueIds(ids: Id<"leads">[]) {
+  const unique = [...new Set(ids)];
+  if (unique.length > MAX_BULK) {
+    invalid("ids", `Pick up to ${MAX_BULK} leads at a time`);
+  }
+  return unique;
+}
+
+/** Bulk status change; converted or missing leads are skipped and counted. */
+export const setStatusMany = memberMutation({
+  args: {
+    ids: v.array(v.id("leads")),
+    status: vLeadStatus,
+    reason: v.optional(vDisqualifyReason),
+  },
+  handler: async (ctx, { ids, status, reason }) => {
+    checkStatus(status, reason);
+    const previous = [];
+    let skipped = 0;
+    for (const id of uniqueIds(ids)) {
+      const lead = await ctx.db.get(id);
+      if (!lead || lead.status === "converted") {
+        skipped++;
+        continue;
+      }
+      previous.push(await applyStatus(ctx, lead, status, reason));
+    }
+    return { previous, skipped };
+  },
+});
+
+const vPreviousStatus = v.object({
+  id: v.id("leads"),
+  status: vLeadStatus,
+  reason: v.optional(vDisqualifyReason),
+});
+
+/** Undo for a bulk status change. */
+export const restoreStatuses = memberMutation({
+  args: { items: v.array(vPreviousStatus) },
+  handler: async (ctx, { items }) => {
+    for (const item of items.slice(0, MAX_BULK)) {
+      const lead = await ctx.db.get(item.id);
+      if (!lead || lead.status === "converted" || item.status === "converted") {
+        continue;
+      }
+      await applyStatus(ctx, lead, item.status, item.reason);
+    }
+  },
+});
+
+/** Changes the owner, logging it; reassigning is not a touch. */
+async function applyOwner(
+  ctx: MutationCtx & { viewer: Doc<"members"> },
+  lead: Doc<"leads">,
+  ownerId: Id<"members"> | null,
+) {
+  const previous = lead.ownerId ?? null;
+  if (ownerId === previous) return previous;
+  const [from, to] = await Promise.all([
+    previous ? ctx.db.get(previous) : null,
+    ownerId ? ctx.db.get(ownerId) : null,
+  ]);
+  await ctx.db.patch(lead._id, {
+    ownerId: ownerId ?? undefined,
+    assignedAt: ownerId ? Date.now() : undefined,
+  });
+  await logChanges(ctx, { leadId: lead._id }, ctx.viewer._id, [
+    { field: "Owner", from: from?.name, to: to?.name },
+  ]);
+  return previous;
+}
+
+/** Returns the previous owner for undo. */
 export const assign = memberMutation({
   args: { id: v.id("leads"), ownerId: v.union(v.id("members"), v.null()) },
   handler: async (ctx, { id, ownerId }) => {
     const lead = await requireLead(ctx, id);
-    const previous = lead.ownerId ?? null;
-    if (ownerId === previous) return previous;
     if (ownerId) await requireActiveMember(ctx, ownerId, "ownerId");
-    await ctx.db.patch(id, {
-      ownerId: ownerId ?? undefined,
-      assignedAt: ownerId ? Date.now() : undefined,
-    });
-    if (ownerId && ownerId !== ctx.viewer._id) {
+    const previous = await applyOwner(ctx, lead, ownerId);
+    if (ownerId && ownerId !== previous && ownerId !== ctx.viewer._id) {
       await notify(ctx, ownerId, {
         kind: "lead_assigned",
         title: `${ctx.viewer.name} assigned you ${lead.name}`,
@@ -386,6 +509,122 @@ export const assign = memberMutation({
       });
     }
     return previous;
+  },
+});
+
+/** Bulk reassignment with a single notification for the new owner. */
+export const assignMany = memberMutation({
+  args: {
+    ids: v.array(v.id("leads")),
+    ownerId: v.union(v.id("members"), v.null()),
+  },
+  handler: async (ctx, { ids, ownerId }) => {
+    if (ownerId) await requireActiveMember(ctx, ownerId, "ownerId");
+    const previous: { id: Id<"leads">; ownerId: Id<"members"> | null }[] = [];
+    const moved: Doc<"leads">[] = [];
+    for (const id of uniqueIds(ids)) {
+      const lead = await ctx.db.get(id);
+      if (!lead) continue;
+      const before = await applyOwner(ctx, lead, ownerId);
+      previous.push({ id, ownerId: before });
+      if (before !== ownerId) moved.push(lead);
+    }
+    if (ownerId && ownerId !== ctx.viewer._id && moved.length > 0) {
+      const [first] = moved;
+      await notify(ctx, ownerId, {
+        kind: "lead_assigned",
+        title:
+          moved.length === 1
+            ? `${ctx.viewer.name} assigned you ${first.name}`
+            : `${ctx.viewer.name} assigned you ${moved.length} leads`,
+        body:
+          moved.length === 1
+            ? leadSummary(first)
+            : moved
+                .slice(0, 3)
+                .map((lead) => lead.name)
+                .join(", ") + (moved.length > 3 ? "…" : ""),
+        href: moved.length === 1 ? leadHref(first._id) : "/leads?owner=mine",
+      });
+    }
+    return previous;
+  },
+});
+
+/** Undo for a bulk reassignment; owners who have since left are skipped. */
+export const restoreOwners = memberMutation({
+  args: {
+    items: v.array(
+      v.object({
+        id: v.id("leads"),
+        ownerId: v.union(v.id("members"), v.null()),
+      }),
+    ),
+  },
+  handler: async (ctx, { items }) => {
+    for (const item of items.slice(0, MAX_BULK)) {
+      const lead = await ctx.db.get(item.id);
+      if (!lead) continue;
+      if (item.ownerId) {
+        const owner = await ctx.db.get(item.ownerId);
+        if (owner?.status !== "active") continue;
+      }
+      await applyOwner(ctx, lead, item.ownerId);
+    }
+  },
+});
+
+const CONTACT_LABELS = {
+  name: "Name",
+  email: "Email",
+  phone: "Phone",
+  companyName: "Company",
+  website: "Website",
+  gstin: "GSTIN",
+  message: "Message",
+} as const;
+
+const vOptionalText = v.optional(v.union(v.string(), v.null()));
+
+/** Edits contact details; pass `null` to clear an optional field. Returns the previous values for undo. */
+export const update = memberMutation({
+  args: {
+    id: v.id("leads"),
+    patch: v.object({
+      name: v.optional(v.string()),
+      email: vOptionalText,
+      phone: vOptionalText,
+      companyName: v.optional(v.string()),
+      website: vOptionalText,
+      gstin: vOptionalText,
+      message: vOptionalText,
+    }),
+  },
+  handler: async (ctx, { id, patch }) => {
+    const lead = await requireLead(ctx, id);
+    const keys = Object.keys(patch) as (keyof typeof CONTACT_LABELS)[];
+    // Untouched optional fields stay out of validation: older values (e.g. a
+    // message grown by repeat submissions) shouldn't block an unrelated edit.
+    const merged: { [K in keyof ContactFields]?: string } = {
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      companyName: lead.companyName,
+    };
+    for (const key of keys) merged[key] = patch[key] ?? undefined;
+    const cleaned = cleanManual(merged);
+    const previous: Record<string, string | null> = {};
+    const next: Partial<Doc<"leads">> = {};
+    for (const key of keys) {
+      previous[key] = lead[key] ?? null;
+      next[key] = cleaned[key];
+    }
+    const changes = diff(lead, next, CONTACT_LABELS);
+    if (changes.length > 0) {
+      await ctx.db.patch(id, next);
+      await logChanges(ctx, { leadId: id }, ctx.viewer._id, changes);
+    }
+    return previous as typeof patch;
   },
 });
 

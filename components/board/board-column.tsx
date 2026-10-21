@@ -20,6 +20,7 @@ type BoardColumnProps<T extends { id: string }> = {
   renderCard: (item: T) => ReactNode;
   getLabel: (item: T) => string;
   onOpen: (id: string) => void;
+  onPeek?: (id: string) => void;
   onAdd?: (columnId: string) => void;
   addLabel: string;
   emptyLabel: string;
@@ -34,6 +35,7 @@ export default function BoardColumn<T extends { id: string }>({
   renderCard,
   getLabel,
   onOpen,
+  onPeek,
   onAdd,
   addLabel,
   emptyLabel,
@@ -83,6 +85,7 @@ export default function BoardColumn<T extends { id: string }>({
               columnId={column.id}
               label={getLabel(item)}
               onOpen={onOpen}
+              onPeek={onPeek}
               hidden
             >
               {renderCard(item)}
@@ -100,6 +103,7 @@ export default function BoardColumn<T extends { id: string }>({
         columnId={column.id}
         label={getLabel(item)}
         onOpen={onOpen}
+        onPeek={onPeek}
         animateLayout={item.id !== settledId}
       >
         {renderCard(item)}

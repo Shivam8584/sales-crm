@@ -1,6 +1,5 @@
 "use client";
 
-import { useId } from "react";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
@@ -8,7 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
-import { Property } from "@/components/record/properties";
+import { Properties, Property } from "@/components/record/properties";
 import { STAGE_LABEL } from "@/lib/domain/labels";
 import { formatMoney } from "@/lib/domain/money";
 import { dateTime, relativeTime, shortDate } from "@/lib/time";
@@ -21,28 +20,21 @@ type Linked = Extract<
   { steps: unknown }
 >;
 
-/** Hypedrive platform usage for a linked account, in the account page sidebar. */
+/** Hypedrive usage for a linked account, in the account page sidebar. */
 export default function AccountPlatform({
   accountId,
 }: {
   accountId: Id<"accounts">;
 }) {
   const data = useQuery(api.platform.forAccount, { accountId });
-  const headingId = useId();
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-1">
-      <h2
-        id={headingId}
-        className="caption-style text-fg-tertiary mb-1.5 font-medium"
-      >
-        Platform
-      </h2>
+    <Properties title="Platform">
       {data === undefined ? (
-        <div aria-busy className="flex flex-col gap-2.5 py-1">
+        <div aria-busy className="flex flex-col gap-3 py-2">
           <Skeleton className="h-3 w-44" />
-          <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-3 w-36" />
+          <Skeleton className="h-3 w-40" />
         </div>
       ) : data.orgId === null ? (
         <p className="text-fg-tertiary text-sm leading-8">
@@ -51,7 +43,7 @@ export default function AccountPlatform({
       ) : (
         <PlatformDetails data={data} />
       )}
-    </section>
+    </Properties>
   );
 }
 
@@ -61,157 +53,219 @@ function PlatformDetails({ data }: { data: Linked }) {
       await navigator.clipboard.writeText(data.orgId);
       toast("Org ID copied");
     } catch {
-      toast("Couldn't copy the org ID");
+      toast("Couldn't copy the org ID", { tone: "danger" });
     }
   }
 
   return (
     <>
-      <dl className="flex flex-col">
-        <Property
-          label="Organisation"
-          action={
-            <Tooltip content="Copy org ID">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Copy org ID"
-                onClick={() => void copy()}
-              >
-                <ClipboardIcon aria-hidden className="size-3" />
-              </Button>
-            </Tooltip>
-          }
-        >
-          <span
-            title={data.orgId}
-            className="text-fg-secondary truncate font-mono text-xs"
-          >
-            {data.orgId}
-          </span>
-        </Property>
-      </dl>
-      <ActivationSteps steps={data.steps} />
-      <dl className="flex flex-col">
-        <Property label="Deposits">
-          {data.topups > 0 ? (
-            <span className="flex min-w-0 items-baseline gap-1.5 text-sm">
-              <span className="tabular-nums">{formatMoney(data.deposits)}</span>
-              <span className="caption-style text-fg-tertiary truncate">
-                {data.topups === 1 ? "1 top-up" : `${data.topups} top-ups`}
-              </span>
+      <Property label="Deposits">
+        {data.topups > 0 ? (
+          <span className="flex min-w-0 items-baseline gap-1.5 text-sm">
+            <span className="tabular-nums">{formatMoney(data.deposits)}</span>
+            <span className="caption-style text-fg-tertiary truncate">
+              {data.topups === 1 ? "1 top-up" : `${data.topups} top-ups`}
             </span>
-          ) : (
-            <span className="text-fg-tertiary text-sm">None yet</span>
-          )}
-        </Property>
-        <Property label="Campaigns live">
-          <span
-            className={cn(
-              "text-sm tabular-nums",
-              data.campaignsLive === 0 && "text-fg-tertiary",
-            )}
-          >
-            {data.campaignsLive === 0 ? "None yet" : data.campaignsLive}
           </span>
-        </Property>
-        <Property label="Last seen">
-          {data.lastEventAt ? (
-            <time
-              dateTime={new Date(data.lastEventAt).toISOString()}
-              title={dateTime(data.lastEventAt)}
-              className="text-sm"
-            >
-              {relativeTime(data.lastEventAt)}
-            </time>
-          ) : (
-            <span className="text-fg-tertiary text-sm">—</span>
+        ) : (
+          <span className="text-fg-tertiary text-sm">None yet</span>
+        )}
+      </Property>
+      <Property label="Campaigns live">
+        <span
+          className={cn(
+            "text-sm tabular-nums",
+            data.campaignsLive === 0 && "text-fg-tertiary",
           )}
-        </Property>
-      </dl>
+        >
+          {data.campaignsLive === 0 ? "None yet" : data.campaignsLive}
+        </span>
+      </Property>
+      <Property label="Last seen">
+        {data.lastEventAt ? (
+          <time
+            dateTime={new Date(data.lastEventAt).toISOString()}
+            title={dateTime(data.lastEventAt)}
+            className="text-sm"
+          >
+            {relativeTime(data.lastEventAt)}
+          </time>
+        ) : (
+          <span className="text-fg-tertiary text-sm">—</span>
+        )}
+      </Property>
+      <Property
+        label="Org ID"
+        action={
+          <Tooltip content="Copy org ID">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Copy org ID"
+              onClick={() => void copy()}
+            >
+              <ClipboardIcon aria-hidden className="size-3" />
+            </Button>
+          </Tooltip>
+        }
+      >
+        <span
+          title={data.orgId}
+          className="text-fg-secondary truncate font-mono text-xs"
+        >
+          {data.orgId}
+        </span>
+      </Property>
     </>
   );
 }
 
-function ActivationSteps({ steps }: { steps: Linked["steps"] }) {
+/**
+ * The activation path as a horizontal row of steps with the date each was
+ * reached, for the account header. Renders nothing until the brand is on Hypedrive.
+ */
+export function AccountActivationPath({
+  accountId,
+  className,
+}: {
+  accountId: Id<"accounts">;
+  className?: string;
+}) {
+  const data = useQuery(api.platform.forAccount, { accountId });
+  const stall = useQuery(api.activation.forAccount, { accountId });
+  if (!data || data.orgId === null) return null;
+
+  const steps = data.steps;
+  const next = steps.findIndex((step) => !step.done);
   const doneCount = steps.filter((step) => step.done).length;
+  const stuck = stall ? next : -1;
+
   return (
-    <div className="flex flex-col gap-1.5 py-2">
-      <p className="caption-style text-fg-tertiary flex justify-between">
-        <span>Activation</span>
-        <span className="tabular-nums">
-          {doneCount} of {steps.length}
+    <section
+      aria-label="Activation path"
+      className={cn("flex min-w-0 flex-col gap-2", className)}
+    >
+      <p className="caption-style text-fg-tertiary flex items-center justify-between gap-3 sm:hidden">
+        <span>
+          Activation{" "}
+          <span className="tabular-nums">
+            {doneCount} of {steps.length}
+          </span>
         </span>
+        {next >= 0 && (
+          <span className={cn("truncate", stuck >= 0 && "text-warning")}>
+            Next: {STAGE_LABEL[steps[next].stage]}
+          </span>
+        )}
       </p>
-      <ol aria-label="Activation progress" className="flex flex-col">
+      <ol className="grid grid-cols-6">
         {steps.map((step, index) => {
-          const next = steps[index + 1];
+          const isNext = index === next;
+          const isStuck = index === stuck;
+          const linked = index < steps.length - 1;
+          const lineDone = step.done && steps[index + 1]?.done;
           return (
-            <li
-              key={step.stage}
-              className="relative grid h-7 grid-cols-[0.875rem_minmax(0,1fr)_auto] items-center gap-2.5"
-            >
-              {next && (
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute top-[calc(50%+0.5rem)] left-[0.4375rem] h-[calc(100%-1rem)] w-px -translate-x-1/2",
-                    step.done && next.done ? "bg-success/50" : "bg-border",
-                  )}
-                />
-              )}
-              <StepDot done={step.done} />
+            <li key={step.stage} className="flex min-w-0 flex-col gap-1.5">
+              <span className="flex items-center">
+                <PathDot done={step.done} next={isNext} stuck={isStuck} />
+                {linked && (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "mx-1.5 h-px flex-1",
+                      lineDone ? "bg-success/60" : "bg-line-strong",
+                    )}
+                  />
+                )}
+              </span>
               <span
                 className={cn(
-                  "truncate text-sm",
-                  step.done ? "text-foreground" : "text-fg-tertiary",
+                  "caption-style truncate pr-2 max-sm:sr-only",
+                  step.done
+                    ? "text-foreground"
+                    : isStuck
+                      ? "text-warning font-medium"
+                      : isNext
+                        ? "text-fg-secondary font-medium"
+                        : "text-fg-tertiary",
                 )}
+                title={STAGE_LABEL[step.stage]}
               >
                 {STAGE_LABEL[step.stage]}
                 <span className="sr-only">
-                  {step.done ? ", done" : ", not yet"}
+                  {step.done
+                    ? step.at
+                      ? `, reached ${dateTime(step.at)}`
+                      : ", done"
+                    : isStuck
+                      ? ", stuck here"
+                      : isNext
+                        ? ", next step"
+                        : ", not yet"}
                 </span>
               </span>
-              {step.at !== null && (
-                <time
-                  dateTime={new Date(step.at).toISOString()}
-                  title={dateTime(step.at)}
-                  className="caption-style text-fg-tertiary tabular-nums"
-                >
-                  {shortDate(step.at)}
-                </time>
-              )}
+              <span
+                aria-hidden
+                className="caption-style text-fg-tertiary h-4 truncate tabular-nums max-sm:hidden"
+                title={step.at ? dateTime(step.at) : undefined}
+              >
+                {step.at ? shortDate(step.at) : step.done ? "Done" : ""}
+              </span>
             </li>
           );
         })}
       </ol>
-    </div>
+    </section>
   );
 }
 
-function StepDot({ done }: { done: boolean }) {
-  if (!done) {
+function PathDot({
+  done,
+  next,
+  stuck,
+}: {
+  done: boolean;
+  next: boolean;
+  stuck: boolean;
+}) {
+  if (done) {
     return (
       <span
         aria-hidden
-        className="border-line-strong size-3.5 rounded-full border border-dashed"
-      />
+        className="bg-success text-background flex size-4 shrink-0 items-center justify-center rounded-full"
+      >
+        <svg viewBox="0 0 12 12" fill="none" className="size-2.5">
+          <path
+            d="M3 6.25 5 8.25 9 4"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
     );
   }
   return (
     <span
       aria-hidden
-      className="bg-success text-background flex size-3.5 items-center justify-center rounded-full"
+      className={cn(
+        "flex size-4 shrink-0 items-center justify-center rounded-full border",
+        stuck
+          ? "border-warning bg-warning/15"
+          : next
+            ? "border-fg-secondary"
+            : "border-line-strong border-dashed",
+      )}
     >
-      <svg viewBox="0 0 12 12" fill="none" className="size-2.5">
-        <path
-          d="M3 6.25 5 8.25 9 4"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      {(next || stuck) && (
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            stuck ? "bg-warning" : "bg-fg-secondary",
+          )}
         />
-      </svg>
+      )}
     </span>
   );
 }

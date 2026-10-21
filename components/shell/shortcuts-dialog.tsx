@@ -22,6 +22,7 @@ const GROUPS = [
         label: `Go to ${item.label.toLowerCase()}`,
       })),
       { keys: ["C"], label: "Create a record" },
+      { keys: ["["], label: "Collapse or expand the sidebar" },
       { keys: ["?"], label: "Show shortcuts" },
     ],
   },
@@ -34,6 +35,16 @@ const GROUPS = [
       { keys: ["X"], label: "Select row" },
       { keys: ["/"], label: "Search the list" },
       { keys: ["Esc"], label: "Clear selection" },
+      { keys: ["U"], label: "Mark notification read or unread" },
+    ],
+  },
+  {
+    title: "Boards",
+    items: [
+      { keys: ["Click"], label: "Peek at card" },
+      { keys: [MOD_KEY, "Click"], label: "Open card page" },
+      { keys: ["↵"], label: "Open card page" },
+      { keys: ["Space"], label: "Pick up and drop a card" },
     ],
   },
 ];
@@ -44,14 +55,14 @@ export default function ShortcutsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
             Work through the pipeline without the mouse.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-5 px-6 py-5">
+        <div className="grid gap-x-10 gap-y-5 px-6 py-5 sm:grid-cols-2 sm:[&>section:first-child]:row-span-3">
           {GROUPS.map((group) => (
             <section key={group.title} className="flex flex-col gap-2">
               <h3 className="eyebrow-style text-fg-tertiary">{group.title}</h3>

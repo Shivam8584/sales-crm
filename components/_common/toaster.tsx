@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import Button from "@/components/_ui/button";
 import Kbd from "@/components/_ui/kbd";
@@ -17,6 +17,78 @@ import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import InfoCircleIcon from "@/public/assets/icons/info-circle.svg";
 
 const DURATION = 5000;
+const EDGE = 16;
+const TOAST_WIDTH = 360;
+const STACK_HEIGHT = 160;
+const SURFACES =
+  "[data-slot=sheet-content][data-state=open]:not([data-side=left]), [data-slot=dialog-content][data-state=open]";
+
+type Placement = { edge: "bottom" | "top"; right?: number };
+
+function intersects(
+  a: DOMRect,
+  b: Omit<DOMRect, "toJSON" | "x" | "y" | "width" | "height">,
+) {
+  return (
+    a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+  );
+}
+
+/** Keeps toasts off open sheets and dialogs so their footers stay clickable. */
+function usePlacement(): Placement {
+  const [placement, setPlacement] = useState<Placement>({ edge: "bottom" });
+
+  useEffect(() => {
+    let frame = 0;
+    function measure() {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const mobile = width < 640;
+        const zone = {
+          left: mobile ? 0 : width - EDGE - TOAST_WIDTH,
+          right: width - (mobile ? 0 : EDGE),
+          top: height - EDGE - STACK_HEIGHT,
+          bottom: height,
+        };
+        let next: Placement = { edge: "bottom" };
+        for (const surface of document.querySelectorAll(SURFACES)) {
+          const rect = surface.getBoundingClientRect();
+          if (!intersects(rect, zone)) continue;
+          const side = surface.getAttribute("data-side");
+          if (side === "right" && rect.left >= TOAST_WIDTH + EDGE * 2) {
+            next = { edge: "bottom", right: width - rect.left + EDGE };
+          } else {
+            next = { edge: "top" };
+            break;
+          }
+        }
+        setPlacement((current) =>
+          current.edge === next.edge && current.right === next.right
+            ? current
+            : next,
+        );
+      });
+    }
+    const observer = new MutationObserver(measure);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-state"],
+    });
+    window.addEventListener("resize", measure);
+    measure();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  return placement;
+}
 
 const TONE = {
   success: { icon: CheckCircleIcon, className: "text-success" },
@@ -98,6 +170,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 
 export default function Toaster() {
   const toasts = useToastStore((state) => state.toasts);
+  const placement = usePlacement();
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -121,9 +194,16 @@ export default function Toaster() {
   return (
     <ol
       data-toaster
+      data-edge={placement.edge}
       aria-live="polite"
       aria-label="Recent actions"
-      className="z-toast short:top-3 short:bottom-auto pointer-events-none fixed inset-x-3 bottom-3 flex flex-col items-end gap-2 sm:inset-x-auto sm:right-4 sm:bottom-4"
+      style={placement.right ? { right: placement.right } : undefined}
+      className={cn(
+        "z-toast duration-base ease-power3-out pointer-events-none fixed inset-x-3 flex flex-col items-end gap-2 transition-[right] sm:inset-x-auto sm:right-4",
+        placement.edge === "top"
+          ? "top-3 sm:top-4"
+          : "short:top-3 short:bottom-auto bottom-3 sm:bottom-4",
+      )}
     >
       <AnimatePresence initial={false}>
         {toasts.map((toast) => (

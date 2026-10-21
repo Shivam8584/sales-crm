@@ -1,5 +1,10 @@
+import Link from "next/link";
 import Tag from "@/components/_ui/tag";
-import { FIRST_PLATFORM_STEP, type Report } from "@/convex/lib/reports";
+import {
+  FIRST_PLATFORM_STEP,
+  type FunnelStepKey,
+  type Report,
+} from "@/convex/lib/reports";
 import { cn } from "@/lib/utils";
 import { count, percent } from "./format";
 
@@ -12,9 +17,12 @@ const GROUPS: Record<number, string> = {
 export default function FunnelChart({
   funnel,
   previous,
+  hrefFor,
 }: {
   funnel: Report["funnel"];
   previous: number[];
+  /** The list behind a step, e.g. accounts at that stage today. */
+  hrefFor: (key: FunnelStepKey) => string;
 }) {
   const hasPrevious = previous.some((value) => value > 0);
   const scale = Math.max(1, funnel.steps[0].count, previous[0] ?? 0);
@@ -79,7 +87,17 @@ export default function FunnelChart({
                 )}
               >
                 <span className="lead-style flex min-w-0 items-center gap-2">
-                  <span className="truncate">{step.label}</span>
+                  <Link
+                    href={hrefFor(step.key)}
+                    title={
+                      platform
+                        ? `Accounts at ${step.label} now`
+                        : `Open ${step.label.toLowerCase()} in Leads`
+                    }
+                    className="hover:text-foreground decoration-fg-tertiary/60 hover:decoration-fg-secondary focus-visible:ring-ring truncate rounded-sm underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2"
+                  >
+                    {step.label}
+                  </Link>
                   {isDrop && (
                     <Tag tone="red" size="xs">
                       Biggest drop

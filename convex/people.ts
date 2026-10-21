@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import {
   cleanTags,
   cleanText,
+  normalizeDomain,
   normalizeEmail,
   normalizeLinkedin,
   normalizePhone,
@@ -11,12 +12,16 @@ import {
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import {
+  checkImportSize,
+  findMember,
+  importFailure,
   memberIndex,
   memberRef,
   personSearchText,
   requireAccount,
   requireActiveMember,
   requirePerson,
+  type ImportResult,
 } from "./lib/records";
 import { diff, logChanges, logSystem } from "./lib/timeline";
 
@@ -216,6 +221,40 @@ export const get = memberQuery({
   },
 });
 
+async function insertPerson(
+  ctx: MutationCtx & { viewer: Doc<"members"> },
+  fields: Partial<Doc<"people">>,
+  account: Doc<"accounts"> | null,
+  verb: string,
+) {
+  const now = Date.now();
+  const draft = {
+    firstName: fields.firstName!,
+    lastName: fields.lastName ?? "",
+    email: fields.email,
+    phone: fields.phone,
+    title: fields.title,
+    linkedinUrl: fields.linkedinUrl,
+    accountId: fields.accountId,
+    ownerId: fields.ownerId!,
+    tags: fields.tags ?? [],
+    updatedAt: now,
+    lastActivityAt: now,
+  };
+  const id = await ctx.db.insert("people", {
+    ...draft,
+    searchText: personSearchText(draft, account?.name),
+  });
+  await logSystem(
+    ctx,
+    { personId: id, accountId: draft.accountId },
+    `${verb} ${[draft.firstName, draft.lastName].filter(Boolean).join(" ")}`,
+    undefined,
+    ctx.viewer._id,
+  );
+  return id;
+}
+
 export const create = memberMutation({
   args: {
     firstName: v.string(),
@@ -232,32 +271,173 @@ export const create = memberMutation({
       lastName: args.lastName ?? "",
       ownerId: args.ownerId ?? ctx.viewer._id,
     });
-    const now = Date.now();
-    const draft = {
-      firstName: fields.firstName!,
-      lastName: fields.lastName ?? "",
-      email: fields.email,
-      phone: fields.phone,
-      title: fields.title,
-      accountId: fields.accountId,
-      ownerId: fields.ownerId!,
-      tags: [],
-      updatedAt: now,
-      lastActivityAt: now,
+    const account = fields.accountId
+      ? await ctx.db.get(fields.accountId)
+      : null;
+    return await insertPerson(ctx, fields, account, "added");
+  },
+});
+
+const vImportRow = v.object({
+  firstName: v.string(),
+  lastName: v.optional(v.string()),
+  email: v.optional(v.string()),
+  phone: v.optional(v.string()),
+  title: v.optional(v.string()),
+  linkedinUrl: v.optional(v.string()),
+  account: v.optional(v.string()),
+  owner: v.optional(v.string()),
+  tags: v.optional(v.string()),
+});
+
+/**
+ * Validates every row with the same rules as `create`; accounts are matched by
+ * website or exact name. With `dryRun` nothing is written.
+ */
+export const importRows = memberMutation({
+  args: { rows: v.array(vImportRow), dryRun: v.boolean() },
+  handler: async (ctx, { rows, dryRun }) => {
+    checkImportSize(rows.length);
+    const [accounts, members] = await Promise.all([
+      ctx.db.query("accounts").collect(),
+      ctx.db.query("members").collect(),
+    ]);
+    const live = accounts.filter((account) => !account.archivedAt);
+    const findAccount = (value: string) => {
+      const text = value.trim().toLowerCase();
+      const domain = normalizeDomain(text);
+      const account =
+        live.find((item) => domain && item.domain === domain) ??
+        live.find((item) => item.name.toLowerCase() === text);
+      if (!account) {
+        invalid("account", `No account matches “${value.trim()}”`);
+      }
+      return account;
     };
-    const account = draft.accountId ? await ctx.db.get(draft.accountId) : null;
-    const id = await ctx.db.insert("people", {
-      ...draft,
-      searchText: personSearchText(draft, account?.name),
-    });
-    await logSystem(
-      ctx,
-      { personId: id, accountId: draft.accountId },
-      `added ${[draft.firstName, draft.lastName].filter(Boolean).join(" ")}`,
-      undefined,
-      ctx.viewer._id,
-    );
-    return id;
+    const emails = new Set<string>();
+    const phones = new Set<string>();
+    const results: ImportResult[] = [];
+    for (const [row, input] of rows.entries()) {
+      try {
+        const account = input.account?.trim()
+          ? findAccount(input.account)
+          : null;
+        const fields = await clean(ctx, {
+          firstName: input.firstName,
+          lastName: input.lastName ?? "",
+          email: input.email,
+          phone: input.phone,
+          title: input.title,
+          linkedinUrl: input.linkedinUrl,
+          accountId: account?._id,
+          ownerId: input.owner?.trim()
+            ? findMember(members, input.owner)._id
+            : ctx.viewer._id,
+          tags: (input.tags ?? "").split(/[,;|]/),
+        });
+        const phone = fields.phone;
+        const samePhone =
+          phone &&
+          (phones.has(phone) ||
+            (
+              await ctx.db
+                .query("people")
+                .withIndex("by_phone", (q) => q.eq("phone", phone))
+                .collect()
+            ).some((person) => !person.archivedAt));
+        if (fields.email && emails.has(fields.email)) {
+          results.push({
+            row,
+            status: "duplicate",
+            message: `${fields.email} appears earlier in the file`,
+          });
+          continue;
+        }
+        if (samePhone) {
+          results.push({
+            row,
+            status: "duplicate",
+            message: `Someone already has ${phone}`,
+          });
+          continue;
+        }
+        if (fields.email) emails.add(fields.email);
+        if (phone) phones.add(phone);
+        if (dryRun) {
+          results.push({ row, status: "ready" });
+        } else {
+          const id = await insertPerson(ctx, fields, account, "imported");
+          results.push({ row, status: "created", id });
+        }
+      } catch (error) {
+        results.push(importFailure(row, error));
+      }
+    }
+    return results;
+  },
+});
+
+/** Deals this person is on, open first. */
+export const deals = memberQuery({
+  args: { personId: v.id("people") },
+  handler: async (ctx, { personId }) => {
+    const person = await ctx.db.get(personId);
+    if (!person) return [];
+    const [all, members] = await Promise.all([
+      ctx.db.query("deals").collect(),
+      memberIndex(ctx),
+    ]);
+    const mine = all.filter((deal) => deal.personIds.includes(personId));
+    const accounts = new Map<Id<"accounts">, Doc<"accounts">>();
+    for (const deal of mine) {
+      if (accounts.has(deal.accountId)) continue;
+      const account = await ctx.db.get(deal.accountId);
+      if (account) accounts.set(account._id, account);
+    }
+    const closed = (deal: Doc<"deals">) =>
+      deal.stage === "won" || deal.stage === "lost";
+    return mine
+      .sort(
+        (a, b) =>
+          Number(closed(a)) - Number(closed(b)) ||
+          (closed(a)
+            ? (b.closedAt ?? 0) - (a.closedAt ?? 0)
+            : a.position - b.position),
+      )
+      .map((deal) => {
+        const account = accounts.get(deal.accountId);
+        return {
+          _id: deal._id,
+          title: deal.title,
+          stage: deal.stage,
+          amount: deal.amount,
+          closeDate: deal.closeDate ?? null,
+          closedAt: deal.closedAt ?? null,
+          owner: memberRef(members, deal.ownerId),
+          account: account ? { _id: account._id, name: account.name } : null,
+        };
+      });
+  },
+});
+
+/** Consent the person gave or withdrew, newest first. */
+export const consents = memberQuery({
+  args: { personId: v.id("people") },
+  handler: async (ctx, { personId }) => {
+    const records = await ctx.db
+      .query("consents")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect();
+    return records
+      .sort((a, b) => b.recordedAt - a.recordedAt)
+      .map((record) => ({
+        _id: record._id,
+        channel: record.channel,
+        granted: record.granted,
+        text: record.text,
+        source: record.source,
+        recordedAt: record.recordedAt,
+      }));
   },
 });
 

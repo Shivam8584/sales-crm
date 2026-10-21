@@ -129,6 +129,22 @@ function report(error: unknown) {
   });
 }
 
+function optimisticUpdateMany(
+  store: OptimisticLocalStore,
+  { updates }: FunctionArgs<typeof api.tasks.updateMany>,
+) {
+  for (const { id, patch } of updates) optimisticUpdate(store, { id, patch });
+}
+
+/** `tasks.updateMany` with an optimistic update, for bulk actions. */
+export function useUpdateMany() {
+  const updateMany = useMutation(api.tasks.updateMany);
+  return useMemo(
+    () => updateMany.withOptimisticUpdate(optimisticUpdateMany),
+    [updateMany],
+  );
+}
+
 /** `tasks.update` with an optimistic update; rejects so forms can show field errors. */
 export function useUpdateTask() {
   const update = useMutation(api.tasks.update);

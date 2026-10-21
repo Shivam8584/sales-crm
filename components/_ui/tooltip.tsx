@@ -22,6 +22,8 @@ type TooltipProps = {
   shortcut?: string;
   side?: ComponentProps<typeof TooltipPrimitive.Content>["side"];
   className?: string;
+  /** Renders the trigger alone, e.g. when its label is already visible. */
+  disabled?: boolean;
   children: ReactNode;
 };
 
@@ -30,8 +32,10 @@ export default function Tooltip({
   shortcut,
   side = "bottom",
   className,
+  disabled = false,
   children,
 }: TooltipProps) {
+  if (disabled) return children;
   return (
     <TooltipPrimitive.Root>
       <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>

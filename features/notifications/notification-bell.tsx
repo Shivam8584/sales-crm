@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ComponentType, type SVGProps } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
@@ -13,29 +14,17 @@ import {
   PopoverTrigger,
 } from "@/components/_ui/popover";
 import Skeleton from "@/components/_ui/skeleton";
-import { relativeTime } from "@/lib/time";
+import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
-import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
+import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import BellIcon from "@/public/assets/icons/bell.svg";
-import CalendarIcon from "@/public/assets/icons/calendar.svg";
-import MessageIcon from "@/public/assets/icons/message.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
-import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
+import { isUrgentKind, KindIcon } from "./kinds";
+import { useNotificationActions } from "./use-notification-actions";
 
 type Item = FunctionReturnType<typeof api.notifications.listMine>[number];
-type Icon = ComponentType<SVGProps<SVGSVGElement>>;
-
-const KIND_ICON: Record<string, Icon> = {
-  lead_new: TargetIcon,
-  lead_assigned: UserPlusIcon,
-  lead_repeat: MessageIcon,
-  lead_sla: AlertIcon,
-  demo_booked: CalendarIcon,
-  demo_rescheduled: CalendarIcon,
-  demo_cancelled: CalendarIcon,
-};
+const PREVIEW = 20;
 
 const TOAST_KINDS = new Set([
   "lead_new",
@@ -74,8 +63,7 @@ export default function NotificationBell() {
   const router = useRouter();
   const items = useQuery(api.notifications.listMine);
   const unread = useQuery(api.notifications.unreadCount) ?? 0;
-  const markRead = useMutation(api.notifications.markRead);
-  const markAllRead = useMutation(api.notifications.markAllRead);
+  const { markRead, markAllRead } = useNotificationActions();
   const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
   const [open, setOpen] = useState(false);
   useArrivalToasts(items);
@@ -147,7 +135,7 @@ export default function NotificationBell() {
             />
           ) : (
             <ul className="flex flex-col p-1">
-              {items.map((item) => (
+              {items.slice(0, PREVIEW).map((item) => (
                 <li key={item._id}>
                   <NotificationRow item={item} onSelect={() => select(item)} />
                 </li>
@@ -155,6 +143,17 @@ export default function NotificationBell() {
             </ul>
           )}
         </div>
+        <Link
+          href="/inbox"
+          onClick={() => {
+            setOpen(false);
+            setSidebarOpen(false);
+          }}
+          className="border-line-strong text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:bg-overlay-2 duration-fast caption-style flex h-10 shrink-0 items-center justify-center gap-1.5 border-t font-medium transition-colors outline-none"
+        >
+          View all in Inbox
+          <ArrowRightIcon aria-hidden className="size-3" />
+        </Link>
       </PopoverContent>
     </Popover>
   );
@@ -167,8 +166,7 @@ function NotificationRow({
   item: Item;
   onSelect: () => void;
 }) {
-  const Icon = KIND_ICON[item.kind] ?? BellIcon;
-  const urgent = item.kind === "lead_sla";
+  const urgent = isUrgentKind(item.kind);
   return (
     <button
       type="button"
@@ -181,7 +179,7 @@ function NotificationRow({
           urgent ? "text-danger" : "text-fg-secondary",
         )}
       >
-        <Icon aria-hidden className="size-3.5" />
+        <KindIcon kind={item.kind} className="size-3.5" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1.5 pt-0.5">
         <span
@@ -198,7 +196,12 @@ function NotificationRow({
           </span>
         )}
         <span className="caption-style text-fg-tertiary">
-          {relativeTime(item._creationTime)}
+          <time
+            dateTime={new Date(item._creationTime).toISOString()}
+            title={dateTime(item._creationTime)}
+          >
+            {relativeTime(item._creationTime)}
+          </time>
         </span>
       </span>
       {!item.read && (

@@ -1,7 +1,8 @@
 import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { cleanText } from "../../lib/domain/normalize";
-import { invalid, notFound } from "./errors";
+import { ConvexError } from "convex/values";
+import { invalid, notFound, type AppErrorData } from "./errors";
 
 export type MemberRef = { _id: Id<"members">; name: string };
 
@@ -60,6 +61,50 @@ export function personSearchText(
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+export const MAX_IMPORT_ROWS = 1000;
+
+export type ImportResult =
+  | { row: number; status: "created"; id: string }
+  | { row: number; status: "ready" }
+  | { row: number; status: "duplicate"; message: string }
+  | { row: number; status: "error"; message: string; field?: string };
+
+/**
+ * Turns a validation error thrown by a record's `clean` into a per-row result,
+ * so one bad row doesn't abort the whole import.
+ */
+export function importFailure(row: number, error: unknown): ImportResult {
+  if (error instanceof ConvexError) {
+    const data = error.data as AppErrorData;
+    if (data.code === "conflict") {
+      return { row, status: "duplicate", message: data.message };
+    }
+    if (data.code === "invalid" || data.code === "not_found") {
+      return { row, status: "error", message: data.message, field: data.field };
+    }
+  }
+  throw error;
+}
+
+/** An active teammate by email or full name, as typed in an imported file. */
+export function findMember(members: Doc<"members">[], value: string) {
+  const text = value.trim().toLowerCase();
+  const member = members.find(
+    (item) =>
+      item.status === "active" &&
+      (item.email.toLowerCase() === text || item.name.toLowerCase() === text),
+  );
+  if (!member) invalid("owner", `No active teammate matches “${value.trim()}”`);
+  return member;
+}
+
+export function checkImportSize(count: number) {
+  if (count === 0) invalid("rows", "The file has no rows to import");
+  if (count > MAX_IMPORT_ROWS) {
+    invalid("rows", `Import up to ${MAX_IMPORT_ROWS} rows at a time`);
+  }
 }
 
 const MAX_ACCOUNT_NAME = 120;

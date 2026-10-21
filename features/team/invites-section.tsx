@@ -94,11 +94,9 @@ export default function InvitesSection({
   }
 
   return (
-    <section aria-labelledby="invites-heading" className="pt-8 pb-10">
-      <div className="flex items-center gap-2 px-4 pb-2">
-        <h2 id="invites-heading" className="lead-style font-medium">
-          Invites
-        </h2>
+    <section aria-labelledby="invites-heading" className="pt-10">
+      <div className="flex items-center gap-2 pb-3">
+        <h3 id="invites-heading">Invites</h3>
         {open && open.length > 0 && (
           <span className="caption-style text-fg-tertiary tabular-nums">
             {open.length} open
@@ -107,11 +105,11 @@ export default function InvitesSection({
       </div>
 
       {!invites ? (
-        <div className="border-border border-t">
+        <div className="border-border overflow-hidden rounded-xl border">
           {Array.from({ length: 2 }, (_, index) => (
             <div
               key={index}
-              className="border-border flex h-12 items-center gap-3 border-b px-4"
+              className="border-border flex h-12 items-center gap-3 px-4 not-last:border-b"
             >
               <Skeleton className="h-3 w-48" />
               <Skeleton className="ml-auto h-3 w-16" />
@@ -119,7 +117,7 @@ export default function InvitesSection({
           ))}
         </div>
       ) : invites.length === 0 ? (
-        <div className="border-border flex flex-wrap items-center gap-3 border-y px-4 py-4">
+        <div className="border-border flex flex-wrap items-center gap-3 rounded-xl border px-4 py-4">
           <p className="caption-style text-fg-tertiary flex-1 leading-snug">
             No open invites. Invite teammates to give them a sign-up link with
             the right role.
@@ -130,12 +128,12 @@ export default function InvitesSection({
           </Button>
         </div>
       ) : (
-        <>
+        <div className="border-border overflow-hidden rounded-xl border">
           <div
             aria-hidden
             className={cn(
               GRID,
-              "caption-style text-fg-tertiary border-border hidden h-9 border-y",
+              "caption-style text-fg-tertiary border-border hidden h-9 border-b",
             )}
           >
             <span>Email</span>
@@ -144,7 +142,7 @@ export default function InvitesSection({
             <span>Status</span>
             <span />
           </div>
-          <ul aria-label="Invites" className="border-border max-sm:border-t">
+          <ul aria-label="Invites">
             {[...(open ?? []), ...(closed ?? [])].map((invite) => (
               <InviteRow
                 key={invite._id}
@@ -156,7 +154,7 @@ export default function InvitesSection({
               />
             ))}
           </ul>
-        </>
+        </div>
       )}
     </section>
   );
@@ -217,7 +215,7 @@ function InviteRow({
     <li
       className={cn(
         GRID,
-        "border-border lead-style flex items-center gap-3 border-b px-4 py-3 sm:h-11 sm:gap-0 sm:p-0",
+        "border-border lead-style flex items-center gap-3 px-4 py-3 not-last:border-b sm:h-11 sm:gap-0 sm:p-0",
       )}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2.5">

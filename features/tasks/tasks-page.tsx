@@ -24,6 +24,7 @@ import ListIcon from "@/public/assets/icons/list.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import Segmented from "./segmented";
+import TaskBulkBar from "./task-bulk-bar";
 import TasksBoard, { TasksBoardSkeleton } from "./tasks-board";
 import TasksList, { LIST_COLUMNS } from "./tasks-list";
 import { isOverdue, type TaskRow } from "./task-meta";
@@ -68,7 +69,9 @@ export default function TasksPage() {
     `${DEFAULT_SORT.id}:${DEFAULT_SORT.dir}`,
   );
   const [taskParam, setTaskParam] = useUrlState("task", "");
+  const [group, setGroup] = useUrlState("group", "due");
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!taskParam) return;
@@ -250,6 +253,19 @@ export default function TasksPage() {
             Clear
           </Button>
         )}
+        {view === "list" && (
+          <FilterMenu
+            label="Group"
+            value={group === "none" ? "none" : "due"}
+            onChange={setGroup}
+            align="end"
+            className="ml-auto max-sm:hidden"
+            options={[
+              { value: "due", label: "Due date" },
+              { value: "none", label: "None" },
+            ]}
+          />
+        )}
         <Segmented
           label="View"
           value={view === "list" ? "list" : "board"}
@@ -267,17 +283,29 @@ export default function TasksPage() {
               icon: <ListIcon aria-hidden className="size-3.5" />,
             },
           ]}
-          className="ml-auto"
+          className={view === "list" ? "max-sm:ml-auto" : "ml-auto"}
         />
       </PageToolbar>
       <div className="relative flex min-h-0 flex-1 flex-col">
         {view === "list" ? (
-          <TasksList
-            rows={rows}
-            sort={sort}
-            onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
-            empty={empty}
-          />
+          <>
+            <TasksList
+              rows={rows}
+              grouped={group !== "none"}
+              sort={sort}
+              onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
+              selected={selected}
+              onSelectedChange={setSelected}
+              empty={empty}
+            />
+            {rows && (
+              <TaskBulkBar
+                tasks={rows}
+                selected={selected}
+                onClear={() => setSelected(new Set())}
+              />
+            )}
+          </>
         ) : rows ? (
           <TasksBoard
             tasks={rows}

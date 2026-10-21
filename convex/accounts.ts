@@ -1,17 +1,24 @@
 import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { LIFECYCLE_STAGES } from "../lib/domain/enums";
 import { STAGE_LABEL } from "../lib/domain/labels";
 import { checkGstin, panRoot } from "../lib/domain/gstin";
 import { cleanTags, normalizeDomain } from "../lib/domain/normalize";
+import { sumMoney, type Money } from "../lib/domain/money";
+import { sourceFamily } from "./lib/enrichment";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import {
   accountName,
+  checkImportSize,
+  findMember,
+  importFailure,
   memberIndex,
   memberRef,
   requireAccount,
   requireActiveMember,
+  type ImportResult,
 } from "./lib/records";
 import { diff, logChanges, logSystem } from "./lib/timeline";
 import { vLifecycleStage } from "./lib/validators";
@@ -124,11 +131,66 @@ export const list = memberQuery({
         stage: account.stage,
         tags: account.tags,
         gstin: account.gstin ?? null,
+        linked: Boolean(account.platformOrgId),
         owner: memberRef(members, account.ownerId),
         peopleCount: peopleCount.get(account._id) ?? 0,
         lastActivityAt: account.lastActivityAt ?? null,
         archivedAt: account.archivedAt ?? null,
       }));
+  },
+});
+
+/**
+ * Per-account rollups for the list: open deals, open pipeline per currency and
+ * whether the GSTIN on record matches a registry lookup. Kept apart from
+ * `list` so deal and fact churn doesn't re-run the main list query.
+ */
+export const listStats = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const [accounts, deals] = await Promise.all([
+      ctx.db.query("accounts").collect(),
+      ctx.db.query("deals").collect(),
+    ]);
+    const stats = new Map<
+      Id<"accounts">,
+      { openDeals: number; pipeline: Money[]; gstVerified: boolean }
+    >();
+    const entry = (id: Id<"accounts">) => {
+      let value = stats.get(id);
+      if (!value) {
+        value = { openDeals: 0, pipeline: [], gstVerified: false };
+        stats.set(id, value);
+      }
+      return value;
+    };
+    for (const deal of deals) {
+      if (deal.stage === "won" || deal.stage === "lost") continue;
+      const value = entry(deal.accountId);
+      value.openDeals += 1;
+      value.pipeline.push(deal.amount);
+    }
+    for (const account of accounts) {
+      const gstin = account.gstin;
+      if (!gstin || account.archivedAt) continue;
+      const facts = await ctx.db
+        .query("facts")
+        .withIndex("by_account", (q) => q.eq("accountId", account._id))
+        .collect();
+      entry(account._id).gstVerified = facts.some(
+        (fact) =>
+          fact.field === "gstin" &&
+          fact.value === gstin &&
+          (fact.status === "applied" || fact.status === "accepted") &&
+          sourceFamily(fact.source) === "gst",
+      );
+    }
+    return [...stats].map(([accountId, value]) => ({
+      accountId,
+      openDeals: value.openDeals,
+      pipeline: sumMoney(value.pipeline),
+      gstVerified: value.gstVerified,
+    }));
   },
 });
 
@@ -147,6 +209,27 @@ export const get = memberQuery({
   },
 });
 
+async function insertAccount(
+  ctx: MutationCtx & { viewer: Doc<"members"> },
+  fields: Partial<Doc<"accounts">>,
+  subject: string,
+) {
+  const now = Date.now();
+  const id = await ctx.db.insert("accounts", {
+    name: fields.name!,
+    domain: fields.domain,
+    ownerId: fields.ownerId!,
+    stage: fields.stage!,
+    tags: fields.tags ?? [],
+    gstin: fields.gstin,
+    panRoot: fields.panRoot,
+    updatedAt: now,
+    lastActivityAt: now,
+  });
+  await logSystem(ctx, { accountId: id }, subject, undefined, ctx.viewer._id);
+  return id;
+}
+
 export const create = memberMutation({
   args: {
     name: v.string(),
@@ -162,24 +245,93 @@ export const create = memberMutation({
       stage: args.stage ?? "prospect",
       tags: args.tags ?? [],
     });
-    const now = Date.now();
-    const id = await ctx.db.insert("accounts", {
-      name: fields.name!,
-      domain: fields.domain,
-      ownerId: fields.ownerId!,
-      stage: fields.stage!,
-      tags: fields.tags ?? [],
-      updatedAt: now,
-      lastActivityAt: now,
-    });
-    await logSystem(
-      ctx,
-      { accountId: id },
-      "created the account",
-      undefined,
-      ctx.viewer._id,
+    return await insertAccount(ctx, fields, "created the account");
+  },
+});
+
+const vImportRow = v.object({
+  name: v.string(),
+  domain: v.optional(v.string()),
+  stage: v.optional(v.string()),
+  owner: v.optional(v.string()),
+  tags: v.optional(v.string()),
+  gstin: v.optional(v.string()),
+});
+
+function parseStage(value: string | undefined) {
+  const text = value?.trim().toLowerCase();
+  if (!text) return "prospect" as const;
+  const stage = LIFECYCLE_STAGES.find(
+    (item) =>
+      item === text.replace(/\s+/g, "_") ||
+      STAGE_LABEL[item].toLowerCase() === text,
+  );
+  if (!stage) invalid("stage", `Unknown stage “${value!.trim()}”`);
+  return stage;
+}
+
+/**
+ * Validates every row with the same rules as `create`. With `dryRun` nothing
+ * is written, so the client can preview errors and duplicates first.
+ */
+export const importRows = memberMutation({
+  args: { rows: v.array(vImportRow), dryRun: v.boolean() },
+  handler: async (ctx, { rows, dryRun }) => {
+    checkImportSize(rows.length);
+    const [accounts, members] = await Promise.all([
+      ctx.db.query("accounts").collect(),
+      ctx.db.query("members").collect(),
+    ]);
+    const names = new Map(
+      accounts
+        .filter((account) => !account.archivedAt)
+        .map((account) => [account.name.toLowerCase(), account.name]),
     );
-    return id;
+    const domains = new Set<string>();
+    const results: ImportResult[] = [];
+    for (const [row, input] of rows.entries()) {
+      try {
+        const fields = await clean(ctx, {
+          name: input.name,
+          domain: input.domain,
+          gstin: input.gstin,
+          stage: parseStage(input.stage),
+          ownerId: input.owner?.trim()
+            ? findMember(members, input.owner)._id
+            : ctx.viewer._id,
+          tags: (input.tags ?? "").split(/[,;|]/),
+        });
+        const key = fields.name!.toLowerCase();
+        const existing = names.get(key);
+        if (existing) {
+          results.push({
+            row,
+            status: "duplicate",
+            message: `${existing} already exists`,
+          });
+          continue;
+        }
+        if (fields.domain && domains.has(fields.domain)) {
+          results.push({
+            row,
+            status: "duplicate",
+            message: `${fields.domain} appears earlier in the file`,
+          });
+          continue;
+        }
+        names.set(key, fields.name!);
+        if (fields.domain) domains.add(fields.domain);
+        if (dryRun) {
+          results.push({ row, status: "ready" });
+        } else {
+          const id = await insertAccount(ctx, fields, "imported the account");
+          results.push({ row, status: "created", id });
+        }
+      } catch (error) {
+        results.push(importFailure(row, error));
+      }
+    }
+    return results;
   },
 });
 

@@ -16,21 +16,26 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="border-sidebar-border bg-sidebar relative hidden w-(--sidebar-width) shrink-0 border-r lg:flex lg:flex-col">
+      <aside
+        data-sidebar="desktop"
+        className="border-sidebar-border bg-sidebar collapsed:w-12 relative hidden w-(--sidebar-width) shrink-0 border-r lg:flex lg:flex-col"
+      >
         <SidebarContent />
-        <SidebarResizer />
+        <span className="collapsed:hidden contents">
+          <SidebarResizer />
+        </span>
       </aside>
 
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent
           side="left"
-          className="border-sidebar-border bg-sidebar w-64 max-w-[85vw]"
+          className="border-sidebar-border bg-sidebar w-72 max-w-[85vw]"
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <SheetDescription className="sr-only">
             Workspace sections
           </SheetDescription>
-          <SidebarContent />
+          <SidebarContent variant="drawer" />
         </SheetContent>
       </Sheet>
     </>

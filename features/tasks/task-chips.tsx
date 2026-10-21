@@ -129,34 +129,33 @@ export function StatusChip({ task }: { task: ChipTask }) {
   );
 }
 
-export function PriorityChip({ task }: { task: ChipTask }) {
-  const { update } = useTaskActions();
+/** Priority chip with a menu; used on rows and in the composer before a task exists. */
+export function PriorityPicker({
+  value,
+  onChange,
+}: {
+  value: Priority;
+  onChange: (priority: Priority) => void;
+}) {
   return (
     <CardSafe>
       <DropdownMenu>
         <DropdownMenuTrigger
-          aria-label={`Priority: ${PRIORITY_LABEL[task.priority]}. Change priority`}
+          aria-label={`Priority: ${PRIORITY_LABEL[value]}. Change priority`}
           className={cn(
             CHIP_CLASS,
-            (task.priority === "urgent" || task.priority === "high") &&
-              PRIORITY_TEXT[task.priority],
+            (value === "urgent" || value === "high") && PRIORITY_TEXT[value],
           )}
         >
-          <PriorityIcon priority={task.priority} className="size-3" />
-          {PRIORITY_LABEL[task.priority]}
+          <PriorityIcon priority={value} className="size-3" />
+          {PRIORITY_LABEL[value]}
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-36">
           <DropdownMenuLabel>Priority</DropdownMenuLabel>
           <DropdownMenuRadioGroup
-            value={task.priority}
-            onValueChange={(value) => {
-              if (value !== task.priority) {
-                void update(
-                  task._id,
-                  { priority: value as Priority },
-                  "Priority",
-                );
-              }
+            value={value}
+            onValueChange={(next) => {
+              if (next !== value) onChange(next as Priority);
             }}
           >
             {PRIORITIES.map((priority) => (
@@ -169,6 +168,16 @@ export function PriorityChip({ task }: { task: ChipTask }) {
         </DropdownMenuContent>
       </DropdownMenu>
     </CardSafe>
+  );
+}
+
+export function PriorityChip({ task }: { task: ChipTask }) {
+  const { update } = useTaskActions();
+  return (
+    <PriorityPicker
+      value={task.priority}
+      onChange={(priority) => void update(task._id, { priority }, "Priority")}
+    />
   );
 }
 
@@ -290,17 +299,20 @@ export function DueDateOptions({
 }
 
 // A popover rather than a menu: menus capture typing for typeahead, which breaks the date field.
-export function DueChip({
-  task,
+/** Due date chip with quick picks; `onChange` fires once a typed date settles. */
+export function DuePicker({
+  value,
+  onChange,
+  overdue = false,
   hideEmpty = false,
 }: {
-  task: ChipTask;
+  value: string | null;
+  onChange: (day: string | null) => void;
+  overdue?: boolean;
   hideEmpty?: boolean;
 }) {
-  const { update } = useTaskActions();
   const [open, setOpen] = useState(false);
-  const overdue = isOverdue(task);
-  const label = task.dueDate ? formatDay(task.dueDate) : null;
+  const label = value ? formatDay(value) : null;
 
   const typing = useRef<number | null>(null);
   useEffect(
@@ -311,12 +323,10 @@ export function DueChip({
   );
 
   // Typing a date fires a change per keystroke, so wait until it settles.
-  const setDue = (dueDate: string | null, via: "pick" | "type") => {
+  const setDue = (day: string | null, via: "pick" | "type") => {
     if (typing.current) window.clearTimeout(typing.current);
     const save = () => {
-      if (dueDate !== task.dueDate) {
-        void update(task._id, { dueDate }, "Due date");
-      }
+      if (day !== value) onChange(day);
     };
     if (via === "type") {
       typing.current = window.setTimeout(save, 700);
@@ -340,7 +350,7 @@ export function DueChip({
             !label && "text-fg-tertiary",
             !label &&
               hideEmpty &&
-              "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100",
+              "opacity-0 group-hover/card:opacity-100 group-data-[cursor=true]/card:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100",
             overdue &&
               "text-danger hover:text-danger data-[state=open]:text-danger border-current/30",
           )}
@@ -354,10 +364,28 @@ export function DueChip({
           className="w-56 rounded-lg p-1"
           aria-label="Set due date"
         >
-          <DueDateOptions value={task.dueDate} onChange={setDue} />
+          <DueDateOptions value={value} onChange={setDue} />
         </PopoverContent>
       </Popover>
     </CardSafe>
+  );
+}
+
+export function DueChip({
+  task,
+  hideEmpty = false,
+}: {
+  task: ChipTask;
+  hideEmpty?: boolean;
+}) {
+  const { update } = useTaskActions();
+  return (
+    <DuePicker
+      value={task.dueDate}
+      overdue={isOverdue(task)}
+      hideEmpty={hideEmpty}
+      onChange={(dueDate) => void update(task._id, { dueDate }, "Due date")}
+    />
   );
 }
 

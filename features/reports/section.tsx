@@ -25,7 +25,7 @@ export function ReportSection({
       aria-labelledby={`${id}-title`}
       className={cn("flex min-w-0 flex-col gap-3", className)}
     >
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+      <div className="flex items-start justify-between gap-x-4">
         <div className="flex min-w-0 flex-col gap-0.5">
           <h2 id={`${id}-title`} className="lead-style font-medium">
             {title}
@@ -36,7 +36,7 @@ export function ReportSection({
             </p>
           )}
         </div>
-        {aside}
+        {aside && <div className="-mr-2 flex shrink-0">{aside}</div>}
       </div>
       {children}
       {footnote && (

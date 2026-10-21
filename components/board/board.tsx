@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -83,7 +84,10 @@ type BoardProps<T extends { id: string }> = {
   renderCard: (item: T) => ReactNode;
   getLabel: (item: T) => string;
   onMove: (id: string, columnId: string, beforeId: string | null) => void;
+  /** Enter, or a click with ⌘/Ctrl held (plain click when there's no `onPeek`). */
   onOpen: (id: string) => void;
+  /** Plain click; when set, the card opens a peek and ⌘/Ctrl-click or Enter opens the page. */
+  onPeek?: (id: string) => void;
   onAdd?: (columnId: string) => void;
   addLabel?: string;
   emptyLabel?: string;
@@ -98,6 +102,7 @@ export default function Board<T extends { id: string }>({
   getLabel,
   onMove,
   onOpen,
+  onPeek,
   onAdd,
   addLabel = "Add",
   emptyLabel = "Nothing here yet",
@@ -105,6 +110,8 @@ export default function Board<T extends { id: string }>({
 }: BoardProps<T>) {
   const { belowLg } = useMobileBreakpoints();
   const mounted = useMounted();
+  // dnd-kit's own id counter differs between server and client renders.
+  const dndId = useId();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [placement, setPlacement] = useState<Placement | null>(null);
   const [settledId, setSettledId] = useState<string | null>(null);
@@ -372,6 +379,7 @@ export default function Board<T extends { id: string }>({
 
   return (
     <DndContext
+      id={dndId}
       sensors={sensors}
       collisionDetection={collisionDetection}
       autoScroll={{ threshold: { x: 0, y: 0.2 } }}
@@ -406,6 +414,7 @@ export default function Board<T extends { id: string }>({
               renderCard={renderCard}
               getLabel={getLabel}
               onOpen={onOpen}
+              onPeek={onPeek}
               onAdd={onAdd}
               addLabel={addLabel}
               emptyLabel={emptyLabel}

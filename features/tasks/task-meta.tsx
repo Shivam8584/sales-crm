@@ -200,3 +200,67 @@ export const QUICK_DATES = [
   { label: "Tomorrow", days: 1 },
   { label: "Next week", days: 7 },
 ] as const;
+
+export const DUE_GROUPS = [
+  "overdue",
+  "today",
+  "week",
+  "later",
+  "none",
+  "done",
+] as const;
+export type DueGroup = (typeof DUE_GROUPS)[number];
+
+export const DUE_GROUP_LABEL: Record<DueGroup, string> = {
+  overdue: "Overdue",
+  today: "Today",
+  week: "This week",
+  later: "Later",
+  none: "No date",
+  done: "Done",
+};
+
+/** Which due bucket a task falls in; done tasks have their own. */
+export function dueGroup(task: Pick<TaskRow, "dueDate" | "status">): DueGroup {
+  if (task.status === "done") return "done";
+  if (!task.dueDate) return "none";
+  const today = dayFromToday(0);
+  if (task.dueDate < today) return "overdue";
+  if (task.dueDate === today) return "today";
+  if (task.dueDate <= dayFromToday(6)) return "week";
+  return "later";
+}
+
+export function byUrgency(a: TaskRow, b: TaskRow) {
+  if (a.dueDate !== b.dueDate) {
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return a.dueDate < b.dueDate ? -1 : 1;
+  }
+  const priority =
+    PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
+  return priority || a.position - b.position;
+}
+
+const PRIORITY_ORDER: Priority[] = ["urgent", "high", "normal", "low"];
+
+/** The record a task is about, as a short label. */
+export function recordName(
+  task: Pick<TaskRow, "account" | "person" | "deal" | "lead">,
+) {
+  return (
+    task.person?.name ??
+    task.account?.name ??
+    task.deal?.title ??
+    task.lead?.name ??
+    null
+  );
+}
+
+/** For use mid-sentence: "today", "tomorrow", "on Fri", "on 24 Oct". */
+export function dayPhrase(day: string) {
+  const label = formatDay(day);
+  return ["Today", "Tomorrow", "Yesterday"].includes(label)
+    ? label.toLowerCase()
+    : `on ${label}`;
+}

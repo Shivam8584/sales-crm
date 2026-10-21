@@ -27,6 +27,19 @@ const PLACEHOLDER: Record<LoggableKind, string> = {
   whatsapp: "Summary of the WhatsApp conversation…",
 };
 
+const KIND_KEY = "timeline:kind";
+
+function readLastKind(): LoggableKind {
+  if (typeof window === "undefined") return "note";
+  try {
+    const stored = localStorage.getItem(KIND_KEY);
+    return LOGGABLE_KINDS.find((kind) => kind === stored) ?? "note";
+  } catch {
+    return "note";
+  }
+}
+
+/** Logs a note, call, meeting, email or WhatsApp; the last kind used is remembered. */
 export default function TimelineComposer({
   target,
 }: {
@@ -34,12 +47,19 @@ export default function TimelineComposer({
 }) {
   const log = useMutation(api.timeline.log);
   const bodyId = useId();
-  const [kind, setKind] = useState<LoggableKind>("note");
+  const [kind, setKindState] = useState<LoggableKind>(readLastKind);
   const [body, setBody] = useState("");
   const [outcome, setOutcome] = useState<CallOutcome>("connected");
   const [duration, setDuration] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  function setKind(next: LoggableKind) {
+    setKindState(next);
+    try {
+      localStorage.setItem(KIND_KEY, next);
+    } catch {}
+  }
 
   const canSubmit = kind === "note" ? body.trim().length > 0 : true;
 

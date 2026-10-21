@@ -8,6 +8,7 @@ import {
   type Utm,
 } from "../../lib/domain/leads";
 import { nextOwner } from "./assignment";
+import { leadSlaSeconds } from "./settings";
 import { leadershipIds, notify, notifyMany } from "../notifications";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -20,13 +21,16 @@ export type AlertEvent =
   | "demo_rescheduled"
   | "demo_cancelled";
 
+/** The env/default SLA, ignoring the workspace setting; prefer `leadSlaSeconds`. */
 export function slaSeconds() {
   const value = Number(process.env.LEAD_SLA_SECONDS);
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_LEAD_SLA_SECONDS;
 }
 
+export { leadSlaSeconds };
+
 export function leadHref(id: Id<"leads">) {
-  return `/leads?lead=${id}`;
+  return `/leads/${id}`;
 }
 
 export function isOpen(lead: Doc<"leads">) {
@@ -120,9 +124,11 @@ export async function createLead(
     });
   }
   if (!lead.firstTouchedAt) {
-    await ctx.scheduler.runAfter(slaSeconds() * 1000, internal.leads.checkSla, {
-      id,
-    });
+    await ctx.scheduler.runAfter(
+      (await leadSlaSeconds(ctx)) * 1000,
+      internal.leads.checkSla,
+      { id },
+    );
   }
   return { id, ownerId: ownerId ?? null };
 }

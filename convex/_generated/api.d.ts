@@ -30,6 +30,7 @@ import type * as lib_money from "../lib/money.js";
 import type * as lib_platform from "../lib/platform.js";
 import type * as lib_records from "../lib/records.js";
 import type * as lib_reports from "../lib/reports.js";
+import type * as lib_settings from "../lib/settings.js";
 import type * as lib_tasks from "../lib/tasks.js";
 import type * as lib_timeline from "../lib/timeline.js";
 import type * as lib_validators from "../lib/validators.js";
@@ -39,6 +40,7 @@ import type * as people from "../people.js";
 import type * as platform from "../platform.js";
 import type * as reports from "../reports.js";
 import type * as seed from "../seed.js";
+import type * as settings from "../settings.js";
 import type * as tasks from "../tasks.js";
 import type * as timeline from "../timeline.js";
 
@@ -71,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   "lib/platform": typeof lib_platform;
   "lib/records": typeof lib_records;
   "lib/reports": typeof lib_reports;
+  "lib/settings": typeof lib_settings;
   "lib/tasks": typeof lib_tasks;
   "lib/timeline": typeof lib_timeline;
   "lib/validators": typeof lib_validators;
@@ -80,6 +83,7 @@ declare const fullApi: ApiFromModules<{
   platform: typeof platform;
   reports: typeof reports;
   seed: typeof seed;
+  settings: typeof settings;
   tasks: typeof tasks;
   timeline: typeof timeline;
 }>;

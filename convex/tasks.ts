@@ -130,7 +130,15 @@ async function toClientList(ctx: QueryCtx, tasks: Doc<"tasks">[]) {
   const members = await memberIndex(ctx);
   const accounts = new Map<Id<"accounts">, Doc<"accounts"> | null>();
   const people = new Map<Id<"people">, Doc<"people"> | null>();
+  const deals = new Map<Id<"deals">, Doc<"deals"> | null>();
+  const leads = new Map<Id<"leads">, Doc<"leads"> | null>();
   for (const task of tasks) {
+    if (task.dealId && !deals.has(task.dealId)) {
+      deals.set(task.dealId, await ctx.db.get(task.dealId));
+    }
+    if (task.leadId && !leads.has(task.leadId)) {
+      leads.set(task.leadId, await ctx.db.get(task.leadId));
+    }
     if (task.accountId && !accounts.has(task.accountId)) {
       accounts.set(task.accountId, await ctx.db.get(task.accountId));
     }
@@ -141,6 +149,8 @@ async function toClientList(ctx: QueryCtx, tasks: Doc<"tasks">[]) {
   return tasks.map((task) => {
     const account = task.accountId ? accounts.get(task.accountId) : null;
     const person = task.personId ? people.get(task.personId) : null;
+    const deal = task.dealId ? deals.get(task.dealId) : null;
+    const lead = task.leadId ? leads.get(task.leadId) : null;
     return {
       _id: task._id,
       _creationTime: task._creationTime,
@@ -161,8 +171,8 @@ async function toClientList(ctx: QueryCtx, tasks: Doc<"tasks">[]) {
           }
         : null,
       person: person ? { _id: person._id, name: personName(person) } : null,
-      dealId: task.dealId ?? null,
-      leadId: task.leadId ?? null,
+      deal: deal ? { _id: deal._id, title: deal.title } : null,
+      lead: lead ? { _id: lead._id, name: lead.name } : null,
       automated: Boolean(task.automationKey),
       completedAt: task.completedAt ?? null,
       updatedAt: task.updatedAt,
@@ -328,6 +338,54 @@ export const update = memberMutation({
     await ctx.db.patch(id, { ...fields, updatedAt: now });
     await logStatus(ctx, { ...task, ...fields }, task.status);
     return before;
+  },
+});
+
+const MAX_BULK = 200;
+
+const vBulkPatch = v.object({
+  status: v.optional(vTaskStatus),
+  assigneeId: v.optional(v.id("members")),
+  dueDate: v.optional(v.union(v.string(), v.null())),
+});
+
+/**
+ * Applies a patch per task in one transaction, for bulk actions. Returns each
+ * task's previous values for the patched fields, ready to pass back as undo.
+ */
+export const updateMany = memberMutation({
+  args: {
+    updates: v.array(v.object({ id: v.id("tasks"), patch: vBulkPatch })),
+  },
+  handler: async (ctx, { updates }) => {
+    if (updates.length > MAX_BULK) {
+      invalid("updates", `Select at most ${MAX_BULK} tasks`);
+    }
+    const previous = [];
+    for (const { id, patch } of updates) {
+      const task = await ctx.db.get(id);
+      if (!task) continue;
+      const before = snapshot(task);
+      const fields = await clean(ctx, patch, task);
+      const now = Date.now();
+      if (fields.status && fields.status !== task.status) {
+        fields.position = await endPosition(ctx, fields.status);
+        fields.completedAt = fields.status === "done" ? now : undefined;
+      }
+      await ctx.db.patch(id, { ...fields, updatedAt: now });
+      await logStatus(ctx, { ...task, ...fields }, task.status);
+      previous.push({
+        id,
+        patch: {
+          ...(patch.status !== undefined && { status: before.status }),
+          ...(patch.assigneeId !== undefined && {
+            assigneeId: before.assigneeId,
+          }),
+          ...(patch.dueDate !== undefined && { dueDate: before.dueDate }),
+        },
+      });
+    }
+    return previous;
   },
 });
 

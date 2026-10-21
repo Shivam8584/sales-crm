@@ -32,9 +32,15 @@ export default function InlineText({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
+    else if (refocus.current) {
+      refocus.current = false;
+      buttonRef.current?.focus();
+    }
   }, [editing]);
 
   function start() {
@@ -63,10 +69,12 @@ export default function InlineText({
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
+      refocus.current = true;
       void commit();
     } else if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      refocus.current = true;
       setEditing(false);
     }
   }
@@ -104,8 +112,10 @@ export default function InlineText({
   return (
     <span className={cn("group/inline flex min-w-0 items-center", className)}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={start}
+        title={value ?? undefined}
         aria-label={`Edit ${label}`}
         className={cn(
           "hover:bg-overlay-1 focus-visible:ring-ring duration-fast -mx-1.5 flex h-7 min-w-0 flex-1 items-center rounded-md px-1.5 text-left text-sm leading-none transition-colors outline-none focus-visible:ring-2",

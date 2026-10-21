@@ -1,11 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import CountBadge from "@/components/_ui/count-badge";
@@ -14,27 +12,29 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
+import RowAction from "@/components/data-table/row-action";
+import SelectionBar from "@/components/data-table/selection-bar";
 import OptionPicker from "@/components/fields/option-picker";
 import type { Column, SortState } from "@/components/data-table/types";
 import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
-import { LEAD_KINDS, LEAD_STATUSES, type LeadStatus } from "@/lib/domain/enums";
+import {
+  LEAD_KINDS,
+  LEAD_STATUSES,
+  type DisqualifyReason,
+  type LeadStatus,
+} from "@/lib/domain/enums";
 import { LEAD_KIND_LABEL, LEAD_STATUS_LABEL } from "@/lib/domain/labels";
-import { readError } from "@/lib/errors";
-import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
+import EyeIcon from "@/public/assets/icons/eye.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
-import LeadSheet from "./lead-sheet";
-import {
-  ChannelTag,
-  DemoTag,
-  StatusTag,
-  compactSpan,
-  ownerOptions,
-} from "./lead-meta";
+import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
+import { ChannelTag, DemoTag, compactSpan, ownerOptions } from "./lead-meta";
+import LeadStatusMenu from "./lead-status-menu";
 import SlaIndicator, { slaState, useNow } from "./sla";
+import { useBulkLeadActions, useLeadActions } from "./use-lead-actions";
 
 type LeadsData = FunctionReturnType<typeof api.leads.list>;
 export type LeadRow = LeadsData["leads"][number];
@@ -42,7 +42,7 @@ export type LeadRow = LeadsData["leads"][number];
 const ANY = "any";
 const MINE = "mine";
 const UNASSIGNED = "unassigned";
-const DEFAULT_SORT: SortState = { id: "age", dir: "asc" };
+const DEFAULT_SORT: SortState = { id: "sla", dir: "asc" };
 
 function matches(row: LeadRow, query: string) {
   const text =
@@ -54,43 +54,29 @@ function matches(row: LeadRow, query: string) {
     .every((word) => text.includes(word));
 }
 
-/** The inbound lead inbox: triage by status, watch the SLA, open a lead in a side sheet. */
+/** The inbound lead inbox: triage by status, watch the SLA, peek or open a lead. */
 export default function LeadsPage() {
   const viewer = useViewer();
   const members = useMembers();
   const data = useQuery(api.leads.list);
-  const assign = useMutation(api.leads.assign);
+  const { assign } = useLeadActions();
+  const bulk = useBulkLeadActions();
   const setCreate = useUiStore((state) => state.setCreate);
-  const params = useSearchParams();
+  const setPeek = useUiStore((state) => state.setPeek);
   const now = useNow(true, 30_000);
 
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useUrlState("status", "new");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [status, setStatusTab] = useUrlState("status", "new");
   const [owner, setOwner] = useUrlState("owner", ANY);
   const [channel, setChannel] = useUrlState("source", ANY);
   const [kind, setKind] = useUrlState("kind", ANY);
-  const [openId, setOpenId] = useUrlState("lead", "");
   const [sortParam, setSortParam] = useUrlState(
     "sort",
     `${DEFAULT_SORT.id}:${DEFAULT_SORT.dir}`,
   );
 
   const slaMs = data?.slaMs ?? 0;
-  async function reassign(row: LeadRow, ownerId: string | null) {
-    try {
-      const previous = await assign({
-        id: row._id,
-        ownerId: ownerId as Id<"members"> | null,
-      });
-      const name = members?.find((member) => member._id === ownerId)?.name;
-      toast(
-        name ? `Assigned ${row.name} to ${name}` : `Unassigned ${row.name}`,
-        () => void assign({ id: row._id, ownerId: previous }),
-      );
-    } catch (error) {
-      toast(readError(error).message, { tone: "danger" });
-    }
-  }
 
   const columns: Column<LeadRow>[] = [
     {
@@ -101,11 +87,13 @@ export default function LeadsPage() {
       cell: (row) => (
         <>
           <Avatar name={row.name} size="sm" />
-          <span className="min-w-0 truncate">
-            {row.name}
-            <span className="text-fg-tertiary font-normal">
-              {" "}
-              · {row.companyName}
+          <span className="flex min-w-0 items-baseline gap-1.5">
+            <span className="truncate font-medium">{row.name}</span>
+            <span
+              className="text-fg-tertiary truncate font-normal"
+              title={`${row.companyName} · ${LEAD_KIND_LABEL[row.kind]}`}
+            >
+              {row.companyName}
             </span>
           </span>
         </>
@@ -131,15 +119,15 @@ export default function LeadsPage() {
           searchPlaceholder="Search teammates…"
           clearLabel="Unassign"
           options={ownerOptions(members, row.owner)}
-          onChange={(value) => void reassign(row, value)}
+          onChange={(value) => void assign(row, value)}
           className="mx-0 -ml-1.5"
         />
       ),
     },
     {
       id: "sla",
-      header: "SLA",
-      width: "minmax(8.5rem,1fr)",
+      header: "First touch",
+      width: "minmax(9.5rem,1fr)",
       sortValue: (row) => {
         const state = slaState(row, slaMs, now);
         if (state.kind === "pending") return state.remainingMs;
@@ -163,25 +151,19 @@ export default function LeadsPage() {
     },
     {
       id: "age",
-      header: "Age",
-      width: "5rem",
+      header: "Received",
+      width: "6.5rem",
       align: "end",
+      defaultDir: "asc",
       sortValue: (row) => now - row._creationTime,
       cell: (row) => (
         <span
-          className="text-fg-secondary"
+          className="text-fg-secondary whitespace-nowrap tabular-nums"
           title={new Date(row._creationTime).toLocaleString("en-IN")}
         >
-          {compactSpan(now - row._creationTime)}
+          {compactSpan(now - row._creationTime)} ago
         </span>
       ),
-    },
-    {
-      id: "status",
-      header: "Status",
-      width: "7.5rem",
-      sortValue: (row) => LEAD_STATUSES.indexOf(row.status),
-      cell: (row) => <StatusTag status={row.status} />,
     },
   ];
 
@@ -219,6 +201,22 @@ export default function LeadsPage() {
   }, [filtered]);
 
   const rows = filtered?.filter((row) => row.status === status);
+  const breached = useMemo(
+    () =>
+      (leads ?? []).filter(
+        (row) => slaState(row, slaMs, now).kind === "breached",
+      ).length,
+    [leads, slaMs, now],
+  );
+  const selectedIds = (rows ?? [])
+    .filter((row) => selected.has(row._id))
+    .map((row) => row._id);
+
+  function bulkStatus(next: LeadStatus, reason?: DisqualifyReason) {
+    const ids = selectedIds;
+    setSelected(new Set());
+    void bulk.setStatus(ids, next, reason);
+  }
   const channels = useMemo(
     () => [...new Set((leads ?? []).map((row) => row.channel))].sort(),
     [leads],
@@ -233,21 +231,33 @@ export default function LeadsPage() {
     setKind(ANY);
   }
 
-  function hrefFor(id: string) {
-    const query = new URLSearchParams(params.toString());
-    query.set("lead", id);
-    return `/leads?${query}`;
-  }
-
   return (
     <Page>
       <PageHeader
         title="Leads"
         meta={
           leads && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {leads.length}
-            </span>
+            <>
+              <span className="caption-style text-fg-tertiary tabular-nums">
+                {leads.length}
+              </span>
+              {breached > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusTab("new");
+                    setSortParam("sla:asc");
+                  }}
+                  className="caption-style text-danger hover:bg-overlay-1 focus-visible:ring-ring flex items-center gap-1.5 rounded-full px-2 py-0.5 tabular-nums outline-none focus-visible:ring-2"
+                >
+                  <span
+                    aria-hidden
+                    className="size-1.5 rounded-full bg-current"
+                  />
+                  {breached} past SLA
+                </button>
+              )}
+            </>
           )
         }
         actions={
@@ -261,7 +271,13 @@ export default function LeadsPage() {
           </Button>
         }
       />
-      <Tabs value={status} onValueChange={setStatus}>
+      <Tabs
+        value={status}
+        onValueChange={(next) => {
+          setStatusTab(next);
+          setSelected(new Set());
+        }}
+      >
         <TabsList
           aria-label="Lead status"
           className="border-border scrollbar-none gap-5 overflow-x-auto border-b px-4"
@@ -333,79 +349,138 @@ export default function LeadsPage() {
         )}
       </PageToolbar>
 
-      <DataTable
-        label={`${LEAD_STATUS_LABEL[status as LeadStatus] ?? "New"} leads`}
-        columns={columns}
-        rows={rows}
-        getId={(row) => row._id}
-        getHref={(row) => hrefFor(row._id)}
-        getLabel={(row) => `${row.name}, ${row.companyName}`}
-        sort={sort}
-        onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
-        onPeek={(row) => setOpenId(row._id)}
-        renderCard={(row) => (
-          <span className="flex items-start gap-3">
-            <Avatar name={row.name} size="md" />
-            <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className="lead-style truncate font-medium">
-                {row.name}
-                <span className="text-fg-tertiary font-normal">
-                  {" "}
-                  · {row.companyName}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <DataTable
+          label={`${LEAD_STATUS_LABEL[status as LeadStatus] ?? "New"} leads`}
+          columns={columns}
+          rows={rows}
+          getId={(row) => row._id}
+          getHref={(row) => `/leads/${row._id}`}
+          getLabel={(row) => `${row.name}, ${row.companyName}`}
+          sort={sort}
+          onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
+          selected={selected}
+          onSelectedChange={setSelected}
+          onPeek={(row) => setPeek({ type: "lead", id: row._id })}
+          rowActions={(row) => (
+            <>
+              {row.owner?._id !== viewer._id && (
+                <RowAction
+                  label="Assign to me"
+                  icon={UserPlusIcon}
+                  onClick={() => void assign(row, viewer._id)}
+                />
+              )}
+              <RowAction
+                label="Peek"
+                icon={EyeIcon}
+                shortcut="Space"
+                onClick={() => setPeek({ type: "lead", id: row._id })}
+              />
+            </>
+          )}
+          renderCard={(row) => (
+            <span className="flex items-start gap-3">
+              <Avatar name={row.name} size="md" />
+              <span className="flex min-w-0 flex-1 flex-col gap-2">
+                <span className="lead-style truncate font-medium">
+                  {row.name}
+                  <span className="text-fg-tertiary font-normal">
+                    {" "}
+                    · {row.companyName}
+                  </span>
+                </span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <SlaIndicator lead={row} slaMs={slaMs} />
+                  <span className="caption-style text-fg-tertiary truncate">
+                    {row.owner?.name ?? "Unassigned"} · {row.channel}
+                  </span>
                 </span>
               </span>
-              <span className="flex min-w-0 items-center gap-2">
-                <SlaIndicator lead={row} slaMs={slaMs} />
-                <span className="caption-style text-fg-tertiary truncate">
-                  {row.owner?.name ?? "Unassigned"} · {row.channel}
-                </span>
+              <span className="caption-style text-fg-tertiary pt-0.5 tabular-nums">
+                {compactSpan(now - row._creationTime)}
               </span>
             </span>
-            <span className="caption-style text-fg-tertiary pt-0.5 tabular-nums">
-              {compactSpan(now - row._creationTime)}
-            </span>
-          </span>
-        )}
-        empty={
-          hasFilters ? (
-            <EmptyState
-              icon={TargetIcon}
-              title="No leads match"
-              description="Try another search or clear the filters."
-              action={
-                <Button variant="secondary" size="sm" onClick={clearFilters}>
-                  Clear filters
+          )}
+          empty={
+            hasFilters ? (
+              <EmptyState
+                icon={TargetIcon}
+                title="No leads match"
+                description="Try another search or clear the filters."
+                action={
+                  <Button variant="secondary" size="sm" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={TargetIcon}
+                title={
+                  status === "new"
+                    ? "Inbox zero"
+                    : `No ${LEAD_STATUS_LABEL[status as LeadStatus]?.toLowerCase() ?? ""} leads`
+                }
+                description={
+                  status === "new"
+                    ? "Demo requests from the website land here and are assigned automatically."
+                    : "Leads move here as you work them."
+                }
+                action={
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setCreate({ type: "lead" })}
+                  >
+                    <PlusIcon aria-hidden className="size-3" />
+                    New lead
+                  </Button>
+                }
+              />
+            )
+          }
+        />
+        <SelectionBar
+          count={selectedIds.length}
+          noun={["lead", "leads"]}
+          onClear={() => setSelected(new Set())}
+        >
+          <OptionPicker
+            value={null}
+            label="Assign selected leads"
+            align="start"
+            clearLabel="Unassign"
+            searchPlaceholder="Search teammates…"
+            onChange={(id) => void bulk.assign(selectedIds, id)}
+            options={ownerOptions(members, null)}
+            className="h-control-sm mx-0 px-2.5 text-xs"
+          >
+            Assign
+          </OptionPicker>
+          {status !== "converted" && (
+            <>
+              <LeadStatusMenu status={null} side="top" onChange={bulkStatus}>
+                <Button variant="ghost" size="xs" className="text-foreground">
+                  Status
                 </Button>
-              }
-            />
-          ) : (
-            <EmptyState
-              icon={TargetIcon}
-              title={
-                status === "new"
-                  ? "Inbox zero"
-                  : `No ${LEAD_STATUS_LABEL[status as LeadStatus]?.toLowerCase() ?? ""} leads`
-              }
-              description={
-                status === "new"
-                  ? "Demo requests from the website land here and are assigned automatically."
-                  : "Leads move here as you work them."
-              }
-              action={
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setCreate({ type: "lead" })}
+              </LeadStatusMenu>
+              {status !== "disqualified" && (
+                <LeadStatusMenu
+                  status={null}
+                  side="top"
+                  disqualifyOnly
+                  onChange={bulkStatus}
                 >
-                  <PlusIcon aria-hidden className="size-3" />
-                  New lead
-                </Button>
-              }
-            />
-          )
-        }
-      />
-      <LeadSheet id={openId || null} onClose={() => setOpenId("")} />
+                  <Button variant="ghost" size="xs" className="text-foreground">
+                    Disqualify
+                  </Button>
+                </LeadStatusMenu>
+              )}
+            </>
+          )}
+        </SelectionBar>
+      </div>
     </Page>
   );
 }

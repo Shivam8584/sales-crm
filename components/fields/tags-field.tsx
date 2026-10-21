@@ -28,11 +28,15 @@ export default function TagsField({ value, onChange, label }: TagsFieldProps) {
       add();
     } else if (event.key === "Backspace" && !draft && value.length > 0) {
       onChange(value.slice(0, -1));
+    } else if (event.key === "Escape" && draft) {
+      event.preventDefault();
+      event.stopPropagation();
+      setDraft("");
     }
   }
 
   return (
-    <div className="-mx-1.5 flex min-h-7 flex-wrap items-center gap-1 px-1.5 py-0.5">
+    <div className="focus-within:bg-overlay-1 hover:bg-overlay-1 duration-fast -mx-1.5 flex min-h-7 min-w-0 flex-wrap items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors">
       {value.map((tag) => (
         <Tag key={tag} size="sm" className="gap-1 pr-1">
           {tag}
@@ -40,7 +44,7 @@ export default function TagsField({ value, onChange, label }: TagsFieldProps) {
             type="button"
             aria-label={`Remove ${tag}`}
             onClick={() => onChange(value.filter((item) => item !== tag))}
-            className="text-fg-tertiary hover:text-foreground rounded-full p-0.5"
+            className="text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-full p-0.5 outline-none focus-visible:ring-2"
           >
             <XIcon aria-hidden className="size-2.5" />
           </button>

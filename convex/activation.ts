@@ -1,10 +1,12 @@
+import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { ACTIVATION_STAGES } from "../lib/domain/platform";
 import { PRIORITIES } from "../lib/domain/enums";
-import { managerMutation, memberQuery } from "./lib/functions";
-import { memberIndex, memberRef } from "./lib/records";
+import { managerMutation, memberMutation, memberQuery } from "./lib/functions";
+import { memberIndex, memberRef, requireAccount } from "./lib/records";
 import {
   accountEvents,
+  accountStall,
   automationKey,
   detectStall,
   journey,
@@ -13,6 +15,7 @@ import {
   stallAccount,
   STALL_RULES,
   STALL_THRESHOLDS,
+  syncAccountActivation,
 } from "./lib/activation";
 
 /** The activation funnel across linked brands, and every brand stuck on a step. */
@@ -91,6 +94,7 @@ export const desk = memberQuery({
         id: rule.id,
         label: rule.label,
         description: rule.description,
+        playbook: rule.playbook,
         priority: rule.priority,
         threshold: STALL_THRESHOLDS[rule.id],
       })),
@@ -99,6 +103,60 @@ export const desk = memberQuery({
       linked: accounts.length,
       rows,
     };
+  },
+});
+
+/** What the account is stuck on right now, with its rep task; null when it isn't stuck. */
+export const forAccount = memberQuery({
+  args: { accountId: v.id("accounts") },
+  handler: async (ctx, { accountId }) => {
+    const account = await ctx.db.get(accountId);
+    if (!account) return null;
+    const stall = await accountStall(ctx, account, Date.now());
+    if (!stall) return null;
+    const members = await memberIndex(ctx);
+    const task = await ctx.db
+      .query("tasks")
+      .withIndex("by_automation_key", (q) =>
+        q.eq("automationKey", automationKey(stall.rule.id, account._id)),
+      )
+      .first();
+    return {
+      stage: stall.stage,
+      since: stall.since,
+      rule: {
+        id: stall.rule.id,
+        label: stall.rule.label,
+        description: stall.rule.description,
+        playbook: stall.rule.playbook,
+        priority: stall.rule.priority,
+      },
+      task: task
+        ? {
+            _id: task._id,
+            title: task.title,
+            status: task.status,
+            dueDate: task.dueDate ?? null,
+            assignee: memberRef(members, task.assigneeId),
+            completedAt: task.completedAt ?? null,
+          }
+        : null,
+    };
+  },
+});
+
+/** Opens (or finds) the rep task for the account's current stall; null when it isn't stuck. */
+export const ensureTask = memberMutation({
+  args: { accountId: v.id("accounts") },
+  handler: async (ctx, { accountId }) => {
+    await requireAccount(ctx, accountId);
+    const { key } = await syncAccountActivation(ctx, accountId, Date.now());
+    if (!key) return null;
+    const task = await ctx.db
+      .query("tasks")
+      .withIndex("by_automation_key", (q) => q.eq("automationKey", key))
+      .first();
+    return task?._id ?? null;
   },
 });
 

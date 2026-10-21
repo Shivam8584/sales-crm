@@ -7,18 +7,36 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import { RecordSection } from "@/components/record/record-layout";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import type { HiddenRecord } from "./task-card";
 import TaskChecklist, { TaskChecklistSkeleton } from "./task-checklist";
 import TaskComposer from "./task-composer";
+import { byUrgency } from "./task-meta";
 
 export type TaskTarget =
   | { accountId: Id<"accounts"> }
-  | { personId: Id<"people"> };
+  | { personId: Id<"people"> }
+  | { dealId: Id<"deals"> }
+  | { leadId: Id<"leads"> };
 
-/** Open tasks section on an account or person page. */
-export default function RecordTasks({ target }: { target: TaskTarget }) {
+function hiddenFor(target: TaskTarget): HiddenRecord {
+  if ("accountId" in target) return "account";
+  if ("personId" in target) return "person";
+  if ("dealId" in target) return "deal";
+  return "lead";
+}
+
+/** Open tasks for a record, with a quick-add row; `bare` drops the section title for use inside a tab. */
+export default function RecordTasks({
+  target,
+  bare = false,
+}: {
+  target: TaskTarget;
+  bare?: boolean;
+}) {
   const tasks = useQuery(api.tasks.list, { ...target, done: "none" });
   const [composing, setComposing] = useState(false);
-  const onAccount = "accountId" in target;
+  const sorted = tasks && [...tasks].sort(byUrgency);
+  const showAdd = Boolean(sorted?.length) && !composing;
 
   const add = (
     <Button variant="ghost" size="xs" onClick={() => setComposing(true)}>
@@ -27,17 +45,14 @@ export default function RecordTasks({ target }: { target: TaskTarget }) {
     </Button>
   );
 
-  return (
-    <RecordSection
-      title="Tasks"
-      action={tasks?.length || composing ? add : undefined}
-    >
-      {tasks === undefined ? (
+  const body = (
+    <>
+      {sorted === undefined ? (
         <TaskChecklistSkeleton rows={1} />
-      ) : tasks.length > 0 ? (
+      ) : sorted.length > 0 ? (
         <TaskChecklist
-          tasks={tasks}
-          hideRecord={onAccount ? "account" : "person"}
+          tasks={sorted}
+          hideRecord={hiddenFor(target)}
           showAssignee
         />
       ) : (
@@ -62,6 +77,21 @@ export default function RecordTasks({ target }: { target: TaskTarget }) {
           className="border-border border shadow-none"
         />
       )}
+    </>
+  );
+
+  if (bare) {
+    return (
+      <div className="flex flex-col gap-3">
+        {showAdd && <div className="-mb-1 flex justify-end">{add}</div>}
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <RecordSection title="Tasks" action={showAdd ? add : undefined}>
+      {body}
     </RecordSection>
   );
 }

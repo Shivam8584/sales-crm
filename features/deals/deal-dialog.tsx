@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
@@ -16,7 +16,6 @@ import {
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
-import Skeleton from "@/components/_ui/skeleton";
 import OptionPicker from "@/components/fields/option-picker";
 import AccountPicker from "@/features/accounts/account-picker";
 import MemberPicker from "@/features/members/member-picker";
@@ -27,12 +26,10 @@ import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
 import { useUiStore, type CreateDialog } from "@/stores/ui-store";
 import PlusIcon from "@/public/assets/icons/plus.svg";
-import TrashIcon from "@/public/assets/icons/trash.svg";
 import { LostReasonChips } from "./lost-reason-dialog";
 import MoneyInput from "./money-input";
 import PeoplePicker from "./people-picker";
 import { DEAL_STAGE_OPTIONS } from "./stage";
-import { useRemoveDeal, type DealRow } from "./use-deal-actions";
 
 const MAX_TITLE = 120;
 
@@ -50,106 +47,50 @@ type Form = {
 type FieldKey = "title" | "accountId" | "amount" | "closeDate" | "lostReason";
 type Errors = Partial<Record<FieldKey | "form", string>>;
 
-type Target =
-  | { mode: "create"; preset: Extract<CreateDialog, { type: "deal" }> }
-  | { mode: "edit"; id: Id<"deals"> };
-
 const PICKER_CLASS =
   "border-input bg-secondary mx-0 h-9 w-full rounded-lg border px-3";
 
-/** Create and edit dialog for deals, driven by `useUiStore` create/edit state. */
+type Preset = Extract<CreateDialog, { type: "deal" }>;
+
+/**
+ * Create dialog for deals, driven by `useUiStore().create`. Deals are edited
+ * inline on their page and peek, so an edit request opens the peek instead.
+ */
 export default function DealDialog() {
   const create = useUiStore((state) => state.create);
   const edit = useUiStore((state) => state.edit);
   const setCreate = useUiStore((state) => state.setCreate);
   const setEdit = useUiStore((state) => state.setEdit);
+  const setPeek = useUiStore((state) => state.setPeek);
 
-  const target: Target | null =
-    create?.type === "deal"
-      ? { mode: "create", preset: create }
-      : edit?.type === "deal"
-        ? { mode: "edit", id: edit.id as Id<"deals"> }
-        : null;
+  useEffect(() => {
+    if (edit?.type !== "deal") return;
+    setEdit(null);
+    setPeek({ type: "deal", id: edit.id });
+  }, [edit, setEdit, setPeek]);
 
-  // Keep rendering the last target while the dialog animates out.
-  const [shown, setShown] = useState<Target | null>(target);
+  const preset = create?.type === "deal" ? create : null;
+  // Keep rendering the last preset while the dialog animates out.
+  const [shown, setShown] = useState<Preset | null>(preset);
   const [session, setSession] = useState(0);
-  const [lastSource, setLastSource] = useState<unknown>(null);
-  const source = create?.type === "deal" ? create : edit;
-  if (target && source !== lastSource) {
-    setLastSource(source);
-    setShown(target);
+  if (preset && preset !== shown) {
+    setShown(preset);
     setSession((count) => count + 1);
-  } else if (!target && lastSource !== null) {
-    setLastSource(null);
   }
 
-  function close() {
-    if (create?.type === "deal") setCreate(null);
-    if (edit?.type === "deal") setEdit(null);
-  }
+  const close = () => setCreate(null);
 
   return (
-    <Dialog open={target !== null} onOpenChange={(open) => !open && close()}>
+    <Dialog open={preset !== null} onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-w-130">
-        {shown?.mode === "create" && (
-          <DealForm key={session} preset={shown.preset} onDone={close} />
-        )}
-        {shown?.mode === "edit" && (
-          <EditDeal
-            key={session}
-            id={shown.id}
-            open={target !== null}
-            onDone={close}
-          />
-        )}
+        {shown && <DealForm key={session} preset={shown} onDone={close} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function EditDeal({
-  id,
-  open,
-  onDone,
-}: {
-  id: Id<"deals">;
-  open: boolean;
-  onDone: () => void;
-}) {
-  const deal = useQuery(api.deals.get, { id });
-
-  useEffect(() => {
-    if (open && deal === null) {
-      toast("That deal no longer exists");
-      onDone();
-    }
-  }, [open, deal, onDone]);
-
-  if (!deal) {
-    return (
-      <>
-        <DialogHeader>
-          <DialogTitle>Edit deal</DialogTitle>
-          <DialogDescription>Loading the deal…</DialogDescription>
-        </DialogHeader>
-        <div aria-busy className="flex flex-col gap-4 px-6 py-5">
-          {[0, 1, 2].map((index) => (
-            <Skeleton key={index} className="h-9 w-full rounded-lg" />
-          ))}
-        </div>
-      </>
-    );
-  }
-  return <DealForm deal={deal} onDone={onDone} />;
-}
-
 function isStage(value: string | undefined): value is DealStage {
   return (DEAL_STAGES as readonly string[]).includes(value ?? "");
-}
-
-function sameIds(a: string[], b: string[]) {
-  return a.length === b.length && a.every((id) => b.includes(id));
 }
 
 function validate(form: Form): Errors {
@@ -167,46 +108,21 @@ function validate(form: Form): Errors {
   return errors;
 }
 
-function DealForm({
-  deal,
-  preset,
-  onDone,
-}: {
-  deal?: DealRow;
-  preset?: Extract<CreateDialog, { type: "deal" }>;
-  onDone: () => void;
-}) {
+function DealForm({ preset, onDone }: { preset: Preset; onDone: () => void }) {
   const viewer = useViewer();
   const createDeal = useMutation(api.deals.create);
-  const updateDeal = useMutation(api.deals.update);
   const removeCreated = useMutation(api.deals.remove);
-  const removeDeal = useRemoveDeal();
-  const editing = deal !== undefined;
 
-  const [initial] = useState<Form>(() =>
-    deal
-      ? {
-          title: deal.title,
-          accountId: deal.accountId,
-          stage: deal.stage,
-          amount: deal.amount,
-          ownerId: deal.ownerId,
-          closeDate: deal.closeDate ?? "",
-          personIds: deal.personIds,
-          lostReason: deal.lostReason ?? "",
-        }
-      : {
-          title: "",
-          accountId: preset?.accountId ?? null,
-          stage: isStage(preset?.stage) ? preset.stage : "discovery",
-          amount: { amount: 0, currency: DEFAULT_CURRENCY },
-          ownerId: viewer._id,
-          closeDate: "",
-          personIds: [],
-          lostReason: "",
-        },
-  );
-  const [form, setForm] = useState(initial);
+  const [form, setForm] = useState<Form>(() => ({
+    title: "",
+    accountId: preset.accountId ?? null,
+    stage: isStage(preset.stage) ? preset.stage : "discovery",
+    amount: { amount: 0, currency: DEFAULT_CURRENCY },
+    ownerId: viewer._id,
+    closeDate: "",
+    personIds: [],
+    lostReason: "",
+  }));
   const [serverErrors, setServerErrors] = useState<Errors>({});
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>(
     {},
@@ -215,8 +131,6 @@ function DealForm({
 
   const errors = validate(form);
   const valid = Object.keys(errors).length === 0;
-  const changed = changedFields(initial, form);
-  const dirty = changed.length > 0;
   const shown = (key: FieldKey) =>
     serverErrors[key] ?? (touched[key] ? errors[key] : undefined);
 
@@ -234,49 +148,25 @@ function DealForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!valid || !dirty || saving) return;
+    if (!valid || saving) return;
     const title = form.title.trim();
     setSaving(true);
     try {
-      if (deal) {
-        const patch = buildPatch(form, changed);
-        const previous = await updateDeal({ id: deal._id, patch });
-        const undoPatch = Object.fromEntries(
-          Object.keys(patch).map((key) => [
-            key,
-            previous[key as keyof typeof previous],
-          ]),
-        ) as typeof patch;
-        if (undoPatch.stage === "lost")
-          undoPatch.lostReason = previous.lostReason;
-        const undo = () =>
-          void updateDeal({ id: deal._id, patch: undoPatch }).catch((error) =>
-            toast(readError(error).message, { tone: "danger" }),
-          );
-        toast(
-          patch.stage === "won" && deal.stage !== "won"
-            ? `Won ${title}`
-            : `Saved ${title}`,
-          undo,
+      const id = await createDeal({
+        title,
+        accountId: form.accountId as Id<"accounts">,
+        stage: form.stage,
+        amount: form.amount,
+        ownerId: form.ownerId as Id<"members">,
+        closeDate: form.closeDate || undefined,
+        personIds: form.personIds as Id<"people">[],
+        lostReason: form.stage === "lost" ? form.lostReason.trim() : undefined,
+      });
+      toast(`Created ${title}`, () => {
+        void removeCreated({ id }).catch((error) =>
+          toast(readError(error).message, { tone: "danger" }),
         );
-      } else {
-        const id = await createDeal({
-          title,
-          accountId: form.accountId as Id<"accounts">,
-          stage: form.stage,
-          amount: form.amount,
-          ownerId: form.ownerId as Id<"members">,
-          closeDate: form.closeDate || undefined,
-          personIds: form.personIds as Id<"people">[],
-          lostReason:
-            form.stage === "lost" ? form.lostReason.trim() : undefined,
-        });
-        toast(`Created ${title}`, () => {
-          void removeCreated({ id }).catch((error) =>
-            toast(readError(error).message, { tone: "danger" }),
-          );
-        });
-      }
+      });
       onDone();
     } catch (error) {
       const { message, field } = readError(error, "Couldn't save the deal");
@@ -298,12 +188,6 @@ function DealForm({
     }
   }
 
-  function remove() {
-    if (!deal) return;
-    onDone();
-    void removeDeal(deal);
-  }
-
   const titleError = shown("title");
   const amountError = shown("amount");
   const closeDateError = shown("closeDate");
@@ -312,11 +196,9 @@ function DealForm({
   return (
     <form onSubmit={submit} noValidate>
       <DialogHeader>
-        <DialogTitle>{editing ? "Edit deal" : "New deal"}</DialogTitle>
+        <DialogTitle>New deal</DialogTitle>
         <DialogDescription>
-          {editing
-            ? "Update the details, or move it to another stage."
-            : "An opportunity with an account, tracked through the pipeline."}
+          An opportunity with an account, tracked through the pipeline.
         </DialogDescription>
       </DialogHeader>
 
@@ -324,7 +206,7 @@ function DealForm({
         <Field label="Title" htmlFor="deal-title" required error={titleError}>
           <Input
             id="deal-title"
-            autoFocus={!editing}
+            autoFocus
             autoComplete="off"
             maxLength={MAX_TITLE + 20}
             value={form.title}
@@ -337,28 +219,9 @@ function DealForm({
           />
         </Field>
 
-        <PickerField
-          label="Account"
-          required
-          error={shown("accountId")}
-          trailing={
-            editing &&
-            form.accountId && (
-              <Button
-                variant="link"
-                size="none"
-                className="caption-style"
-                href={`/accounts/${form.accountId}`}
-                onClick={onDone}
-              >
-                Open account
-              </Button>
-            )
-          }
-        >
+        <PickerField label="Account" required error={shown("accountId")}>
           <AccountPicker
             value={form.accountId}
-            currentName={deal?.account?.name}
             placeholder="Pick an account"
             onChange={(accountId) => {
               if (accountId === form.accountId) return;
@@ -447,7 +310,6 @@ function DealForm({
           <PickerField label="Owner">
             <MemberPicker
               value={form.ownerId}
-              currentName={deal?.owner?.name}
               onChange={(ownerId) => set("ownerId", ownerId)}
               className={PICKER_CLASS}
             />
@@ -475,35 +337,22 @@ function DealForm({
         )}
       </div>
 
-      <DialogFooter className={editing ? "justify-between" : undefined}>
-        {editing && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="hover:text-danger -ml-2.25"
-            onClick={remove}
-          >
-            <TrashIcon aria-hidden className="size-3.5" />
-            Delete
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button variant="subtle" size="sm">
+            Cancel
           </Button>
-        )}
-        <div className="flex items-center gap-2">
-          <DialogClose asChild>
-            <Button variant="subtle" size="sm">
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button
-            type="submit"
-            variant="primary"
-            size="sm"
-            loading={saving}
-            disabled={!valid || !dirty}
-          >
-            {!editing && <PlusIcon aria-hidden className="size-3" />}
-            {editing ? "Save changes" : "Create deal"}
-          </Button>
-        </div>
+        </DialogClose>
+        <Button
+          type="submit"
+          variant="primary"
+          size="sm"
+          loading={saving}
+          disabled={!valid}
+        >
+          <PlusIcon aria-hidden className="size-3" />
+          Create deal
+        </Button>
       </DialogFooter>
     </form>
   );
@@ -544,48 +393,4 @@ function PickerField({
       )}
     </div>
   );
-}
-
-function changedFields(initial: Form, form: Form) {
-  return (Object.keys(form) as (keyof Form)[]).filter((key) => {
-    if (key === "lostReason" && form.stage !== "lost") return false;
-    if (key === "title" || key === "lostReason") {
-      return form[key].trim() !== initial[key].trim();
-    }
-    if (key === "amount") {
-      return (
-        form.amount.amount !== initial.amount.amount ||
-        form.amount.currency !== initial.amount.currency
-      );
-    }
-    if (key === "personIds") return !sameIds(form.personIds, initial.personIds);
-    return form[key] !== initial[key];
-  });
-}
-
-function buildPatch(form: Form, changed: (keyof Form)[]) {
-  const patch: {
-    title?: string;
-    accountId?: Id<"accounts">;
-    stage?: DealStage;
-    amount?: Money;
-    ownerId?: Id<"members">;
-    closeDate?: string | null;
-    personIds?: Id<"people">[];
-    lostReason?: string | null;
-  } = {};
-  for (const key of changed) {
-    if (key === "title") patch.title = form.title.trim();
-    if (key === "accountId") patch.accountId = form.accountId as Id<"accounts">;
-    if (key === "stage") patch.stage = form.stage;
-    if (key === "amount") patch.amount = form.amount;
-    if (key === "ownerId") patch.ownerId = form.ownerId as Id<"members">;
-    if (key === "closeDate") patch.closeDate = form.closeDate || null;
-    if (key === "personIds") patch.personIds = form.personIds as Id<"people">[];
-    if (key === "lostReason" && form.stage === "lost") {
-      patch.lostReason = form.lostReason.trim();
-    }
-  }
-  if (patch.stage === "lost") patch.lostReason = form.lostReason.trim();
-  return patch;
 }

@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { httpAction, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Doc } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { LifecycleStage } from "../lib/domain/enums";
 import { gstinCheckChar } from "../lib/domain/gstin";
 import {
@@ -9,10 +10,12 @@ import {
   type PlatformEventData,
   type PlatformEventType,
 } from "../lib/domain/platform";
+import { syncAccountActivation } from "./lib/activation";
 import { fail } from "./lib/errors";
 import { adminQuery, memberQuery } from "./lib/functions";
 import { json, parseJsonObject, readBody, verifyHmac } from "./lib/http";
 import {
+  accountForOrg,
   parseEnvelope,
   platformMetrics,
   receive,
@@ -34,9 +37,59 @@ const vEnvelope = v.object({
   data: v.record(v.string(), v.any()),
 });
 
+/** The CRM account an event is about: by org, or by the signed-up user's person. */
+async function accountFor(
+  ctx: MutationCtx,
+  event: { orgId?: string; userId?: string },
+): Promise<Id<"accounts"> | null> {
+  if (event.orgId) {
+    const account = await accountForOrg(ctx, event.orgId);
+    if (account) return account._id;
+  }
+  if (event.userId) {
+    const userId = event.userId;
+    const person = await ctx.db
+      .query("people")
+      .withIndex("by_platform_user", (q) => q.eq("platformUserId", userId))
+      .first();
+    if (person?.accountId) return person.accountId;
+  }
+  return null;
+}
+
+// Without this, a brand that moves on keeps its stall task open until the hourly check.
+async function syncActivation(
+  ctx: MutationCtx,
+  events: { orgId?: string; userId?: string }[],
+) {
+  const ids = new Set<Id<"accounts">>();
+  for (const event of events) {
+    const id = await accountFor(ctx, event);
+    if (id) ids.add(id);
+  }
+  const now = Date.now();
+  for (const id of ids) await syncAccountActivation(ctx, id, now);
+}
+
+const refs = (data: Record<string, unknown>) => ({
+  orgId: typeof data.org_id === "string" ? data.org_id : undefined,
+  userId:
+    typeof data.user_id === "string"
+      ? data.user_id
+      : typeof data.created_by === "string"
+        ? data.created_by
+        : undefined,
+});
+
 export const ingest = internalMutation({
   args: { envelope: vEnvelope },
-  handler: (ctx, { envelope }) => receive(ctx, envelope),
+  handler: async (ctx, { envelope }) => {
+    const result = await receive(ctx, envelope);
+    if (result.status === "processed") {
+      await syncActivation(ctx, [refs(envelope.data)]);
+    }
+    return result;
+  },
 });
 
 /** Keeps an event whose processing threw, so it is parked rather than lost. */
@@ -120,6 +173,7 @@ export const retryParked = internalMutation({
       .filter((q) => q.eq(q.field("processedAt"), undefined))
       .collect();
     const results = await retry(ctx, events);
+    await syncActivation(ctx, events);
     return results.reduce<Record<string, number>>((counts, result) => {
       counts[result.status] = (counts[result.status] ?? 0) + 1;
       return counts;
@@ -330,16 +384,22 @@ async function simulateAccount(
     }
   }
 
+  // Advancing a brand that already has history lands its last step within the
+  // hour, so it reads as having just moved on rather than as stuck again.
   const now = Date.now();
   const latest = Math.max(0, ...existing.map((event) => event.occurredAt));
   const from = latest || now - (drafts.length * 2 + 1) * DAY_MS;
-  const step = (now - from) / (drafts.length + 1);
+  const end = latest
+    ? Math.max(from, now - (5 + Math.random() * 50) * 60_000)
+    : now - (now - from) / (drafts.length + 1);
+  const step = (end - from) / Math.max(1, drafts.length);
   const results = [];
   for (const [index, draft] of drafts.entries()) {
+    const jitter = latest ? 0 : Math.random() * step * 0.4;
     const envelope: Envelope = {
       eventId: platformId("evt"),
       type: draft.type,
-      occurredAt: Math.round(from + (index + 1 - Math.random() / 2) * step),
+      occurredAt: Math.round(from + (index + 1) * step - jitter),
       data: draft.data as Record<string, unknown>,
     };
     results.push({ type: draft.type, ...(await receive(ctx, envelope)) });
@@ -361,7 +421,9 @@ export const simulate = internalMutation({
     if (accountId) {
       const account = await ctx.db.get(accountId);
       if (!account) fail("not_found", "Account not found");
-      return [await simulateAccount(ctx, account, until ?? "activated")];
+      const result = await simulateAccount(ctx, account, until ?? "activated");
+      await syncAccountActivation(ctx, account._id, Date.now());
+      return [result];
     }
     const accounts = await ctx.db.query("accounts").collect();
     const path = ACTIVATION_STAGES as readonly LifecycleStage[];
@@ -372,6 +434,7 @@ export const simulate = internalMutation({
       if (!path.includes(stage)) continue;
       const fresh = (await ctx.db.get(account._id))!;
       results.push(await simulateAccount(ctx, fresh, until ?? stage));
+      await syncAccountActivation(ctx, account._id, Date.now());
     }
     return results;
   },

@@ -12,6 +12,23 @@ import { toast } from "@/stores/toast-store";
 
 export type DealRow = FunctionReturnType<typeof api.deals.list>[number];
 
+/** A left click without modifiers; anything else should follow the link. */
+export function isPlainClick(event: {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}) {
+  return (
+    event.button === 0 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.shiftKey &&
+    !event.altKey
+  );
+}
+
 /** Position that drops a card before `beforeId` (or at the end) of a column. */
 export function positionBefore(
   column: DealRow[],

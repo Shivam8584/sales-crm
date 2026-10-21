@@ -81,7 +81,7 @@ export function Suggestions({
           return (
             <li
               key={fact._id}
-              className="bg-card shadow-hairline flex flex-col gap-2.5 rounded-lg p-3"
+              className="bg-card shadow-hairline flex flex-col gap-2 rounded-lg px-3 py-2.5"
             >
               <div className="flex min-w-0 flex-col gap-1.5">
                 <span className="caption-style text-fg-tertiary flex flex-wrap items-center gap-1.5">

@@ -5,37 +5,78 @@ import Avatar from "@/components/_ui/avatar";
 import Tag from "@/components/_ui/tag";
 import AccountLogo from "@/features/accounts/account-logo";
 import { cn } from "@/lib/utils";
+import TargetIcon from "@/public/assets/icons/target-05.svg";
+import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import TaskChips, { CardSafe } from "./task-chips";
 import { StatusIcon, type TaskRow } from "./task-meta";
 import { useTaskActions } from "./use-task-actions";
 
-/** Link to the task's person, or its account; never opens the task itself. */
+/** A record type the surrounding view already shows, so its chip would repeat it. */
+export type HiddenRecord = "account" | "person" | "deal" | "lead";
+
+type ChipRecord = Pick<TaskRow, "account" | "person" | "deal" | "lead">;
+
+function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
+  const { person, account, deal, lead } = task;
+  if (person && hide !== "person") {
+    return {
+      href: `/people/${person._id}`,
+      label: person.name,
+      icon: <Avatar name={person.name} size="xs" />,
+      context: !hide && account ? account.name : null,
+    };
+  }
+  if (account && !hide) {
+    return {
+      href: `/accounts/${account._id}`,
+      label: account.name,
+      icon: <AccountLogo account={account} size="xs" className="size-4" />,
+      context: null,
+    };
+  }
+  if (deal && hide !== "deal") {
+    return {
+      href: `/deals/${deal._id}`,
+      label: deal.title,
+      icon: <TargetIcon aria-hidden className="text-fg-tertiary size-3.5" />,
+      context: null,
+    };
+  }
+  if (lead && hide !== "lead") {
+    return {
+      href: `/leads/${lead._id}`,
+      label: lead.name,
+      icon: <UserPlusIcon aria-hidden className="text-fg-tertiary size-3.5" />,
+      context: null,
+    };
+  }
+  return null;
+}
+
+/** Link to the record the task is about; never opens the task itself. */
 export function RecordChip({
   task,
+  hide,
   className,
 }: {
-  task: Pick<TaskRow, "account" | "person">;
+  task: ChipRecord;
+  hide?: HiddenRecord;
   className?: string;
 }) {
-  const { person, account } = task;
-  if (!person && !account) return null;
-  const href = person ? `/people/${person._id}` : `/accounts/${account!._id}`;
+  const target = chipTarget(task, hide);
+  if (!target) return null;
   return (
     <CardSafe>
       <Link
-        href={href}
+        href={target.href}
         className={cn(
           "caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast ease-power3-out -mx-1 -my-0.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors outline-none focus-visible:ring-2",
           className,
         )}
       >
-        {person ? (
-          <Avatar name={person.name} size="xs" />
-        ) : (
-          <AccountLogo account={account!} size="xs" className="size-4" />
-        )}
-        <span className="truncate">{person ? person.name : account!.name}</span>
-        {person && account && (
+        {target.icon}
+        <span className="truncate">{target.label}</span>
+        {target.context && (
           <>
             <span
               aria-hidden
@@ -44,7 +85,7 @@ export function RecordChip({
               ·
             </span>
             <span className="text-fg-tertiary truncate max-sm:hidden">
-              {account.name}
+              {target.context}
             </span>
           </>
         )}
@@ -84,6 +125,19 @@ export function DoneToggle({
   );
 }
 
+export function AutoTag({ className }: { className?: string }) {
+  return (
+    <Tag
+      size="xs"
+      tone="purple"
+      title="Opened automatically"
+      className={className}
+    >
+      Auto
+    </Tag>
+  );
+}
+
 export default function TaskCard({ task }: { task: TaskRow }) {
   const done = task.status === "done";
   return (
@@ -98,16 +152,7 @@ export default function TaskCard({ task }: { task: TaskRow }) {
         >
           {task.title}
         </h3>
-        {task.automated && (
-          <Tag
-            size="xs"
-            tone="purple"
-            title="Created automatically"
-            className="-my-px"
-          >
-            Auto
-          </Tag>
-        )}
+        {task.automated && <AutoTag className="-my-px" />}
       </div>
       <RecordChip task={task} />
       <TaskChips task={task} />

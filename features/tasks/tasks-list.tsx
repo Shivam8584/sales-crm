@@ -1,19 +1,28 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import DataTable from "@/components/data-table/data-table";
+import ToneDot from "@/components/board/tone-dot";
 import type { Column, SortState } from "@/components/data-table/types";
 import Avatar from "@/components/_ui/avatar";
 import { PRIORITIES, TASK_STATUSES } from "@/lib/domain/enums";
 import { cn } from "@/lib/utils";
-import { RecordChip } from "./task-card";
+import { useUiStore } from "@/stores/ui-store";
+import GroupedTable, { type RowGroup } from "./grouped-table";
+import { AutoTag, DoneToggle, RecordChip } from "./task-card";
 import { AssigneeChip, DueChip, PriorityChip, StatusChip } from "./task-chips";
 import {
+  DUE_GROUPS,
+  DUE_GROUP_LABEL,
   PriorityIcon,
   StatusIcon,
+  byUrgency,
+  dueGroup,
   formatDay,
   isOverdue,
+  recordName,
+  type DueGroup,
   type TaskRow,
 } from "./task-meta";
 
@@ -34,6 +43,7 @@ export const LIST_COLUMNS: Column<TaskRow>[] = [
         >
           {row.title}
         </span>
+        {row.automated && <AutoTag className="shrink-0" />}
       </>
     ),
   },
@@ -42,9 +52,9 @@ export const LIST_COLUMNS: Column<TaskRow>[] = [
     header: "Record",
     width: "minmax(10rem,1.5fr)",
     minViewport: 900,
-    sortValue: (row) => row.person?.name ?? row.account?.name ?? null,
+    sortValue: recordName,
     cell: (row) =>
-      row.person || row.account ? (
+      recordName(row) ? (
         <RecordChip task={row} className="mx-0" />
       ) : (
         <span className="text-fg-tertiary">—</span>
@@ -84,7 +94,7 @@ export const LIST_COLUMNS: Column<TaskRow>[] = [
 function MobileCard({ row }: { row: TaskRow }) {
   const overdue = isOverdue(row);
   const meta: ReactNode[] = [];
-  const record = row.person?.name ?? row.account?.name;
+  const record = recordName(row);
   if (record) meta.push(record);
   if (row.dueDate) {
     meta.push(
@@ -124,26 +134,108 @@ function MobileCard({ row }: { row: TaskRow }) {
   );
 }
 
+const GROUP_TONE: Record<
+  DueGroup,
+  "red" | "amber" | "blue" | "neutral" | "green"
+> = {
+  overdue: "red",
+  today: "amber",
+  week: "blue",
+  later: "neutral",
+  none: "neutral",
+  done: "green",
+};
+
+const GROUPED_COLUMNS: Column<TaskRow>[] = LIST_COLUMNS.filter(
+  (column) => column.id !== "status",
+).map((column) =>
+  column.id === "title"
+    ? {
+        ...column,
+        cell: (row: TaskRow) => (
+          <>
+            <span
+              className={cn(
+                "truncate",
+                row.status === "done" && "text-fg-secondary line-through",
+              )}
+            >
+              {row.title}
+            </span>
+            {row.automated && <AutoTag className="shrink-0" />}
+          </>
+        ),
+      }
+    : column,
+);
+
 type TasksListProps = {
   rows: TaskRow[] | undefined;
+  grouped: boolean;
   sort: SortState;
   onSortChange: (sort: SortState) => void;
+  selected: Set<string>;
+  onSelectedChange: (selected: Set<string>) => void;
   empty: ReactNode;
 };
 
-/** Rows link to `?task=<id>` on this page, which opens the task dialog. */
+/** Grouped by due date, or one sortable table. Rows link to `?task=<id>`, which opens the task dialog. */
 export default function TasksList({
   rows,
+  grouped,
   sort,
   onSortChange,
+  selected,
+  onSelectedChange,
   empty,
 }: TasksListProps) {
   const params = useSearchParams();
+  const setEdit = useUiStore((state) => state.setEdit);
   const href = (row: TaskRow) => {
     const query = new URLSearchParams(params.toString());
     query.set("task", row._id);
     return `/tasks?${query.toString()}`;
   };
+
+  const groups = useMemo((): RowGroup<TaskRow>[] | undefined => {
+    if (!rows) return undefined;
+    const buckets = new Map<DueGroup, TaskRow[]>(
+      DUE_GROUPS.map((group) => [group, []]),
+    );
+    for (const row of rows) buckets.get(dueGroup(row))!.push(row);
+    return DUE_GROUPS.map((group) => ({
+      id: group,
+      label: DUE_GROUP_LABEL[group],
+      rows: buckets
+        .get(group)!
+        .sort(
+          group === "done"
+            ? (a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)
+            : byUrgency,
+        ),
+      icon: <ToneDot tone={GROUP_TONE[group]} />,
+      tone: group === "overdue" ? "danger" : undefined,
+      defaultCollapsed: group === "done",
+    }));
+  }, [rows]);
+
+  if (grouped) {
+    return (
+      <GroupedTable
+        label="Tasks"
+        columns={GROUPED_COLUMNS}
+        groups={groups}
+        getId={(row) => row._id}
+        getLabel={(row) => row.title}
+        onOpen={(row) => setEdit({ type: "task", id: row._id })}
+        renderCard={(row) => <MobileCard row={row} />}
+        leading={(row) => <DoneToggle task={row} />}
+        selected={selected}
+        onSelectedChange={onSelectedChange}
+        empty={empty}
+      />
+    );
+  }
 
   return (
     <DataTable
@@ -156,6 +248,8 @@ export default function TasksList({
       renderCard={(row) => <MobileCard row={row} />}
       sort={sort}
       onSortChange={onSortChange}
+      selected={selected}
+      onSelectedChange={onSelectedChange}
       empty={empty}
     />
   );

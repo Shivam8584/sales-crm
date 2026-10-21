@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import {
   Popover,
@@ -34,6 +34,10 @@ type OptionPickerProps = {
   children?: ReactNode;
 };
 
+function optionValue(option: Option) {
+  return `${option.label} ${option.hint ?? ""} ${option.value}`;
+}
+
 /** Searchable single choice in a popover; the trigger reads like plain text until hovered. */
 export default function OptionPicker({
   value,
@@ -49,6 +53,8 @@ export default function OptionPicker({
   children,
 }: OptionPickerProps) {
   const [open, setOpen] = useState(false);
+  const commandRef = useRef<HTMLDivElement>(null);
+  const searchable = options.length > 7;
   const selected = options.find((option) => option.value === value);
 
   function pick(next: string | null) {
@@ -76,11 +82,28 @@ export default function OptionPicker({
             <span className="text-fg-tertiary truncate">{placeholder}</span>
           ))}
       </PopoverTrigger>
-      <PopoverContent align={align} className="w-64 p-0">
-        <CommandPrimitive loop className="flex flex-col">
-          {options.length > 7 && (
+      <PopoverContent
+        align={align}
+        className="w-64 p-0"
+        onOpenAutoFocus={(event) => {
+          // cmdk handles arrow keys on its root, so focus must start inside it.
+          event.preventDefault();
+          const target = searchable
+            ? commandRef.current?.querySelector("input")
+            : commandRef.current;
+          target?.focus();
+        }}
+      >
+        <CommandPrimitive
+          ref={commandRef}
+          loop
+          tabIndex={-1}
+          label={label}
+          defaultValue={selected ? optionValue(selected) : undefined}
+          className="flex flex-col outline-none"
+        >
+          {searchable && (
             <CommandPrimitive.Input
-              autoFocus
               placeholder={searchPlaceholder}
               className="border-line-strong placeholder:text-fg-tertiary h-10 border-b bg-transparent px-3 text-sm outline-none"
             />
@@ -92,9 +115,9 @@ export default function OptionPicker({
             {options.map((option) => (
               <CommandPrimitive.Item
                 key={option.value}
-                value={`${option.label} ${option.hint ?? ""} ${option.value}`}
+                value={optionValue(option)}
                 onSelect={() => pick(option.value)}
-                className="data-[selected=true]:bg-overlay-2 flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-sm leading-none outline-none"
+                className="data-[selected=true]:bg-overlay-2 flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-sm leading-none outline-none data-[disabled=true]:opacity-50"
               >
                 {option.icon}
                 <span className="min-w-0 flex-1 truncate">{option.label}</span>

@@ -356,6 +356,31 @@ export type CheckResult = {
   changes: CheckChange[];
 };
 
+/** Linked to an org, or signed up before creating one. */
+export function isOnPlatform(account: Doc<"accounts">) {
+  return (
+    !account.archivedAt &&
+    (Boolean(account.platformOrgId) || account.stage === "signed_up")
+  );
+}
+
+export type AccountStall = Stall & { stage: ActivationStage };
+
+/** The step this account is stuck on right now, if any. */
+export async function accountStall(
+  ctx: QueryCtx,
+  account: Doc<"accounts">,
+  now: number,
+  events?: TimelineEvent[],
+): Promise<AccountStall | null> {
+  if (!isOnPlatform(account)) return null;
+  const list = events ?? (await accountEvents(ctx, account));
+  const input = stallAccount(account);
+  const stall = detectStall(input, list, now);
+  const stage = journey(input, list).stage;
+  return stall && stage ? { ...stall, stage } : null;
+}
+
 function clearReason(account: Doc<"accounts"> | null, events: TimelineEvent[]) {
   if (!account || account.archivedAt) return "the account was archived";
   if (!account.platformOrgId && account.stage !== "signed_up") {
@@ -376,6 +401,101 @@ function clearReason(account: Doc<"accounts"> | null, events: TimelineEvent[]) {
     : `${account.name} is no longer stuck`;
 }
 
+const isOpenActivationTask = (task: Doc<"tasks">) =>
+  task.status !== "done" && Boolean(task.automationKey?.startsWith(KEY_PREFIX));
+
+type Assignees = { fallback: Id<"members"> | undefined | null };
+
+/**
+ * Opens the task for the account's current stall and closes its activation
+ * tasks for any other step. Returns what changed.
+ */
+async function syncAccount(
+  ctx: MutationCtx,
+  account: Doc<"accounts">,
+  events: TimelineEvent[],
+  now: number,
+  assignees: Assignees,
+) {
+  const changes: CheckChange[] = [];
+  const stall = await accountStall(ctx, account, now, events);
+  const key = stall ? automationKey(stall.rule.id, account._id) : null;
+
+  if (stall && key) {
+    let assigneeId: Id<"members"> | undefined = account.ownerId;
+    const owner = await ctx.db.get(account.ownerId);
+    if (owner?.status !== "active") {
+      if (assignees.fallback === null) {
+        assignees.fallback = await fallbackAssignee(ctx);
+      }
+      assigneeId = assignees.fallback;
+    }
+    if (assigneeId) {
+      const title = stall.rule.title(account.name, stall.since, now);
+      const result = await upsertAutomatedTask(ctx, {
+        automationKey: key,
+        title,
+        notes: stall.rule.playbook,
+        priority: stall.rule.priority,
+        assigneeId,
+        dueDate: indiaDay(now),
+        accountId: account._id,
+      });
+      if (result.outcome !== "unchanged") {
+        changes.push({
+          outcome: result.outcome,
+          taskId: result.id,
+          accountId: account._id,
+          accountName: account.name,
+          rule: stall.rule.label,
+          detail: title,
+        });
+      }
+    }
+  }
+
+  const tasks = await ctx.db
+    .query("tasks")
+    .withIndex("by_account", (q) => q.eq("accountId", account._id))
+    .collect();
+  for (const task of tasks) {
+    if (!isOpenActivationTask(task) || task.automationKey === key) continue;
+    changes.push(await closeStale(ctx, task, account, events));
+  }
+  return { key, changes };
+}
+
+async function closeStale(
+  ctx: MutationCtx,
+  task: Doc<"tasks">,
+  account: Doc<"accounts"> | null,
+  events: TimelineEvent[],
+): Promise<CheckChange> {
+  const reason = clearReason(account, events);
+  await closeAutomatedTask(ctx, task, reason);
+  const ruleId = task.automationKey!.split(":")[1] as StallRuleId;
+  return {
+    outcome: "closed",
+    taskId: task._id,
+    accountId: account?._id ?? null,
+    accountName: account?.name ?? "Deleted account",
+    rule: STALL_RULE[ruleId]?.label ?? "Activation",
+    detail: reason,
+  };
+}
+
+/** Brings one account's activation task in line with where it is now, e.g. right after a platform event. */
+export async function syncAccountActivation(
+  ctx: MutationCtx,
+  accountId: Id<"accounts">,
+  now: number,
+) {
+  const account = await ctx.db.get(accountId);
+  if (!account) return { key: null, changes: [] };
+  const events = await accountEvents(ctx, account);
+  return await syncAccount(ctx, account, events, now, { fallback: null });
+}
+
 /**
  * Opens a task for every stalled brand and closes the ones whose brand moved on.
  * Safe to run any number of times: tasks are keyed by rule and account.
@@ -385,71 +505,27 @@ export async function runActivationChecks(
   now: number,
 ): Promise<CheckResult> {
   const accounts = await platformAccounts(ctx);
-  const eventsByAccount = new Map<Id<"accounts">, TimelineEvent[]>();
-  const active = new Set<string>();
+  const checked = new Set<Id<"accounts">>();
+  const assignees: Assignees = { fallback: null };
   const changes: CheckChange[] = [];
-  const dueDate = indiaDay(now);
-  let fallback: Id<"members"> | undefined | null = null;
+  let stuck = 0;
 
   for (const account of accounts) {
+    checked.add(account._id);
     const events = await accountEvents(ctx, account);
-    eventsByAccount.set(account._id, events);
-    const stall = detectStall(stallAccount(account), events, now);
-    if (!stall) continue;
-    const key = automationKey(stall.rule.id, account._id);
-    active.add(key);
-
-    let assigneeId: Id<"members"> | undefined = account.ownerId;
-    const owner = await ctx.db.get(account.ownerId);
-    if (owner?.status !== "active") {
-      if (fallback === null) fallback = await fallbackAssignee(ctx);
-      assigneeId = fallback;
-    }
-    if (!assigneeId) continue;
-
-    const title = stall.rule.title(account.name, stall.since, now);
-    const result = await upsertAutomatedTask(ctx, {
-      automationKey: key,
-      title,
-      notes: stall.rule.playbook,
-      priority: stall.rule.priority,
-      assigneeId,
-      dueDate,
-      accountId: account._id,
-    });
-    if (result.outcome !== "unchanged") {
-      changes.push({
-        outcome: result.outcome,
-        taskId: result.id,
-        accountId: account._id,
-        accountName: account.name,
-        rule: stall.rule.label,
-        detail: title,
-      });
-    }
+    const result = await syncAccount(ctx, account, events, now, assignees);
+    if (result.key) stuck++;
+    changes.push(...result.changes);
   }
 
   for (const task of await openActivationTasks(ctx)) {
-    if (active.has(task.automationKey!)) continue;
+    if (task.accountId && checked.has(task.accountId)) continue;
     const account = task.accountId ? await ctx.db.get(task.accountId) : null;
-    const events = account
-      ? (eventsByAccount.get(account._id) ??
-        (await accountEvents(ctx, account)))
-      : [];
-    const reason = clearReason(account, events);
-    await closeAutomatedTask(ctx, task, reason);
-    const ruleId = task.automationKey!.split(":")[1] as StallRuleId;
-    changes.push({
-      outcome: "closed",
-      taskId: task._id,
-      accountId: account?._id ?? null,
-      accountName: account?.name ?? "Deleted account",
-      rule: STALL_RULE[ruleId]?.label ?? "Activation",
-      detail: reason,
-    });
+    const events = account ? await accountEvents(ctx, account) : [];
+    changes.push(await closeStale(ctx, task, account, events));
   }
 
-  return { checked: accounts.length, stuck: active.size, changes };
+  return { checked: accounts.length, stuck, changes };
 }
 
 async function openActivationTasks(ctx: QueryCtx) {
@@ -459,9 +535,7 @@ async function openActivationTasks(ctx: QueryCtx) {
       .query("tasks")
       .withIndex("by_status_position", (q) => q.eq("status", status))
       .collect();
-    open.push(
-      ...tasks.filter((task) => task.automationKey?.startsWith(KEY_PREFIX)),
-    );
+    open.push(...tasks.filter(isOpenActivationTask));
   }
   return open;
 }

@@ -30,11 +30,13 @@ export default function EmptyState({
       )}
       <span className="lead-style block font-medium">{title}</span>
       {description && (
-        <span className="caption-style text-fg-tertiary block leading-snug">
+        <span className="caption-style text-fg-tertiary block max-w-sm leading-snug text-balance">
           {description}
         </span>
       )}
-      {action && <div className="mt-2">{action}</div>}
+      {action && (
+        <div className="mt-2 flex flex-wrap justify-center gap-2">{action}</div>
+      )}
     </div>
   );
 }

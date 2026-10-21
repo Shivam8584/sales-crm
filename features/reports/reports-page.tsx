@@ -10,7 +10,12 @@ import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
 import FilterMenu from "@/components/_common/filter-menu";
 import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
-import { PERIODS, UNASSIGNED, type Period } from "@/convex/lib/reports";
+import {
+  PERIODS,
+  UNASSIGNED,
+  type FunnelStepKey,
+  type Period,
+} from "@/convex/lib/reports";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { cn } from "@/lib/utils";
@@ -26,12 +31,27 @@ import PipelineChart from "./pipeline-chart";
 import { Panel, ReportSection } from "./section";
 import SourceTable from "./source-table";
 import SpeedSection from "./speed-section";
+import ExportButton from "./export-button";
+import { csvFilename, csvRows } from "./export";
 
 type ReportData = FunctionReturnType<typeof api.reports.overview>;
 
 const ALL = "all";
 const MINE = "mine";
 const DEFAULT_PERIOD: Period = "30d";
+
+const STEP_LIST: Record<FunnelStepKey, string> = {
+  lead: "/leads",
+  contacted: "/leads?status=contacted",
+  demo: "/leads?kind=demo",
+  converted: "/leads?status=converted",
+  signed_up: "/accounts?stage=signed_up",
+  org_created: "/accounts?stage=org_created",
+  gst_verified: "/accounts?stage=gst_verified",
+  funded: "/accounts?stage=funded",
+  live: "/accounts?stage=live",
+  activated: "/accounts?stage=activated",
+};
 
 /** Where the funnel leaks, which channels bring brands that activate, and how fast the team responds. */
 export default function ReportsPage() {
@@ -68,6 +88,12 @@ export default function ReportsPage() {
   function clearFilters() {
     setSource(ALL);
     setOwner(ALL);
+  }
+
+  function stepHref(key: FunnelStepKey) {
+    const href = STEP_LIST[key];
+    if (ownerParam !== MINE) return href;
+    return `${href}${href.includes("?") ? "&" : "?"}owner=mine`;
   }
 
   const sourceOptions = [
@@ -142,7 +168,15 @@ export default function ReportsPage() {
           <ReportSection
             id="funnel"
             title="Funnel"
-            description="Where leads created in this period stopped."
+            description="Where leads created in this period stopped. Select a step to open that list."
+            aside={
+              <ExportButton
+                label="funnel"
+                filename={csvFilename("funnel", period)}
+                disabled={!report}
+                rows={() => csvRows.funnel(report!)}
+              />
+            }
             footnote={
               <>
                 Cohort: every lead created in the period, followed to today. A
@@ -150,7 +184,8 @@ export default function ReportsPage() {
                 so the funnel never grows; a self-serve signup counts as
                 contacted and demoed. Platform steps come from Hypedrive events
                 and the account stage. Recent cohorts have had less time to
-                move, so compare like periods.
+                move, so compare like periods. A step links to today&apos;s list
+                for it, not to the cohort.
               </>
             }
           >
@@ -195,6 +230,7 @@ export default function ReportsPage() {
                 <FunnelChart
                   funnel={report.funnel}
                   previous={report.previousFunnel}
+                  hrefFor={stepHref}
                 />
               )}
             </Panel>
@@ -215,6 +251,14 @@ export default function ReportsPage() {
             id="sources"
             title="By source"
             description="Which channels bring brands that go on to activate. Select a source to narrow the whole report."
+            aside={
+              <ExportButton
+                label="sources"
+                filename={csvFilename("sources", period)}
+                disabled={!report?.bySource.length}
+                rows={() => csvRows.sources(report!)}
+              />
+            }
             footnote={
               <>
                 Grouped by UTM source; without one, by how the lead arrived
@@ -241,6 +285,14 @@ export default function ReportsPage() {
             id="speed"
             title="Speed to lead"
             description="How fast someone first works a new inbound lead."
+            aside={
+              <ExportButton
+                label="speed to lead"
+                filename={csvFilename("speed-to-lead", period)}
+                disabled={!report?.speedByOwner.length}
+                rows={() => csvRows.speed(report!)}
+              />
+            }
             footnote={
               report && (
                 <>
@@ -273,6 +325,14 @@ export default function ReportsPage() {
               id="activation"
               title="Time to activate"
               description="Median time between platform milestones."
+              aside={
+                <ExportButton
+                  label="time to activate"
+                  filename={csvFilename("time-to-activate", period)}
+                  disabled={!report?.hasPlatformEvents}
+                  rows={() => csvRows.activation(report!)}
+                />
+              }
               footnote="Measured for brands that completed each step in the period, from the first event of each kind. Waiting counts brands that reached the first stage and not the next, as of now."
             >
               <Panel className="flex-1">
@@ -300,6 +360,14 @@ export default function ReportsPage() {
                   : "Open deals now, and deals closed in the period."
               }
               footnote="Totals are kept per currency and never converted."
+              aside={
+                <ExportButton
+                  label="pipeline"
+                  filename={csvFilename("pipeline", period)}
+                  disabled={!report}
+                  rows={() => csvRows.pipeline(report!)}
+                />
+              }
             >
               <Panel className="flex-1">
                 {!report ? (

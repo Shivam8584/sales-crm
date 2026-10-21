@@ -10,9 +10,24 @@ type Desk = FunctionReturnType<typeof api.activation.desk>;
 
 const percent = (value: number) => `${Math.round(value * 100)}%`;
 
-/** How many linked brands reached each activation step, with the weakest step flagged. */
-export default function FunnelStrip({ desk }: { desk: Desk | undefined }) {
+/**
+ * How many linked brands reached each activation step, with the weakest step
+ * flagged. Selecting a step narrows the stuck list to brands at that step.
+ */
+export default function FunnelStrip({
+  desk,
+  selected,
+  onSelect,
+}: {
+  desk: Desk | undefined;
+  selected: string | null;
+  onSelect: (stage: string | null) => void;
+}) {
   const top = desk?.funnel[0]?.count ?? 0;
+  const stuckAt = new Map<string, number>();
+  for (const row of desk?.rows ?? []) {
+    stuckAt.set(row.stage, (stuckAt.get(row.stage) ?? 0) + 1);
+  }
 
   return (
     <section
@@ -23,46 +38,60 @@ export default function FunnelStrip({ desk }: { desk: Desk | undefined }) {
         const item = desk?.funnel[step];
         const leak = desk?.leak === step;
         const share = item && top ? item.count / top : 0;
+        const stuck = stuckAt.get(stage) ?? 0;
+        const active = selected === stage;
         return (
-          <div
+          <button
             key={stage}
+            type="button"
+            aria-pressed={active}
+            disabled={!desk}
+            onClick={() => onSelect(active ? null : stage)}
             className={cn(
-              "border-border flex min-w-0 flex-col gap-2 px-4 py-3.5",
+              "border-border hover:bg-overlay-1 focus-visible:ring-ring duration-fast relative flex min-w-0 cursor-pointer flex-col gap-2 px-4 py-3.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset disabled:cursor-default",
               step % 3 !== 2 && "border-r",
               step < 3 && "max-lg:border-b",
               step === 2 && "lg:border-r",
               leak &&
-                "bg-[color-mix(in_srgb,var(--tag-red-bg)_60%,transparent)]",
+                "bg-[color-mix(in_srgb,var(--tag-red-bg)_55%,transparent)]",
+              active && "bg-overlay-2 hover:bg-overlay-2",
             )}
           >
-            <span className="caption-style text-fg-secondary truncate">
-              {STAGE_LABEL[stage]}
+            <span className="flex h-4 min-w-0 items-center justify-between gap-2">
+              <span
+                className={cn(
+                  "caption-style truncate font-medium",
+                  active ? "text-foreground" : "text-fg-secondary",
+                )}
+              >
+                {STAGE_LABEL[stage]}
+              </span>
+              {leak && (
+                <Tag tone="red" size="xs" className="-my-1 shrink-0">
+                  <span className="max-sm:hidden">Biggest leak</span>
+                  <span className="sm:hidden">Leak</span>
+                </Tag>
+              )}
             </span>
             {item ? (
-              <span className="flex h-5 items-baseline gap-2">
-                <span className="text-lg leading-none font-medium tabular-nums">
+              <span className="flex h-6 items-baseline gap-2">
+                <span className="text-xl leading-none font-semibold tabular-nums">
                   {item.count}
                 </span>
                 {item.conversion !== null && (
                   <span
                     className={cn(
-                      "caption-style tabular-nums",
+                      "caption-style truncate tabular-nums",
                       leak ? "text-danger font-medium" : "text-fg-tertiary",
                     )}
                   >
                     {percent(item.conversion)}
-                    <span className="sr-only"> of the previous step</span>
+                    <span className="max-sm:sr-only"> moved on</span>
                   </span>
-                )}
-                {leak && (
-                  <Tag tone="red" size="xs" className="ml-auto self-center">
-                    <span className="max-sm:hidden">Biggest leak</span>
-                    <span className="sm:hidden">Leak</span>
-                  </Tag>
                 )}
               </span>
             ) : (
-              <Skeleton className="my-0.5 h-4 w-10" />
+              <Skeleton className="my-1 h-4 w-10" />
             )}
             <span
               aria-hidden
@@ -76,7 +105,15 @@ export default function FunnelStrip({ desk }: { desk: Desk | undefined }) {
                 style={{ width: `${share * 100}%` }}
               />
             </span>
-          </div>
+            <span
+              className={cn(
+                "caption-style h-4 truncate tabular-nums",
+                stuck > 0 ? "text-warning" : "text-fg-tertiary",
+              )}
+            >
+              {stuck > 0 ? `${stuck} stuck here` : ""}
+            </span>
+          </button>
         );
       })}
     </section>

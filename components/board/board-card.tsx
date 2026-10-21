@@ -1,6 +1,11 @@
 "use client";
 
-import { useCallback, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { motion } from "motion/react";
 import { wasJustDragged } from "./board-drag";
@@ -41,6 +46,7 @@ type BoardCardProps = {
   hidden?: boolean;
   animateLayout?: boolean;
   onOpen: (id: string) => void;
+  onPeek?: (id: string) => void;
   children: ReactNode;
 };
 
@@ -51,6 +57,7 @@ export default function BoardCard({
   hidden = false,
   animateLayout = true,
   onOpen,
+  onPeek,
   children,
 }: BoardCardProps) {
   const {
@@ -75,6 +82,15 @@ export default function BoardCard({
 
   const open = () => {
     if (!wasJustDragged()) onOpen(id);
+  };
+
+  const onClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (wasJustDragged()) return;
+    if (onPeek && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+      onPeek(id);
+    } else {
+      onOpen(id);
+    }
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -104,7 +120,7 @@ export default function BoardCard({
         data-board-card={hidden ? undefined : id}
         aria-label={`Open ${label}`}
         aria-roledescription="draggable card"
-        onClick={open}
+        onClick={onClick}
         onKeyDown={onKeyDown}
         className={cn(
           "focus-visible:ring-ring cursor-grab touch-manipulation rounded-xl outline-none focus-visible:ring-2",

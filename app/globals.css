@@ -5,6 +5,7 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
 @custom-variant short (@media (max-height: 480px));
+@custom-variant collapsed (&:where(html[data-sidebar-collapsed] [data-sidebar="desktop"], html[data-sidebar-collapsed] [data-sidebar="desktop"] *));
 
 @theme inline {
   --font-sans: var(--font-geist);
@@ -48,6 +49,16 @@
   --color-overlay-4: var(--overlay-4);
   --color-overlay-5: var(--overlay-5);
   --color-scrim: var(--scrim);
+  --color-row-hover: color-mix(
+    in srgb,
+    var(--foreground) 3.5%,
+    var(--background)
+  );
+  --color-row-selected: color-mix(
+    in srgb,
+    var(--primary) 10%,
+    var(--background)
+  );
 
   --color-success: var(--success);
   --color-warning: var(--warning);
@@ -131,7 +142,7 @@
 
 :root {
   --radius: 0.5rem;
-  --row-height: 42px;
+  --row-height: 44px;
   --logo-tile: #ffffff;
   --logo-tile-fg: #52525b;
   --sidebar-width: 254px;
