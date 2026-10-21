@@ -322,7 +322,8 @@ export default defineSchema({
     .index("by_deal", ["dealId", "occurredAt"])
     .index("by_lead", ["leadId", "occurredAt"])
     .index("by_account_kind", ["accountId", "kind", "occurredAt"])
-    .index("by_person_kind", ["personId", "kind", "occurredAt"]),
+    .index("by_person_kind", ["personId", "kind", "occurredAt"])
+    .index("by_kind", ["kind", "occurredAt"]),
 
   notifications: defineTable({
     recipientId: v.id("members"),
@@ -624,6 +625,7 @@ export default defineSchema({
     history: v.array(vHistoryEntry),
   })
     .index("by_automation", ["automationId", "status"])
+    .index("by_automation_time", ["automationId"])
     .index("by_automation_subject", ["automationId", "subjectKey"])
     .index("by_subject", ["subjectKey", "status"])
     .index("by_status", ["status"]),

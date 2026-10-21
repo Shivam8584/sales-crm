@@ -93,17 +93,16 @@ export const team = memberQuery({
           .withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
           .collect(),
         ctx.db.query("tasks").collect(),
-        // Entries can be backdated but not logged ahead, so none created before the window fall in it.
-        ctx.db
-          .query("timeline")
-          .withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
-          .filter((q) =>
-            q.or(
-              q.eq(q.field("kind"), "call"),
-              q.eq(q.field("kind"), "meeting"),
-            ),
-          )
-          .collect(),
+        Promise.all(
+          (["call", "meeting"] as const).map((kind) =>
+            ctx.db
+              .query("timeline")
+              .withIndex("by_kind", (q) =>
+                q.eq("kind", kind).gte("occurredAt", since),
+              )
+              .collect(),
+          ),
+        ).then((rows) => rows.flat()),
         Promise.all(
           (["won", "lost"] as const).map((stage) =>
             ctx.db

@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import {
   internalAction,
@@ -333,16 +334,17 @@ export const logs = memberQuery({
   },
 });
 
+/** One page of an automation's runs, newest first. */
 export const enrollments = memberQuery({
-  args: { id: v.id("automations") },
-  handler: async (ctx, { id }) => {
-    const rows = await ctx.db
+  args: { id: v.id("automations"), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { id, paginationOpts }) => {
+    const result = await ctx.db
       .query("automationEnrollments")
-      .withIndex("by_automation", (q) => q.eq("automationId", id))
+      .withIndex("by_automation_time", (q) => q.eq("automationId", id))
       .order("desc")
-      .take(LOG_PAGE);
+      .paginate(paginationOpts);
     const out = [];
-    for (const row of rows) {
+    for (const row of result.page) {
       out.push({
         _id: row._id,
         status: row.status,
@@ -357,7 +359,7 @@ export const enrollments = memberQuery({
         subject: await subjectName(ctx, row),
       });
     }
-    return out.sort((a, b) => b.enrolledAt - a.enrolledAt);
+    return { ...result, page: out };
   },
 });
 

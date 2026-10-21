@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
+import { usePagedList } from "@/hooks/use-paged-list";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -26,7 +27,9 @@ import LogOutIcon from "@/public/assets/icons/log-out.svg";
 import { describeStep } from "./describe";
 import { ENROLLMENT_TONE } from "./node-meta";
 
-type Run = FunctionReturnType<typeof api.automations.enrollments>[number];
+type Run = FunctionReturnType<
+  typeof api.automations.enrollments
+>["page"][number];
 
 function When({ at }: { at: number | null }) {
   if (!at) return <span className="text-fg-tertiary">—</span>;
@@ -79,7 +82,9 @@ export default function AutomationRuns({
   subjectKind: SubjectKind;
   names: NameLookup;
 }) {
-  const runs = useQuery(api.automations.enrollments, { id });
+  const { rows: runs, paging } = usePagedList(api.automations.enrollments, {
+    id,
+  });
   const exit = useMutation(api.automations.exitEnrollment);
   const pauseRun = useMutation(api.automations.pauseEnrollment);
   const resumeRun = useMutation(api.automations.resumeEnrollment);
@@ -197,6 +202,7 @@ export default function AutomationRuns({
         label="Runs"
         columns={columns}
         rows={runs}
+        paging={paging}
         getId={(run) => run._id}
         getHref={(run) => run.subject.href ?? "#"}
         getLabel={(run) => run.subject.name}
