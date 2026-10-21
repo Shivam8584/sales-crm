@@ -11,7 +11,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
@@ -30,7 +30,6 @@ import {
 import AccountLogo from "@/features/accounts/account-logo";
 import { TrendCell } from "@/features/accounts/record-cells";
 import { StageTag } from "@/features/accounts/stage";
-import { isOpenStage } from "@/features/deals/stage";
 import TaskComposer from "@/features/tasks/task-composer";
 import {
   byUrgency,
@@ -127,9 +126,16 @@ export default function TodayPage() {
   });
   const waiting = useQuery(api.leads.waiting, {});
   const stuck = useQuery(api.activation.mine, {});
-  const deals = useQuery(api.deals.list, { open: true });
-  const accounts = useQuery(api.accounts.list, {});
-  const accountStats = useQuery(api.accounts.listStats, {});
+  const deals = useQuery(api.deals.closing, { by: dayFromToday(7) });
+  const recentAccounts = usePaginatedQuery(
+    api.accounts.page,
+    { ownerId: viewer._id },
+    { initialNumItems: RECENT_ACCOUNTS },
+  );
+  const accounts =
+    recentAccounts.status === "LoadingFirstPage"
+      ? undefined
+      : recentAccounts.results;
 
   const [focus, setFocus] = useState<SectionId | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -221,16 +227,7 @@ export default function TodayPage() {
         stat: "Closing soon",
         icon: WalletIcon,
         aside: true,
-        items: deals
-          ?.filter(
-            (deal) =>
-              deal.ownerId === viewer._id &&
-              isOpenStage(deal.stage) &&
-              deal.closeDate !== null &&
-              deal.closeDate <= weekAhead,
-          )
-          .sort((a, b) => (a.closeDate! < b.closeDate! ? -1 : 1))
-          .map((deal) => ({ kind: "deal", id: deal._id, deal })),
+        items: deals?.map((deal) => ({ kind: "deal", id: deal._id, deal })),
         empty: "No deals of yours are due to close this week.",
         href: { label: "Pipeline", to: "/deals?owner=mine" },
       },
@@ -520,11 +517,7 @@ export default function TodayPage() {
               {!focus && (
                 <div className="flex min-w-0 flex-col gap-5">
                   {aside.map(renderSection)}
-                  <RecentAccounts
-                    accounts={accounts}
-                    stats={accountStats}
-                    viewerId={viewer._id}
-                  />
+                  <RecentAccounts accounts={accounts} />
                 </div>
               )}
             </div>
@@ -634,22 +627,10 @@ function RowsSkeleton() {
 }
 
 function RecentAccounts({
-  accounts,
-  stats,
-  viewerId,
+  accounts: recent,
 }: {
-  accounts: FunctionReturnType<typeof api.accounts.list> | undefined;
-  stats: FunctionReturnType<typeof api.accounts.listStats> | undefined;
-  viewerId: string;
+  accounts: FunctionReturnType<typeof api.accounts.page>["page"] | undefined;
 }) {
-  const trends = new Map(
-    (stats ?? []).map((item) => [item.accountId, item.trend]),
-  );
-  const recent = accounts
-    ?.filter((account) => account.owner?._id === viewerId)
-    .sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0))
-    .slice(0, RECENT_ACCOUNTS);
-
   return (
     <Card aria-labelledby="today-recent">
       <CardHeader
@@ -673,33 +654,30 @@ function RecentAccounts({
         </p>
       ) : (
         <ul className="divide-border flex flex-col divide-y">
-          {recent.map((account) => {
-            const trend = trends.get(account._id);
-            return (
-              <li key={account._id}>
-                <Link
-                  href={`/accounts/${account._id}`}
-                  className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
-                >
-                  <AccountLogo account={account} size="sm" />
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="lead-style truncate leading-5 font-medium">
-                      {account.name}
-                    </span>
-                    <span className="caption-style text-fg-tertiary truncate">
-                      {account.lastActivityAt
-                        ? relativeTime(account.lastActivityAt)
-                        : "No activity yet"}
-                    </span>
+          {recent.map((account) => (
+            <li key={account._id}>
+              <Link
+                href={`/accounts/${account._id}`}
+                className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
+              >
+                <AccountLogo account={account} size="sm" />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="lead-style truncate leading-5 font-medium">
+                    {account.name}
                   </span>
-                  <span className="flex shrink-0 flex-col items-end gap-1.5">
-                    <StageTag stage={account.stage} />
-                    {trend && <TrendCell values={trend} />}
+                  <span className="caption-style text-fg-tertiary truncate">
+                    {account.lastActivityAt
+                      ? relativeTime(account.lastActivityAt)
+                      : "No activity yet"}
                   </span>
-                </Link>
-              </li>
-            );
-          })}
+                </span>
+                <span className="flex shrink-0 flex-col items-end gap-1.5">
+                  <StageTag stage={account.stage} />
+                  <TrendCell values={account.trend} />
+                </span>
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
     </Card>

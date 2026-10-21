@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -13,6 +14,7 @@ import {
   CommandList,
 } from "@/components/_ui/command";
 import AccountLogo from "@/features/accounts/account-logo";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
 
@@ -30,13 +32,23 @@ export default function LinkAccountDialog({
   draft: LinkDraft | null;
   onClose: () => void;
 }) {
-  const accounts = useQuery(api.accounts.list, draft ? {} : "skip");
+  const [search, setSearch] = useState("");
+  const query = useDebouncedValue(search, 150);
+  const accounts = useQuery(
+    api.accounts.search,
+    draft ? { search: query, selected: draft.linkedId ?? undefined } : "skip",
+  );
   const link = useMutation(api.prospecting.linkAccount);
+
+  function close() {
+    setSearch("");
+    onClose();
+  }
 
   async function choose(accountId: string | null) {
     if (!draft) return;
     const { key, brand } = draft;
-    onClose();
+    close();
     try {
       const previous = await link({
         key,
@@ -57,12 +69,14 @@ export default function LinkAccountDialog({
   return (
     <CommandDialog
       open={draft !== null}
-      onOpenChange={(open) => !open && onClose()}
+      onOpenChange={(open) => !open && close()}
       title={`Add ${draft?.brand ?? "brand"} to an account`}
       description="Search your accounts and pick the one this brand belongs to."
     >
-      <Command>
+      <Command shouldFilter={false}>
         <CommandInput
+          value={search}
+          onValueChange={setSearch}
           placeholder={`Add ${draft?.brand ?? "brand"} to account…`}
         />
         <CommandList>

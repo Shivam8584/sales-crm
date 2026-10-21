@@ -65,7 +65,8 @@ export async function paginateEmptyLast<T>(
   if (phase === "2") return await run("2", cursor);
   const first = await run("1", cursor);
   if (!first.isDone || (opts.endCursor && endPhase === "1")) return first;
-  if (first.page.length === 0) return await run("2", null);
+  // Convex allows one paginated query per function, so the empty range always
+  // starts on the next call, even when this page came back empty.
   return { ...first, isDone: false, continueCursor: "2:" };
 }
 

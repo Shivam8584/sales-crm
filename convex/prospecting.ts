@@ -297,6 +297,31 @@ function gapRef(row: ProductRow): GapRef {
   };
 }
 
+const MATCH_SCAN = 10;
+
+/** An active account named or hosted like the brand, found by name search and website prefix. */
+async function matchAccount(ctx: QueryCtx, key: string, brand: string) {
+  const [named, hosted] = await Promise.all([
+    ctx.db
+      .query("accounts")
+      .withSearchIndex("search_name", (q) =>
+        q.search("name", brand).eq("archivedAt", undefined),
+      )
+      .take(MATCH_SCAN),
+    ctx.db
+      .query("accounts")
+      .withIndex("by_domain", (q) =>
+        q.gte("domain", `${key}.`).lt("domain", `${key}/`),
+      )
+      .take(MATCH_SCAN),
+  ]);
+  return (
+    [...named, ...hosted].find(
+      (account) => !account.archivedAt && sameBrand(key, account),
+    ) ?? null
+  );
+}
+
 /** Groups scored listings by brand, matched against the CRM. */
 async function brandsOf(ctx: QueryCtx, rows: ProductRow[]) {
   const unique = new Map<string, ProductRow>();
@@ -312,20 +337,18 @@ async function brandsOf(ctx: QueryCtx, rows: ProductRow[]) {
     byBrand.set(row.brandKey!, [...(byBrand.get(row.brandKey!) ?? []), row]);
   }
   const keys = [...byBrand.keys()];
-  const [decisions, accounts] = await Promise.all([
-    brandDecisions(ctx, keys),
-    ctx.db.query("accounts").collect(),
-  ]);
-  const active = accounts.filter((account) => !account.archivedAt);
-  const byId = new Map(accounts.map((account) => [account._id, account]));
+  const decisions = await brandDecisions(ctx, keys);
 
   const out = [];
   for (const [key, products] of byBrand) {
     const decision = decisions.get(key);
-    const linked = decision?.accountId ? byId.get(decision.accountId) : null;
-    const matched = linked
-      ? null
-      : active.find((account) => sameBrand(key, account));
+    const brand =
+      decision?.brand ??
+      products.map((row) => row.brand!).sort((a, b) => b.length - a.length)[0];
+    const linked = decision?.accountId
+      ? await ctx.db.get(decision.accountId)
+      : null;
+    const matched = linked ? null : await matchAccount(ctx, key, brand);
     const lead = decision?.leadId ? await ctx.db.get(decision.leadId) : null;
     const scored = products
       .filter((row) => row.score !== null)
@@ -343,11 +366,7 @@ async function brandsOf(ctx: QueryCtx, rows: ProductRow[]) {
       .filter((value): value is number => value !== null);
     out.push({
       key,
-      brand:
-        decision?.brand ??
-        products
-          .map((row) => row.brand!)
-          .sort((a, b) => b.length - a.length)[0],
+      brand,
       products: products.length,
       marketplaces: [...new Set(products.map((row) => row.marketplace))].sort(),
       watchlistIds: [...new Set(products.map((row) => row.watchlistId))],

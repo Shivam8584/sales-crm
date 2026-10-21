@@ -25,6 +25,7 @@ import { personSearchText } from "./lib/records";
 import { notify } from "./notifications";
 import { receive } from "./lib/platform";
 import { simulateAccount, type Scenario } from "./platform";
+import { accountCounts, leadCounts, peopleCounts } from "./lib/counts";
 import { internalMutation } from "./lib/functions";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -933,6 +934,9 @@ export const reset = internalMutation({
       for (const doc of await ctx.db.query(table).collect()) {
         await ctx.db.delete(doc._id);
       }
+    }
+    for (const aggregate of [accountCounts, peopleCounts, leadCounts]) {
+      await aggregate.clear(ctx);
     }
     return await seedWorkspace(ctx);
   },

@@ -16,7 +16,7 @@ import { cleanText, isValidDay } from "../lib/domain/normalize";
 import { PROPOSAL_CURRENCY } from "../lib/domain/pricing";
 import { dealStageEffects, isDealClosed } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
-import { fail, invalid, notFound } from "./lib/errors";
+import { invalid, notFound } from "./lib/errors";
 import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
 import {
   mapPage,
@@ -228,27 +228,44 @@ async function openDeals(ctx: QueryCtx) {
   return columns.flat();
 }
 
-/** One account's deals, or every open deal, in board order. */
+/** One account's deals in board order. */
 export const list = memberQuery({
-  args: {
-    accountId: v.optional(v.id("accounts")),
-    open: v.optional(v.boolean()),
-  },
-  handler: async (ctx, { accountId, open }) => {
-    if (!accountId && !open) fail("invalid", "Pass an account or open: true");
+  args: { accountId: v.id("accounts") },
+  handler: async (ctx, { accountId }) => {
     const [deals, members] = await Promise.all([
-      accountId
-        ? ctx.db
-            .query("deals")
-            .withIndex("by_account", (q) => q.eq("accountId", accountId))
-            .collect()
-            .then((rows) =>
-              open ? rows.filter((deal) => !isClosed(deal.stage)) : rows,
-            )
-        : openDeals(ctx),
+      ctx.db
+        .query("deals")
+        .withIndex("by_account", (q) => q.eq("accountId", accountId))
+        .collect(),
       memberIndex(ctx),
     ]);
     deals.sort((a, b) => a.position - b.position);
+    return await toClient(ctx, deals, members);
+  },
+});
+
+const CLOSING_LIMIT = 50;
+
+/** The viewer's open deals due to close by `by`, overdue ones included, soonest first. */
+export const closing = memberQuery({
+  args: { by: vDay },
+  handler: async (ctx, { by }) => {
+    const me = ctx.viewer._id;
+    const [deals, members] = await Promise.all([
+      ctx.db
+        .query("deals")
+        .withIndex("list_owner_close", (q) =>
+          q.eq("ownerId", me).gte("closeDate", "").lte("closeDate", by),
+        )
+        .filter((q) =>
+          q.and(
+            q.neq(q.field("stage"), "won"),
+            q.neq(q.field("stage"), "lost"),
+          ),
+        )
+        .take(CLOSING_LIMIT),
+      memberIndex(ctx),
+    ]);
     return await toClient(ctx, deals, members);
   },
 });

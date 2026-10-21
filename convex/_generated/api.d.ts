@@ -65,6 +65,7 @@ import type * as members from "../members.js";
 import type * as migrations from "../migrations.js";
 import type * as notifications from "../notifications.js";
 import type * as people from "../people.js";
+import type * as perf from "../perf.js";
 import type * as platform from "../platform.js";
 import type * as platformSync from "../platformSync.js";
 import type * as proposals from "../proposals.js";
@@ -141,6 +142,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   notifications: typeof notifications;
   people: typeof people;
+  perf: typeof perf;
   platform: typeof platform;
   platformSync: typeof platformSync;
   proposals: typeof proposals;

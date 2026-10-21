@@ -169,25 +169,6 @@ async function countPeople(ctx: QueryCtx, accountId: Id<"accounts">) {
   return people.filter((person) => !person.archivedAt).length;
 }
 
-/** Every account, recently updated first. Reads the whole table: lists use `page`. */
-export const list = memberQuery({
-  args: { includeArchived: v.optional(v.boolean()) },
-  handler: async (ctx, { includeArchived }) => {
-    const [accounts, members] = await Promise.all([
-      ctx.db.query("accounts").withIndex("by_updated").order("desc").collect(),
-      memberIndex(ctx),
-    ]);
-    const visible = accounts.filter(
-      (account) => includeArchived || !account.archivedAt,
-    );
-    return await Promise.all(
-      visible.map(async (account) =>
-        toRow(account, members, await countPeople(ctx, account._id)),
-      ),
-    );
-  },
-});
-
 const TREND_DAYS = 14;
 
 async function accountStats(
@@ -243,25 +224,6 @@ async function accountStats(
     lastInteraction,
   };
 }
-
-/**
- * Per-account rollups for every account: open deals, pipeline, GSTIN
- * verification, activity trend, last interaction and whether onboarding is
- * stuck. Reads the whole table: lists get the same fields from `page`.
- */
-export const listStats = memberQuery({
-  args: {},
-  handler: async (ctx) => {
-    const now = Date.now();
-    const accounts = await ctx.db.query("accounts").collect();
-    return await Promise.all(
-      accounts.map(async (account) => ({
-        accountId: account._id,
-        ...(await accountStats(ctx, account, now)),
-      })),
-    );
-  },
-});
 
 const ORG_EVENT_LIMIT = 5000;
 
