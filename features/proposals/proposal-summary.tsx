@@ -37,9 +37,9 @@ export default function ProposalSummary({
           <ProposalStatusTag status={proposal.status} />
           <span
             className="truncate tabular-nums"
-            title={`${formatMoney(proposal.take)} monthly take at ${rateLabel(proposal.marginRate)} blended margin`}
+            title={`${formatMoney(proposal.take)} take at ${rateLabel(proposal.marginRate)} blended margin`}
           >
-            {formatMoney(proposal.take, { compact: true })}/mo ·{" "}
+            {formatMoney(proposal.take, { compact: true })} take ·{" "}
             <span
               className={
                 proposal.needsApproval ? "text-danger" : "text-fg-secondary"

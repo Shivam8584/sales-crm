@@ -5,9 +5,12 @@ import { invalid, notFound } from "./lib/errors";
 import { adminMutation, adminQuery, memberQuery } from "./lib/functions";
 import { retry } from "./lib/platform";
 import { providerMode } from "./lib/enrichment";
+import { literals } from "./lib/validators";
 import {
   LEAD_SLA_MINUTES,
+  PRICING_KEY_LIST,
   SETTING_KEYS,
+  checkPricingSetting,
   defaultLeadSlaMinutes,
   roundRobinMemberIds,
   storedLeadSlaMinutes,
@@ -74,9 +77,23 @@ export const set = adminMutation({
         key: v.literal(SETTING_KEYS.roundRobinMemberIds),
         value: v.union(v.array(v.id("members")), v.null()),
       }),
+      v.object({
+        key: literals(PRICING_KEY_LIST),
+        value: v.union(v.number(), v.null()),
+      }),
     ),
   },
   handler: async (ctx, { setting }) => {
+    if (
+      setting.key !== SETTING_KEYS.leadSlaMinutes &&
+      setting.key !== SETTING_KEYS.roundRobinMemberIds
+    ) {
+      const { key, value } = setting;
+      const previous = await checkPricingSetting(ctx, key, value);
+      await write(ctx, key, value === null ? null : String(value));
+      return { key, previous };
+    }
+
     if (setting.key === SETTING_KEYS.leadSlaMinutes) {
       const previous = await storedLeadSlaMinutes(ctx);
       const { value } = setting;

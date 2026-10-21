@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
+import { accountHealth, weakestFactors } from "../lib/domain/health";
 import { ACTIVATION_STAGES } from "../lib/domain/platform";
 import { PRIORITIES, ROLE_RANK } from "../lib/domain/enums";
 import { fail } from "./lib/errors";
@@ -11,6 +12,7 @@ import {
   type Viewer,
 } from "./lib/functions";
 import { memberIndex, memberRef, requireAccount } from "./lib/records";
+import { healthInput, latestSnapshot } from "./lib/platform";
 import {
   accountEvents,
   accountStall,
@@ -69,6 +71,7 @@ export const desk = memberQuery({
         },
         stage: current.stage,
         ruleId: stall.rule.id,
+        title: stall.title,
         since: stall.since,
         severity: PRIORITIES.indexOf(stall.rule.priority),
         owner: memberRef(members, account.ownerId),
@@ -140,6 +143,7 @@ export const forAccount = memberQuery({
       stage: stall.stage,
       since: stall.since,
       canOpenTask: canManageAccount(ctx.viewer, account),
+      title: stall.title,
       rule: {
         id: stall.rule.id,
         label: stall.rule.label,
@@ -176,6 +180,52 @@ export const ensureTask = memberMutation({
       .withIndex("by_automation_key", (q) => q.eq("automationKey", key))
       .first();
     return task?._id ?? null;
+  },
+});
+
+/** Health for every brand linked to an organisation, riskiest first, with their expansion signals. */
+export const health = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const members = await memberIndex(ctx);
+    const accounts = (await platformAccounts(ctx)).filter(
+      (account) => account.platformOrgId,
+    );
+    const rows = [];
+    for (const account of accounts) {
+      const events = await accountEvents(ctx, account);
+      const snapshot = await latestSnapshot(ctx, account._id);
+      const input = healthInput(account, events, snapshot, now);
+      const result = accountHealth(input);
+      rows.push({
+        _id: account._id,
+        account: {
+          _id: account._id,
+          name: account.name,
+          domain: account.domain ?? null,
+          logoUrl: account.logoUrl ?? null,
+        },
+        stage: journey(stallAccount(account), events).stage,
+        owner: memberRef(members, account.ownerId),
+        score: result.score,
+        band: result.band,
+        factors: result.factors,
+        weakest: weakestFactors(result),
+        signals: result.signals,
+        balance:
+          input.balancePaise === null
+            ? null
+            : { amount: input.balancePaise, currency: "INR" as const },
+        wallet: input.wallet,
+        live: input.campaigns.filter((item) => item.status === "live").length,
+        fetchedAt: snapshot?.fetchedAt ?? null,
+        lastActivityAt: input.lastActivityAt,
+        canOpenTask: canManageAccount(ctx.viewer, account),
+      });
+    }
+    rows.sort((a, b) => a.score - b.score);
+    return rows;
   },
 });
 

@@ -1,4 +1,5 @@
 import { internalMutation, type MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type {
   CallOutcome,
@@ -11,7 +12,7 @@ import type {
   TaskStatus,
 } from "../lib/domain/enums";
 import { money } from "../lib/domain/money";
-import { ACTIVATION_STAGES } from "../lib/domain/platform";
+import type { ActivationStage } from "../lib/domain/platform";
 import type { ProposalLine } from "../lib/domain/pricing";
 import { syncAccountActivation } from "./lib/activation";
 import { appendLedger } from "./lib/consent";
@@ -20,7 +21,7 @@ import { createLead, recordConsents } from "./lib/leads";
 import { personSearchText } from "./lib/records";
 import { notify } from "./notifications";
 import { receive } from "./lib/platform";
-import { simulateAccount } from "./platform";
+import { simulateAccount, type Scenario } from "./platform";
 
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -44,7 +45,9 @@ type AccountSeed = {
   owner: number;
   people: Person[];
   /** Walks the brand along the platform path to this stage. */
-  platform?: (typeof ACTIVATION_STAGES)[number];
+  platform?: ActivationStage;
+  /** Then stages a v2 stall or expansion signal. */
+  scenario?: Scenario;
 };
 
 const ACCOUNTS: AccountSeed[] = [
@@ -55,6 +58,7 @@ const ACCOUNTS: AccountSeed[] = [
     tags: ["Baby care", "Amazon"],
     owner: 0,
     platform: "activated",
+    scenario: "expansion",
     people: [
       {
         first: "Rohit",
@@ -73,6 +77,7 @@ const ACCOUNTS: AccountSeed[] = [
     tags: ["Home & kitchen", "Amazon"],
     owner: 1,
     platform: "live",
+    scenario: "review_backlog",
     people: [
       {
         first: "Arjun",
@@ -89,7 +94,8 @@ const ACCOUNTS: AccountSeed[] = [
     stage: "demo",
     tags: ["Electronics", "Flipkart"],
     owner: 0,
-    platform: "funded",
+    platform: "live",
+    scenario: "paused_no_funds",
     people: [
       {
         first: "Sana",
@@ -106,7 +112,7 @@ const ACCOUNTS: AccountSeed[] = [
     stage: "demo",
     tags: ["Food", "Quick commerce"],
     owner: 1,
-    platform: "gst_verified",
+    platform: "org_created",
     people: [
       {
         first: "Vikram",
@@ -123,7 +129,8 @@ const ACCOUNTS: AccountSeed[] = [
     stage: "demo",
     tags: ["Home decor", "Myntra"],
     owner: 1,
-    platform: "org_created",
+    platform: "funded",
+    scenario: "changes_requested",
     people: [{ first: "Ananya", last: "Rao", title: "Brand manager" }],
   },
   {
@@ -133,6 +140,7 @@ const ACCOUNTS: AccountSeed[] = [
     tags: ["Food", "Amazon"],
     owner: 0,
     platform: "signed_up",
+    scenario: "gst_failed",
     people: [
       {
         first: "Aditi",
@@ -190,6 +198,8 @@ const ACCOUNTS: AccountSeed[] = [
     stage: "at_risk",
     tags: ["Beauty", "Amazon"],
     owner: 0,
+    platform: "activated",
+    scenario: "renewal",
     people: [
       {
         first: "Tanvi",
@@ -206,6 +216,8 @@ const ACCOUNTS: AccountSeed[] = [
     stage: "dormant",
     tags: ["Apparel", "Ajio"],
     owner: 1,
+    platform: "live",
+    scenario: "low_balance",
     people: [{ first: "Farah", last: "Khan", title: "Owner" }],
   },
   {
@@ -486,6 +498,7 @@ const APP_TABLES = [
   "facts",
   "enrichmentRuns",
   "platformEvents",
+  "platformSnapshots",
   "retentionReviews",
   "rateLimits",
 ] as const;
@@ -501,12 +514,15 @@ function line(
     key,
     product,
     marketplace: "amazon",
-    orderValue: money(rupees),
-    slots,
+    archetype: "online_purchase",
+    order: { value: money(rupees), fundBps: 6_000, feeBps: 1_000 },
     bonus: money(Math.round(rupees * 0.1)),
-    orderFeeBps: 1_000,
     bonusFeeBps: 3_000,
-    coupon: money(0),
+    coupon: { kind: "none" },
+    slots,
+    slotMode: "lines",
+    expiryDays: 45,
+    oversubscribe: 150,
     ...(price ? { price: money(price) } : {}),
     presentation: "bundled",
   };
@@ -592,7 +608,7 @@ async function seedWorkspace(ctx: MutationCtx) {
       });
     }
     if (item.platform) {
-      await simulateAccount(ctx, account, item.platform);
+      await simulateAccount(ctx, account, item.platform, item.scenario);
       await syncAccountActivation(ctx, account._id, now);
     }
   }
@@ -653,7 +669,7 @@ async function seedWorkspace(ctx: MutationCtx) {
     version: 1,
     status: "draft",
     currency: "INR",
-    lines: [line("serum", "Kumkumadi serum 30 ml", 899, 50, 1050)],
+    lines: [line("serum", "Kumkumadi serum 30 ml", 899, 50, 700)],
     validUntil: dayKey(14),
     terms: "Prices per verified sale, excluding GST. Valid for 14 days.",
     createdById: kesarOwner,
@@ -773,6 +789,7 @@ async function seedWorkspace(ctx: MutationCtx) {
     });
   }
   await newBrandSignsUp(ctx, now);
+  await ctx.scheduler.runAfter(0, internal.platformSync.syncAll, {});
   const seen = await ctx.db
     .query("notifications")
     .withIndex("by_recipient_time", (q) => q.eq("recipientId", admin._id))
@@ -787,7 +804,7 @@ async function seedWorkspace(ctx: MutationCtx) {
   return counts;
 }
 
-/** A brand the CRM has never seen signs up and creates an organisation. */
+/** A brand the CRM has never seen signs up and creates an organisation; a platform demo org is ignored. */
 async function newBrandSignsUp(ctx: MutationCtx, now: number) {
   const userId = "usr_demo_tinytots";
   const envelopes = [
@@ -810,6 +827,18 @@ async function newBrandSignsUp(ctx: MutationCtx, now: number) {
         created_by: userId,
         name: "Tiny Tots",
         website: "https://tinytots.in",
+        gstin: "29AAACI4798L1ZU",
+        legal_name: "Tiny Tots Retail Private Limited",
+      },
+    },
+    {
+      type: "organization.created",
+      occurredAt: now - 2 * HOUR,
+      data: {
+        org_id: "org_demo_qa_sandbox",
+        created_by: "usr_demo_qa",
+        name: "QA sandbox brand",
+        is_demo: true,
       },
     },
   ];

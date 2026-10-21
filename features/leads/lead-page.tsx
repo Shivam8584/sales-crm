@@ -22,6 +22,7 @@ import {
   useTitleShortcut,
 } from "@/features/accounts/use-title-shortcut";
 import Timeline from "@/features/timeline/timeline";
+import { RecordAutomations } from "@/features/automations/record-automations";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { useViewer } from "@/hooks/use-viewer";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
@@ -203,7 +204,7 @@ function LeadView({ lead }: { lead: Lead }) {
                   value={lead.name}
                   label="Name"
                   onSave={(name) => save({ name }, "Name")}
-                  inputClassName="h-8 text-xl font-semibold"
+                  inputClassName="font-display h-9 text-2xl font-medium"
                 />
               </span>
             }
@@ -352,6 +353,11 @@ function LeadView({ lead }: { lead: Lead }) {
                   </Property>
                 </Properties>
               ),
+            },
+            {
+              id: "automations",
+              label: "Automations",
+              content: <RecordAutomations target={{ leadId: lead._id }} />,
             },
           ]}
         />

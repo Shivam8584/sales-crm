@@ -3,7 +3,10 @@ import type { api } from "@/convex/_generated/api";
 import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
 import SegmentBar from "@/components/_common/segment-bar";
-import { ACTIVATION_STAGES } from "@/lib/domain/platform";
+import {
+  ACTIVATION_STAGES,
+  ACTIVATION_STEP_LABEL,
+} from "@/lib/domain/platform";
 import { STAGE_LABEL } from "@/lib/domain/labels";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +39,7 @@ export default function FunnelStrip({
       aria-label="Activation funnel"
       className="border-border scrollbar-none shrink-0 overflow-x-auto border-b px-4 py-4"
     >
-      <div className="grid min-w-[54rem] grid-cols-6 gap-2">
+      <div className="grid min-w-[48rem] grid-cols-5 gap-2">
         {ACTIVATION_STAGES.map((stage, step) => {
           const item = desk?.funnel[step];
           const leak = desk?.leak === step;
@@ -61,7 +64,10 @@ export default function FunnelStrip({
                   <span className="text-fg-tertiary tabular-nums">
                     {step + 1}
                   </span>
-                  <span className={cn("truncate", active && "text-foreground")}>
+                  <span
+                    title={ACTIVATION_STEP_LABEL[stage]}
+                    className={cn("truncate", active && "text-foreground")}
+                  >
                     {STAGE_LABEL[stage]}
                   </span>
                 </span>

@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
-import { Checkbox } from "@/components/_ui/checkbox";
+import { Switch } from "@/components/_ui/switch";
 import { Input } from "@/components/_ui/input";
 import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
@@ -18,6 +18,10 @@ import { toast } from "@/stores/toast-store";
 import { PageStatus } from "@/components/shell/page";
 import { ROLE_TONE } from "@/features/team/roles";
 import PrivacySettings from "@/features/consent/privacy-settings";
+import PricingPolicySettings from "@/features/proposals/pricing-policy-settings";
+import ClockIcon from "@/public/assets/icons/clock.svg";
+import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
+import UsersIcon from "@/public/assets/icons/users.svg";
 import {
   AdminOnly,
   SettingsIntro,
@@ -45,6 +49,7 @@ export default function WorkspaceSettings() {
         gets them, and who can join.
       </SettingsIntro>
       <WorkspaceForm />
+      <PricingPolicySettings />
       <PrivacySettings />
     </AdminOnly>
   );
@@ -74,6 +79,7 @@ function WorkspaceForm() {
   return (
     <>
       <SettingsSection
+        icon={ClockIcon}
         title="Lead routing"
         description="Changes apply to leads that arrive from now on; existing leads keep their owner."
       >
@@ -86,7 +92,11 @@ function WorkspaceForm() {
 
       <RotationSection settings={settings} />
 
-      <SettingsSection title="Joining the workspace">
+      <SettingsSection
+        icon={UserPlusIcon}
+        title="Joining the workspace"
+        description="Who can sign up without an invite."
+      >
         <SettingsRow
           label="Allowed sign-up domains"
           description={
@@ -304,10 +314,11 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
 
   return (
     <SettingsSection
+      icon={UsersIcon}
       title="Round-robin"
       description={
         everyone
-          ? "New leads rotate through every active member, including people who join later. Untick someone to leave them out."
+          ? "New leads rotate through every active member, including people who join later. Switch someone off to leave them out."
           : `New leads rotate through ${chosen.length} of ${members?.length ?? "…"} active members.`
       }
       action={
@@ -339,18 +350,14 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
               <li key={member._id}>
                 <label
                   htmlFor={id}
-                  className="border-border hover:bg-overlay-1 duration-fast flex h-12 cursor-pointer items-center gap-3 border-t px-6 transition-colors"
+                  className="border-border hover:bg-overlay-1 duration-fast flex h-13 cursor-pointer items-center gap-3 border-t px-4 transition-colors sm:px-5"
                 >
-                  <Checkbox
-                    id={id}
-                    checked={included}
-                    onCheckedChange={(checked) =>
-                      toggle(member._id, member.name, checked === true)
-                    }
-                  />
-                  <Avatar name={member.name} size="sm" />
-                  <span className="lead-style min-w-0 flex-1 truncate">
-                    {member.name}
+                  <Avatar name={member.name} size="md" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="lead-style truncate">{member.name}</span>
+                    <span className="caption-style text-fg-tertiary">
+                      {included ? "Gets new leads" : "Left out"}
+                    </span>
                   </span>
                   <Tag
                     tone={ROLE_TONE[member.role]}
@@ -359,11 +366,13 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
                   >
                     {ROLE_LABEL[member.role]}
                   </Tag>
-                  <span className="flex w-24 shrink-0 justify-end">
-                    <PageStatus tone={included ? "success" : "neutral"}>
-                      {included ? "In rotation" : "Left out"}
-                    </PageStatus>
-                  </span>
+                  <Switch
+                    id={id}
+                    checked={included}
+                    onCheckedChange={(checked) =>
+                      toggle(member._id, member.name, checked)
+                    }
+                  />
                 </label>
               </li>
             );
@@ -376,7 +385,7 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
 
 function RowSkeleton() {
   return (
-    <div className="border-border flex h-12 items-center gap-3 border-t px-6">
+    <div className="border-border flex h-13 items-center gap-3 border-t px-4 sm:px-5">
       <Skeleton className="h-3 w-40" />
       <Skeleton className="ml-auto h-3 w-16" />
     </div>

@@ -5,6 +5,7 @@ import type { DealStage } from "../lib/domain/enums";
 import { DEAL_STAGE_LABEL, personName } from "../lib/domain/labels";
 import { DEFAULT_CURRENCY, formatMoney } from "../lib/domain/money";
 import { cleanText, isValidDay } from "../lib/domain/normalize";
+import { emitAutomationTrigger } from "./lib/automations/engine";
 import { invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import schema from "./schema";
@@ -136,6 +137,11 @@ async function logStage(
     stage === "lost" ? lostReason : undefined,
     ctx.viewer._id,
   );
+  await emitAutomationTrigger(ctx, {
+    kind: "deal_stage_changed",
+    refs: { dealId: deal._id, accountId: deal.accountId },
+    value: stage,
+  });
 }
 
 /** Fields that follow from a stage change: close time and lost reason. */

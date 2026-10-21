@@ -24,25 +24,31 @@ function DropdownMenuTrigger(
 
 function DropdownMenuContent({
   className,
+  contentClassName,
   sideOffset = 6,
   align = "start",
+  collisionPadding = 8,
   children,
   ...props
-}: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+}: ComponentProps<typeof DropdownMenuPrimitive.Content> & {
+  /** Classes for the padded inner list, e.g. `p-0` for sectioned menus. */
+  contentClassName?: string;
+}) {
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         align={align}
+        collisionPadding={collisionPadding}
         className={cn(
-          "border-line-strong bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-base data-[state=closed]:duration-fast min-w-42 overflow-hidden rounded-lg border",
+          "border-line-strong bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1 data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-base data-[state=closed]:duration-fast min-w-42 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-xl border",
           className,
         )}
         {...props}
       >
         <ScrollArea viewportClassName="max-h-[min(360px,var(--radix-dropdown-menu-content-available-height))]">
-          <div className="p-1">{children}</div>
+          <div className={cn("p-1", contentClassName)}>{children}</div>
         </ScrollArea>
       </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
@@ -57,7 +63,7 @@ function DropdownMenuItem({
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       className={cn(
-        "caption-style text-foreground ease-power3-out duration-fast data-[highlighted]:bg-overlay-2 relative flex cursor-pointer items-center gap-2 rounded-sm px-2 py-2 transition-colors outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "caption-style text-foreground ease-power3-out duration-fast data-[highlighted]:bg-overlay-2 relative flex min-h-8 cursor-pointer items-center gap-2 rounded-lg px-2 py-2 transition-colors outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 pointer-coarse:min-h-11",
         className,
       )}
       {...props}
@@ -85,7 +91,7 @@ function DropdownMenuRadioItem({
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
       className={cn(
-        "caption-style text-fg-secondary ease-power3-out data-[highlighted]:text-foreground data-[state=checked]:text-foreground duration-fast data-[highlighted]:bg-overlay-2 relative flex cursor-pointer items-center gap-2 rounded-sm py-2 pr-2 pl-6 transition-colors outline-none select-none",
+        "caption-style text-fg-secondary ease-power3-out data-[highlighted]:text-foreground data-[state=checked]:text-foreground duration-fast data-[highlighted]:bg-overlay-2 relative flex min-h-8 cursor-pointer items-center gap-2 rounded-lg py-2 pr-2 pl-6 transition-colors outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 pointer-coarse:min-h-11",
         className,
       )}
       {...props}

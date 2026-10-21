@@ -105,7 +105,7 @@ export default function TimelineComposer({
       <div
         role="tablist"
         aria-label="Entry type"
-        className="scrollbar-none flex gap-1 overflow-x-auto px-2 pt-2"
+        className="scrollbar-none flex gap-1 overflow-x-auto px-2 pt-2 max-sm:mask-r-from-[calc(100%-1.5rem)] max-sm:pr-6"
       >
         {LOGGABLE_KINDS.map((value) => {
           const meta = KIND_META[value];

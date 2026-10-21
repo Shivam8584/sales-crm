@@ -30,7 +30,7 @@ export default function ActivationPath({
   const current = [...steps].reverse().find((step) => step.done);
 
   return (
-    <div className="border-border bg-card flex flex-col gap-2.5 rounded-xl border px-4 py-3">
+    <div className="bg-card shadow-card flex flex-col gap-2.5 rounded-2xl px-4 py-3">
       <p className="caption-style text-fg-tertiary flex items-center justify-between gap-3">
         <span>Activation</span>
         <span className="tabular-nums">

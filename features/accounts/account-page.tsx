@@ -27,6 +27,7 @@ import {
   PageStatus,
 } from "@/components/shell/page";
 import AccountStallBanner from "@/features/activation/account-stall-banner";
+import { RecordAutomations } from "@/features/automations/record-automations";
 import RecordDeals from "@/features/deals/record-deals";
 import AccountVerification from "@/features/enrichment/account-verification";
 import MemberPicker from "@/features/members/member-picker";
@@ -194,7 +195,7 @@ function AccountView({ account }: { account: Account }) {
                     value={account.name}
                     label="Account name"
                     onSave={(name) => save({ name }, "Name")}
-                    inputClassName="h-8 text-xl font-semibold"
+                    inputClassName="font-display h-9 text-2xl font-medium"
                   />
                 </span>
               }
@@ -251,6 +252,7 @@ function AccountView({ account }: { account: Account }) {
               className={ASIDE_SECTION}
             />
             <DetailSection
+              collapsible
               title="Details"
               className={cn(ASIDE_SECTION, "gap-2")}
             >
@@ -304,6 +306,7 @@ function AccountView({ account }: { account: Account }) {
               className={ASIDE_SECTION}
             />
             <DetailSection
+              collapsible
               title="Record"
               className={cn(ASIDE_SECTION, "gap-2")}
               divider={false}
@@ -368,6 +371,13 @@ function AccountView({ account }: { account: Account }) {
               label: "Tasks",
               count: tasks?.length,
               content: <RecordTasks target={{ accountId: account._id }} />,
+            },
+            {
+              id: "automations",
+              label: "Automations",
+              content: (
+                <RecordAutomations target={{ accountId: account._id }} />
+              ),
             },
           ]}
         />

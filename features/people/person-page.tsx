@@ -37,6 +37,7 @@ import {
   useTitleShortcut,
 } from "@/features/accounts/use-title-shortcut";
 import DinLookup from "@/features/enrichment/din-lookup";
+import { RecordAutomations } from "@/features/automations/record-automations";
 import MemberPicker from "@/features/members/member-picker";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
@@ -139,6 +140,7 @@ function ErasedPersonView({ person }: { person: Person }) {
           <>
             <ConsentRecords personId={person._id} className={ASIDE_SECTION} />
             <DetailSection
+              collapsible
               title="Record"
               className={cn(ASIDE_SECTION, "gap-2")}
               divider={false}
@@ -274,14 +276,14 @@ function PersonView({ person }: { person: Person }) {
                   label="First name"
                   onSave={(firstName) => save({ firstName }, "First name")}
                   className="shrink-0"
-                  inputClassName="h-8 text-xl font-semibold"
+                  inputClassName="font-display h-9 text-2xl font-medium"
                 />
                 {person.lastName && (
                   <InlineText
                     value={person.lastName}
                     label="Last name"
                     onSave={(lastName) => save({ lastName }, "Last name")}
-                    inputClassName="h-8 text-xl font-semibold"
+                    inputClassName="font-display h-9 text-2xl font-medium"
                   />
                 )}
               </span>
@@ -325,6 +327,7 @@ function PersonView({ person }: { person: Person }) {
         aside={
           <>
             <DetailSection
+              collapsible
               title="Contact"
               className={cn(ASIDE_SECTION, "gap-2")}
             >
@@ -370,6 +373,7 @@ function PersonView({ person }: { person: Person }) {
               className={ASIDE_SECTION}
             />
             <DetailSection
+              collapsible
               title="Details"
               className={cn(ASIDE_SECTION, "gap-2")}
             >
@@ -430,6 +434,7 @@ function PersonView({ person }: { person: Person }) {
             <ConsentRecords personId={person._id} className={ASIDE_SECTION} />
             <DinLookup personId={person._id} className={ASIDE_SECTION} />
             <DetailSection
+              collapsible
               title="Record"
               className={cn(ASIDE_SECTION, "gap-2")}
               divider={false}
@@ -476,6 +481,11 @@ function PersonView({ person }: { person: Person }) {
               label: "Tasks",
               count: tasks?.length,
               content: <RecordTasks target={{ personId: person._id }} />,
+            },
+            {
+              id: "automations",
+              label: "Automations",
+              content: <RecordAutomations target={{ personId: person._id }} />,
             },
           ]}
         />

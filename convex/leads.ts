@@ -32,6 +32,7 @@ import {
   normalizeEmail,
   normalizePhone,
 } from "../lib/domain/normalize";
+import { emitAutomationTrigger } from "./lib/automations/engine";
 import { fail, invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import {
@@ -409,6 +410,15 @@ async function applyStatus(
       to: statusText(status, nextReason),
     },
   ]);
+  await emitAutomationTrigger(ctx, {
+    kind: "lead_status_changed",
+    refs: {
+      leadId: lead._id,
+      personId: lead.personId,
+      accountId: lead.accountId,
+    },
+    value: status,
+  });
   return previous;
 }
 
@@ -826,6 +836,11 @@ export const convert = memberMutation({
       accountId: account._id,
       personId: person._id,
       convertedAt: now,
+    });
+    await emitAutomationTrigger(ctx, {
+      kind: "lead_status_changed",
+      refs: { leadId: id, personId: person._id, accountId: account._id },
+      value: "converted",
     });
 
     return {

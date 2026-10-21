@@ -3,13 +3,19 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { formatMoney, type Money } from "../lib/domain/money";
 import {
+  DEFAULT_PAYMENT,
   DEFAULT_TERMS,
   DEFAULT_VALIDITY_DAYS,
+  PROPOSAL_CURRENCY,
+  approvalPayload,
   approvalReasons,
-  lineInput,
+  freezeLines,
   priceLines,
+  pricingFingerprint,
   rateLabel,
+  type PricingPolicy,
   type ProposalLine,
+  type ProposalPricing,
 } from "../lib/domain/pricing";
 import { fail, invalid } from "./lib/errors";
 import {
@@ -24,25 +30,29 @@ import {
   applyLinePatch,
   checkLineCount,
   cleanLine,
+  cleanPayment,
   cleanReason,
   cleanTerms,
   cleanValidUntil,
-  requireComplete,
   requireDeal,
   requireProposal,
   vApproval,
-  vLinePatch,
   vProposalLine,
+  vLinePatch,
+  vPayment,
+  vPolicy,
   vProposalStatus,
   versionLabel,
 } from "./lib/pricing";
 import { memberIndex, memberRef } from "./lib/records";
+import { pricingPolicy, storedPricingPolicy } from "./lib/settings";
 import { logChanges, logSystem } from "./lib/timeline";
 import { vCurrency, vDay, vMoney } from "./lib/validators";
 
 const MAX_KEY_LENGTH = 40;
 
 type Ctx = MutationCtx & { viewer: Viewer };
+type Priced = Pick<Doc<"proposals">, "lines" | "policy">;
 
 function addDays(days: number) {
   return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
@@ -65,20 +75,27 @@ function requireDraft(proposal: Doc<"proposals">) {
   }
 }
 
-function monthlyTake(proposal: Pick<Doc<"proposals">, "lines" | "currency">) {
-  const pricing = priceLines(proposal.lines);
+/** Sent versions keep the policy they were priced under; drafts follow the live one. */
+function policyFor(proposal: Priced, live: PricingPolicy): PricingPolicy {
+  return proposal.policy ?? live;
+}
+
+function takeOf(pricing: ProposalPricing): Money {
   return {
-    pricing,
-    take: {
-      amount: Math.max(0, pricing.total.take),
-      currency: proposal.currency,
-    } satisfies Money,
+    amount: Math.max(0, pricing.total.take),
+    currency: PROPOSAL_CURRENCY,
   };
 }
 
-function summaryLine(proposal: Pick<Doc<"proposals">, "lines" | "currency">) {
-  const { pricing, take } = monthlyTake(proposal);
-  return `${formatMoney(take)} monthly take · ${rateLabel(pricing.marginRate)} blended margin`;
+function summaryLine(pricing: ProposalPricing) {
+  return `${formatMoney(takeOf(pricing))} take · ${rateLabel(pricing.marginRate)} blended margin`;
+}
+
+/** A proposal has to be complete and platform-valid before it is sent or approved. */
+function requireComplete(lines: ProposalLine[], pricing: ProposalPricing) {
+  if (lines.length === 0) invalid("lines", "Add at least one line");
+  const [issue] = pricing.issues;
+  if (issue) invalid("lines", `Line ${issue.index + 1}: ${issue.message}`);
 }
 
 async function log(
@@ -105,7 +122,7 @@ function keepApproval(
   const approval = proposal.approval;
   if (!approval || approval.state === "requested") return approval;
   const priced = (lines: ProposalLine[]) =>
-    JSON.stringify(lines.map(lineInput));
+    JSON.stringify(lines.map(pricingFingerprint));
   return priced(before) === priced(after) ? approval : undefined;
 }
 
@@ -127,16 +144,42 @@ function findLine(proposal: Doc<"proposals">, key: string) {
   return index;
 }
 
-/** Every version for a deal, newest first, with names resolved. */
+/** The live pricing policy, its defaults and the platform's own floor. */
+export const policy = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const stored = await storedPricingPolicy(ctx);
+    return {
+      policy: await pricingPolicy(ctx),
+      isDefault: {
+        marginFloorBps: stored.marginFloorBps === undefined,
+        approvalBps: stored.approvalBps === undefined,
+        defaultMarginBps: stored.defaultMarginBps === undefined,
+        defaultFundBps: stored.defaultFundBps === undefined,
+        defaultFeeBps: stored.defaultFeeBps === undefined,
+        defaultBonusFeeBps: stored.defaultBonusFeeBps === undefined,
+      },
+      platformFloorFromEnv: {
+        rate: Boolean(process.env.PLATFORM_MIN_MARGIN_RATE),
+        minimum: Boolean(process.env.PLATFORM_MIN_MARGIN_ABS),
+      },
+    };
+  },
+});
+
+/** Every version for a deal, newest first, with names resolved and the policy each is priced under. */
 export const forDeal = memberQuery({
   args: { dealId: v.id("deals") },
   handler: async (ctx, { dealId }) => {
-    const [rows, members] = await Promise.all([
+    const [rows, members, live] = await Promise.all([
       versions(ctx, dealId),
       memberIndex(ctx),
+      pricingPolicy(ctx),
     ]);
     return rows.map((proposal) => ({
       ...proposal,
+      policy: policyFor(proposal, live),
+      payment: proposal.payment ?? DEFAULT_PAYMENT,
       createdBy: memberRef(members, proposal.createdById),
       approval: proposal.approval
         ? {
@@ -157,14 +200,17 @@ export const current = memberQuery({
     const proposal =
       rows.find((row) => row.status === "accepted") ?? rows[0] ?? null;
     if (!proposal) return null;
-    const { pricing, take } = monthlyTake(proposal);
+    const pricing = priceLines(
+      proposal.lines,
+      policyFor(proposal, await pricingPolicy(ctx)),
+    );
     return {
       _id: proposal._id,
       version: proposal.version,
       status: proposal.status,
       approvalState: proposal.approval?.state ?? null,
       needsApproval: pricing.needsApproval,
-      take,
+      take: takeOf(pricing),
       marginRate: pricing.marginRate,
       lineCount: proposal.lines.length,
     };
@@ -184,9 +230,53 @@ export const get = memberQuery({
     const owner = deal ? members.get(deal.ownerId) : undefined;
     return {
       ...proposal,
+      policy: policyFor(proposal, await pricingPolicy(ctx)),
+      payment: proposal.payment ?? DEFAULT_PAYMENT,
       deal: deal ? { _id: deal._id, title: deal.title } : null,
       account: account ? { _id: account._id, name: account.name } : null,
       preparedBy: owner ? { name: owner.name, email: owner.email } : null,
+    };
+  },
+});
+
+function adminBase() {
+  const url = process.env.PLATFORM_ADMIN_URL?.trim().replace(/\/+$/, "");
+  return url && /^https?:\/\//.test(url) ? url : null;
+}
+
+/** For an accepted proposal: the approval payload for the platform admin and where to paste it. */
+export const handoff = memberQuery({
+  args: { id: v.id("proposals") },
+  handler: async (ctx, { id }) => {
+    const proposal = await ctx.db.get(id);
+    if (!proposal || proposal.status !== "accepted") return null;
+    const deal = await ctx.db.get(proposal.dealId);
+    const account = deal ? await ctx.db.get(deal.accountId) : null;
+    const orgId = account?.platformOrgId ?? null;
+    const payload = approvalPayload(
+      proposal.lines,
+      proposal.payment ?? DEFAULT_PAYMENT,
+      policyFor(proposal, await pricingPolicy(ctx)),
+    );
+    const base = adminBase();
+    return {
+      json: JSON.stringify(
+        {
+          crm_proposal: `v${proposal.version}`,
+          organization: {
+            platform_org_id: orgId,
+            name: account?.name ?? null,
+            ...payload.organization,
+          },
+          campaigns: payload.campaigns,
+        },
+        null,
+        2,
+      ),
+      reviewUrl: base
+        ? `${base}/campaigns${orgId ? `?organization_id=${encodeURIComponent(orgId)}` : ""}`
+        : null,
+      campaignUrlTemplate: base ? `${base}/campaigns/{campaign_id}` : null,
     };
   },
 });
@@ -204,11 +294,10 @@ export const create = memberMutation({
     if (latest?.status === "draft") {
       fail("conflict", `Draft v${latest.version} is still open`);
     }
-    const currency = latest?.currency ?? deal.amount.currency;
     const lines = latest
       ? latest.lines
       : args.line
-        ? [cleanLine(args.line, currency)]
+        ? [cleanLine(args.line)]
         : [];
     const now = Date.now();
     const version = (latest?.version ?? 0) + 1;
@@ -216,12 +305,13 @@ export const create = memberMutation({
       dealId: deal._id,
       version,
       status: "draft",
-      currency,
+      currency: PROPOSAL_CURRENCY,
       lines,
       validUntil: cleanValidUntil(
         args.validUntil ?? addDays(DEFAULT_VALIDITY_DAYS),
       ),
       terms: latest?.terms ?? DEFAULT_TERMS,
+      payment: latest?.payment ?? DEFAULT_PAYMENT,
       createdById: ctx.viewer._id,
       updatedAt: now,
     });
@@ -243,7 +333,7 @@ export const update = memberMutation({
     patch: v.object({
       validUntil: v.optional(vDay),
       terms: v.optional(v.string()),
-      currency: v.optional(vCurrency),
+      payment: v.optional(vPayment),
     }),
   },
   handler: async (ctx, { id, patch }) => {
@@ -252,26 +342,14 @@ export const update = memberMutation({
     const before = {
       validUntil: proposal.validUntil,
       terms: proposal.terms,
-      currency: proposal.currency,
+      payment: proposal.payment ?? DEFAULT_PAYMENT,
     };
     const next: Partial<Doc<"proposals">> = {};
     if (patch.validUntil !== undefined) {
       next.validUntil = cleanValidUntil(patch.validUntil);
     }
     if (patch.terms !== undefined) next.terms = cleanTerms(patch.terms);
-    if (patch.currency !== undefined && patch.currency !== proposal.currency) {
-      const currency = patch.currency;
-      next.currency = currency;
-      const recurrency = (money: Money) => ({ ...money, currency });
-      next.lines = proposal.lines.map((line) => ({
-        ...line,
-        orderValue: recurrency(line.orderValue),
-        bonus: recurrency(line.bonus),
-        coupon: recurrency(line.coupon),
-        ...(line.price ? { price: recurrency(line.price) } : {}),
-      }));
-      next.approval = undefined;
-    }
+    if (patch.payment !== undefined) next.payment = cleanPayment(patch.payment);
     await ctx.db.patch(id, { ...next, updatedAt: Date.now() });
     return before;
   },
@@ -299,7 +377,7 @@ export const addLine = memberMutation({
       index === undefined
         ? lines.length
         : Math.max(0, Math.min(lines.length, Math.trunc(index)));
-    lines.splice(at, 0, cleanLine(line, proposal.currency));
+    lines.splice(at, 0, cleanLine(line));
     await saveLines(ctx, proposal, lines);
   },
 });
@@ -313,7 +391,7 @@ export const updateLine = memberMutation({
     const index = findLine(proposal, key);
     const previous = proposal.lines[index];
     const lines = [...proposal.lines];
-    lines[index] = applyLinePatch(previous, patch, proposal.currency);
+    lines[index] = applyLinePatch(previous, patch, await pricingPolicy(ctx));
     await saveLines(ctx, proposal, lines);
     return previous;
   },
@@ -341,8 +419,9 @@ export const requestApproval = memberMutation({
   handler: async (ctx, { id }) => {
     const proposal = await requireProposal(ctx, id);
     requireDraft(proposal);
-    requireComplete(proposal.lines);
-    const pricing = priceLines(proposal.lines);
+    const policy = await pricingPolicy(ctx);
+    const pricing = priceLines(proposal.lines, policy);
+    requireComplete(proposal.lines, pricing);
     if (!pricing.needsApproval) {
       fail("conflict", "This proposal is within policy; send it directly");
     }
@@ -356,7 +435,7 @@ export const requestApproval = memberMutation({
       },
       updatedAt: Date.now(),
     });
-    const reasons = approvalReasons(pricing).join(". ");
+    const reasons = approvalReasons(pricing, policy).join(". ");
     await log(
       ctx,
       deal,
@@ -369,7 +448,7 @@ export const requestApproval = memberMutation({
     await notifyMany(ctx, managers, {
       kind: "proposal_approval",
       title: `${ctx.viewer.name} needs approval on ${deal.title}`,
-      body: `${reasons}. ${summaryLine(proposal)}`,
+      body: `${reasons}. ${summaryLine(pricing)}`,
       href: `/deals/${deal._id}?tab=proposal`,
     });
   },
@@ -386,11 +465,11 @@ export const decide = managerMutation({
     const proposal = await requireProposal(ctx, id);
     requireDraft(proposal);
     const reason = cleanReason(input, true);
-    const pricing = priceLines(proposal.lines);
+    const pricing = priceLines(proposal.lines, await pricingPolicy(ctx));
     if (!pricing.needsApproval) {
       fail("conflict", "This proposal is within policy and needs no approval");
     }
-    if (approve) requireComplete(proposal.lines);
+    if (approve) requireComplete(proposal.lines, pricing);
     const deal = await requireDeal(ctx, proposal.dealId);
     const now = Date.now();
     await ctx.db.patch(id, {
@@ -423,13 +502,15 @@ export const decide = managerMutation({
   },
 });
 
+/** Freezes the version: default prices are written onto the lines and the policy is kept with it. */
 export const send = memberMutation({
   args: { id: v.id("proposals") },
   handler: async (ctx, { id }) => {
     const proposal = await requireProposal(ctx, id);
     requireDraft(proposal);
-    requireComplete(proposal.lines);
-    const pricing = priceLines(proposal.lines);
+    const policy = await pricingPolicy(ctx);
+    const pricing = priceLines(proposal.lines, policy);
+    requireComplete(proposal.lines, pricing);
     if (pricing.needsApproval && proposal.approval?.state !== "approved") {
       fail(
         "forbidden",
@@ -438,18 +519,25 @@ export const send = memberMutation({
     }
     const deal = await requireDeal(ctx, proposal.dealId);
     const now = Date.now();
-    await ctx.db.patch(id, { status: "sent", sentAt: now, updatedAt: now });
+    await ctx.db.patch(id, {
+      status: "sent",
+      lines: freezeLines(proposal.lines, policy),
+      policy,
+      payment: proposal.payment ?? DEFAULT_PAYMENT,
+      sentAt: now,
+      updatedAt: now,
+    });
     await log(
       ctx,
       deal,
       `sent ${versionLabel(proposal)} to the brand`,
-      summaryLine(proposal),
+      summaryLine(pricing),
     );
   },
 });
 
 /**
- * The brand said yes: the deal's amount becomes this proposal's monthly take.
+ * The brand said yes: the deal's amount becomes this proposal's take.
  * Returns what it replaced so the client can undo.
  */
 export const accept = memberMutation({
@@ -460,7 +548,11 @@ export const accept = memberMutation({
       fail("conflict", "Only a sent proposal can be accepted");
     }
     const deal = await requireDeal(ctx, proposal.dealId);
-    const { take } = monthlyTake(proposal);
+    const pricing = priceLines(
+      proposal.lines,
+      policyFor(proposal, await pricingPolicy(ctx)),
+    );
+    const take = takeOf(pricing);
     const now = Date.now();
     await ctx.db.patch(id, {
       status: "accepted",
@@ -471,7 +563,7 @@ export const accept = memberMutation({
       ctx,
       deal,
       `marked ${versionLabel(proposal)} as accepted`,
-      summaryLine(proposal),
+      summaryLine(pricing),
     );
     const previousAmount = deal.amount;
     if (
@@ -599,6 +691,8 @@ export const restore = memberMutation({
       lines: v.array(vProposalLine),
       validUntil: vDay,
       terms: v.string(),
+      payment: v.optional(vPayment),
+      policy: v.optional(vPolicy),
       approval: v.optional(vApproval),
       createdById: v.id("members"),
       sentAt: v.optional(v.number()),
@@ -620,7 +714,9 @@ export const restore = memberMutation({
     checkLineCount(proposal.lines.length);
     const id = await ctx.db.insert("proposals", {
       ...proposal,
-      lines: proposal.lines.map((line) => cleanLine(line, proposal.currency)),
+      currency: PROPOSAL_CURRENCY,
+      lines: proposal.lines.map(cleanLine),
+      payment: cleanPayment(proposal.payment ?? DEFAULT_PAYMENT),
       validUntil: cleanValidUntil(proposal.validUntil),
       terms: cleanTerms(proposal.terms),
       updatedAt: Date.now(),

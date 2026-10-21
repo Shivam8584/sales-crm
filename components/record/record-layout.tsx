@@ -43,7 +43,7 @@ export function RecordHeader({
     <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
       <div className="shrink-0">{visual}</div>
       <div className="flex min-w-0 flex-1 basis-48 flex-col gap-2 pt-0.5">
-        <div className="min-w-0 text-xl leading-7 font-semibold tracking-[-0.01em]">
+        <div className="font-display min-w-0 text-2xl font-medium text-balance">
           {title}
         </div>
         {subtitle && (

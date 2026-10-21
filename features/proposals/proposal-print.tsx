@@ -8,18 +8,24 @@ import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
 import MembershipGate from "@/features/auth/membership-gate";
-import type { Currency } from "@/lib/domain/money";
 import {
+  ARCHETYPE_LABEL,
   MARKETPLACE_LABEL,
+  PAYMENT_MODE_LABEL,
+  PROPOSAL_CURRENCY,
+  SLOT_MODE_LABEL,
+  TAX_BPS,
   bpsLabel,
   priceLines,
   type LinePricing,
+  type Payment,
   type ProposalLine,
 } from "@/lib/domain/pricing";
 import Logo from "@/public/assets/images/_common/logo.svg";
 import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
-import { Amount } from "./amount";
+import { Amount, formatAmount } from "./amount";
+import { brandParts, productNote } from "./brand-view";
 import { ProposalStatusTag } from "./status";
 
 const PAGE_CSS = `@page { size: A4; margin: 14mm; }`;
@@ -32,8 +38,8 @@ const LONG_DATE = new Intl.DateTimeFormat("en-IN", {
 
 /**
  * The proposal as the brand receives it, ready to print or save as PDF.
- * Fees and margin never appear here; itemised lines show only what the brand
- * pays for.
+ * Cuts, coupons, commissions and margin never appear here; itemised lines show
+ * only what the brand pays for.
  */
 export default function ProposalPrint({ id }: { id: string }) {
   return (
@@ -116,8 +122,8 @@ function PrintView({ id }: { id: string }) {
 type PrintProposal = NonNullable<FunctionReturnType<typeof api.proposals.get>>;
 
 function Document({ proposal }: { proposal: PrintProposal }) {
-  const pricing = priceLines(proposal.lines);
-  const currency = proposal.currency;
+  const pricing = priceLines(proposal.lines, proposal.policy);
+  const currency = PROPOSAL_CURRENCY;
   const issued = LONG_DATE.format(proposal.sentAt ?? proposal.updatedAt);
   const validUntil = LONG_DATE.format(
     new Date(`${proposal.validUntil}T00:00:00`),
@@ -188,42 +194,62 @@ function Document({ proposal }: { proposal: PrintProposal }) {
 
       <section className="flex flex-col gap-2">
         <h2 className="text-display leading-tight font-medium text-balance">
-          Pay only for verified sales
+          Pay only for verified creator campaigns
         </h2>
         <p className="text-fg-secondary max-w-[60ch] text-base leading-relaxed">
-          Creators buy your product
+          Creators buy or try your product
           {marketplaces.length > 0 && ` on ${listFormat(marketplaces)}`}, share
-          it with their audience, and are paid once the sale is verified.
-          You&apos;re billed per verified sale, with no retainer.
+          it with their audience, and are paid once their work is verified.
+          You&apos;re charged per enrollment, with no retainer.
         </p>
       </section>
 
       <section aria-label="Pricing" className="flex flex-col">
         <div className="caption-style text-fg-tertiary border-border grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 border-b pb-2 sm:grid-cols-[minmax(0,1fr)_6rem_8.5rem_8.5rem]">
-          <span>Product</span>
-          <span className="text-right max-sm:hidden">Sales / month</span>
-          <span className="text-right max-sm:hidden">Per verified sale</span>
-          <span className="text-right">Monthly</span>
+          <span>Campaign</span>
+          <span className="text-right max-sm:hidden">Slots</span>
+          <span className="text-right max-sm:hidden">Per enrollment</span>
+          <span className="text-right">Total</span>
         </div>
         {proposal.lines.map((line, index) => (
           <PrintLine
             key={line.key}
             line={line}
             pricing={pricing.lines[index]}
-            currency={currency}
           />
         ))}
-        <div className="flex items-end justify-between gap-4 pt-5">
-          <span className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Monthly total</span>
-            <span className="caption-style text-fg-tertiary">
-              Excludes GST, which is added on the invoice
-            </span>
-          </span>
-          <span className="text-2xl font-medium">
-            <Amount value={{ amount: pricing.total.brandCharge, currency }} />
-          </span>
-        </div>
+        <dl className="ml-auto flex w-full flex-col gap-2 pt-5 sm:max-w-xs">
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <dt className="text-fg-secondary">Subtotal</dt>
+            <dd className="tabular-nums">
+              <Amount value={{ amount: pricing.total.billed, currency }} />
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <dt className="text-fg-secondary">GST {bpsLabel(TAX_BPS)}</dt>
+            <dd className="tabular-nums">
+              <Amount value={{ amount: pricing.total.tax, currency }} />
+            </dd>
+          </div>
+          <div className="border-border flex items-end justify-between gap-4 border-t pt-3">
+            <dt className="text-sm font-medium">Total</dt>
+            <dd className="text-2xl font-medium">
+              <Amount
+                value={{
+                  amount: pricing.total.billed + pricing.total.tax,
+                  currency,
+                }}
+              />
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="flex break-inside-avoid flex-col gap-3">
+        <h2 className="eyebrow-style text-fg-secondary">Payment</h2>
+        <p className="text-fg-secondary text-sm leading-relaxed">
+          {paymentText(proposal.payment)}
+        </p>
       </section>
 
       {terms.length > 0 && (
@@ -260,27 +286,21 @@ function Party({ label, children }: { label: string; children: ReactNode }) {
 function PrintLine({
   line,
   pricing,
-  currency,
 }: {
   line: ProposalLine;
   pricing: LinePricing;
-  currency: Currency;
 }) {
-  const { perSale } = pricing;
-  const money = (amount: number) => <Amount value={{ amount, currency }} />;
-  const itemised = line.presentation === "itemised";
-  const parts: [string, number][] = itemised
-    ? [
-        ["Product value, refunded to the creator", perSale.orderValue],
-        ...(perSale.bonus > 0
-          ? ([["Creator bonus", perSale.bonus]] as [string, number][])
-          : []),
-        [
-          "Hypedrive service fee",
-          perSale.brandCharge - perSale.orderValue - perSale.bonus,
-        ],
-      ]
-    : [];
+  const { perEnrollment } = pricing;
+  const money = (amount: number) => (
+    <Amount value={{ amount, currency: PROPOSAL_CURRENCY }} />
+  );
+  const note = productNote(line, pricing);
+  const meta = [
+    ARCHETYPE_LABEL[line.archetype],
+    MARKETPLACE_LABEL[line.marketplace],
+    `${line.expiryDays}-day window`,
+    ...(line.slotMode === "pool" ? [SLOT_MODE_LABEL.pool.toLowerCase()] : []),
+  ].join(" · ");
 
   return (
     <div className="border-border flex break-inside-avoid flex-col gap-3 border-b py-4">
@@ -288,11 +308,11 @@ function PrintLine({
         <span className="flex min-w-0 flex-col gap-1">
           <span className="text-sm font-medium">{line.product}</span>
           <span className="caption-style text-fg-tertiary">
-            {MARKETPLACE_LABEL[line.marketplace]}
+            {meta}
             <span className="sm:hidden">
               {" "}
-              · {line.slots.toLocaleString("en-IN")} sales × {""}
-              <Amount value={{ amount: perSale.brandCharge, currency }} />
+              · {line.slots.toLocaleString("en-IN")} × {""}
+              {money(perEnrollment.billed)}
             </span>
           </span>
         </span>
@@ -300,34 +320,45 @@ function PrintLine({
           {line.slots.toLocaleString("en-IN")}
         </span>
         <span className="text-right text-sm max-sm:hidden">
-          {money(perSale.brandCharge)}
+          {money(perEnrollment.billed)}
         </span>
         <span className="text-right text-sm font-medium">
-          {money(pricing.total.brandCharge)}
+          {money(pricing.total.billed)}
         </span>
       </div>
-      {itemised && (
+      {note && <span className="caption-style text-fg-secondary">{note}</span>}
+      {line.presentation === "itemised" && (
         <div className="bg-overlay-1 flex flex-col gap-1.5 rounded-lg px-3 py-2.5 sm:max-w-md">
-          {parts.map(([label, amount]) => (
+          {brandParts(line, pricing).map((part) => (
             <div
-              key={label}
+              key={part.label}
               className="caption-style flex items-center justify-between gap-3"
             >
-              <span className="text-fg-secondary">{label}</span>
-              <span className="tabular-nums">{money(amount)}</span>
+              <span className="text-fg-secondary">{part.label}</span>
+              <span className="tabular-nums">{money(part.amount)}</span>
             </div>
           ))}
-          <span className="caption-style text-fg-tertiary border-border mt-1 border-t pt-2 leading-snug">
-            Creators receive their payout net of Hypedrive&apos;s commission of{" "}
-            {bpsLabel(line.orderFeeBps)} on the order value
-            {perSale.bonus > 0 &&
-              ` and ${bpsLabel(line.bonusFeeBps)} on the bonus`}
-            .
-          </span>
+          {line.order && (
+            <span className="caption-style text-fg-tertiary border-border mt-1 border-t pt-2 leading-snug">
+              Order funding follows each verified order; the amount shown is for
+              the order value quoted.
+            </span>
+          )}
         </div>
       )}
     </div>
   );
+}
+
+function paymentText(payment: Payment) {
+  if (payment.mode === "prepaid") {
+    return `${PAYMENT_MODE_LABEL.prepaid}: fund your Hypedrive wallet before the campaign goes live. Each enrollment is charged from the wallet.`;
+  }
+  return `${PAYMENT_MODE_LABEL.postpaid}: enrollments are charged as they are approved${
+    payment.creditLimit
+      ? `, within a credit limit of ${formatAmount(payment.creditLimit.amount, PROPOSAL_CURRENCY)}`
+      : ""
+  }.`;
 }
 
 function listFormat(items: string[]) {

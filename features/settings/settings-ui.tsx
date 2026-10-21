@@ -1,15 +1,18 @@
 "use client";
 
 import {
+  useId,
   useState,
   type ComponentType,
   type ReactNode,
   type SVGProps,
 } from "react";
 import Button from "@/components/_ui/button";
+import Divider from "@/components/_ui/divider";
+import { Card, CardHeader } from "@/components/_ui/card";
 import EmptyState from "@/components/_ui/empty-state";
+import IconBadge from "@/components/_ui/icon-badge";
 import Skeleton from "@/components/_ui/skeleton";
-import { DetailSection } from "@/components/record/detail";
 import { PageStatus } from "@/components/shell/page";
 import { useViewer } from "@/hooks/use-viewer";
 import { cn } from "@/lib/utils";
@@ -22,38 +25,45 @@ export function SettingsIntro({ children }: { children: ReactNode }) {
 }
 
 const CARD =
-  "bg-card border-border shadow-card flex min-w-0 flex-col overflow-hidden rounded-xl border";
+  "bg-card shadow-card flex min-w-0 flex-col overflow-hidden rounded-2xl";
 
-/** A settings card: eyebrow title and optional control, a short note, then its rows. */
+type Icon = ComponentType<SVGProps<SVGSVGElement>>;
+
+/** Drops the top rule of the first row, which the header's divider replaces. */
+const BODY =
+  "flex min-w-0 flex-col [&>:first-child]:border-t-0 [&>:first-child>:first-child]:border-t-0";
+
+/** A settings card: icon badge, title and short note in a header band, then its rows. */
 export function SettingsSection({
   title,
   description,
+  icon,
+  tone = "default",
   action,
   children,
   className,
 }: {
   title: string;
   description?: ReactNode;
+  icon?: Icon;
+  tone?: "default" | "danger";
   action?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
+  const id = `settings-${useId()}`;
   return (
-    <div className={cn(CARD, className)}>
-      <DetailSection
+    <Card aria-labelledby={id} className={className}>
+      <CardHeader
+        id={id}
+        icon={icon}
         title={title}
+        description={description}
         action={action}
-        divider={false}
-        className="gap-1 pt-3.5 pb-3.5"
-      >
-        {description && (
-          <p className="caption-style text-fg-tertiary max-w-prose pb-1 leading-snug">
-            {description}
-          </p>
-        )}
-      </DetailSection>
-      {children}
-    </div>
+        tone={tone}
+      />
+      <div className={BODY}>{children}</div>
+    </Card>
   );
 }
 
@@ -75,7 +85,7 @@ export function SettingsRow({
   return (
     <div
       className={cn(
-        "border-border flex flex-col gap-3 border-t px-6 py-4 sm:flex-row sm:items-center sm:gap-6",
+        "border-border flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:gap-6 sm:px-5",
         className,
       )}
     >
@@ -109,7 +119,7 @@ export function SettingsBlock({
   return (
     <div
       className={cn(
-        "border-border flex flex-col gap-3 border-t px-6 py-4",
+        "border-border flex flex-col gap-3 border-t px-4 py-4 sm:px-5",
         className,
       )}
     >
@@ -121,13 +131,21 @@ export function SettingsBlock({
 export function SettingsSkeleton({ rows = 2 }: { rows?: number }) {
   return (
     <div aria-hidden className={cn(CARD, "gap-0")}>
-      <div className="px-6 pt-5 pb-4">
-        <Skeleton className="h-2.5 w-24" />
+      <div className="bg-overlay-1 flex items-center gap-3 px-4 py-4 sm:px-5">
+        <Skeleton className="size-8 rounded-[10px]" />
+        <span className="flex flex-col gap-2">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-2.5 w-48 max-w-full" />
+        </span>
       </div>
+      <Divider />
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}
-          className="border-border flex h-16 items-center gap-3 border-t px-6"
+          className={cn(
+            "border-border flex h-16 items-center gap-3 px-4 sm:px-5",
+            index > 0 && "border-t",
+          )}
         >
           <span className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3 w-32" />
@@ -252,7 +270,7 @@ export function AdminOnly({ children }: { children: ReactNode }) {
   const viewer = useViewer();
   if (viewer.role === "admin") return <>{children}</>;
   return (
-    <div className={cn(CARD, "py-6")}>
+    <Card className="py-6">
       <EmptyState
         icon={SettingsIcon}
         title="Only admins can change this"
@@ -263,28 +281,19 @@ export function AdminOnly({ children }: { children: ReactNode }) {
           </Button>
         }
       />
-    </div>
+    </Card>
   );
 }
 
-/** Square icon tile, the visual for integrations and the profile hero. */
+/** Raised icon tile, the visual for integrations. */
 export function IconTile({
-  icon: Icon,
+  icon,
   className,
 }: {
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  icon: Icon;
   className?: string;
 }) {
-  return (
-    <span
-      className={cn(
-        "bg-muted shadow-tile flex size-10 shrink-0 items-center justify-center rounded-xl",
-        className,
-      )}
-    >
-      <Icon aria-hidden className="text-icon size-4.5" />
-    </span>
-  );
+  return <IconBadge icon={icon} size="lg" className={className} />;
 }
 
 /** A card per integration: icon tile, name, what it does and its health or main action, then its details. */
@@ -304,22 +313,18 @@ export function IntegrationCard({
   action?: ReactNode;
   children: ReactNode;
 }) {
+  const id = `integration-${useId()}`;
   return (
-    <section className={CARD}>
-      <header className="flex items-start gap-3 px-6 py-5">
-        {visual}
-        <div className="flex min-w-0 flex-1 flex-col gap-2 pt-0.5">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-            <h3 className="lead-style font-medium">{title}</h3>
-            {health && <HealthTag health={health} />}
-          </div>
-          <p className="caption-style text-fg-tertiary max-w-prose leading-snug">
-            {description}
-          </p>
-        </div>
-        {action && <div className="flex shrink-0 items-center">{action}</div>}
-      </header>
-      {children}
-    </section>
+    <Card aria-labelledby={id}>
+      <CardHeader
+        id={id}
+        visual={visual}
+        title={title}
+        meta={health && <HealthTag health={health} />}
+        description={description}
+        action={action}
+      />
+      <div className={BODY}>{children}</div>
+    </Card>
   );
 }

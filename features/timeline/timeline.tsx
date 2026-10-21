@@ -246,7 +246,7 @@ function AutomaticItem({ entry, last }: { entry: Entry; last: boolean }) {
   const changes = entry.changes ?? [];
 
   return (
-    <li className="relative flex gap-3 pb-3.5">
+    <li className="animate-item-in relative flex gap-3 pb-3.5">
       <Rail last={last} compact />
       <span className="flex w-7 shrink-0 justify-center">
         <span className="bg-overlay-2 text-fg-tertiary flex size-5.5 items-center justify-center rounded-md">
@@ -398,7 +398,7 @@ function LoggedItem({
   }
 
   return (
-    <li className="group/item relative flex gap-3 pb-5">
+    <li className="group/item animate-item-in relative flex gap-3 pb-5">
       <Rail last={last} compact={false} />
       <span className="bg-card shadow-card text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg">
         <meta.icon aria-hidden className="size-3.5" />

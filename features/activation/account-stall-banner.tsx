@@ -7,7 +7,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import { dayFromToday, dayPhrase } from "@/features/tasks/task-meta";
 import { useTaskActions } from "@/features/tasks/use-task-actions";
-import { STAGE_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -34,6 +33,7 @@ export default function AccountStallBanner({
   const today = dayFromToday(0);
   const open = task && task.status !== "done";
   const snoozed = open && task.dueDate !== null && task.dueDate > today;
+  const urgent = rule.priority === "urgent";
 
   async function openTask() {
     if (task) {
@@ -82,7 +82,9 @@ export default function AccountStallBanner({
         "flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:gap-4",
         snoozed || !open
           ? "border-border bg-overlay-1"
-          : "border-warning/30 bg-[color-mix(in_srgb,var(--warning)_7%,transparent)]",
+          : urgent
+            ? "border-danger/30 bg-[color-mix(in_srgb,var(--danger)_7%,transparent)]"
+            : "border-warning/30 bg-[color-mix(in_srgb,var(--warning)_7%,transparent)]",
       )}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -96,7 +98,11 @@ export default function AccountStallBanner({
             aria-hidden
             className={cn(
               "mt-0.5 size-4 shrink-0",
-              open ? "text-warning" : "text-fg-tertiary",
+              !open
+                ? "text-fg-tertiary"
+                : urgent
+                  ? "text-danger"
+                  : "text-warning",
             )}
           />
         )}
@@ -107,7 +113,7 @@ export default function AccountStallBanner({
             </span>
             <span className="text-fg-secondary">
               {" "}
-              at {STAGE_LABEL[stall.stage]} for{" "}
+              for{" "}
               <time
                 dateTime={new Date(stall.since).toISOString()}
                 title={`Since ${dateTime(stall.since)}`}

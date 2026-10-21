@@ -1,28 +1,63 @@
+"use client";
+
 import type { ReactNode } from "react";
+import {
+  Collapsible,
+  CollapsibleChevron,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/_ui/collapsible";
 import { cn } from "@/lib/utils";
 
+/** A titled block of label/value lines; a titled block folds away from its title. */
 export function Properties({
   title,
   action,
   children,
   className,
+  defaultOpen = true,
 }: {
   title?: string;
   /** Small control on the right of the title, e.g. a refresh button. */
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  defaultOpen?: boolean;
 }) {
+  const list = <dl className="flex flex-col gap-px">{children}</dl>;
+  if (!title) {
+    return (
+      <section className={cn("flex min-w-0 flex-col gap-2", className)}>
+        {action && (
+          <div className="flex h-6 items-center justify-end gap-2">
+            {action}
+          </div>
+        )}
+        {list}
+      </section>
+    );
+  }
   return (
-    <section className={cn("flex min-w-0 flex-col gap-2", className)}>
-      {(title || action) && (
+    <Collapsible
+      asChild
+      defaultOpen={defaultOpen}
+      className={cn("group/collapsible flex min-w-0 flex-col", className)}
+    >
+      <section>
         <div className="flex h-6 items-center justify-between gap-2">
-          {title && <h2 className="eyebrow-style font-normal">{title}</h2>}
+          <h2 className="flex min-w-0 flex-1">
+            <CollapsibleTrigger className="eyebrow-style hover:text-fg-secondary focus-visible:ring-ring duration-fast -mx-1 flex max-w-full cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+              <span className="truncate">{title}</span>
+              <CollapsibleChevron className="opacity-60" />
+            </CollapsibleTrigger>
+          </h2>
           {action}
         </div>
-      )}
-      <dl className="flex flex-col gap-px">{children}</dl>
-    </section>
+        <CollapsibleContent>
+          <div className="pt-2">{list}</div>
+        </CollapsibleContent>
+      </section>
+    </Collapsible>
   );
 }
 

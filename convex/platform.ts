@@ -5,24 +5,35 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { LifecycleStage } from "../lib/domain/enums";
 import { gstinCheckChar } from "../lib/domain/gstin";
+import { accountHealth } from "../lib/domain/health";
 import {
   ACTIVATION_STAGES,
+  eventStage,
+  marketplaceLabel,
+  pathIndex,
+  type ActivationStage,
   type PlatformEventData,
   type PlatformEventType,
 } from "../lib/domain/platform";
+import { platformState } from "../lib/domain/platform-state";
 import { syncAccountActivation } from "./lib/activation";
 import { fail } from "./lib/errors";
 import { adminQuery, memberQuery } from "./lib/functions";
 import { json, parseJsonObject, readBody, verifyHmac } from "./lib/http";
 import {
   accountForOrg,
+  furthestStage,
+  healthInput,
+  latestSnapshot,
   parseEnvelope,
   platformMetrics,
   receive,
   retry,
   signupEvent,
+  stateEvents,
   type Envelope,
 } from "./lib/platform";
+import { platformMode } from "./lib/platformClient";
 import { requireAccount } from "./lib/records";
 import { literals } from "./lib/validators";
 
@@ -35,6 +46,7 @@ const vEnvelope = v.object({
   type: v.string(),
   occurredAt: v.number(),
   data: v.record(v.string(), v.any()),
+  version: v.optional(v.number()),
 });
 
 /** The CRM account an event is about: by org, or by the signed-up user's person. */
@@ -101,15 +113,13 @@ export const park = internalMutation({
       .withIndex("by_event_id", (q) => q.eq("eventId", envelope.eventId))
       .first();
     if (existing) return;
-    const ref = (value: unknown) =>
-      typeof value === "string" ? value : undefined;
     await ctx.db.insert("platformEvents", {
       eventId: envelope.eventId,
       type: envelope.type,
-      orgId: ref(envelope.data.org_id),
-      userId: ref(envelope.data.user_id) ?? ref(envelope.data.created_by),
+      ...refs(envelope.data),
       occurredAt: envelope.occurredAt,
       payload: JSON.stringify(envelope.data),
+      ...(envelope.version === undefined ? {} : { v: envelope.version }),
       error: error.slice(0, 500),
     });
   },
@@ -117,7 +127,8 @@ export const park = internalMutation({
 
 /**
  * `POST /webhooks/platform`: signed events from the Hypedrive backend.
- * 200 processed or duplicate, 202 stored for later (unknown org or type, bad payload).
+ * 200 processed, duplicate or ignored; 202 stored for later (unknown org, user
+ * or type, bad payload, unsupported version).
  */
 export const webhook = httpAction(async (ctx, request) => {
   const secret = process.env.PLATFORM_WEBHOOK_SECRET;
@@ -141,7 +152,11 @@ export const webhook = httpAction(async (ctx, request) => {
     const result = await ctx.runMutation(internal.platform.ingest, {
       envelope: envelope.value,
     });
-    if (result.status === "duplicate" || result.status === "processed") {
+    if (
+      result.status === "duplicate" ||
+      result.status === "processed" ||
+      result.status === "ignored"
+    ) {
       return json({ ok: true, eventId, status: result.status });
     }
     return json(
@@ -181,12 +196,30 @@ export const retryParked = internalMutation({
   },
 });
 
+/** Moves accounts left on the v1 `gst_verified` stage to `org_created`, where v2 puts them. */
+export const migrateV2 = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const legacy = await ctx.db
+      .query("accounts")
+      .withIndex("by_stage", (q) => q.eq("stage", "gst_verified"))
+      .collect();
+    for (const account of legacy) {
+      await ctx.db.patch(account._id, { stage: "org_created" });
+    }
+    return { moved: legacy.length };
+  },
+});
+
+const money = (amount: number) => ({ amount, currency: "INR" as const });
+
 export const forAccount = memberQuery({
   args: { accountId: v.id("accounts") },
   handler: async (ctx, { accountId }) => {
     const account = await requireAccount(ctx, accountId);
     const orgId = account.platformOrgId;
     if (!orgId) return { orgId: null };
+    const now = Date.now();
     const events = await ctx.db
       .query("platformEvents")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
@@ -197,18 +230,106 @@ export const forAccount = memberQuery({
     const signup = created?.userId
       ? await signupEvent(ctx, created.userId)
       : null;
+    const metrics = platformMetrics(
+      events,
+      account.stage,
+      signup?.processedAt ? signup.occurredAt : null,
+      now,
+    );
+    const snapshot = await latestSnapshot(ctx, accountId);
+    const input = healthInput(account, stateEvents(events), snapshot, now);
+    const listings = snapshot?.listings ?? [];
+    const markets = new Map(
+      listings.map((item) => [item.marketplace, item.count]),
+    );
+    for (const item of metrics.state.listings) {
+      if (!markets.has(item.slug)) markets.set(item.slug, 1);
+    }
     return {
+      steps: metrics.steps,
+      deposits: metrics.deposits,
+      topups: metrics.topups,
+      campaignsLive: metrics.campaignsLive,
+      lastEventAt: metrics.lastEventAt,
       orgId,
-      ...platformMetrics(
-        events,
-        account.stage,
-        signup?.processedAt ? signup.occurredAt : null,
-      ),
+      health: accountHealth(input),
+      wallet: {
+        status: input.wallet,
+        balance: input.balancePaise === null ? null : money(input.balancePaise),
+        held:
+          snapshot?.heldPaise === undefined ? null : money(snapshot.heldPaise),
+        creditLimit:
+          snapshot?.creditLimitPaise === undefined
+            ? null
+            : money(snapshot.creditLimitPaise),
+      },
+      campaigns: input.campaigns,
+      deposits30d: money(input.deposits30dPaise),
+      deposits90d: money(input.deposits90dPaise),
+      reviews: {
+        count: input.staleReviews,
+        oldestDays: input.oldestReviewDays,
+      },
+      disputes: input.disputes,
+      marketplaces: [...markets].map(([slug, count]) => ({
+        slug,
+        label: marketplaceLabel(slug),
+        count,
+      })),
+      members: snapshot ? snapshot.members.length : null,
+      snapshot: snapshot
+        ? {
+            fetchedAt: snapshot.fetchedAt,
+            source: snapshot.source,
+            error: snapshot.error ?? null,
+            attemptedAt: snapshot.attemptedAt ?? null,
+          }
+        : null,
+      syncMode: platformMode(process.env),
     };
   },
 });
 
+/** Health score and band for every linked account, keyed by account id; for list columns and badges. */
+export const healthIndex = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const accounts = await ctx.db
+      .query("accounts")
+      .withIndex("by_platform_org", (q) => q.gt("platformOrgId", ""))
+      .collect();
+    const result: Record<
+      string,
+      { score: number; band: string; signals: string[] }
+    > = {};
+    for (const account of accounts) {
+      if (account.archivedAt || !account.platformOrgId) continue;
+      const orgId = account.platformOrgId;
+      const events = await ctx.db
+        .query("platformEvents")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .take(ORG_EVENT_LIMIT);
+      const health = accountHealth(
+        healthInput(
+          account,
+          stateEvents(events),
+          await latestSnapshot(ctx, account._id),
+          now,
+        ),
+      );
+      result[account._id] = {
+        score: health.score,
+        band: health.band,
+        signals: health.signals.map((signal) => signal.id),
+      };
+    }
+    return result;
+  },
+});
+
 function eventStatus(event: Doc<"platformEvents">) {
+  if (event.ignored) return "ignored" as const;
   if (event.processedAt) return "processed" as const;
   if (event.error) return "parked" as const;
   return "pending" as const;
@@ -231,13 +352,14 @@ export const recentEvents = adminQuery({
       occurredAt: event.occurredAt,
       receivedAt: event._creationTime,
       status: eventStatus(event),
-      error: event.error ?? null,
+      error: event.error ?? event.ignored ?? null,
     }));
   },
 });
 
 const CROCKFORD = "0123456789abcdefghjkmnpqrstvwxyz";
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 
 function platformId(prefix: string) {
   let body = "";
@@ -271,19 +393,192 @@ const CAMPAIGN_TITLES = [
   "New SKU seeding",
 ];
 
+/** Situations the simulator can put a brand in, each one a v2 stall rule or expansion signal. */
+export const SCENARIOS = [
+  "gst_failed",
+  "paused_no_funds",
+  "low_balance",
+  "negative_balance",
+  "review_backlog",
+  "review_escalation",
+  "changes_requested",
+  "renewal",
+  "expansion",
+] as const;
+export type Scenario = (typeof SCENARIOS)[number];
+
+/** The furthest step a scenario needs the brand to have reached first. */
+const SCENARIO_STAGE: Record<Scenario, ActivationStage> = {
+  gst_failed: "signed_up",
+  paused_no_funds: "live",
+  low_balance: "live",
+  negative_balance: "live",
+  review_backlog: "live",
+  review_escalation: "live",
+  changes_requested: "funded",
+  renewal: "activated",
+  expansion: "activated",
+};
+
 type Draft = {
   [T in PlatformEventType]: { type: T; data: PlatformEventData[T] };
 }[PlatformEventType];
+type Timed = Draft & { ago: number };
 
-/** Feeds the events that walk one account up to `until` through the webhook path, skipping steps it already has. */
+type ScenarioContext = {
+  orgId: string;
+  userId: string;
+  campaigns: { id: string; title: string }[];
+  domain?: string;
+};
+
+function scenarioDrafts(scenario: Scenario, context: ScenarioContext): Timed[] {
+  const { orgId, userId } = context;
+  const [first, second] = context.campaigns;
+  const campaign = (
+    target: { id: string; title: string },
+    from: PlatformEventData["campaign.status_changed"]["from"],
+    to: PlatformEventData["campaign.status_changed"]["to"],
+    ago: number,
+    extra: Partial<PlatformEventData["campaign.status_changed"]> = {},
+  ): Timed => ({
+    type: "campaign.status_changed",
+    data: {
+      org_id: orgId,
+      campaign_id: target.id,
+      title: target.title,
+      from,
+      to,
+      ...extra,
+    },
+    ago,
+  });
+  switch (scenario) {
+    case "gst_failed":
+      return [
+        {
+          type: "organization.gst_failed",
+          data: {
+            user_id: userId,
+            gstin: demoGstin(),
+            reason: "GSTIN is cancelled on the GST portal",
+          },
+          ago: 20 * HOUR,
+        },
+      ];
+    case "paused_no_funds":
+      return [
+        {
+          type: "wallet.low_balance",
+          data: { org_id: orgId, balance_paise: 310_000 },
+          ago: 30 * HOUR,
+        },
+        campaign(first, "live", "paused", 9 * HOUR, {
+          pause_reason: "insufficient_funds",
+        }),
+        {
+          type: "wallet.topup_succeeded",
+          data: {
+            org_id: orgId,
+            amount_paise: 2_500_000,
+            method: "upi",
+            is_first: false,
+          },
+          ago: 3 * HOUR,
+        },
+      ];
+    case "low_balance":
+      return [
+        {
+          type: "wallet.low_balance",
+          data: { org_id: orgId, balance_paise: 320_000 },
+          ago: 6 * HOUR,
+        },
+      ];
+    case "negative_balance":
+      return [
+        {
+          type: "wallet.negative",
+          data: { org_id: orgId, balance_paise: -125_000 },
+          ago: 5 * HOUR,
+        },
+      ];
+    case "review_backlog":
+    case "review_escalation":
+      return [
+        {
+          type: "enrollment.review_overdue",
+          data: {
+            org_id: orgId,
+            campaign_id: first.id,
+            title: first.title,
+            count: scenario === "review_backlog" ? 4 : 9,
+            oldest_days: scenario === "review_backlog" ? 5 : 16,
+          },
+          ago: 2 * HOUR,
+        },
+      ];
+    case "changes_requested": {
+      const target = { id: platformId("cmp"), title: "Festive push" };
+      return [
+        campaign(target, "draft", "pending_review", 5 * DAY),
+        campaign(target, "pending_review", "changes_requested", 3 * DAY),
+      ];
+    }
+    case "renewal":
+      return context.campaigns.map((item, index) =>
+        campaign(item, "live", "ended", (9 + index) * DAY),
+      );
+    case "expansion":
+      return [
+        {
+          type: "listing.created",
+          data: {
+            org_id: orgId,
+            listing_id: platformId("lst"),
+            platform_slug: "flipkart",
+            name: "Bestseller combo pack",
+          },
+          ago: 4 * DAY,
+        },
+        {
+          type: "member.joined",
+          data: {
+            org_id: orgId,
+            user_id: platformId("usr"),
+            role: "campaign_manager",
+            name: "Rhea Kapoor",
+            email: context.domain ? `rhea@${context.domain}` : undefined,
+          },
+          ago: 2 * DAY,
+        },
+        {
+          type: "campaign.slots_filled",
+          data: {
+            org_id: orgId,
+            campaign_id: (second ?? first).id,
+            title: (second ?? first).title,
+            max_enrollments: 40,
+            waiting: 12,
+          },
+          ago: 20 * HOUR,
+        },
+      ];
+  }
+}
+
+/**
+ * Feeds the events that walk one account up to `until` through the webhook
+ * path, skipping steps it already has, then the events of a `scenario`.
+ */
 export async function simulateAccount(
   ctx: Parameters<typeof receive>[0],
   account: Doc<"accounts">,
-  until: LifecycleStage,
+  until: ActivationStage,
+  scenario?: Scenario,
 ) {
-  const target = (ACTIVATION_STAGES as readonly LifecycleStage[]).indexOf(
-    until,
-  );
+  const need = scenario ? SCENARIO_STAGE[scenario] : until;
+  const target = Math.max(pathIndex(until), pathIndex(need));
   if (target < 0) fail("invalid", `${until} is not on the activation path`);
 
   const orgId = account.platformOrgId ?? platformId("org");
@@ -293,8 +588,10 @@ export async function simulateAccount(
         .withIndex("by_org", (q) => q.eq("orgId", orgId))
         .collect()
     : [];
-  const has = (type: PlatformEventType) =>
-    existing.some((event) => event.type === type && event.processedAt);
+  const processed = stateEvents(existing);
+  const reached = pathIndex(
+    furthestStage(processed.map((event) => eventStage(event.type, event.data))),
+  );
   const creatorOrgEvent = existing.find(
     (event) => event.type === "organization.created",
   );
@@ -306,6 +603,11 @@ export async function simulateAccount(
   const person = people.find((item) => !item.archivedAt && item.email);
   const userId =
     creatorOrgEvent?.userId ?? person?.platformUserId ?? platformId("usr");
+  const now = Date.now();
+  const campaigns = platformState(processed, now).campaigns.map((item) => ({
+    id: item.id,
+    title: item.title ?? "Campaign",
+  }));
 
   const drafts: Draft[] = [];
   if (!(await signupEvent(ctx, userId)) && person?.email) {
@@ -320,7 +622,8 @@ export async function simulateAccount(
       },
     });
   }
-  if (target >= 1 && !has("organization.created")) {
+  const orgStep = scenario === "gst_failed" ? Infinity : 1;
+  if (target >= orgStep && reached < 1) {
     drafts.push({
       type: "organization.created",
       data: {
@@ -328,54 +631,64 @@ export async function simulateAccount(
         created_by: userId,
         name: account.name,
         website: account.domain ? `https://${account.domain}` : undefined,
-      },
-    });
-  }
-  if (target >= 2 && !has("organization.gst_verified")) {
-    drafts.push({
-      type: "organization.gst_verified",
-      data: {
-        org_id: orgId,
         gstin: account.gstin ?? demoGstin(),
         legal_name: `${account.name} Private Limited`,
+        is_demo: false,
       },
     });
   }
-  if (target >= 3 && !has("wallet.topup_succeeded")) {
-    const topups = target >= 5 ? 3 : 1;
-    for (let index = 0; index < topups; index++) {
-      drafts.push({
-        type: "wallet.topup_succeeded",
-        data: {
-          org_id: orgId,
-          amount_paise: pick([10_000, 25_000, 50_000, 100_000]) * 100,
-          method: pick(["upi", "va", "card"]),
-          is_first: index === 0,
-        },
-      });
+  if (target >= 2 && reached < 2) {
+    const count = target >= 4 ? 3 : 1;
+    for (let index = 0; index < count; index++) {
+      const amount = pick([10_000, 25_000, 50_000, 100_000]) * 100;
+      drafts.push(
+        index % 2 === 0
+          ? {
+              type: "wallet.topup_succeeded",
+              data: {
+                org_id: orgId,
+                amount_paise: amount,
+                method: pick(["upi", "card", "netbanking"]),
+                is_first: index === 0,
+              },
+            }
+          : {
+              type: "wallet.deposit_received",
+              data: {
+                org_id: orgId,
+                amount_paise: amount,
+                utr: `UTIB${Math.floor(1e11 + Math.random() * 9e11)}`,
+                is_first: false,
+              },
+            },
+      );
     }
   }
-  if (target >= 4 && !has("campaign.live")) {
-    const campaigns = target >= 5 ? 2 : 1;
-    for (let index = 0; index < campaigns; index++) {
-      const campaignId = platformId("cmp");
-      const title = CAMPAIGN_TITLES[index % CAMPAIGN_TITLES.length];
+  if (target >= 3 && reached < 3) {
+    const count = target >= 4 ? 2 : 1;
+    for (let index = 0; index < count; index++) {
+      const item = {
+        id: platformId("cmp"),
+        title:
+          CAMPAIGN_TITLES[(campaigns.length + index) % CAMPAIGN_TITLES.length],
+      };
+      campaigns.push(item);
+      const base = { org_id: orgId, campaign_id: item.id, title: item.title };
       drafts.push(
         {
-          type: "campaign.submitted",
-          data: { org_id: orgId, campaign_id: campaignId, title },
+          type: "campaign.status_changed",
+          data: { ...base, from: "draft", to: "pending_review" },
         },
         {
-          type: "campaign.live",
-          data: { org_id: orgId, campaign_id: campaignId, title },
+          type: "campaign.status_changed",
+          data: { ...base, from: "pending_review", to: "live" },
         },
       );
-      if (target >= 5 && index === 0) {
+      if (target >= 4 && index === 0) {
         drafts.push({
           type: "enrollment.approved",
           data: {
-            org_id: orgId,
-            campaign_id: campaignId,
+            ...base,
             platform_fee_paise: 4900,
             is_first_for_org: true,
           },
@@ -384,22 +697,52 @@ export async function simulateAccount(
     }
   }
 
-  // Advancing a brand that already has history lands its last step within the
-  // hour, so it reads as having just moved on rather than as stuck again.
-  const now = Date.now();
+  const extra = scenario
+    ? scenarioDrafts(scenario, {
+        orgId,
+        userId,
+        campaigns,
+        domain: account.domain,
+      })
+    : [];
+
+  // Scenario events land at fixed ages; the path before them is spread over the
+  // days just before. Without one, advancing a brand that already has history
+  // lands its last step within the hour, so it reads as having just moved on.
   const latest = Math.max(0, ...existing.map((event) => event.occurredAt));
-  const from = latest || now - (drafts.length * 2 + 1) * DAY_MS;
-  const end = latest
-    ? Math.max(from, now - (5 + Math.random() * 50) * 60_000)
-    : now - (now - from) / (drafts.length + 1);
+  const floor = extra.length
+    ? now - Math.max(...extra.map((item) => item.ago)) - HOUR
+    : null;
+  const from = floor
+    ? Math.max(latest, floor - (drafts.length * 2 + 1) * DAY)
+    : latest || now - (drafts.length * 2 + 1) * DAY;
+  const end = floor
+    ? floor
+    : latest
+      ? Math.max(from, now - (5 + Math.random() * 50) * 60_000)
+      : now - (now - from) / (drafts.length + 1);
   const step = (end - from) / Math.max(1, drafts.length);
+  const timed = [
+    ...drafts.map((draft, index) => ({
+      draft,
+      at: Math.round(
+        from +
+          (index + 1) * step -
+          (latest || floor ? 0 : Math.random() * step * 0.4),
+      ),
+    })),
+    ...extra.map(({ ago, ...draft }) => ({
+      draft: draft as Draft,
+      at: now - ago,
+    })),
+  ];
+
   const results = [];
-  for (const [index, draft] of drafts.entries()) {
-    const jitter = latest ? 0 : Math.random() * step * 0.4;
+  for (const { draft, at } of timed) {
     const envelope: Envelope = {
       eventId: platformId("evt"),
       type: draft.type,
-      occurredAt: Math.round(from + (index + 1) * step - jitter),
+      occurredAt: at,
       data: draft.data as Record<string, unknown>,
     };
     results.push({ type: draft.type, ...(await receive(ctx, envelope)) });
@@ -409,31 +752,44 @@ export async function simulateAccount(
 
 /**
  * Local demo data: feeds realistic events through the same path as the webhook.
- * `npx convex run platform:simulate '{"accountId":"…","until":"funded"}'`, or no
- * args to walk every account on the activation path up to its current stage.
+ * `npx convex run platform:simulate '{"accountId":"…","until":"funded"}'`, add
+ * `"scenario":"paused_no_funds"` (see SCENARIOS) to stage a stall or expansion
+ * signal, or no args to walk every account on the path up to its current stage.
  */
 export const simulate = internalMutation({
   args: {
     accountId: v.optional(v.id("accounts")),
     until: v.optional(literals(ACTIVATION_STAGES)),
+    scenario: v.optional(literals(SCENARIOS)),
   },
-  handler: async (ctx, { accountId, until }) => {
+  handler: async (ctx, { accountId, until, scenario }) => {
     if (accountId) {
       const account = await ctx.db.get(accountId);
       if (!account) fail("not_found", "Account not found");
-      const result = await simulateAccount(ctx, account, until ?? "activated");
+      const result = await simulateAccount(
+        ctx,
+        account,
+        until ?? (scenario ? SCENARIO_STAGE[scenario] : "activated"),
+        scenario,
+      );
       await syncAccountActivation(ctx, account._id, Date.now());
       return [result];
     }
     const accounts = await ctx.db.query("accounts").collect();
-    const path = ACTIVATION_STAGES as readonly LifecycleStage[];
     const results = [];
     for (const account of accounts) {
       if (account.archivedAt) continue;
-      const stage = account.stage === "expanding" ? "activated" : account.stage;
-      if (!path.includes(stage)) continue;
+      const stage: LifecycleStage =
+        account.stage === "expanding" ? "activated" : account.stage;
+      if (pathIndex(stage) < 0) continue;
       const fresh = (await ctx.db.get(account._id))!;
-      results.push(await simulateAccount(ctx, fresh, until ?? stage));
+      results.push(
+        await simulateAccount(
+          ctx,
+          fresh,
+          until ?? ACTIVATION_STAGES[pathIndex(stage)],
+        ),
+      );
       await syncAccountActivation(ctx, account._id, Date.now());
     }
     return results;

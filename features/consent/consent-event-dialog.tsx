@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
+import { Textarea } from "@/components/_ui/textarea";
 import {
   Select,
   SelectContent,
@@ -364,7 +365,7 @@ function ConsentForm({
           error={errors.note}
           hint="Kept with the record. What was said, when, and where it's written down."
         >
-          <textarea
+          <Textarea
             id="consent-note"
             rows={3}
             autoFocus
@@ -379,7 +380,6 @@ function ConsentForm({
             aria-describedby={
               errors.note ? "consent-note-error" : "consent-note-hint"
             }
-            className="border-input bg-secondary text-foreground duration-fast placeholder:text-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 aria-invalid:border-danger field-sizing-content max-h-40 min-h-18 w-full resize-none rounded-lg border px-3 py-2.5 text-sm leading-snug transition-[border-color,box-shadow] outline-none focus-visible:ring-3"
           />
         </Field>
         {errors.form && (

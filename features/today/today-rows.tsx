@@ -55,7 +55,7 @@ function RowShell({
       data-cursor={active}
       onMouseMove={() => !active && onHover(id)}
       className={cn(
-        "group/card data-[cursor=true]:bg-row-hover duration-fast before:bg-selected relative flex min-h-13 scroll-my-16 items-start gap-3 px-4 py-3 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:opacity-0 data-[cursor=true]:before:opacity-100 sm:items-center sm:px-5",
+        "group/card animate-item-in data-[cursor=true]:bg-row-hover duration-fast before:bg-selected relative flex min-h-13 scroll-my-16 items-start gap-3 px-4 py-3 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:opacity-0 data-[cursor=true]:before:opacity-100 sm:items-center sm:px-5",
         className,
       )}
     >

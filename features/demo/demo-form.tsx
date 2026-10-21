@@ -5,6 +5,7 @@ import Button from "@/components/_ui/button";
 import { Checkbox } from "@/components/_ui/checkbox";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
+import { Textarea } from "@/components/_ui/textarea";
 import {
   GST_STATES,
   GSTIN_LENGTH,
@@ -79,8 +80,7 @@ const FIELD_IDS: [LeadFormField, string][] = [
 ];
 const DETAIL_FIELDS: LeadFormField[] = ["gstin", "ordersBand", "message"];
 
-const TEXTAREA_CLASS =
-  "border-input bg-secondary text-foreground duration-fast ease-power3-out placeholder:text-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 aria-invalid:border-danger field-sizing-content max-h-48 min-h-20 w-full resize-none rounded-lg border px-3 py-2.5 text-sm leading-snug transition-[border-color,box-shadow] outline-none focus-visible:ring-3 max-sm:text-base";
+const TEXTAREA_CLASS = "max-h-48 min-h-20 max-sm:text-base";
 
 const INPUT_CLASS = "aria-invalid:border-danger h-10 max-sm:text-base";
 
@@ -429,7 +429,7 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
             htmlFor="demo-message"
             error={errors.message}
           >
-            <textarea
+            <Textarea
               id="demo-message"
               name="message"
               rows={3}

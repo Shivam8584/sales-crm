@@ -53,7 +53,6 @@ const STEP_LIST: Record<FunnelStepKey, string> = {
   converted: "/leads?status=converted",
   signed_up: "/accounts?stage=signed_up",
   org_created: "/accounts?stage=org_created",
-  gst_verified: "/accounts?stage=gst_verified",
   funded: "/accounts?stage=funded",
   live: "/accounts?stage=live",
   activated: "/accounts?stage=activated",

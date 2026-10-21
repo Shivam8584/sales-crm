@@ -407,7 +407,7 @@ export function PageToolbar({
         className,
       )}
     >
-      <div className="scrollbar-none relative -my-1 flex min-w-0 flex-1 items-center gap-2 py-1 max-sm:overflow-x-auto sm:flex-wrap">
+      <div className="scrollbar-none relative -my-1 flex min-w-0 flex-1 items-center gap-2 py-1 max-sm:overflow-x-auto max-sm:mask-r-from-[calc(100%-1.5rem)] max-sm:pr-4 sm:flex-wrap">
         {children}
       </div>
       {actions && (

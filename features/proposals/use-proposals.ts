@@ -5,7 +5,12 @@ import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import type { ProposalLine } from "@/lib/domain/pricing";
+import {
+  patchLine,
+  type LinePatch,
+  type Payment,
+  type ProposalLine,
+} from "@/lib/domain/pricing";
 import { formatMoney } from "@/lib/domain/money";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
@@ -14,17 +19,7 @@ export type ProposalRow = FunctionReturnType<
   typeof api.proposals.forDeal
 >[number];
 
-export type LinePatch = Partial<Omit<ProposalLine, "key" | "price">> & {
-  price?: ProposalLine["price"] | null;
-};
-
-function patchLine(line: ProposalLine, patch: LinePatch): ProposalLine {
-  const { price, ...rest } = patch;
-  const next: ProposalLine = { ...line, ...rest };
-  if (price === null) delete next.price;
-  else if (price !== undefined) next.price = price;
-  return next;
-}
+export type { LinePatch };
 
 const fail = (error: unknown, fallback?: string) =>
   toast(readError(error, fallback).message, { tone: "danger" });
@@ -34,7 +29,7 @@ export function useProposalActions(dealId: Id<"deals">) {
   function editLines(
     store: OptimisticLocalStore,
     id: Id<"proposals">,
-    edit: (lines: ProposalLine[]) => ProposalLine[],
+    edit: (lines: ProposalLine[], row: ProposalRow) => ProposalLine[],
   ) {
     const rows = store.getQuery(api.proposals.forDeal, { dealId });
     if (!rows) return;
@@ -42,7 +37,7 @@ export function useProposalActions(dealId: Id<"deals">) {
       api.proposals.forDeal,
       { dealId },
       rows.map((row) =>
-        row._id === id ? { ...row, lines: edit(row.lines) } : row,
+        row._id === id ? { ...row, lines: edit(row.lines, row) } : row,
       ),
     );
   }
@@ -50,9 +45,9 @@ export function useProposalActions(dealId: Id<"deals">) {
   const updateLineMutation = useMutation(
     api.proposals.updateLine,
   ).withOptimisticUpdate((store, { id, key, patch }) =>
-    editLines(store, id, (lines) =>
+    editLines(store, id, (lines, row) =>
       lines.map((line) =>
-        line.key === key ? patchLine(line, patch as LinePatch) : line,
+        line.key === key ? patchLine(line, patch, row.policy) : line,
       ),
     ),
   );
@@ -92,6 +87,14 @@ export function useProposalActions(dealId: Id<"deals">) {
     },
     updateLine: (id: Id<"proposals">, key: string, patch: LinePatch) =>
       updateLineMutation({ id, key, patch }).catch((error) => fail(error)),
+    /** Like `updateLine`, but hands the error back for a form to show on its field. */
+    saveLine: async (id: Id<"proposals">, key: string, patch: LinePatch) => {
+      try {
+        await updateLineMutation({ id, key, patch });
+      } catch (error) {
+        return readError(error, "Couldn't save the line");
+      }
+    },
     addLine: (id: Id<"proposals">, line: ProposalLine, index?: number) =>
       addLineMutation({ id, line, index }).catch((error) => fail(error)),
     removeLine: async (id: Id<"proposals">, line: ProposalLine) => {
@@ -115,7 +118,7 @@ export function useProposalActions(dealId: Id<"deals">) {
       patch: {
         validUntil?: string;
         terms?: string;
-        currency?: ProposalRow["currency"];
+        payment?: Payment;
       },
       label: string,
     ) => {

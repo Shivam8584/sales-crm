@@ -9,20 +9,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/_ui/dropdown-menu";
-import type { Currency } from "@/lib/domain/money";
 import {
-  MARGIN_DEFAULT_BPS,
+  ARCHETYPES,
+  ARCHETYPE_LABEL,
+  COUPON_KIND_LABEL,
   MARKETPLACES,
   MARKETPLACE_LABEL,
   MAX_PRODUCT_LENGTH,
   MAX_SLOTS,
   PRESENTATIONS,
   PRESENTATION_LABEL,
+  PROPOSAL_CURRENCY,
   bpsLabel,
+  isOrderBased,
   marginBand,
+  orderPoolProblem,
   parsePercent,
   rateLabel,
+  usesProductCost,
+  type CompanyPolicy,
+  type LinePatch,
   type LinePricing,
+  type OrderPool,
   type ProposalLine,
   type ProposalPricing,
 } from "@/lib/domain/pricing";
@@ -38,7 +46,6 @@ import {
   parseAmount,
 } from "./amount";
 import { EditableCell, SelectCell, type Parsed } from "./cells";
-import type { LinePatch } from "./use-proposals";
 
 type Column = {
   id: string;
@@ -52,13 +59,20 @@ type Column = {
 type RowContext = {
   line: ProposalLine;
   pricing: LinePricing;
+  policy: CompanyPolicy;
   index: number;
-  currency: Currency;
   readOnly: boolean;
   autoFocus: boolean;
   save: (patch: LinePatch) => void;
+  openSettings: () => void;
 };
 
+const currency = PROPOSAL_CURRENCY;
+
+const ARCHETYPE_OPTIONS = ARCHETYPES.map((value) => ({
+  value,
+  label: ARCHETYPE_LABEL[value],
+}));
 const MARKETPLACE_OPTIONS = MARKETPLACES.map((value) => ({
   value,
   label: MARKETPLACE_LABEL[value],
@@ -92,48 +106,84 @@ function percentResult(text: string): Parsed<number> {
     : { ok: true, value };
 }
 
-function CurrencySymbol({ currency }: { currency: Currency }) {
-  const symbol =
-    new Intl.NumberFormat("en-IN", { style: "currency", currency })
-      .formatToParts(0)
-      .find((part) => part.type === "currency")?.value ?? currency;
-  return <span className="text-fg-tertiary shrink-0">{symbol}</span>;
+function Rupee() {
+  return <span className="text-fg-tertiary shrink-0">₹</span>;
 }
 
-function moneyColumn(
-  id: "orderValue" | "bonus" | "coupon",
-  header: string,
-  width: string,
-  hint: string,
-): Column {
-  return {
-    id,
-    header,
-    hint,
-    width,
-    cell: (row) => {
-      const amount = row.line[id].amount;
-      return (
-        <EditableCell
-          label={`${header} for ${lineName(row)}`}
-          display={amount ? groupedAmount(amount, row.currency) : ""}
-          edit={editableAmount(amount)}
-          placeholder="0"
-          prefix={<CurrencySymbol currency={row.currency} />}
-          parse={amountResult}
-          same={(value) => value === amount}
-          onCommit={(value) =>
-            row.save({ [id]: { amount: value, currency: row.currency } })
-          }
-          readOnly={row.readOnly}
-        />
-      );
-    },
-  };
+/** A cell that doesn't apply to this line's archetype. */
+function NotApplicable({ reason }: { reason: string }) {
+  return (
+    <span
+      title={reason}
+      className="text-fg-tertiary flex h-8 items-center justify-end px-2 text-sm"
+    >
+      <span aria-hidden>—</span>
+      <span className="sr-only">{reason}</span>
+    </span>
+  );
 }
 
-function percentColumn(
-  id: "orderFeeBps" | "bonusFeeBps",
+function AmountCell({
+  row,
+  header,
+  amount,
+  onCommit,
+}: {
+  row: RowContext;
+  header: string;
+  amount: number;
+  onCommit: (value: number) => void;
+}) {
+  return (
+    <EditableCell
+      label={`${header} for ${lineName(row)}`}
+      display={amount ? groupedAmount(amount, currency) : ""}
+      edit={editableAmount(amount)}
+      placeholder="0"
+      prefix={<Rupee />}
+      parse={amountResult}
+      same={(value) => value === amount}
+      onCommit={onCommit}
+      readOnly={row.readOnly}
+    />
+  );
+}
+
+function PercentCell({
+  row,
+  header,
+  bps,
+  check,
+  onCommit,
+}: {
+  row: RowContext;
+  header: string;
+  bps: number;
+  check?: (value: number) => string | null;
+  onCommit: (value: number) => void;
+}) {
+  return (
+    <EditableCell
+      label={`${header} for ${lineName(row)}`}
+      display={bpsLabel(bps).replace("%", "")}
+      edit={bpsLabel(bps).replace("%", "")}
+      suffix={<span className="text-fg-tertiary shrink-0">%</span>}
+      parse={(text) => {
+        const parsed = percentResult(text);
+        const problem = parsed.ok && check?.(parsed.value);
+        return problem ? { ok: false, message: problem } : parsed;
+      }}
+      same={(value) => value === bps}
+      onCommit={onCommit}
+      readOnly={row.readOnly}
+    />
+  );
+}
+
+const ONLINE_ONLY = "Only online purchases fund an order";
+
+function orderColumn(
+  id: "fundBps" | "feeBps",
   header: string,
   hint: string,
 ): Column {
@@ -143,21 +193,34 @@ function percentColumn(
     hint,
     width: "5.25rem",
     cell: (row) => {
-      const bps = row.line[id];
+      const order = row.line.order;
+      if (!order) return <NotApplicable reason={ONLINE_ONLY} />;
       return (
-        <EditableCell
-          label={`${header} for ${lineName(row)}`}
-          display={bpsLabel(bps).replace("%", "")}
-          edit={bpsLabel(bps).replace("%", "")}
-          suffix={<span className="text-fg-tertiary shrink-0">%</span>}
-          parse={percentResult}
-          same={(value) => value === bps}
-          onCommit={(value) => row.save({ [id]: value })}
-          readOnly={row.readOnly}
+        <PercentCell
+          row={row}
+          header={header}
+          bps={order[id]}
+          check={(value) =>
+            id === "fundBps"
+              ? orderPoolProblem(value, order.feeBps)
+              : orderPoolProblem(order.fundBps, value)
+          }
+          onCommit={(value) =>
+            row.save({ order: { ...order, [id]: value } satisfies OrderPool })
+          }
         />
       );
     },
   };
+}
+
+function couponText(line: ProposalLine) {
+  const { coupon } = line;
+  if (coupon.kind === "none") return null;
+  const bonus = formatAmount(coupon.bonus.amount, currency);
+  return coupon.kind === "promo"
+    ? `${COUPON_KIND_LABEL.promo} ${bonus}`
+    : `${COUPON_KIND_LABEL.share} ${bonus} + ${formatAmount(coupon.commission.amount, currency)}`;
 }
 
 const COLUMNS: Column[] = [
@@ -189,13 +252,29 @@ const COLUMNS: Column[] = [
     ),
   },
   {
+    id: "archetype",
+    header: "Campaign",
+    hint: "What the creator does to earn: buy online, receive the product (barter), check in or post content",
+    width: "8.5rem",
+    align: "start",
+    cell: (row) => (
+      <SelectCell
+        label={`Campaign type for ${lineName(row)}`}
+        value={row.line.archetype}
+        options={ARCHETYPE_OPTIONS}
+        onChange={(archetype) => row.save({ archetype })}
+        readOnly={row.readOnly}
+      />
+    ),
+  },
+  {
     id: "slots",
-    header: "Slots / mo",
-    hint: "Verified sales per month",
+    header: "Slots",
+    hint: "Enrollments the campaign takes (max_enrollments)",
     width: "5rem",
     cell: (row) => (
       <EditableCell
-        label={`Slots per month for ${lineName(row)}`}
+        label={`Slots for ${lineName(row)}`}
         display={row.line.slots.toLocaleString("en-IN")}
         edit={String(row.line.slots)}
         inputMode="numeric"
@@ -214,31 +293,141 @@ const COLUMNS: Column[] = [
       />
     ),
   },
-  moneyColumn(
-    "orderValue",
-    "Order value",
-    "6.5rem",
-    "What the creator pays for the product; the brand refunds it",
+  {
+    id: "orderValue",
+    header: "Order value",
+    hint: "Expected order value; on the platform each charge follows the verified order",
+    width: "6.5rem",
+    cell: (row) => {
+      const order = row.line.order;
+      if (!order) return <NotApplicable reason={ONLINE_ONLY} />;
+      return (
+        <AmountCell
+          row={row}
+          header="Order value"
+          amount={order.value.amount}
+          onCommit={(amount) =>
+            row.save({ order: { ...order, value: { amount, currency } } })
+          }
+        />
+      );
+    },
+  },
+  orderColumn(
+    "fundBps",
+    "Fund",
+    "Share of the order the brand funds (order_funding_rate)",
   ),
-  moneyColumn("bonus", "Bonus", "5.5rem", "Creator bonus per verified sale"),
+  orderColumn(
+    "feeBps",
+    "Order cut",
+    "Platform's cut of the order (order_fee_rate). The creator keeps fund − cut, at least 50%.",
+  ),
+  {
+    id: "productCost",
+    header: "Product cost",
+    hint: "Barter: what the product the brand ships costs them. Never billed.",
+    width: "6.5rem",
+    cell: (row) => {
+      if (!usesProductCost(row.line.archetype)) {
+        return <NotApplicable reason="Only barter ships a product" />;
+      }
+      return (
+        <AmountCell
+          row={row}
+          header="Product cost"
+          amount={row.line.productCost?.amount ?? 0}
+          onCommit={(amount) => row.save({ productCost: { amount, currency } })}
+        />
+      );
+    },
+  },
+  {
+    id: "bonus",
+    header: "Bonus",
+    hint: "Flat creator bonus per enrollment (bonus_gross)",
+    width: "5.5rem",
+    cell: (row) => (
+      <AmountCell
+        row={row}
+        header="Bonus"
+        amount={row.line.bonus.amount}
+        onCommit={(amount) => row.save({ bonus: { amount, currency } })}
+      />
+    ),
+  },
+  {
+    id: "bonusFeeBps",
+    header: "Bonus cut",
+    hint: "Platform's cut of the bonus (bonus_fee_rate)",
+    width: "5.25rem",
+    cell: (row) => (
+      <PercentCell
+        row={row}
+        header="Bonus cut"
+        bps={row.line.bonusFeeBps}
+        onCommit={(bonusFeeBps) => row.save({ bonusFeeBps })}
+      />
+    ),
+  },
+  {
+    id: "coupon",
+    header: "Coupon",
+    hint: "Platform-funded creator coupon: promo, or share with a referral commission",
+    width: "8.5rem",
+    align: "start",
+    cell: (row) => {
+      if (!isOrderBased(row.line.archetype)) {
+        return (
+          <NotApplicable reason="Coupons only apply to online purchases" />
+        );
+      }
+      const text = couponText(row.line);
+      if (row.readOnly) {
+        return (
+          <span
+            className={cn(
+              "flex h-8 items-center truncate px-2 text-sm",
+              !text && "text-fg-tertiary",
+            )}
+          >
+            {text ?? "None"}
+          </span>
+        );
+      }
+      return (
+        <button
+          type="button"
+          onClick={row.openSettings}
+          aria-label={`Coupon for ${lineName(row)}: ${text ?? "none"}`}
+          className={cn(
+            "hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex h-8 w-full min-w-0 cursor-pointer items-center rounded-md px-2 text-left text-sm whitespace-nowrap tabular-nums transition-colors outline-none focus-visible:ring-2",
+            !text && "text-fg-tertiary",
+          )}
+        >
+          <span className="truncate">{text ?? "Add coupon"}</span>
+        </button>
+      );
+    },
+  },
   {
     id: "price",
-    header: "Price / sale",
-    hint: `What the brand pays per verified sale. Leave it empty for the ${bpsLabel(MARGIN_DEFAULT_BPS)} default margin.`,
+    header: "Price",
+    hint: "What the brand pays per enrollment, all-in (for barter, including the product they ship). Leave it empty for the default margin.",
     width: "6.5rem",
     cell: (row) => {
       const price = row.line.price?.amount ?? null;
       return (
         <EditableCell
-          label={`Price per sale for ${lineName(row)}`}
-          display={price === null ? "" : groupedAmount(price, row.currency)}
+          label={`Price per enrollment for ${lineName(row)}`}
+          display={price === null ? "" : groupedAmount(price, currency)}
           edit={price === null ? "" : editableAmount(price)}
           placeholder={
             row.pricing.defaultPrice
-              ? groupedAmount(row.pricing.defaultPrice, row.currency)
+              ? groupedAmount(row.pricing.defaultPrice, currency)
               : "0"
           }
-          prefix={<CurrencySymbol currency={row.currency} />}
+          prefix={<Rupee />}
           parse={(text): Parsed<number | null> => {
             if (!text.trim()) return { ok: true, value: null };
             const value = parseAmount(text);
@@ -254,10 +443,7 @@ const COLUMNS: Column[] = [
           same={(value) => value === price}
           onCommit={(value) =>
             row.save({
-              price:
-                value === null
-                  ? null
-                  : { amount: value, currency: row.currency },
+              price: value === null ? null : { amount: value, currency },
             })
           }
           readOnly={row.readOnly}
@@ -269,16 +455,17 @@ const COLUMNS: Column[] = [
   {
     id: "margin",
     header: "Margin",
-    hint: "Margin ÷ price: price − order value − bonus − coupon",
+    hint: "(Price − funded order − bonus − product − coupon − commission) ÷ price",
     width: "4.75rem",
-    cell: ({ pricing, currency }) => {
+    cell: ({ pricing, policy }) => {
       const band = marginBand(
-        pricing.perSale.margin,
-        pricing.perSale.brandCharge,
+        pricing.perEnrollment.margin,
+        pricing.perEnrollment.brandCharge,
+        policy,
       );
       return (
         <span
-          title={`${formatAmount(pricing.perSale.margin, currency)} margin per sale`}
+          title={`${formatAmount(pricing.perEnrollment.margin, currency)} margin per enrollment`}
           className={cn(
             "flex h-8 items-center justify-end gap-1 px-2 text-sm font-medium tabular-nums",
             BAND_TONE[band],
@@ -294,31 +481,15 @@ const COLUMNS: Column[] = [
   },
   {
     id: "take",
-    header: "Take / mo",
-    hint: "Hypedrive fees + margin for the month",
+    header: "Take",
+    hint: "Platform fee + markup − share commission, across all slots",
     width: "6.5rem",
-    cell: ({ pricing, currency }) => (
+    cell: ({ pricing }) => (
       <span className="flex h-8 items-center justify-end px-2 text-sm">
         <Amount value={{ amount: pricing.total.take, currency }} />
       </span>
     ),
   },
-  percentColumn(
-    "orderFeeBps",
-    "Order fee",
-    "Hypedrive's cut of the order value, withheld from the creator",
-  ),
-  percentColumn(
-    "bonusFeeBps",
-    "Bonus fee",
-    "Hypedrive's cut of the bonus, withheld from the creator",
-  ),
-  moneyColumn(
-    "coupon",
-    "Coupon",
-    "6rem",
-    "Funded by Hypedrive out of the margin; the brand never pays it",
-  ),
   {
     id: "marketplace",
     header: "Marketplace",
@@ -337,7 +508,7 @@ const COLUMNS: Column[] = [
   {
     id: "presentation",
     header: "Brand sees",
-    hint: "Bundled shows one price per verified sale; itemised shows the parts",
+    hint: "Bundled shows one price per enrollment; itemised shows the parts",
     width: "7rem",
     align: "start",
     cell: (row) => (
@@ -359,20 +530,22 @@ const STICKY =
 export default function LineTable({
   lines,
   pricing,
-  currency,
+  policy,
   readOnly,
   focusKey,
   onSave,
+  onSettings,
   onDuplicate,
   onRemove,
   footer,
 }: {
   lines: ProposalLine[];
   pricing: ProposalPricing;
-  currency: Currency;
+  policy: CompanyPolicy;
   readOnly: boolean;
   focusKey: string | null;
   onSave: (line: ProposalLine, patch: LinePatch) => void;
+  onSettings: (line: ProposalLine) => void;
   onDuplicate: (line: ProposalLine, index: number) => void;
   onRemove: (line: ProposalLine) => void;
   footer: ReactNode;
@@ -413,7 +586,7 @@ export default function LineTable({
             {COLUMNS.map((column) => (
               <col key={column.id} style={{ width: column.width }} />
             ))}
-            {!readOnly && <col style={{ width: "2.75rem" }} />}
+            <col style={{ width: "2.75rem" }} />
           </colgroup>
           <thead>
             <tr className="h-row">
@@ -433,14 +606,12 @@ export default function LineTable({
                   {column.header}
                 </th>
               ))}
-              {!readOnly && (
-                <th
-                  scope="col"
-                  className="border-border bg-background z-sticky sticky right-0 border-b group-data-[scroll-end=false]/table:shadow-[inset_1px_0_0_var(--line-strong)]"
-                >
-                  <span className="sr-only">Actions</span>
-                </th>
-              )}
+              <th
+                scope="col"
+                className="border-border bg-background z-sticky sticky right-0 border-b group-data-[scroll-end=false]/table:shadow-[inset_1px_0_0_var(--line-strong)]"
+              >
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -448,12 +619,14 @@ export default function LineTable({
               const row: RowContext = {
                 line,
                 pricing: pricing.lines[index],
+                policy,
                 index,
-                currency,
                 readOnly,
                 autoFocus: focusKey === line.key,
                 save: (patch) => onSave(line, patch),
+                openSettings: () => onSettings(line),
               };
+              const issues = row.pricing.issues.length > 0;
               return (
                 <tr
                   key={line.key}
@@ -465,28 +638,31 @@ export default function LineTable({
                       className={cn(
                         "border-border border-b px-2 py-1",
                         columnIndex === 0 && cn(STICKY, "pl-2"),
+                        columnIndex === 0 &&
+                          issues &&
+                          "shadow-[inset_2px_0_0_var(--color-warning)]",
                         index === lines.length - 1 && "border-b-0",
                       )}
                     >
                       {column.cell(row)}
                     </td>
                   ))}
-                  {!readOnly && (
-                    <td
-                      className={cn(
-                        "border-border bg-background group-hover/row:bg-row-hover z-sticky sticky right-0 border-b pr-2 group-data-[scroll-end=false]/table:shadow-[inset_1px_0_0_var(--line-strong)]",
-                        index === lines.length - 1 && "border-b-0",
-                      )}
-                    >
-                      <LineMenu
-                        name={lineName(row)}
-                        priceSet={row.pricing.priceSet}
-                        onReset={() => onSave(line, { price: null })}
-                        onDuplicate={() => onDuplicate(line, index)}
-                        onRemove={() => onRemove(line)}
-                      />
-                    </td>
-                  )}
+                  <td
+                    className={cn(
+                      "border-border bg-background group-hover/row:bg-row-hover z-sticky sticky right-0 border-b pr-2 group-data-[scroll-end=false]/table:shadow-[inset_1px_0_0_var(--line-strong)]",
+                      index === lines.length - 1 && "border-b-0",
+                    )}
+                  >
+                    <LineMenu
+                      name={lineName(row)}
+                      readOnly={readOnly}
+                      priceSet={row.pricing.priceSet}
+                      onSettings={row.openSettings}
+                      onReset={() => onSave(line, { price: null })}
+                      onDuplicate={() => onDuplicate(line, index)}
+                      onRemove={() => onRemove(line)}
+                    />
+                  </td>
                 </tr>
               );
             })}
@@ -500,13 +676,17 @@ export default function LineTable({
 
 function LineMenu({
   name,
+  readOnly,
   priceSet,
+  onSettings,
   onReset,
   onDuplicate,
   onRemove,
 }: {
   name: string;
+  readOnly: boolean;
   priceSet: boolean;
+  onSettings: () => void;
   onReset: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
@@ -523,18 +703,30 @@ function LineMenu({
           <DotsIcon aria-hidden className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-48">
-        <DropdownMenuItem onSelect={onDuplicate}>
-          Duplicate line
+      <DropdownMenuContent align="end" className="min-w-52">
+        <DropdownMenuItem onSelect={onSettings}>
+          {readOnly
+            ? "Coupon and campaign settings"
+            : "Coupon and campaign settings…"}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!priceSet} onSelect={onReset}>
-          Reset to default price
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onRemove} className="text-danger">
-          <TrashIcon aria-hidden className="text-danger size-3.5 shrink-0" />
-          Remove line
-        </DropdownMenuItem>
+        {!readOnly && (
+          <>
+            <DropdownMenuItem onSelect={onDuplicate}>
+              Duplicate line
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!priceSet} onSelect={onReset}>
+              Reset to default price
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onRemove} className="text-danger">
+              <TrashIcon
+                aria-hidden
+                className="text-danger size-3.5 shrink-0"
+              />
+              Remove line
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

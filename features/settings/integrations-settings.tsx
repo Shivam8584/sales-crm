@@ -74,7 +74,7 @@ function IntegrationList() {
 
 function EnvHint({ children }: { children: ReactNode }) {
   return (
-    <p className="caption-style border-border bg-overlay-1 text-fg-secondary border-t px-6 py-3.5 leading-relaxed">
+    <p className="caption-style border-border bg-overlay-1 text-fg-secondary border-t px-4 py-3.5 leading-relaxed sm:px-5">
       {children}
     </p>
   );
@@ -192,7 +192,7 @@ function PlatformCard({ platform }: { platform: Status["platform"] }) {
         )}
       </SettingsRow>
       <div className="border-border flex flex-col border-t">
-        <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:px-5">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <span className="lead-style font-medium">Waiting events</span>
             <span className="caption-style text-fg-tertiary leading-snug">
@@ -243,7 +243,7 @@ function WaitingTable({
         return (
           <li
             key={event._id}
-            className="border-border flex min-h-10.5 items-center gap-3 border-t px-6 py-2"
+            className="border-border flex min-h-10.5 items-center gap-3 border-t px-4 py-2 sm:px-5"
           >
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span className="flex min-w-0 items-center gap-2">

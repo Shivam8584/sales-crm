@@ -5,6 +5,7 @@ import schema from "./schema";
 import { TASK_STATUSES, type TaskStatus } from "../lib/domain/enums";
 import { personName } from "../lib/domain/labels";
 import { cleanText } from "../lib/domain/normalize";
+import { emitAutomationTrigger } from "./lib/automations/engine";
 import { invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import {
@@ -120,6 +121,7 @@ async function logStatus(
   else if (task.status === "done" && from !== "done") {
     subject = `completed the task “${task.title}”`;
     await touchRecords(ctx, refs);
+    await emitAutomationTrigger(ctx, { kind: "task_completed", refs });
   } else if (task.status !== "done" && from === "done") {
     subject = `reopened the task “${task.title}”`;
   }

@@ -3,33 +3,50 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { LifecycleStage, Priority } from "../../lib/domain/enums";
 import {
   ACTIVATION_STAGES,
-  EVENT_STAGE,
+  ACTIVATION_STEP_LABEL,
   PLATFORM_EVENT_LABEL,
+  eventStage,
+  pathIndex,
+  type ActivationStage,
   type PlatformEventType,
 } from "../../lib/domain/platform";
-import { STAGE_LABEL } from "../../lib/domain/labels";
-import { signupEvent } from "./platform";
+import {
+  fundsPaused,
+  isOpenCampaign,
+  liveCampaigns,
+  platformState,
+  type PlatformState,
+  type StateEvent,
+} from "../../lib/domain/platform-state";
+import { gstFailures, signupEvent, stateEvents } from "./platform";
+import { emitAutomationTrigger } from "./automations/engine";
 import { endPosition, taskRefs, upsertAutomatedTask } from "./tasks";
 import { logSystem } from "./timeline";
+
+export type { ActivationStage };
 
 const HOUR = 60 * 60_000;
 const DAY = 24 * HOUR;
 
-/** How long a brand may sit at each step before a rep gets a task. */
+/** How long a brand may sit in each situation before a rep gets a task. */
 export const STALL_THRESHOLDS = {
-  signup_no_org: 24 * HOUR,
-  org_no_gst: 24 * HOUR,
   gst_failed: 0,
+  signup_no_org: 24 * HOUR,
+  paused_no_funds: 0,
+  low_balance: 0,
+  review_escalation: 14 * DAY,
+  review_backlog: 3 * DAY,
+  changes_requested: 48 * HOUR,
   verified_no_topup: 72 * HOUR,
   funded_no_campaign: 3 * DAY,
   review_pending: 48 * HOUR,
   live_no_result: 7 * DAY,
+  renewal_due: 7 * DAY,
 } as const;
 
 export type StallRuleId = keyof typeof STALL_THRESHOLDS;
-export type ActivationStage = (typeof ACTIVATION_STAGES)[number];
 
-export type TimelineEvent = { type: string; occurredAt: number };
+export type TimelineEvent = StateEvent;
 export type StallAccount = {
   name: string;
   stage: LifecycleStage;
@@ -45,6 +62,14 @@ export type Journey = {
   lastEventAt: number | null;
 };
 
+/** Everything a rule can look at. */
+export type StallInput = {
+  account: StallAccount;
+  journey: Journey;
+  state: PlatformState;
+  now: number;
+};
+
 export type StallRule = {
   id: StallRuleId;
   label: string;
@@ -52,20 +77,17 @@ export type StallRule = {
   playbook: string;
   priority: Priority;
   /** Stall start, or null when the rule doesn't apply. */
-  detect: (
-    account: StallAccount,
-    events: TimelineEvent[],
+  detect: (input: StallInput) => number | null;
+  title: (
+    name: string,
+    since: number,
     now: number,
-  ) => number | null;
-  title: (name: string, since: number, now: number) => string;
+    input: StallInput,
+  ) => string;
 };
 
-const BEYOND_ACTIVATION: LifecycleStage[] = ["expanding"];
-
-function stageIndex(type: string) {
-  const stage = EVENT_STAGE[type as PlatformEventType];
-  return stage ? ACTIVATION_STAGES.indexOf(stage as ActivationStage) : -1;
-}
+const stageIndex = (event: TimelineEvent) =>
+  pathIndex(eventStage(event.type, event.data));
 
 /**
  * Where the brand is on the activation path. Platform events are the source of
@@ -77,10 +99,11 @@ export function journey(
 ): Journey {
   const sorted = [...events].sort((a, b) => a.occurredAt - b.occurredAt);
   let index = -1;
-  for (const event of sorted) index = Math.max(index, stageIndex(event.type));
-  const fromAccount = BEYOND_ACTIVATION.includes(account.stage)
-    ? ACTIVATION_STAGES.length - 1
-    : ACTIVATION_STAGES.indexOf(account.stage as ActivationStage);
+  for (const event of sorted) index = Math.max(index, stageIndex(event));
+  const fromAccount =
+    account.stage === "expanding"
+      ? ACTIVATION_STAGES.length - 1
+      : pathIndex(account.stage);
   const reached = Math.max(index, fromAccount);
   const lastEventAt = sorted[sorted.length - 1]?.occurredAt ?? null;
   if (reached === -1) {
@@ -91,7 +114,7 @@ export function journey(
       lastEventAt,
     };
   }
-  const entered = sorted.find((event) => stageIndex(event.type) === reached);
+  const entered = sorted.find((event) => stageIndex(event) === reached);
   return {
     stage: ACTIVATION_STAGES[reached],
     stageAt: entered?.occurredAt ?? lastEventAt ?? account.createdAt,
@@ -109,29 +132,61 @@ export function span(ms: number) {
 
 const ago = (since: number, now: number) => `${span(now - since)} ago`;
 
-function atStage(
-  stage: ActivationStage,
+function past(
   threshold: number,
-  extra?: (journey: Journey) => number | null | false,
-): StallRule["detect"] {
-  return (account, events, now) => {
-    const current = journey(account, events);
-    if (current.stage !== stage) return null;
-    const since = extra ? extra(current) : current.stageAt;
-    if (since === null || since === false) return null;
-    return now - since >= threshold ? since : null;
-  };
+  since: number | null | undefined,
+  now: number,
+): number | null {
+  if (since === null || since === undefined) return null;
+  return now - since >= threshold ? since : null;
 }
 
-const lastGst = (current: Journey) =>
-  current.events
-    .filter((event) => event.type.startsWith("organization.gst_"))
-    .pop();
+const atStage = (input: StallInput, stage: ActivationStage) =>
+  input.journey.stage === stage;
 
-const firstSubmitted = (current: Journey) =>
-  current.events.find((event) => event.type === "campaign.submitted");
+const earliest = (values: number[]) =>
+  values.length ? Math.min(...values) : null;
+
+const worstReview = (input: StallInput) =>
+  [...input.state.reviews].sort((a, b) => a.oldestAt - b.oldestAt)[0];
+
+/** Funding that arrived after the campaign was paused, which the platform doesn't act on. */
+const toppedUpSince = (input: StallInput, since: number) =>
+  input.state.funding.at.some((at) => at > since);
 
 export const STALL_RULES: StallRule[] = [
+  {
+    id: "paused_no_funds",
+    label: "Paused: no funds",
+    description: "A campaign was paused automatically for insufficient funds",
+    playbook:
+      "Call now: they need to top up AND resume the campaign by hand, because nothing resumes it after a top-up. Send the UPI link or virtual account details, then stay on the line while they press Resume.",
+    priority: "urgent",
+    detect: (input) =>
+      past(
+        STALL_THRESHOLDS.paused_no_funds,
+        earliest(fundsPaused(input.state).map((campaign) => campaign.since)),
+        input.now,
+      ),
+    title: (name, since, now, input) =>
+      toppedUpSince(input, since)
+        ? `Get ${name} to resume their paused campaign — topped up but still paused ${span(now - since)}`
+        : `Rescue ${name}: top up and resume — campaign paused for funds ${ago(since, now)}`,
+  },
+  {
+    id: "gst_failed",
+    label: "GST failed",
+    description: "GST verification failed at signup, so no organisation yet",
+    playbook:
+      "Call to find out why: a typo, a cancelled or suspended GSTIN, or a legal name that doesn't match. Walk them through retrying; refer them to a CA partner if the registration itself needs fixing. There's no onboarding without GST.",
+    priority: "high",
+    detect: (input) =>
+      input.journey.stage === "signed_up" || input.journey.stage === null
+        ? past(STALL_THRESHOLDS.gst_failed, input.state.gstFailedAt, input.now)
+        : null,
+    title: (name, since, now) =>
+      `Fix ${name}'s GST so they can create their organisation — failed ${ago(since, now)}`,
+  },
   {
     id: "signup_no_org",
     label: "No organisation",
@@ -139,49 +194,105 @@ export const STALL_RULES: StallRule[] = [
     playbook:
       "Call, then follow up on WhatsApp. Offer to fill in the onboarding form with them on the call: brand name, website, support phone and GSTIN.",
     priority: "high",
-    detect: atStage("signed_up", STALL_THRESHOLDS.signup_no_org),
+    detect: (input) =>
+      atStage(input, "signed_up")
+        ? past(STALL_THRESHOLDS.signup_no_org, input.journey.stageAt, input.now)
+        : null,
     title: (name, since, now) =>
       `Help ${name} create their organisation — signed up ${ago(since, now)}`,
   },
   {
-    id: "org_no_gst",
-    label: "GST not verified",
-    description: "Created an organisation but hasn't verified GST",
+    id: "low_balance",
+    label: "Low balance",
+    description: "Wallet is low or negative while campaigns are live",
     playbook:
-      "Ask for the GSTIN and check it on the GST portal together. If they don't have one yet, note it on the account; there's no onboarding path without GST.",
+      "Ask for a top-up before campaigns pause: share the UPI link and their virtual account for bank transfers. A negative wallet blocks submitting and resuming campaigns.",
     priority: "high",
-    detect: atStage(
-      "org_created",
-      STALL_THRESHOLDS.org_no_gst,
-      (current) => !lastGst(current) && current.stageAt,
-    ),
-    title: (name, since, now) =>
-      `Get ${name} to verify GST — organisation created ${ago(since, now)}`,
+    detect: (input) =>
+      input.state.wallet.status !== "ok" &&
+      liveCampaigns(input.state).length > 0
+        ? past(
+            STALL_THRESHOLDS.low_balance,
+            input.state.wallet.since,
+            input.now,
+          )
+        : null,
+    title: (name, since, now, input) =>
+      input.state.wallet.status === "negative"
+        ? `Get ${name} out of a negative balance — live campaigns at risk since ${ago(since, now)}`
+        : `Get ${name} to top up — balance low with campaigns live, ${ago(since, now)}`,
   },
   {
-    id: "gst_failed",
-    label: "GST failed",
-    description: "Their latest GST verification failed",
+    id: "review_escalation",
+    label: "Reviews stuck 14d+",
+    description: "Creator results have waited 14 days or more for the brand",
     playbook:
-      "Call to find out why: a typo, a cancelled or suspended GSTIN, or a legal name mismatch. Walk them through retrying, or refer them to a CA partner if registration needs fixing.",
+      "Escalate: call the brand owner and agree a review slot today. Creators are waiting to be paid and the platform's own reminders haven't worked; loop in ops if results need an admin decision.",
+    priority: "urgent",
+    detect: (input) => {
+      const review = worstReview(input);
+      return review
+        ? past(STALL_THRESHOLDS.review_escalation, review.oldestAt, input.now)
+        : null;
+    },
+    title: (name, since, now, input) =>
+      `Escalate ${name}'s review backlog — ${worstReview(input)?.count ?? "results"} waiting, oldest ${span(now - since)}`,
+  },
+  {
+    id: "review_backlog",
+    label: "Review backlog",
+    description: "Creator results have waited 3+ days for the brand's review",
+    playbook:
+      "Nudge the brand on WhatsApp with the count waiting, and offer a 10-minute call to review together. Slow reviews put creators off the next campaign.",
     priority: "high",
-    detect: atStage("org_created", STALL_THRESHOLDS.gst_failed, (current) => {
-      const gst = lastGst(current);
-      return gst?.type === "organization.gst_failed" && gst.occurredAt;
-    }),
+    detect: (input) => {
+      const review = worstReview(input);
+      return review
+        ? past(STALL_THRESHOLDS.review_backlog, review.oldestAt, input.now)
+        : null;
+    },
+    title: (name, since, now, input) =>
+      `Get ${name} to review creator results — ${worstReview(input)?.count ?? "some"} waiting, oldest ${span(now - since)}`,
+  },
+  {
+    id: "changes_requested",
+    label: "Not resubmitted",
+    description:
+      "Review asked for changes 48+ hours ago and they haven't resubmitted",
+    playbook:
+      "Call with the reviewer's action items in hand and fix the campaign together, then resubmit on the call.",
+    priority: "high",
+    detect: (input) =>
+      past(
+        STALL_THRESHOLDS.changes_requested,
+        earliest(
+          input.state.campaigns
+            .filter((campaign) => campaign.status === "changes_requested")
+            .map((campaign) => campaign.since),
+        ),
+        input.now,
+      ),
     title: (name, since, now) =>
-      `Fix ${name}'s GST verification — failed ${ago(since, now)}`,
+      `Help ${name} resubmit their campaign — changes requested ${ago(since, now)}`,
   },
   {
     id: "verified_no_topup",
     label: "Not funded",
-    description: "GST verified but hasn't topped up their wallet",
+    description:
+      "Organisation created (GST verified) but the wallet isn't funded",
     playbook:
-      "Send a UPI top-up link on WhatsApp and remind them the minimum is ₹100. Share their virtual account details for bank transfers and recap the expected return on a first campaign.",
+      "Send a UPI top-up link on WhatsApp, or share their virtual account for a bank transfer. Recap the expected return on a first campaign.",
     priority: "urgent",
-    detect: atStage("gst_verified", STALL_THRESHOLDS.verified_no_topup),
+    detect: (input) =>
+      atStage(input, "org_created")
+        ? past(
+            STALL_THRESHOLDS.verified_no_topup,
+            input.journey.stageAt,
+            input.now,
+          )
+        : null,
     title: (name, since, now) =>
-      `Get ${name} to top up — GST verified ${ago(since, now)}`,
+      `Get ${name} to fund their wallet — organisation created ${ago(since, now)}`,
   },
   {
     id: "funded_no_campaign",
@@ -190,28 +301,38 @@ export const STALL_RULES: StallRule[] = [
     playbook:
       "Offer assisted setup: add their first listing from the marketplace link, pick a slot count that fits the balance, and submit the campaign together on a call.",
     priority: "high",
-    detect: atStage(
-      "funded",
-      STALL_THRESHOLDS.funded_no_campaign,
-      (current) => !firstSubmitted(current) && current.stageAt,
-    ),
+    detect: (input) =>
+      atStage(input, "funded") && input.state.campaigns.length === 0
+        ? past(
+            STALL_THRESHOLDS.funded_no_campaign,
+            input.journey.stageAt,
+            input.now,
+          )
+        : null,
     title: (name, since, now) =>
       `Get ${name} to submit a campaign — funded ${ago(since, now)}`,
   },
   {
     id: "review_pending",
     label: "Stuck in review",
-    description: "Campaign submitted but not live yet",
+    description: "First campaign submitted but not approved yet",
     playbook:
-      "Internal SLA: escalate to ops to finish pricing review. If changes were requested, call the brand with the fixes, then let them know when it goes live.",
+      "Internal SLA: escalate to ops to finish the pricing review, then tell the brand when it's approved.",
     priority: "high",
-    detect: atStage(
-      "funded",
-      STALL_THRESHOLDS.review_pending,
-      (current) => firstSubmitted(current)?.occurredAt ?? null,
-    ),
+    detect: (input) =>
+      atStage(input, "funded")
+        ? past(
+            STALL_THRESHOLDS.review_pending,
+            earliest(
+              input.state.campaigns
+                .filter((campaign) => campaign.status === "pending_review")
+                .map((campaign) => campaign.since),
+            ),
+            input.now,
+          )
+        : null,
     title: (name, since, now) =>
-      `Get ${name}'s campaign live — in review for ${span(now - since)}`,
+      `Get ${name}'s campaign approved — in review for ${span(now - since)}`,
   },
   {
     id: "live_no_result",
@@ -220,9 +341,40 @@ export const STALL_RULES: StallRule[] = [
     playbook:
       "Check slot fill and pending enrollments. If slots aren't filling, suggest a higher bonus or price; if results are waiting, nudge the brand to review them.",
     priority: "normal",
-    detect: atStage("live", STALL_THRESHOLDS.live_no_result),
+    detect: (input) =>
+      atStage(input, "live")
+        ? past(
+            STALL_THRESHOLDS.live_no_result,
+            input.journey.stageAt,
+            input.now,
+          )
+        : null,
     title: (name, since, now) =>
       `Get ${name} their first approved result — live ${ago(since, now)}`,
+  },
+  {
+    id: "renewal_due",
+    label: "Renewal due",
+    description: "Every campaign has ended and nothing new in 7 days",
+    playbook:
+      "Share the results of the last campaign, then pitch the next one: new SKUs, another marketplace, or more slots on what sold out.",
+    priority: "normal",
+    detect: (input) => {
+      const { campaigns } = input.state;
+      if (campaigns.length === 0 || campaigns.some(isOpenCampaign)) return null;
+      const ended = campaigns.flatMap((campaign) =>
+        campaign.status === "ended" && campaign.endedAt
+          ? [campaign.endedAt]
+          : [],
+      );
+      return past(
+        STALL_THRESHOLDS.renewal_due,
+        ended.length ? Math.max(...ended) : null,
+        input.now,
+      );
+    },
+    title: (name, since, now) =>
+      `Pitch ${name}'s next campaign — last one ended ${ago(since, now)}`,
   },
 ];
 
@@ -230,17 +382,37 @@ export const STALL_RULE = Object.fromEntries(
   STALL_RULES.map((rule) => [rule.id, rule]),
 ) as Record<StallRuleId, StallRule>;
 
-export type Stall = { rule: StallRule; since: number };
+export type Stall = { rule: StallRule; since: number; title: string };
 
-/** The step the brand is stuck on, if any. Rules are mutually exclusive by stage. */
+export function stallInput(
+  account: StallAccount,
+  events: TimelineEvent[],
+  now: number,
+): StallInput {
+  return {
+    account,
+    journey: journey(account, events),
+    state: platformState(events, now),
+    now,
+  };
+}
+
+/** The most pressing thing the brand is stuck on; rules are ordered by urgency. */
 export function detectStall(
   account: StallAccount,
   events: TimelineEvent[],
   now: number,
 ): Stall | null {
+  const input = stallInput(account, events, now);
   for (const rule of STALL_RULES) {
-    const since = rule.detect(account, events, now);
-    if (since !== null) return { rule, since };
+    const since = rule.detect(input);
+    if (since !== null) {
+      return {
+        rule,
+        since,
+        title: rule.title(account.name, since, now, input),
+      };
+    }
   }
   return null;
 }
@@ -268,7 +440,7 @@ export async function platformAccounts(ctx: QueryCtx) {
   });
 }
 
-/** Processed platform events for the account's org, plus its people's signups before an org exists. */
+/** Processed platform events for the account's org, plus its people's signups and GST failures before an org exists. */
 export async function accountEvents(
   ctx: QueryCtx,
   account: Doc<"accounts">,
@@ -291,11 +463,10 @@ export async function accountEvents(
       if (!person.platformUserId) continue;
       const signup = await signupEvent(ctx, person.platformUserId);
       if (signup) rows.push(signup);
+      rows.push(...(await gstFailures(ctx, person.platformUserId)));
     }
   }
-  return rows
-    .filter((row) => row.processedAt)
-    .map((row) => ({ type: row.type, occurredAt: row.occurredAt }));
+  return stateEvents(rows);
 }
 
 export function stallAccount(account: Doc<"accounts">): StallAccount {
@@ -377,8 +548,8 @@ export async function accountStall(
   const list = events ?? (await accountEvents(ctx, account));
   const input = stallAccount(account);
   const stall = detectStall(input, list, now);
-  const stage = journey(input, list).stage;
-  return stall && stage ? { ...stall, stage } : null;
+  const stage = journey(input, list).stage ?? "signed_up";
+  return stall ? { ...stall, stage } : null;
 }
 
 function clearReason(account: Doc<"accounts"> | null, events: TimelineEvent[]) {
@@ -388,10 +559,10 @@ function clearReason(account: Doc<"accounts"> | null, events: TimelineEvent[]) {
   }
   const current = journey(stallAccount(account), events);
   const entered = events.some(
-    (event) => EVENT_STAGE[event.type as PlatformEventType] === current.stage,
+    (event) => eventStage(event.type, event.data) === current.stage,
   );
   if (current.stage && !entered) {
-    return `${account.name} moved to ${STAGE_LABEL[current.stage]}`;
+    return `${account.name} moved to ${ACTIVATION_STEP_LABEL[current.stage]}`;
   }
   const latest = current.events[current.events.length - 1];
   const label =
@@ -408,7 +579,7 @@ type Assignees = { fallback: Id<"members"> | undefined | null };
 
 /**
  * Opens the task for the account's current stall and closes its activation
- * tasks for any other step. Returns what changed.
+ * tasks for any other rule. Returns what changed.
  */
 async function syncAccount(
   ctx: MutationCtx,
@@ -431,10 +602,9 @@ async function syncAccount(
       assigneeId = assignees.fallback;
     }
     if (assigneeId) {
-      const title = stall.rule.title(account.name, stall.since, now);
       const result = await upsertAutomatedTask(ctx, {
         automationKey: key,
-        title,
+        title: stall.title,
         notes: stall.rule.playbook,
         priority: stall.rule.priority,
         assigneeId,
@@ -442,13 +612,18 @@ async function syncAccount(
         accountId: account._id,
       });
       if (result.outcome !== "unchanged") {
+        await emitAutomationTrigger(ctx, {
+          kind: "stall_started",
+          refs: { accountId: account._id },
+          value: stall.rule.id,
+        });
         changes.push({
           outcome: result.outcome,
           taskId: result.id,
           accountId: account._id,
           accountName: account.name,
           rule: stall.rule.label,
-          detail: title,
+          detail: stall.title,
         });
       }
     }

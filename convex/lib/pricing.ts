@@ -1,18 +1,25 @@
 import { v, type Infer } from "convex/values";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { Currency, Money } from "../../lib/domain/money";
+import type { Money } from "../../lib/domain/money";
 import {
   APPROVAL_STATES,
+  ARCHETYPES,
   MARKETPLACES,
   MAX_LINES,
-  MAX_PRODUCT_LENGTH,
   MAX_REASON_LENGTH,
-  MAX_SLOTS,
   MAX_TERMS_LENGTH,
+  PAYMENT_MODES,
   PRESENTATIONS,
+  PROPOSAL_CURRENCY,
   PROPOSAL_STATUSES,
-  BPS,
+  SLOT_MODES,
+  lineProblem,
+  patchLine,
+  paymentProblem,
+  type CompanyPolicy,
+  type LinePatch,
+  type Payment,
   type ProposalLine,
 } from "../../lib/domain/pricing";
 import { cleanText, isValidDay } from "../../lib/domain/normalize";
@@ -24,19 +31,54 @@ export const vProposalStatus = literals(PROPOSAL_STATUSES);
 export const vMarketplace = literals(MARKETPLACES);
 export const vPresentation = literals(PRESENTATIONS);
 export const vApprovalState = literals(APPROVAL_STATES);
+export const vArchetype = literals(ARCHETYPES);
+export const vSlotMode = literals(SLOT_MODES);
+export const vPaymentMode = literals(PAYMENT_MODES);
+
+export const vOrderPool = v.object({
+  value: vMoney,
+  fundBps: v.number(),
+  feeBps: v.number(),
+});
+
+export const vCoupon = v.union(
+  v.object({ kind: v.literal("none") }),
+  v.object({ kind: v.literal("promo"), bonus: vMoney }),
+  v.object({ kind: v.literal("share"), bonus: vMoney, commission: vMoney }),
+);
 
 export const vProposalLine = v.object({
   key: v.string(),
   product: v.string(),
   marketplace: vMarketplace,
-  orderValue: vMoney,
-  slots: v.number(),
+  archetype: vArchetype,
+  order: v.optional(vOrderPool),
   bonus: vMoney,
-  orderFeeBps: v.number(),
   bonusFeeBps: v.number(),
-  coupon: vMoney,
+  productCost: v.optional(vMoney),
+  coupon: vCoupon,
+  slots: v.number(),
+  slotMode: vSlotMode,
+  expiryDays: v.number(),
+  oversubscribe: v.number(),
   price: v.optional(vMoney),
   presentation: vPresentation,
+});
+
+export const vPayment = v.object({
+  mode: vPaymentMode,
+  creditLimit: v.optional(vMoney),
+});
+
+/** The policy a sent proposal was priced under. */
+export const vPolicy = v.object({
+  marginFloorBps: v.number(),
+  approvalBps: v.number(),
+  defaultMarginBps: v.number(),
+  defaultFundBps: v.number(),
+  defaultFeeBps: v.number(),
+  defaultBonusFeeBps: v.number(),
+  platformFloor: v.object({ rateBps: v.number(), minimum: v.number() }),
 });
 
 export const vApproval = v.object({
@@ -50,101 +92,96 @@ export const vApproval = v.object({
 
 export type Approval = Infer<typeof vApproval>;
 
-/** Editable fields of a line; `price: null` returns it to the default-margin price. */
+/** Editable fields of a line; `null` clears `order`, `productCost` and `price`. */
 export const vLinePatch = v.object({
   product: v.optional(v.string()),
   marketplace: v.optional(vMarketplace),
-  orderValue: v.optional(vMoney),
-  slots: v.optional(v.number()),
+  archetype: v.optional(vArchetype),
+  order: v.optional(v.union(vOrderPool, v.null())),
   bonus: v.optional(vMoney),
-  orderFeeBps: v.optional(v.number()),
   bonusFeeBps: v.optional(v.number()),
-  coupon: v.optional(vMoney),
+  productCost: v.optional(v.union(vMoney, v.null())),
+  coupon: v.optional(vCoupon),
+  slots: v.optional(v.number()),
+  slotMode: v.optional(vSlotMode),
+  expiryDays: v.optional(v.number()),
+  oversubscribe: v.optional(v.number()),
   price: v.optional(v.union(vMoney, v.null())),
   presentation: v.optional(vPresentation),
 });
 
-export type LinePatch = Infer<typeof vLinePatch>;
-
-function sameCurrency(value: Money, currency: Currency, field: string) {
+function rupees(value: Money, field: string): Money {
   assertMoney(value, field);
-  if (value.currency !== currency) {
-    invalid(field, `Use ${currency}, the proposal's currency`);
+  if (value.currency !== PROPOSAL_CURRENCY) {
+    invalid(field, `Proposals are priced in ${PROPOSAL_CURRENCY}`);
   }
-  return value;
-}
-
-function cleanBps(value: number, field: string) {
-  if (!Number.isInteger(value) || value < 0 || value > BPS) {
-    invalid(field, "Enter a rate between 0% and 100%");
-  }
-  return value;
+  return { amount: value.amount, currency: value.currency };
 }
 
 /**
- * Product names may be empty while a draft is being filled in; `requireComplete`
- * enforces them before the proposal leaves the building.
+ * Normalises a line and enforces the platform's pricing rules. Product names
+ * may be empty while a draft is filled in; `requireComplete` catches them.
  */
-export function cleanLine(
-  line: ProposalLine,
-  currency: Currency,
-): ProposalLine {
-  const product = cleanText(line.product) ?? "";
-  if (product.length > MAX_PRODUCT_LENGTH) {
-    invalid("product", "Keep the product name shorter");
-  }
-  if (
-    !Number.isInteger(line.slots) ||
-    line.slots < 1 ||
-    line.slots > MAX_SLOTS
-  ) {
-    invalid(
-      "slots",
-      `Enter between 1 and ${MAX_SLOTS.toLocaleString("en-IN")} slots`,
-    );
-  }
-  const price = line.price
-    ? sameCurrency(line.price, currency, "price")
-    : undefined;
-  if (price && price.amount === 0) invalid("price", "Enter a price above zero");
-  return {
+export function cleanLine(line: ProposalLine): ProposalLine {
+  const clean: ProposalLine = {
     key: line.key,
-    product,
+    product: cleanText(line.product) ?? "",
     marketplace: line.marketplace,
-    orderValue: sameCurrency(line.orderValue, currency, "orderValue"),
+    archetype: line.archetype,
+    ...(line.order
+      ? {
+          order: {
+            value: rupees(line.order.value, "orderValue"),
+            fundBps: line.order.fundBps,
+            feeBps: line.order.feeBps,
+          },
+        }
+      : {}),
+    bonus: rupees(line.bonus, "bonus"),
+    bonusFeeBps: line.bonusFeeBps,
+    ...(line.productCost
+      ? { productCost: rupees(line.productCost, "productCost") }
+      : {}),
+    coupon:
+      line.coupon.kind === "none"
+        ? { kind: "none" }
+        : line.coupon.kind === "promo"
+          ? { kind: "promo", bonus: rupees(line.coupon.bonus, "couponBonus") }
+          : {
+              kind: "share",
+              bonus: rupees(line.coupon.bonus, "couponBonus"),
+              commission: rupees(line.coupon.commission, "commission"),
+            },
     slots: line.slots,
-    bonus: sameCurrency(line.bonus, currency, "bonus"),
-    orderFeeBps: cleanBps(line.orderFeeBps, "orderFeeBps"),
-    bonusFeeBps: cleanBps(line.bonusFeeBps, "bonusFeeBps"),
-    coupon: sameCurrency(line.coupon, currency, "coupon"),
-    ...(price ? { price } : {}),
+    slotMode: line.slotMode,
+    expiryDays: line.expiryDays,
+    oversubscribe: line.oversubscribe,
+    ...(line.price ? { price: rupees(line.price, "price") } : {}),
     presentation: line.presentation,
   };
+  const problem = lineProblem(clean);
+  if (problem) invalid(problem.field, problem.message);
+  return clean;
 }
 
 export function applyLinePatch(
   line: ProposalLine,
   patch: LinePatch,
-  currency: Currency,
+  policy: CompanyPolicy,
 ): ProposalLine {
-  const { price, ...rest } = patch;
-  const next: ProposalLine = { ...line, ...rest };
-  if (price === null) delete next.price;
-  else if (price !== undefined) next.price = price;
-  return cleanLine(next, currency);
+  return cleanLine(patchLine(line, patch, policy));
 }
 
-/** A proposal has to be complete before it is sent or approved. */
-export function requireComplete(lines: ProposalLine[]) {
-  if (lines.length === 0) invalid("lines", "Add at least one line");
-  lines.forEach((line, index) => {
-    if (!line.product) {
-      invalid("product", `Name the product on line ${index + 1}`);
-    }
-    if (line.orderValue.amount + line.bonus.amount === 0) {
-      invalid("orderValue", `Add an order value or bonus on line ${index + 1}`);
-    }
-  });
+export function cleanPayment(payment: Payment): Payment {
+  const clean: Payment = {
+    mode: payment.mode,
+    ...(payment.creditLimit
+      ? { creditLimit: rupees(payment.creditLimit, "creditLimit") }
+      : {}),
+  };
+  const problem = paymentProblem(clean);
+  if (problem) invalid(problem.field, problem.message);
+  return clean;
 }
 
 export function checkLineCount(count: number) {

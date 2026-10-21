@@ -19,6 +19,7 @@ import {
 import Field from "@/components/_ui/field";
 import Kbd from "@/components/_ui/kbd";
 import { Input } from "@/components/_ui/input";
+import { Textarea } from "@/components/_ui/textarea";
 import Skeleton from "@/components/_ui/skeleton";
 import OptionPicker, { type Option } from "@/components/fields/option-picker";
 import AccountPicker from "@/features/accounts/account-picker";
@@ -441,7 +442,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
           />
         </Field>
         <Field label="Description" htmlFor="task-notes" error={errors.notes}>
-          <textarea
+          <Textarea
             id="task-notes"
             value={draft.notes}
             maxLength={5000}
@@ -449,7 +450,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
             placeholder="Context, links, what was promised…"
             rows={3}
             aria-invalid={errors.notes ? true : undefined}
-            className="border-input bg-secondary text-foreground placeholder:text-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 duration-fast aria-invalid:border-danger field-sizing-content max-h-60 min-h-22 w-full resize-none rounded-lg border px-3 py-2.5 text-sm leading-snug transition-[border-color,box-shadow] outline-none focus-visible:ring-3"
+            className="max-h-60 min-h-22"
           />
         </Field>
         <Choice label="Priority">

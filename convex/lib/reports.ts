@@ -8,8 +8,9 @@ import { LEAD_SOURCE_LABEL, type Utm } from "../../lib/domain/leads";
 import { sumMoney, type Money } from "../../lib/domain/money";
 import {
   ACTIVATION_STAGES,
-  EVENT_STAGE,
-  type PlatformEventType,
+  ACTIVATION_STEP_LABEL,
+  eventStage,
+  type ActivationStage,
 } from "../../lib/domain/platform";
 
 /**
@@ -103,6 +104,8 @@ export type EventInput = {
   userId?: string;
   occurredAt: number;
   payload: string;
+  processedAt?: number;
+  ignored?: string;
 };
 export type DealInput = {
   stage: DealStage;
@@ -118,12 +121,11 @@ export const FUNNEL_STEPS = [
   { key: "contacted", label: "Contacted" },
   { key: "demo", label: "Demo booked" },
   { key: "converted", label: "Converted to account" },
-  { key: "signed_up", label: "Signed up" },
-  { key: "org_created", label: "Org created" },
-  { key: "gst_verified", label: "GST verified" },
-  { key: "funded", label: "Funded" },
-  { key: "live", label: "Live" },
-  { key: "activated", label: "Activated" },
+  { key: "signed_up", label: ACTIVATION_STEP_LABEL.signed_up },
+  { key: "org_created", label: ACTIVATION_STEP_LABEL.org_created },
+  { key: "funded", label: ACTIVATION_STEP_LABEL.funded },
+  { key: "live", label: ACTIVATION_STEP_LABEL.live },
+  { key: "activated", label: ACTIVATION_STEP_LABEL.activated },
 ] as const;
 export type FunnelStepKey = (typeof FUNNEL_STEPS)[number]["key"];
 export const FIRST_PLATFORM_STEP = 4;
@@ -141,7 +143,7 @@ const STAGE_STEP: Partial<Record<LifecycleStage, number>> = {
   demo: DEMO,
   signed_up: step("signed_up"),
   org_created: step("org_created"),
-  gst_verified: step("gst_verified"),
+  gst_verified: step("org_created"),
   funded: step("funded"),
   live: step("live"),
   activated: ACTIVATED,
@@ -167,22 +169,16 @@ export function sourceOf(lead: Pick<LeadInput, "utm" | "source">) {
 }
 const ACCOUNT_SOURCE_LABEL = "Added as account";
 
-type ActivationStage = (typeof ACTIVATION_STAGES)[number];
 type Timeline = Partial<Record<ActivationStage, number>>;
 
-function readCreator(payload: string): string | undefined {
+function readPayload(payload: string): Record<string, unknown> {
   try {
-    const data = JSON.parse(payload) as {
-      created_by?: unknown;
-      data?: unknown;
-    };
-    const body =
-      data.data && typeof data.data === "object"
-        ? (data.data as { created_by?: unknown })
-        : data;
-    return typeof body.created_by === "string" ? body.created_by : undefined;
+    const data: unknown = JSON.parse(payload);
+    return data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -201,9 +197,9 @@ export function orgTimelines(
   };
 
   for (const event of events) {
-    const stage = EVENT_STAGE[event.type as PlatformEventType] as
-      | ActivationStage
-      | undefined;
+    if (event.ignored || event.processedAt === undefined) continue;
+    const data = readPayload(event.payload);
+    const stage = eventStage(event.type, data);
     if (!stage) continue;
     if (stage === "signed_up") {
       if (!event.userId) continue;
@@ -217,9 +213,9 @@ export function orgTimelines(
     const timeline = orgs.get(event.orgId) ?? {};
     earliest(timeline, stage, event.occurredAt);
     orgs.set(event.orgId, timeline);
-    if (stage === "org_created") {
-      const creator = readCreator(event.payload);
-      if (creator) creators.set(event.orgId, creator);
+    if (event.type === "organization.created") {
+      const creator = data.created_by;
+      if (typeof creator === "string") creators.set(event.orgId, creator);
     }
   }
 
@@ -503,8 +499,8 @@ export function speedByOwner(
 }
 
 export const ACTIVATION_STEPS = [
-  ["signed_up", "gst_verified"],
-  ["gst_verified", "funded"],
+  ["signed_up", "org_created"],
+  ["org_created", "funded"],
   ["funded", "live"],
   ["live", "activated"],
 ] as const satisfies readonly (readonly [ActivationStage, ActivationStage])[];

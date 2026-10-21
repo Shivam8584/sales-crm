@@ -17,6 +17,7 @@ import {
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
+import { Textarea } from "@/components/_ui/textarea";
 import MemberPicker from "@/features/members/member-picker";
 import { useViewer } from "@/hooks/use-viewer";
 import { checkGstin, gstinError } from "@/lib/domain/gstin";
@@ -231,13 +232,12 @@ export default function CreateLeadDialog() {
               </Field>
             </div>
             <Field label="Notes" htmlFor="lead-message" error={errors.message}>
-              <textarea
+              <Textarea
                 id="lead-message"
                 rows={3}
                 value={values.message}
                 onChange={(event) => set("message", event.target.value)}
                 placeholder="What they asked about, where you met"
-                className="border-input bg-secondary text-foreground duration-fast placeholder:text-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 field-sizing-content max-h-40 min-h-18 w-full resize-none rounded-lg border px-3 py-2.5 text-sm leading-snug transition-[border-color,box-shadow] outline-none focus-visible:ring-3"
               />
             </Field>
             <div className="flex flex-col gap-2">

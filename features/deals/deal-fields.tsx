@@ -359,7 +359,7 @@ export function DealPeopleMenu({
                       ) : (
                         <UncheckedIcon
                           aria-hidden
-                          className="text-ring size-4 shrink-0"
+                          className="text-fg-tertiary size-4 shrink-0"
                         />
                       )}
                       <Avatar name={personName(person)} size="sm" />

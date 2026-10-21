@@ -1,15 +1,12 @@
 import type { ReactNode } from "react";
-import type { Currency } from "@/lib/domain/money";
 import {
-  MARGIN_APPROVAL_BPS,
-  MARGIN_DEFAULT_BPS,
-  MARGIN_FLOOR_BPS,
-  MARGIN_TARGET_BPS,
-  MARKETPLACE_LABEL,
+  PROPOSAL_CURRENCY,
+  TAX_BPS,
   approvalReasons,
   bpsLabel,
   marginBand,
   rateLabel,
+  type CompanyPolicy,
   type LinePricing,
   type ProposalLine,
   type ProposalPricing,
@@ -17,8 +14,10 @@ import {
 import { cn } from "@/lib/utils";
 import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
 import { Amount } from "./amount";
+import { brandLineMeta, brandParts, productNote } from "./brand-view";
 
 const SCALE_BPS = 4_000;
+const currency = PROPOSAL_CURRENCY;
 
 const BAND_TEXT = {
   below_floor: "text-danger",
@@ -37,6 +36,8 @@ const BAND_FILL = {
 function position(bps: number) {
   return `${Math.min(100, Math.max(0, (bps / SCALE_BPS) * 100))}%`;
 }
+
+const money = (amount: number) => <Amount value={{ amount, currency }} />;
 
 function Card({
   eyebrow,
@@ -68,16 +69,29 @@ function Card({
 
 function Row({
   label,
+  hint,
   children,
   strong,
+  indent,
 }: {
   label: string;
+  hint?: string;
   children: ReactNode;
   strong?: boolean;
+  indent?: boolean;
 }) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-3 py-1.5">
-      <dt className="text-fg-secondary truncate text-sm">{label}</dt>
+      <dt
+        title={hint}
+        className={cn(
+          "truncate text-sm",
+          strong ? "text-foreground font-medium" : "text-fg-secondary",
+          indent && "pl-3",
+        )}
+      >
+        {label}
+      </dt>
       <dd
         className={cn(
           "shrink-0 text-sm tabular-nums",
@@ -90,22 +104,24 @@ function Row({
   );
 }
 
-/** Margin on a 0–40% scale with the floor, approval line, target band and default marked. */
+/** Margin on a 0–40% scale with the policy's floor, approval line and default marked. */
 function MarginGauge({
   margin,
   charge,
   rate,
+  policy,
 }: {
   margin: number;
   charge: number;
   rate: number;
+  policy: CompanyPolicy;
 }) {
-  const band = marginBand(margin, charge);
+  const band = marginBand(margin, charge, policy);
   const bps = Math.round(rate * 10_000);
   const marks = [
-    { bps: MARGIN_FLOOR_BPS, label: "Floor" },
-    { bps: MARGIN_APPROVAL_BPS, label: "Approval" },
-    { bps: MARGIN_DEFAULT_BPS, label: "Default" },
+    { bps: policy.marginFloorBps, label: "Floor" },
+    { bps: policy.approvalBps, label: "Approval" },
+    { bps: policy.defaultMarginBps, label: "Default" },
   ];
   return (
     <div className="flex flex-col gap-2">
@@ -122,22 +138,22 @@ function MarginGauge({
         aria-label="Blended margin"
         aria-valuemin={0}
         aria-valuemax={SCALE_BPS / 100}
-        aria-valuenow={Math.round(bps) / 100}
-        aria-valuetext={`${rateLabel(rate)}; floor ${bpsLabel(MARGIN_FLOOR_BPS)}, default ${bpsLabel(MARGIN_DEFAULT_BPS)}`}
+        aria-valuenow={Math.max(0, Math.min(SCALE_BPS, bps)) / 100}
+        aria-valuetext={`${rateLabel(rate)}; floor ${bpsLabel(policy.marginFloorBps)}, approval under ${bpsLabel(policy.approvalBps)}, default ${bpsLabel(policy.defaultMarginBps)}`}
         className="bg-track relative h-1.5 rounded-full"
       >
         <span
           aria-hidden
           className="bg-success/25 absolute inset-y-0 rounded-full"
           style={{
-            left: position(MARGIN_TARGET_BPS.min),
-            right: `calc(100% - ${position(MARGIN_TARGET_BPS.max)})`,
+            left: position(policy.approvalBps),
+            right: `calc(100% - ${position(policy.defaultMarginBps)})`,
           }}
         />
         <span
           aria-hidden
           className="bg-danger/40 absolute inset-y-0 left-0 rounded-l-full"
-          style={{ width: position(MARGIN_FLOOR_BPS) }}
+          style={{ width: position(policy.marginFloorBps) }}
         />
         {charge > 0 && (
           <span
@@ -167,55 +183,104 @@ function MarginGauge({
 
 /** Every number behind the price: the team's view. */
 export function InternalTotals({
+  lines,
   pricing,
-  currency,
+  policy,
 }: {
+  lines: ProposalLine[];
   pricing: ProposalPricing;
-  currency: Currency;
+  policy: CompanyPolicy;
 }) {
   const { total } = pricing;
-  const money = (amount: number) => <Amount value={{ amount, currency }} />;
-  const warnings = approvalReasons(pricing);
+  const reasons = approvalReasons(pricing, policy);
+  const enrollments = pricing.lines.reduce(
+    (sum, line) => sum + line.maxEnrollments,
+    0,
+  );
+  const slots = lines.reduce((sum, line) => sum + line.slots, 0);
   return (
     <Card eyebrow="Internal" note="Only your team sees this">
       <div className="flex flex-col gap-1.5">
-        <span className="caption-style text-fg-tertiary">
-          Hypedrive take per month
-        </span>
+        <span className="caption-style text-fg-tertiary">Hypedrive take</span>
         <span className="text-display leading-none font-medium">
           {money(total.take)}
         </span>
         <span className="caption-style text-fg-secondary">
-          Fees {rateLabel(pricing.takeRate - pricing.marginRate)} + margin{" "}
-          {rateLabel(pricing.marginRate)} of the brand charge
+          {rateLabel(pricing.takeRate)} of the brand price ·{" "}
+          {rateLabel(pricing.marginRate)} margin
         </span>
       </div>
       <dl className="divide-border flex flex-col divide-y">
-        <Row label="Brand charge / mo">{money(total.brandCharge)}</Row>
-        <Row label="Creator payouts / mo">{money(total.creatorPayout)}</Row>
-        <Row label="Order fees">{money(total.orderFee)}</Row>
-        <Row label="Bonus fees">{money(total.bonusFee)}</Row>
-        {total.coupon > 0 && (
-          <Row label="Coupons (Hypedrive-funded)">{money(-total.coupon)}</Row>
+        <Row label="Brand billed, excl. GST">{money(total.billed)}</Row>
+        <Row
+          label="Creator payouts"
+          hint="Cashback (fund − cut) + bonus after its cut + coupon bonuses"
+        >
+          {money(total.creatorNet)}
+        </Row>
+        <Row
+          label="Platform fee"
+          hint="order_fee + bonus_fee − coupon_net, as the platform computes it"
+        >
+          {money(total.platformFee)}
+        </Row>
+        <Row label="Order cut" indent>
+          {money(total.orderFee)}
+        </Row>
+        <Row label="Bonus cut" indent>
+          {money(total.bonusFee)}
+        </Row>
+        {total.couponNet > 0 && (
+          <Row label="Coupon bonuses" indent>
+            {money(-total.couponNet)}
+          </Row>
         )}
-        <Row label="Margin" strong>
-          {money(total.margin)}
+        <Row label="Markup" hint="Price above the funded order and bonus">
+          {money(total.markup)}
+        </Row>
+        {total.commission > 0 && (
+          <Row label="Share commissions">{money(-total.commission)}</Row>
+        )}
+        <Row label="Take" strong>
+          {money(total.take)}
         </Row>
       </dl>
       <MarginGauge
         margin={total.margin}
         charge={total.brandCharge}
         rate={pricing.marginRate}
+        policy={policy}
       />
-      {warnings.length > 0 && (
+      {enrollments > slots && (
+        <p className="caption-style text-fg-tertiary leading-snug">
+          With oversubscription the platform may accept up to{" "}
+          {enrollments.toLocaleString("en-IN")} enrollments, billing up to{" "}
+          {money(pricing.maxBilled)} before GST.
+        </p>
+      )}
+      {(reasons.length > 0 || pricing.issues.length > 0) && (
         <ul className="flex flex-col gap-1.5">
-          {warnings.map((warning) => (
+          {reasons.map((reason) => (
             <li
-              key={warning}
+              key={reason}
               className="text-danger flex items-start gap-2 text-sm leading-snug"
             >
               <AlertIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-              {warning}
+              {reason}
+            </li>
+          ))}
+          {pricing.issues.map((issue) => (
+            <li
+              key={`${issue.key}-${issue.message}`}
+              className="text-warning flex items-start gap-2 text-sm leading-snug"
+            >
+              <AlertIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                <span className="font-medium">
+                  {lines[issue.index]?.product || `Line ${issue.index + 1}`}:
+                </span>{" "}
+                {issue.message}
+              </span>
             </li>
           ))}
         </ul>
@@ -228,16 +293,12 @@ export function InternalTotals({
 export function BrandTotals({
   lines,
   pricing,
-  currency,
-  action,
 }: {
   lines: ProposalLine[];
   pricing: ProposalPricing;
-  currency: Currency;
-  action?: ReactNode;
 }) {
   return (
-    <Card eyebrow="Brand sees" note="Per verified sale, excl. GST">
+    <Card eyebrow="Brand sees" note="Per enrollment, excl. GST">
       {lines.length === 0 ? (
         <p className="text-fg-tertiary text-sm">
           Add a line to see the brand&apos;s price.
@@ -249,20 +310,20 @@ export function BrandTotals({
               key={line.key}
               line={line}
               pricing={pricing.lines[index]}
-              currency={currency}
             />
           ))}
         </ul>
       )}
-      <div className="border-border flex items-end justify-between gap-3 border-t pt-4">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="caption-style text-fg-tertiary">Monthly total</span>
-          <span className="text-2xl font-medium">
-            <Amount value={{ amount: pricing.total.brandCharge, currency }} />
-          </span>
+      <dl className="border-border flex flex-col gap-1 border-t pt-4">
+        <Row label="Subtotal">{money(pricing.total.billed)}</Row>
+        <Row label={`GST ${bpsLabel(TAX_BPS)}`}>{money(pricing.total.tax)}</Row>
+        <div className="flex items-end justify-between gap-3 pt-2">
+          <dt className="caption-style text-fg-tertiary">Total incl. GST</dt>
+          <dd className="text-2xl font-medium">
+            {money(pricing.total.billed + pricing.total.tax)}
+          </dd>
         </div>
-        {action}
-      </div>
+      </dl>
     </Card>
   );
 }
@@ -270,14 +331,11 @@ export function BrandTotals({
 function BrandLine({
   line,
   pricing,
-  currency,
 }: {
   line: ProposalLine;
   pricing: LinePricing;
-  currency: Currency;
 }) {
-  const { perSale } = pricing;
-  const money = (amount: number) => <Amount value={{ amount, currency }} />;
+  const note = productNote(line, pricing);
   return (
     <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -290,48 +348,33 @@ function BrandLine({
           >
             {line.product || "Untitled product"}
           </span>
-          <span className="caption-style text-fg-tertiary">
-            {MARKETPLACE_LABEL[line.marketplace]} ·{" "}
-            {line.slots.toLocaleString("en-IN")} sales / mo
+          <span className="caption-style text-fg-tertiary truncate">
+            {brandLineMeta(line)}
           </span>
         </div>
         <span className="flex shrink-0 flex-col items-end gap-1">
           <span className="text-sm font-medium">
-            {money(perSale.brandCharge)}
+            {money(pricing.perEnrollment.billed)}
           </span>
-          <span className="caption-style text-fg-tertiary">per sale</span>
+          <span className="caption-style text-fg-tertiary">per enrollment</span>
         </span>
       </div>
+      {note && <span className="caption-style text-fg-secondary">{note}</span>}
       {line.presentation === "itemised" && (
         <dl className="bg-overlay-1 caption-style flex flex-col gap-1.5 rounded-lg px-3 py-2.5">
-          <ItemisedRow label="Product value, refunded to the creator">
-            {money(perSale.orderValue)}
-          </ItemisedRow>
-          {perSale.bonus > 0 && (
-            <ItemisedRow label="Creator bonus">
-              {money(perSale.bonus)}
-            </ItemisedRow>
-          )}
-          <ItemisedRow label="Hypedrive service fee">
-            {money(perSale.brandCharge - perSale.orderValue - perSale.bonus)}
-          </ItemisedRow>
+          {brandParts(line, pricing).map((part) => (
+            <div
+              key={part.label}
+              className="flex items-center justify-between gap-3"
+            >
+              <dt className="text-fg-secondary truncate">{part.label}</dt>
+              <dd className="text-foreground shrink-0 tabular-nums">
+                {money(part.amount)}
+              </dd>
+            </div>
+          ))}
         </dl>
       )}
     </li>
-  );
-}
-
-function ItemisedRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-fg-secondary truncate">{label}</dt>
-      <dd className="text-foreground shrink-0 tabular-nums">{children}</dd>
-    </div>
   );
 }

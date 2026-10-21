@@ -8,6 +8,7 @@ import { cleanTags, normalizeDomain } from "../lib/domain/normalize";
 import { sumMoney, type Money } from "../lib/domain/money";
 import { accountStall, isOnPlatform } from "./lib/activation";
 import { sourceFamily } from "./lib/enrichment";
+import { emitAutomationTrigger } from "./lib/automations/engine";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import {
@@ -384,6 +385,13 @@ export const update = memberMutation({
     if (changes.length === 0) return before;
     await ctx.db.patch(id, { ...fields, updatedAt: Date.now() });
     await logChanges(ctx, { accountId: id }, ctx.viewer._id, changes);
+    if (fields.stage && fields.stage !== account.stage) {
+      await emitAutomationTrigger(ctx, {
+        kind: "account_stage_changed",
+        refs: { accountId: id },
+        value: fields.stage,
+      });
+    }
     return before;
   },
 });

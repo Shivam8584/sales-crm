@@ -11,7 +11,8 @@ import { Input } from "@/components/_ui/input";
 import Kbd from "@/components/_ui/kbd";
 import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
-import { DetailHero, Properties, Property } from "@/components/record";
+import { Card, CardHeader } from "@/components/_ui/card";
+import { Properties, Property } from "@/components/record";
 import { PageStatus } from "@/components/shell/page";
 import { ROLE_DESCRIPTION, ROLE_TONE } from "@/features/team/roles";
 import { useViewer } from "@/hooks/use-viewer";
@@ -27,6 +28,8 @@ import { useUiStore } from "@/stores/ui-store";
 import MonitorIcon from "@/public/assets/icons/monitor.svg";
 import MoonIcon from "@/public/assets/icons/moon.svg";
 import SunIcon from "@/public/assets/icons/sun.svg";
+import KeyboardIcon from "@/public/assets/icons/message-question.svg";
+import SessionIcon from "@/public/assets/icons/arrow-right.svg";
 import { SettingsRow, SettingsSection } from "./settings-ui";
 
 const MAX_NAME = 80;
@@ -53,18 +56,24 @@ export default function ProfileSettings() {
 
   return (
     <>
-      <div className="bg-card border-border shadow-card flex flex-col overflow-hidden rounded-xl border">
-        <DetailHero
-          visual={<Avatar name={viewer.name} size="xl" />}
+      <Card aria-labelledby="profile-title">
+        <CardHeader
+          id="profile-title"
+          visual={
+            <Avatar name={viewer.name} size="lg" className="rounded-xl" />
+          }
           title={viewer.name}
-        >
-          <Tag tone={ROLE_TONE[viewer.role]} size="sm">
-            {ROLE_LABEL[viewer.role]}
-          </Tag>
-          <PageStatus>Active</PageStatus>
-        </DetailHero>
-        <div className="flex flex-col gap-5 px-6 py-5">
-          <h3 className="eyebrow-style font-normal">Account</h3>
+          meta={
+            <>
+              <Tag tone={ROLE_TONE[viewer.role]} size="xs">
+                {ROLE_LABEL[viewer.role]}
+              </Tag>
+              <PageStatus>Active</PageStatus>
+            </>
+          }
+          description={viewer.email}
+        />
+        <div className="flex flex-col gap-5 px-4 py-5 sm:px-5">
           <NameField key={viewer.name} name={viewer.name} />
           <Properties>
             <Property label="Email">
@@ -89,9 +98,13 @@ export default function ProfileSettings() {
             </Property>
           </Properties>
         </div>
-      </div>
+      </Card>
 
-      <SettingsSection title="Appearance">
+      <SettingsSection
+        icon={MonitorIcon}
+        title="Appearance"
+        description="How the CRM looks on this device."
+      >
         <SettingsRow
           label="Theme"
           description="System follows your device's light or dark setting."
@@ -101,7 +114,9 @@ export default function ProfileSettings() {
       </SettingsSection>
 
       <SettingsSection
+        icon={KeyboardIcon}
         title="Keyboard shortcuts"
+        description="The few worth learning first."
         action={
           <Button
             variant="secondary"
@@ -117,7 +132,7 @@ export default function ProfileSettings() {
           {SHORTCUTS.map((item) => (
             <li
               key={item.label}
-              className="border-border flex h-11 items-center justify-between gap-4 border-t px-6"
+              className="border-border flex h-11 items-center justify-between gap-4 border-t px-4 sm:px-5"
             >
               <span className="lead-style text-fg-secondary truncate">
                 {item.label}
@@ -132,7 +147,7 @@ export default function ProfileSettings() {
         </ul>
       </SettingsSection>
 
-      <SettingsSection title="Session">
+      <SettingsSection icon={SessionIcon} title="Session">
         <SettingsRow
           label="Sign out"
           description="Ends your session in this browser."

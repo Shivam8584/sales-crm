@@ -1,11 +1,18 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import SegmentBar from "@/components/_common/segment-bar";
 import Sparkline from "@/components/_common/sparkline";
+import {
+  Collapsible,
+  CollapsibleChevron,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/_ui/collapsible";
 import { cn } from "@/lib/utils";
 
 /**
  * A block of a detail sheet or record sidebar: uppercase eyebrow title, an
- * optional control on the right, and a divider underneath.
+ * optional control on the right, and a divider underneath. `collapsible`
+ * lets the title fold the block away.
  */
 export function DetailSection({
   title,
@@ -13,6 +20,8 @@ export function DetailSection({
   children,
   className,
   divider = true,
+  collapsible = false,
+  defaultOpen = true,
 }: {
   title: string;
   action?: ReactNode;
@@ -20,15 +29,43 @@ export function DetailSection({
   className?: string;
   /** Turn off for the last section of a sheet. */
   divider?: boolean;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }) {
+  const classes = cn(
+    "flex min-w-0 flex-col gap-4 px-6 py-5",
+    divider && "shadow-divider",
+    className,
+  );
+  if (collapsible) {
+    return (
+      <Collapsible
+        asChild
+        defaultOpen={defaultOpen}
+        className={cn(
+          classes,
+          "group/collapsible duration-base ease-power3-out transition-[gap] data-[state=closed]:gap-0",
+        )}
+      >
+        <section>
+          <div className="min-h-control-md flex items-center justify-between gap-2">
+            <h3 className="flex min-w-0 flex-1">
+              <CollapsibleTrigger className="eyebrow-style hover:text-fg-secondary focus-visible:ring-ring duration-fast -mx-1 flex max-w-full cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+                <span className="truncate">{title}</span>
+                <CollapsibleChevron className="opacity-60" />
+              </CollapsibleTrigger>
+            </h3>
+            {action}
+          </div>
+          <CollapsibleContent className="-mx-1 flex min-w-0 flex-col gap-[inherit] px-1">
+            {children}
+          </CollapsibleContent>
+        </section>
+      </Collapsible>
+    );
+  }
   return (
-    <section
-      className={cn(
-        "flex min-w-0 flex-col gap-4 px-6 py-5",
-        divider && "shadow-divider",
-        className,
-      )}
-    >
+    <section className={classes}>
       <div className="min-h-control-md flex items-center justify-between gap-2">
         <h3 className="eyebrow-style font-normal">{title}</h3>
         {action}
@@ -91,7 +128,7 @@ export function StatTile({
   return (
     <div
       className={cn(
-        "border-line-strong flex min-w-0 flex-col gap-3 rounded-lg border p-2.75",
+        "bg-overlay-1 shadow-hairline flex min-w-0 flex-col gap-3 rounded-xl p-3",
         className,
       )}
     >
@@ -124,9 +161,8 @@ export function BigNumber({
         <span
           className={cn(
             "block leading-none",
-            size === "display"
-              ? "text-display font-semibold"
-              : "text-2xl font-semibold",
+            "font-display font-medium",
+            size === "display" ? "text-display" : "text-2xl",
           )}
         >
           {value}

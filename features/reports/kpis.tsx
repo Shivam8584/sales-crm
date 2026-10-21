@@ -30,7 +30,8 @@ export default function Kpis({ report }: { report: Report }) {
   const prev = report.previousFunnel;
   const leads = steps[0].count;
   const converted = steps[3].count;
-  const activated = steps[9].count;
+  const last = steps.length - 1;
+  const activated = steps[last].count;
   const speed = report.speed;
   const prevSpeed = report.previousSpeed;
   const speedChange =
@@ -70,8 +71,8 @@ export default function Kpis({ report }: { report: Report }) {
         detail={`${percent(rate(activated, leads))} of leads`}
         delta={
           <Delta
-            value={pts(rate(activated, leads), rate(prev[9], prev[0]))}
-            trend={trend(rate(activated, leads), rate(prev[9], prev[0]))}
+            value={pts(rate(activated, leads), rate(prev[last], prev[0]))}
+            trend={trend(rate(activated, leads), rate(prev[last], prev[0]))}
           />
         }
       />

@@ -15,6 +15,7 @@ import {
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
+import { Textarea } from "@/components/_ui/textarea";
 import OptionPicker from "@/components/fields/option-picker";
 import { CALL_OUTCOMES, type CallOutcome } from "@/lib/domain/enums";
 import { CALL_OUTCOME_LABEL } from "@/lib/domain/labels";
@@ -118,7 +119,7 @@ export default function LogCallDialog({
               </Field>
             </div>
             <Field label="Notes" htmlFor="log-call-notes" error={errors.body}>
-              <textarea
+              <Textarea
                 id="log-call-notes"
                 autoFocus
                 value={body}
@@ -134,7 +135,7 @@ export default function LogCallDialog({
                 }}
                 rows={4}
                 placeholder="What was discussed?"
-                className="border-input bg-secondary placeholder:text-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 min-h-24 w-full resize-none rounded-lg border px-3 py-2 text-sm leading-snug outline-none focus-visible:ring-3"
+                className="min-h-24"
               />
             </Field>
             {errors.form && (

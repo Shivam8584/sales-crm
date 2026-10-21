@@ -40,7 +40,7 @@ export default function SidebarNavItem({
   const showCount = count !== undefined && count > 0;
   const className = cn(
     buttonVariants({ variant: "nav", size: "md" }),
-    "group relative h-8 gap-1.5 py-0 font-normal",
+    "group relative h-8 gap-1.5 py-0 font-normal pointer-coarse:h-10",
     "collapsed:size-8 collapsed:justify-center collapsed:gap-0 collapsed:px-0",
     tone === "quiet" && "text-fg-tertiary",
   );

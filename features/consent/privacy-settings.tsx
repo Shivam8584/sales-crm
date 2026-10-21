@@ -16,6 +16,9 @@ import { RETENTION_DAYS } from "@/lib/domain/consent";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime, shortDate } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
+import EyeIcon from "@/public/assets/icons/eye.svg";
+import TrashIcon from "@/public/assets/icons/trash.svg";
+import ClockIcon from "@/public/assets/icons/clock.svg";
 import ConsentEventDialog from "./consent-event-dialog";
 import EraseDialog, { type EraseTarget } from "./erase-dialog";
 
@@ -38,6 +41,7 @@ export default function PrivacySettings() {
   return (
     <>
       <SettingsSection
+        icon={EyeIcon}
         title="Privacy"
         description="How long prospect data is kept before it's reviewed. Nothing is deleted automatically."
       >
@@ -49,6 +53,8 @@ export default function PrivacySettings() {
       </SettingsSection>
 
       <SettingsSection
+        icon={TrashIcon}
+        tone={privacy && privacy.requests.length > 0 ? "danger" : "default"}
         title="Erasure requests"
         description="People who asked to be forgotten. Contact with them is paused until you erase their data or dismiss the request."
       >
@@ -61,7 +67,7 @@ export default function PrivacySettings() {
             {privacy.requests.map((request) => (
               <li
                 key={request.personId}
-                className="border-border flex flex-col gap-3 border-t px-6 py-3 sm:flex-row sm:items-center sm:gap-6"
+                className="border-border flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-5"
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <Link
@@ -294,6 +300,7 @@ function ReviewSection({
   const total = privacy?.staleTotal ?? 0;
   return (
     <SettingsSection
+      icon={ClockIcon}
       title="Retention review"
       description={
         privacy
@@ -317,7 +324,7 @@ function ReviewSection({
           {privacy.stale.map((row) => (
             <li
               key={row.id}
-              className="border-border flex flex-col gap-3 border-t px-6 py-3 sm:flex-row sm:items-center sm:gap-6"
+              className="border-border flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-5"
             >
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="flex min-w-0 items-center gap-2">
@@ -380,7 +387,7 @@ function ReviewSection({
             </li>
           ))}
           {total > privacy.stale.length && (
-            <li className="caption-style text-fg-tertiary border-border border-t px-6 py-3">
+            <li className="caption-style text-fg-tertiary border-border border-t px-4 py-3 sm:px-5">
               Showing the {privacy.stale.length} oldest of {total}.
             </li>
           )}
@@ -392,7 +399,7 @@ function ReviewSection({
 
 function EmptyRow({ children }: { children: string }) {
   return (
-    <p className="caption-style text-fg-tertiary border-border flex min-h-12 items-center border-t px-6">
+    <p className="caption-style text-fg-tertiary border-border flex min-h-12 items-center border-t px-4 sm:px-5">
       {children}
     </p>
   );
@@ -400,7 +407,7 @@ function EmptyRow({ children }: { children: string }) {
 
 function RowSkeleton() {
   return (
-    <div className="border-border flex h-12 items-center gap-3 border-t px-6">
+    <div className="border-border flex h-12 items-center gap-3 border-t px-4 sm:px-5">
       <Skeleton className="h-3 w-40" />
       <Skeleton className="ml-auto h-3 w-16" />
     </div>

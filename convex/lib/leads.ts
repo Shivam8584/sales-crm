@@ -10,6 +10,7 @@ import {
 import { nextOwner } from "./assignment";
 import { leadSlaSeconds } from "./settings";
 import { leadershipIds, notify, notifyMany } from "../notifications";
+import { emitAutomationTrigger } from "./automations/engine";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const CLOSED_STATUSES: LeadStatus[] = ["disqualified", "converted"];
@@ -130,6 +131,12 @@ export async function createLead(
       { id },
     );
   }
+  await emitAutomationTrigger(ctx, {
+    kind: "lead_created",
+    refs: { leadId: id },
+    value: lead.kind,
+    source: lead.source,
+  });
   return { id, ownerId: ownerId ?? null };
 }
 

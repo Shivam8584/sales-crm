@@ -15,7 +15,9 @@ import Field from "@/components/_ui/field";
 import {
   MAX_REASON_LENGTH,
   approvalReasons,
+  bpsLabel,
   rateLabel,
+  type CompanyPolicy,
   type ProposalPricing,
 } from "@/lib/domain/pricing";
 import { relativeTime, dateTime } from "@/lib/time";
@@ -39,18 +41,20 @@ const TONE = {
 export default function ApprovalPanel({
   proposal,
   pricing,
+  policy,
   canApprove,
   actions,
 }: {
   proposal: ProposalRow;
   pricing: ProposalPricing;
+  policy: CompanyPolicy;
   canApprove: boolean;
   actions: ProposalActions;
 }) {
   const [deciding, setDeciding] = useState<"approve" | "decline" | null>(null);
   const approval = proposal.approval;
   const state = approval?.state ?? "required";
-  const reasons = approvalReasons(pricing);
+  const reasons = approvalReasons(pricing, policy);
   const Icon =
     state === "approved"
       ? CheckIcon
@@ -151,6 +155,7 @@ export default function ApprovalPanel({
         mode={deciding}
         proposal={proposal}
         pricing={pricing}
+        policy={policy}
         onClose={() => setDeciding(null)}
         onSubmit={(reason) =>
           actions.decide(proposal, deciding === "approve", reason)
@@ -164,12 +169,14 @@ function DecideDialog({
   mode,
   proposal,
   pricing,
+  policy,
   onClose,
   onSubmit,
 }: {
   mode: "approve" | "decline" | null;
   proposal: ProposalRow;
   pricing: ProposalPricing;
+  policy: CompanyPolicy;
   onClose: () => void;
   onSubmit: (reason: string) => Promise<{ message: string } | void>;
 }) {
@@ -209,7 +216,7 @@ function DecideDialog({
             </DialogTitle>
             <DialogDescription className="pr-8">
               Proposal v{proposal.version} at {rateLabel(pricing.marginRate)}{" "}
-              blended margin. {approvalReasons(pricing).join(". ")}.
+              blended margin. {approvalReasons(pricing, policy).join(". ")}.
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 py-5">
@@ -233,7 +240,7 @@ function DecideDialog({
                 placeholder={
                   approve
                     ? "Strategic logo; volume ramps to 1,000 slots in month 2"
-                    : "Bring the bonus down or the price up to clear 15%"
+                    : `Bring the bonus down or the price up to clear ${bpsLabel(policy.approvalBps)}`
                 }
                 aria-invalid={error ? true : undefined}
                 aria-describedby={

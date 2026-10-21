@@ -21,8 +21,28 @@ import {
   vTimelineKind,
   vUtm,
 } from "./lib/validators";
-import { vApproval, vProposalLine, vProposalStatus } from "./lib/pricing";
+import {
+  vApproval,
+  vPayment,
+  vPolicy,
+  vProposalLine,
+  vProposalStatus,
+} from "./lib/pricing";
 import { vConsentEvent, vConsentPurpose, vLawfulBasis } from "./lib/consent";
+import {
+  vAutomationStatus,
+  vEnrollmentStatus,
+  vGraph,
+  vHistoryEntry,
+  vMessageChannel,
+  vMessageStatus,
+  vPublished,
+  vSettings,
+  vStats,
+  vStepLevel,
+  vSubjectKind,
+  vTrigger,
+} from "./lib/automations/validators";
 
 /**
  * Times are epoch milliseconds; calendar days are `YYYY-MM-DD` strings.
@@ -287,12 +307,70 @@ export default defineSchema({
     userId: v.optional(v.string()),
     occurredAt: v.number(),
     payload: v.string(),
+    /** Envelope version; absent means 1. */
+    v: v.optional(v.number()),
     processedAt: v.optional(v.number()),
     error: v.optional(v.string()),
+    /** Stored but deliberately not processed, e.g. a demo organisation. */
+    ignored: v.optional(v.string()),
   })
     .index("by_event_id", ["eventId"])
     .index("by_org", ["orgId", "occurredAt"])
     .index("by_user_type", ["userId", "type"]),
+
+  /** The latest read of an account's organisation from the platform admin API. */
+  platformSnapshots: defineTable({
+    accountId: v.id("accounts"),
+    orgId: v.string(),
+    source: v.union(v.literal("live"), v.literal("sandbox")),
+    fetchedAt: v.number(),
+    /** The latest sync failed; the data is from `fetchedAt`. */
+    error: v.optional(v.string()),
+    attemptedAt: v.optional(v.number()),
+    balancePaise: v.optional(v.number()),
+    heldPaise: v.optional(v.number()),
+    creditLimitPaise: v.optional(v.number()),
+    paymentMode: v.optional(v.string()),
+    campaigns: v.array(
+      v.object({
+        id: v.string(),
+        title: v.string(),
+        status: v.string(),
+        pauseReason: v.optional(v.string()),
+        enrolled: v.number(),
+        max: v.optional(v.number()),
+        pending: v.number(),
+        approved: v.number(),
+        submittedAt: v.optional(v.number()),
+        endDate: v.optional(v.string()),
+      }),
+    ),
+    deposits30d: v.number(),
+    deposits90d: v.number(),
+    depositCount90d: v.number(),
+    staleReviews: v.number(),
+    oldestReviewDays: v.optional(v.number()),
+    disputes: v.number(),
+    listings: v.array(
+      v.object({
+        marketplace: v.string(),
+        count: v.number(),
+        firstAt: v.number(),
+        latestAt: v.number(),
+      }),
+    ),
+    members: v.array(
+      v.object({
+        userId: v.string(),
+        name: v.optional(v.string()),
+        email: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        roles: v.array(v.string()),
+      }),
+    ),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_org", ["orgId"]),
 
   settings: defineTable({ key: v.string(), value: v.string() }).index(
     "by_key",
@@ -324,10 +402,109 @@ export default defineSchema({
     lines: v.array(vProposalLine),
     validUntil: vDay,
     terms: v.string(),
+    payment: v.optional(vPayment),
+    /** The pricing policy a sent version was priced under. */
+    policy: v.optional(vPolicy),
     approval: v.optional(vApproval),
     createdById: v.id("members"),
     sentAt: v.optional(v.number()),
     decidedAt: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_deal", ["dealId", "version"]),
+
+  /** A trigger and a graph of steps; the engine runs the `published` snapshot. */
+  automations: defineTable({
+    name: v.string(),
+    description: v.string(),
+    status: vAutomationStatus,
+    subjectKind: vSubjectKind,
+    trigger: vTrigger,
+    graph: vGraph,
+    settings: vSettings,
+    /** Bumped on every activation that publishes a change. */
+    version: v.number(),
+    published: v.optional(vPublished),
+    stats: vStats,
+    templateKey: v.optional(v.string()),
+    createdById: v.id("members"),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  }).index("by_status", ["status"]),
+
+  /** One record's run through an automation. */
+  automationEnrollments: defineTable({
+    automationId: v.id("automations"),
+    version: v.number(),
+    subjectKind: vSubjectKind,
+    /** `<kind>:<id>`, to find a record's runs and keep one live run per automation. */
+    subjectKey: v.string(),
+    leadId: v.optional(v.id("leads")),
+    personId: v.optional(v.id("people")),
+    accountId: v.optional(v.id("accounts")),
+    dealId: v.optional(v.id("deals")),
+    status: vEnrollmentStatus,
+    currentNodeId: v.string(),
+    /** The only scheduled step allowed to run; anything else is stale. */
+    stepKey: v.string(),
+    seq: v.number(),
+    attempt: v.number(),
+    nextRunAt: v.optional(v.number()),
+    /** Set while the current step is a wait that has started. */
+    waitStartedAt: v.optional(v.number()),
+    waitingFor: v.optional(vTrigger),
+    /** Held because the automation is paused; resumes on activation. */
+    heldAt: v.optional(v.number()),
+    enrolledAt: v.number(),
+    enrolledById: v.optional(v.id("members")),
+    source: v.string(),
+    finishedAt: v.optional(v.number()),
+    exitReason: v.optional(v.string()),
+    history: v.array(vHistoryEntry),
+  })
+    .index("by_automation", ["automationId", "status"])
+    .index("by_automation_subject", ["automationId", "subjectKey"])
+    .index("by_subject", ["subjectKey", "status"])
+    .index("by_status", ["status"]),
+
+  /** Run log: one row per thing a step did or decided. */
+  automationSteps: defineTable({
+    automationId: v.id("automations"),
+    enrollmentId: v.id("automationEnrollments"),
+    nodeId: v.optional(v.string()),
+    stepKey: v.optional(v.string()),
+    at: v.number(),
+    level: vStepLevel,
+    message: v.string(),
+  })
+    .index("by_enrollment", ["enrollmentId", "at"])
+    .index("by_automation", ["automationId", "at"])
+    .index("by_automation_node", ["automationId", "nodeId", "at"])
+    .index("by_step_key", ["stepKey"]),
+
+  /** Outbound email and WhatsApp messages; at most one per step key. */
+  automationMessages: defineTable({
+    automationId: v.id("automations"),
+    enrollmentId: v.id("automationEnrollments"),
+    stepKey: v.string(),
+    channel: vMessageChannel,
+    personId: v.optional(v.id("people")),
+    leadId: v.optional(v.id("leads")),
+    to: v.string(),
+    subject: v.optional(v.string()),
+    body: v.optional(v.string()),
+    template: v.optional(v.string()),
+    language: v.optional(v.string()),
+    params: v.optional(v.array(v.string())),
+    status: vMessageStatus,
+    /** "outbox" when no provider is configured: recorded, never sent. */
+    provider: v.string(),
+    providerMessageId: v.optional(v.string()),
+    attempts: v.number(),
+    error: v.optional(v.string()),
+    timelineId: v.optional(v.id("timeline")),
+    sentAt: v.optional(v.number()),
+  })
+    .index("by_step_key", ["stepKey"])
+    .index("by_enrollment", ["enrollmentId"])
+    .index("by_status", ["status"]),
 });

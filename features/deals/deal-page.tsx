@@ -194,7 +194,7 @@ function DealView({ deal }: { deal: DealRow }) {
                   value={deal.title}
                   label="Deal title"
                   onSave={(title) => save({ title }, "Title", { inline: true })}
-                  inputClassName="h-8 text-xl font-semibold"
+                  inputClassName="font-display h-9 text-2xl font-medium"
                 />
               </span>
             }

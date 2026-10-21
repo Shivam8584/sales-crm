@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
 import ScrollToTop from "@/components/_common/scroll-to-top";
 import Toaster from "@/components/_common/toaster";
@@ -10,9 +11,16 @@ import { THEME_SCRIPT } from "@/lib/theme-script";
 import { SIDEBAR_WIDTH_SCRIPT } from "@/lib/sidebar";
 import "./globals.css";
 
-const geist = Geist({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-geist",
+  variable: "--font-inter",
+  axes: ["opsz"],
+});
+
+const interDisplay = localFont({
+  src: "../fonts/InterDisplay-Medium.woff2",
+  weight: "500",
+  variable: "--font-inter-display",
 });
 
 const geistMono = Geist_Mono({
@@ -37,7 +45,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${geist.variable} ${geistMono.variable}`}
+      className={`${inter.variable} ${interDisplay.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
       <head>
