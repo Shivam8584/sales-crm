@@ -310,8 +310,6 @@ export default defineSchema({
     editedAt: v.optional(v.number()),
     /** Members @mentioned in the body, which holds them as `<@id>` tokens. */
     mentions: v.optional(v.array(v.id("members"))),
-    /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
-    acks: v.optional(v.array(v.id("members"))),
     /** Written by an automation, not a teammate: never counts as an interaction. */
     automated: v.optional(v.boolean()),
     /** For emails and WhatsApp: "inbound" is a reply received from the contact. */
@@ -340,9 +338,6 @@ export default defineSchema({
     count: v.optional(v.number()),
     /** Cleared from the inbox; archived implies read. */
     archivedAt: v.optional(v.number()),
-    /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
-    doneAt: v.optional(v.number()),
-    snoozedUntil: v.optional(v.number()),
   })
     .index("by_recipient", ["recipientId", "readAt"])
     .index("by_recipient_time", ["recipientId"])
@@ -356,14 +351,6 @@ export default defineSchema({
   })
     .index("by_record", ["record"])
     .index("by_member_record", ["memberId", "record"]),
-
-  /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
-  notificationPrefs: defineTable({
-    memberId: v.id("members"),
-    muted: v.array(v.string()),
-    emailDigest: v.boolean(),
-    lastDigest: v.optional(v.any()),
-  }),
 
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({
@@ -487,8 +474,6 @@ export default defineSchema({
   /** The deal-desk proposal for a deal, one per deal. */
   proposals: defineTable({
     dealId: v.id("deals"),
-    /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
-    version: v.optional(v.number()),
     status: vProposalStatus,
     currency: vCurrency,
     lines: v.array(vProposalLine),

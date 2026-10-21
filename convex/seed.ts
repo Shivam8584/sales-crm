@@ -660,7 +660,6 @@ async function seedWorkspace(ctx: MutationCtx) {
   const drogo = dealIds.get("Earbuds review push")!;
   await ctx.db.insert("proposals", {
     dealId: drogo,
-    version: 1,
     status: "sent",
     currency: "INR",
     lines: [
@@ -677,7 +676,6 @@ async function seedWorkspace(ctx: MutationCtx) {
   const kesarOwner = accounts.get("Kesar Leaf Naturals")!.ownerId;
   await ctx.db.insert("proposals", {
     dealId: kesar,
-    version: 1,
     status: "draft",
     currency: "INR",
     lines: [line("serum", "Kumkumadi serum 30 ml", 899, 50, 700)],

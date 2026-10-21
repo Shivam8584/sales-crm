@@ -73,8 +73,6 @@ export const vPayment = v.object({
 /** The policy a sent proposal was priced under. */
 export const vPolicy = v.object({
   marginFloorBps: v.number(),
-  /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
-  approvalBps: v.optional(v.number()),
   defaultMarginBps: v.number(),
   defaultFundBps: v.number(),
   defaultFeeBps: v.number(),
