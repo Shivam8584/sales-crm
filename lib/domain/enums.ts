@@ -20,7 +20,6 @@ export const LIFECYCLE_STAGES = [
   "demo",
   "signed_up",
   "org_created",
-  "gst_verified",
   "funded",
   "live",
   "activated",

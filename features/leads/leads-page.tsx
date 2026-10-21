@@ -1,5 +1,6 @@
 "use client";
 
+import { istToday } from "@/lib/domain/day";
 import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -11,6 +12,7 @@ import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
 import SelectionBar from "@/components/data-table/selection-bar";
+import AddToAutomation from "@/features/automations/add-to-automation";
 import OptionPicker from "@/components/fields/option-picker";
 import {
   compareBy,
@@ -97,7 +99,7 @@ function iso(at: number | null) {
 }
 
 function exportRows(rows: LeadRow[]) {
-  const day = new Date().toISOString().slice(0, 10);
+  const day = istToday();
   downloadCsv(`leads-${day}.csv`, [
     [
       "Name",
@@ -564,6 +566,11 @@ export default function LeadsPage() {
           >
             Assign
           </OptionPicker>
+          <AddToAutomation
+            kind="lead"
+            ids={selectedIds}
+            onDone={() => setSelected(new Set())}
+          />
           {status !== "converted" && (
             <>
               <LeadStatusMenu status={null} side="top" onChange={bulkStatus}>

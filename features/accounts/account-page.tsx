@@ -33,6 +33,8 @@ import AccountVerification from "@/features/enrichment/account-verification";
 import MemberPicker from "@/features/members/member-picker";
 import PeopleList from "@/features/people/people-list";
 import AccountPlatform from "@/features/platform/account-platform";
+import MarketplaceListings from "@/features/prospecting/marketplace-listings";
+import PlatformTab from "@/features/platform/platform-tab";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
@@ -60,6 +62,7 @@ import ActivationPath from "./activation-path";
 import { StageAndTags } from "./record-cells";
 import { STAGE_OPTIONS, StageTag } from "./stage";
 import { editRecordTitle, useTitleShortcut } from "./use-title-shortcut";
+import FollowButton from "@/features/notifications/follow-button";
 
 const CRUMBS = [{ label: "Accounts", href: "/accounts" }];
 
@@ -167,21 +170,28 @@ function AccountView({ account }: { account: Account }) {
         title={account.name}
         meta={archived && <PageStatus tone="warning">Archived</PageStatus>}
         actions={
-          <PageActions
-            label="Account actions"
-            actions={[
-              { label: "Add person", icon: UserPlusIcon, onSelect: addPerson },
-              { label: "New deal", icon: TargetIcon, onSelect: newDeal },
-              { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
-              {
-                label: archived ? "Restore account" : "Archive account",
-                icon: TrashIcon,
-                tone: archived ? undefined : "danger",
-                separated: true,
-                onSelect: () => void toggleArchived(),
-              },
-            ]}
-          />
+          <>
+            <FollowButton target={{ accountId: account._id }} />
+            <PageActions
+              label="Account actions"
+              actions={[
+                {
+                  label: "Add person",
+                  icon: UserPlusIcon,
+                  onSelect: addPerson,
+                },
+                { label: "New deal", icon: TargetIcon, onSelect: newDeal },
+                { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
+                {
+                  label: archived ? "Restore account" : "Archive account",
+                  icon: TrashIcon,
+                  tone: archived ? undefined : "danger",
+                  separated: true,
+                  onSelect: () => void toggleArchived(),
+                },
+              ]}
+            />
+          </>
         }
       />
       <RecordLayout
@@ -305,6 +315,10 @@ function AccountView({ account }: { account: Account }) {
               accountId={account._id}
               className={ASIDE_SECTION}
             />
+            <MarketplaceListings
+              accountId={account._id}
+              className={ASIDE_SECTION}
+            />
             <DetailSection
               collapsible
               title="Record"
@@ -341,6 +355,16 @@ function AccountView({ account }: { account: Account }) {
               id: "activity",
               label: "Activity",
               content: <Timeline target={{ accountId: account._id }} />,
+            },
+            {
+              id: "platform",
+              label: "Platform",
+              content: (
+                <PlatformTab
+                  accountId={account._id}
+                  accountName={account.name}
+                />
+              ),
             },
             {
               id: "people",

@@ -39,12 +39,12 @@ test("a bank deposit funds the wallet like a top-up", () => {
   assert.equal(journey(account(), live.slice(0, 3)).stage, "funded");
 });
 
-test("a stage set by hand counts, and v1 gst_verified reads as org created", () => {
+test("a stage set by hand counts", () => {
   assert.equal(
     journey(account("funded"), [event("user.signed_up", 0)]).stage,
     "funded",
   );
-  assert.equal(journey(account("gst_verified"), []).stage, "org_created");
+  assert.equal(journey(account("org_created"), []).stage, "org_created");
   assert.equal(journey(account("prospect"), []).stage, null);
 });
 

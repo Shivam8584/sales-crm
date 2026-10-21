@@ -17,7 +17,11 @@ import {
   type ProposalLine,
   type ProposalPricing,
 } from "../lib/domain/pricing";
+import { istToday } from "../lib/domain/day";
+import { proposalMoveProblem, type Problem } from "../lib/domain/transitions";
+import type { ProposalStatus } from "../lib/domain/pricing";
 import { fail, invalid } from "./lib/errors";
+import { canDecideApproval } from "./lib/permissions";
 import {
   managerMutation,
   memberMutation,
@@ -54,8 +58,9 @@ const MAX_KEY_LENGTH = 40;
 type Ctx = MutationCtx & { viewer: Viewer };
 type Priced = Pick<Doc<"proposals">, "lines" | "policy">;
 
-function addDays(days: number) {
-  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+function requireMove(proposal: Doc<"proposals">, to: ProposalStatus) {
+  const problem: Problem | null = proposalMoveProblem(proposal.status, to);
+  if (problem) fail("conflict", problem.message);
 }
 
 async function versions(ctx: QueryCtx, dealId: Id<"deals">) {
@@ -225,14 +230,15 @@ export const get = memberQuery({
     const proposal = id ? await ctx.db.get(id) : null;
     if (!proposal) return null;
     const deal = await ctx.db.get(proposal.dealId);
-    const account = deal ? await ctx.db.get(deal.accountId) : null;
+    if (!deal) return null;
+    const account = await ctx.db.get(deal.accountId);
     const members = await memberIndex(ctx);
-    const owner = deal ? members.get(deal.ownerId) : undefined;
+    const owner = members.get(deal.ownerId);
     return {
       ...proposal,
       policy: policyFor(proposal, await pricingPolicy(ctx)),
       payment: proposal.payment ?? DEFAULT_PAYMENT,
-      deal: deal ? { _id: deal._id, title: deal.title } : null,
+      deal: { _id: deal._id, title: deal.title },
       account: account ? { _id: account._id, name: account.name } : null,
       preparedBy: owner ? { name: owner.name, email: owner.email } : null,
     };
@@ -308,7 +314,7 @@ export const create = memberMutation({
       currency: PROPOSAL_CURRENCY,
       lines,
       validUntil: cleanValidUntil(
-        args.validUntil ?? addDays(DEFAULT_VALIDITY_DAYS),
+        args.validUntil ?? istToday(DEFAULT_VALIDITY_DAYS),
       ),
       terms: latest?.terms ?? DEFAULT_TERMS,
       payment: latest?.payment ?? DEFAULT_PAYMENT,
@@ -464,6 +470,12 @@ export const decide = managerMutation({
   handler: async (ctx, { id, approve, reason: input }) => {
     const proposal = await requireProposal(ctx, id);
     requireDraft(proposal);
+    if (!canDecideApproval(ctx.viewer, proposal.approval?.requestedById)) {
+      fail(
+        "forbidden",
+        "Another manager or an admin has to decide on your own request",
+      );
+    }
     const reason = cleanReason(input, true);
     const pricing = priceLines(proposal.lines, await pricingPolicy(ctx));
     if (!pricing.needsApproval) {
@@ -544,10 +556,17 @@ export const accept = memberMutation({
   args: { id: v.id("proposals") },
   handler: async (ctx, { id }) => {
     const proposal = await requireProposal(ctx, id);
-    if (proposal.status !== "sent") {
-      fail("conflict", "Only a sent proposal can be accepted");
-    }
+    requireMove(proposal, "accepted");
     const deal = await requireDeal(ctx, proposal.dealId);
+    const accepted = (await versions(ctx, deal._id)).find(
+      (row) => row.status === "accepted" && row._id !== proposal._id,
+    );
+    if (accepted) {
+      fail(
+        "conflict",
+        `${versionLabel(accepted)} is already accepted; reopen it first`,
+      );
+    }
     const pricing = priceLines(
       proposal.lines,
       policyFor(proposal, await pricingPolicy(ctx)),
@@ -592,9 +611,7 @@ export const reject = memberMutation({
   args: { id: v.id("proposals"), reason: v.optional(v.string()) },
   handler: async (ctx, { id, reason: input }) => {
     const proposal = await requireProposal(ctx, id);
-    if (proposal.status !== "sent") {
-      fail("conflict", "Only a sent proposal can be rejected");
-    }
+    requireMove(proposal, "rejected");
     const reason = cleanReason(input, false);
     const deal = await requireDeal(ctx, proposal.dealId);
     const now = Date.now();
@@ -628,9 +645,10 @@ export const reopen = memberMutation({
   },
   handler: async (ctx, { id, restore }) => {
     const proposal = await requireProposal(ctx, id);
-    if (proposal.status !== "accepted" && proposal.status !== "rejected") {
+    if (proposal.status === "sent" || proposal.status === "draft") {
       fail("conflict", "This proposal is not decided");
     }
+    requireMove(proposal, "sent");
     const deal = await requireDeal(ctx, proposal.dealId);
     const now = Date.now();
     await ctx.db.patch(id, {
@@ -712,8 +730,22 @@ export const restore = memberMutation({
       fail("conflict", `v${proposal.version} already exists`);
     }
     checkLineCount(proposal.lines.length);
+    // The copy comes from the client: only a decision this viewer could make survives.
+    const approval =
+      proposal.approval &&
+      (proposal.approval.state === "requested" ||
+        canDecideApproval(ctx.viewer, proposal.approval.requestedById))
+        ? proposal.approval
+        : undefined;
     const id = await ctx.db.insert("proposals", {
       ...proposal,
+      approval,
+      policy: undefined,
+      sentAt: undefined,
+      decidedAt: undefined,
+      createdById: (await ctx.db.get(proposal.createdById))
+        ? proposal.createdById
+        : ctx.viewer._id,
       currency: PROPOSAL_CURRENCY,
       lines: proposal.lines.map(cleanLine),
       payment: cleanPayment(proposal.payment ?? DEFAULT_PAYMENT),

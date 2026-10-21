@@ -23,7 +23,6 @@ export const STAGE_LABEL: Record<LifecycleStage, string> = {
   demo: "Demo",
   signed_up: "Signed up",
   org_created: "Org created",
-  gst_verified: "GST verified",
   funded: "Funded",
   live: "Live",
   activated: "Activated",

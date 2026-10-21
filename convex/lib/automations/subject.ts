@@ -5,9 +5,17 @@ import {
   type ConsentPurpose,
 } from "../../../lib/domain/consent";
 import type { Channel } from "../../../lib/domain/enums";
-import { personName } from "../../../lib/domain/labels";
+import {
+  DEAL_STAGE_LABEL,
+  LEAD_KIND_LABEL,
+  STAGE_LABEL,
+  personName,
+} from "../../../lib/domain/labels";
+import { LEAD_SOURCE_LABEL } from "../../../lib/domain/leads";
+import { formatMoney } from "../../../lib/domain/money";
 import {
   ACTIVATION_STAGES,
+  ACTIVATION_STEP_LABEL,
   CAMPAIGN_ALIASES,
   eventStage,
   pathIndex,
@@ -331,30 +339,78 @@ export async function subjectFacts(
   return { facts, consent };
 }
 
-/** Values for `{{variables}}` in messages and task titles. */
+/** Values for `{{variables}}` in messages and task titles, keyed by the library's names. */
 export async function subjectVars(
   ctx: QueryCtx,
   subject: Subject,
   recipient?: Recipient | null,
-) {
+  context?: Record<string, string>,
+): Promise<Record<string, string>> {
   const owner = subject.ownerId ? await ctx.db.get(subject.ownerId) : null;
   const to = recipient ?? (await recipientFor(ctx, subject, "email"));
-  return {
-    first_name: to?.firstName ?? "",
-    name: subject.name,
-    company: subject.account?.name ?? subject.lead?.companyName ?? "",
-    owner_name: owner?.name ?? "",
-    owner_first_name: owner?.name.split(/\s+/)[0] ?? "",
-    deal_title: subject.deal?.title ?? "",
+  const person = to?.personId ? await ctx.db.get(to.personId) : null;
+  const { account, lead, deal } = subject;
+  const snapshot = account
+    ? await ctx.db
+        .query("platformSnapshots")
+        .withIndex("by_account", (q) => q.eq("accountId", account._id))
+        .order("desc")
+        .first()
+    : null;
+  const live = snapshot?.campaigns.filter(
+    (campaign) => campaign.status === "live",
+  ).length;
+  const lastName =
+    person?.lastName ?? to?.name.split(/\s+/).slice(1).join(" ") ?? "";
+  const vars: Record<string, string> = {
+    "person.firstName": to?.firstName ?? "",
+    "person.lastName": lastName,
+    "person.fullName": to?.name ?? "",
+    "person.title": person?.title ?? "",
+    "person.email": to?.email ?? "",
+    "account.name": account?.name ?? lead?.companyName ?? "",
+    "account.domain": account?.domain ?? "",
+    "account.stage": account ? STAGE_LABEL[account.stage] : "",
+    "lead.source": lead ? (LEAD_SOURCE_LABEL[lead.source] ?? lead.source) : "",
+    "lead.kind": lead ? LEAD_KIND_LABEL[lead.kind] : "",
+    "lead.company": lead?.companyName ?? "",
+    "deal.title": deal?.title ?? "",
+    "deal.amount": deal ? formatMoney(deal.amount) : "",
+    "deal.stage": deal ? DEAL_STAGE_LABEL[deal.stage] : "",
+    "owner.name": owner?.name ?? "",
+    "owner.firstName": owner?.name.split(/\s+/)[0] ?? "",
+    "owner.email": owner?.email ?? "",
+    "platform.balance":
+      snapshot?.balancePaise !== undefined
+        ? formatMoney({ amount: snapshot.balancePaise, currency: "INR" })
+        : "",
+    "platform.liveCampaigns":
+      snapshot && live !== undefined ? String(live) : "",
+    "platform.stage": "",
+    "record.name": subject.name,
   };
+  if (account) {
+    const reached = pathIndex(account.stage);
+    if (reached >= 0) {
+      vars["platform.stage"] =
+        ACTIVATION_STEP_LABEL[ACTIVATION_STAGES[reached]];
+    }
+  }
+  for (const [key, value] of Object.entries(context ?? {})) {
+    if (key.startsWith("prospect.") && value.trim()) vars[key] = value.trim();
+  }
+  return vars;
 }
 
-/** Interactions a teammate logged on the record since `since`, which count as a reply. */
+/**
+ * Since `since`: a reply received from the contact, or an interaction a
+ * teammate logged; either means the conversation moved off the automation.
+ */
 export async function repliedSince(
   ctx: QueryCtx,
   subject: Subject,
   since: number,
-) {
+): Promise<"inbound" | "logged" | null> {
   const timeline = ctx.db.query("timeline");
   const queries = [
     subject.lead &&
@@ -375,13 +431,16 @@ export async function repliedSince(
         q.eq("dealId", subject.deal!._id).gt("occurredAt", since),
       ),
   ];
+  let found: "inbound" | "logged" | null = null;
   for (const query of queries) {
     if (!query) continue;
     for (const entry of await query.collect()) {
-      if (REPLY_KINDS.has(entry.kind) && entry.actorId) return true;
+      if (!REPLY_KINDS.has(entry.kind) || entry.automated) continue;
+      if (entry.direction === "inbound") return "inbound";
+      if (entry.actorId) found = "logged";
     }
   }
-  return false;
+  return found;
 }
 
 const REPLY_KINDS = new Set(["email", "whatsapp", "call", "meeting"]);

@@ -7,6 +7,8 @@ import {
   LEAD_SOURCE_LABEL,
   type Utm,
 } from "../../lib/domain/leads";
+import { slaDueAt } from "../../lib/domain/day";
+import { isLeadOpen } from "../../lib/domain/transitions";
 import { nextOwner } from "./assignment";
 import { leadSlaSeconds } from "./settings";
 import { leadershipIds, notify, notifyMany } from "../notifications";
@@ -34,8 +36,8 @@ export function leadHref(id: Id<"leads">) {
   return `/leads/${id}`;
 }
 
-export function isOpen(lead: Doc<"leads">) {
-  return !CLOSED_STATUSES.includes(lead.status);
+export function isOpen(lead: Pick<Doc<"leads">, "status">) {
+  return isLeadOpen(lead.status);
 }
 
 /** "google / cpc", a referrer host, or how the lead entered the CRM. */
@@ -125,8 +127,8 @@ export async function createLead(
     });
   }
   if (!lead.firstTouchedAt) {
-    await ctx.scheduler.runAfter(
-      (await leadSlaSeconds(ctx)) * 1000,
+    await ctx.scheduler.runAt(
+      slaDueAt(now, (await leadSlaSeconds(ctx)) * 1000),
       internal.leads.checkSla,
       { id },
     );

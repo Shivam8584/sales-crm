@@ -32,6 +32,7 @@ import { vConsentEvent, vConsentPurpose, vLawfulBasis } from "./lib/consent";
 import {
   vAutomationStatus,
   vEnrollmentStatus,
+  vExitKind,
   vGraph,
   vHistoryEntry,
   vMessageChannel,
@@ -195,6 +196,7 @@ export default defineSchema({
   })
     .index("by_account", ["accountId"])
     .index("by_stage_position", ["stage", "position"])
+    .index("by_stage_closed", ["stage", "closedAt"])
     .index("by_owner", ["ownerId"]),
 
   tasks: defineTable({
@@ -211,6 +213,9 @@ export default defineSchema({
     position: v.number(),
     automationKey: v.optional(v.string()),
     completedAt: v.optional(v.number()),
+    /** Who last changed the assignee, and when: lets them undo a hand-off. */
+    reassignedById: v.optional(v.id("members")),
+    reassignedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_assignee_status_completed", [
@@ -249,6 +254,14 @@ export default defineSchema({
       ),
     ),
     editedAt: v.optional(v.number()),
+    /** Members @mentioned in the body, which holds them as `<@id>` tokens. */
+    mentions: v.optional(v.array(v.id("members"))),
+    /** Members who acknowledged the entry. */
+    acks: v.optional(v.array(v.id("members"))),
+    /** Written by an automation, not a teammate: never counts as an interaction. */
+    automated: v.optional(v.boolean()),
+    /** For emails and WhatsApp: "inbound" is a reply received from the contact. */
+    direction: v.optional(v.union(v.literal("inbound"), v.literal("outbound"))),
   })
     .index("by_account", ["accountId", "occurredAt"])
     .index("by_person", ["personId", "occurredAt"])
@@ -264,9 +277,51 @@ export default defineSchema({
     body: v.optional(v.string()),
     href: v.optional(v.string()),
     readAt: v.optional(v.number()),
+    /** `accounts:<id>`, the record it is about; grouping and follow batching key. */
+    record: v.optional(v.string()),
+    actorId: v.optional(v.id("members")),
+    entryId: v.optional(v.id("timeline")),
+    /** Follow updates merged into this one. */
+    count: v.optional(v.number()),
+    /** Cleared from the inbox; done implies read. */
+    doneAt: v.optional(v.number()),
+    /** Hidden and read until then, when it comes back unread. */
+    snoozedUntil: v.optional(v.number()),
   })
     .index("by_recipient", ["recipientId", "readAt"])
-    .index("by_recipient_time", ["recipientId"]),
+    .index("by_recipient_time", ["recipientId"])
+    .index("by_recipient_state", ["recipientId", "doneAt", "snoozedUntil"])
+    .index("by_recipient_record", ["recipientId", "record"]),
+
+  /** A member following a record hears about its stage changes, deals and notes. */
+  follows: defineTable({
+    memberId: v.id("members"),
+    record: v.string(),
+  })
+    .index("by_record", ["record"])
+    .index("by_member_record", ["memberId", "record"]),
+
+  notificationPrefs: defineTable({
+    memberId: v.id("members"),
+    /** Preference groups turned off in-app. */
+    muted: v.array(v.string()),
+    emailDigest: v.boolean(),
+    lastDigest: v.optional(
+      v.object({
+        at: v.number(),
+        count: v.number(),
+        status: v.union(
+          v.literal("sent"),
+          v.literal("queued"),
+          v.literal("failed"),
+        ),
+        provider: v.string(),
+        error: v.optional(v.string()),
+        subject: v.string(),
+        body: v.string(),
+      }),
+    ),
+  }).index("by_member", ["memberId"]),
 
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({
@@ -412,6 +467,70 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_deal", ["dealId", "version"]),
 
+  /** Marketplace listings watched for their review gap against category leaders. */
+  watchlists: defineTable({
+    name: v.string(),
+    /** Ratings a listing should reach; absent means its category's leaders set it. */
+    benchmark: v.optional(v.number()),
+    createdById: v.id("members"),
+    refreshedAt: v.optional(v.number()),
+    deletedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }),
+
+  watchedProducts: defineTable({
+    watchlistId: v.id("watchlists"),
+    marketplace: v.string(),
+    identifier: v.string(),
+    /** `marketplace:identifier`, lower-cased; one per watchlist. */
+    listingKey: v.string(),
+    url: v.string(),
+    status: v.union(v.literal("pending"), v.literal("ok"), v.literal("failed")),
+    error: v.optional(v.string()),
+    source: v.optional(v.union(v.literal("live"), v.literal("sandbox"))),
+    title: v.optional(v.string()),
+    brand: v.optional(v.string()),
+    brandKey: v.optional(v.string()),
+    category: v.optional(v.string()),
+    price: v.optional(vMoney),
+    mrp: v.optional(vMoney),
+    rating: v.optional(v.number()),
+    ratingsCount: v.optional(v.number()),
+    /** Ratings a week over the last 28 days, from snapshots. */
+    velocity: v.optional(v.number()),
+    imageUrl: v.optional(v.string()),
+    variants: v.optional(v.number()),
+    queuedAt: v.optional(v.number()),
+    checkedAt: v.optional(v.number()),
+    addedById: v.id("members"),
+    removedAt: v.optional(v.number()),
+  })
+    .index("by_watchlist", ["watchlistId"])
+    .index("by_watchlist_listing", ["watchlistId", "listingKey"])
+    .index("by_brand", ["brandKey"]),
+
+  /** One reading of a watched listing per calendar day. */
+  productSnapshots: defineTable({
+    productId: v.id("watchedProducts"),
+    day: vDay,
+    takenAt: v.number(),
+    rating: v.optional(v.number()),
+    ratingsCount: v.optional(v.number()),
+    price: v.optional(vMoney),
+  }).index("by_product_day", ["productId", "day"]),
+
+  /** What the team decided about a brand found by prospecting. */
+  prospectBrands: defineTable({
+    brandKey: v.string(),
+    brand: v.string(),
+    /** Set by hand; overrides matching by name or domain. */
+    accountId: v.optional(v.id("accounts")),
+    leadId: v.optional(v.id("leads")),
+    updatedAt: v.number(),
+  })
+    .index("by_brand", ["brandKey"])
+    .index("by_account", ["accountId"]),
+
   /** A trigger and a graph of steps; the engine runs the `published` snapshot. */
   automations: defineTable({
     name: v.string(),
@@ -459,6 +578,13 @@ export default defineSchema({
     source: v.string(),
     finishedAt: v.optional(v.number()),
     exitReason: v.optional(v.string()),
+    exitKind: v.optional(vExitKind),
+    /** A reply arrived while the run was live or soon after it ended. */
+    repliedAt: v.optional(v.number()),
+    /** Paused by hand; unlike `heldAt`, re-activating the automation doesn't resume it. */
+    pausedById: v.optional(v.id("members")),
+    /** Values for `{{prospect.*}}` given at enrolment. */
+    context: v.optional(v.record(v.string(), v.string())),
     history: v.array(vHistoryEntry),
   })
     .index("by_automation", ["automationId", "status"])
@@ -506,5 +632,8 @@ export default defineSchema({
   })
     .index("by_step_key", ["stepKey"])
     .index("by_enrollment", ["enrollmentId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_automation", ["automationId", "status"])
+    .index("by_person", ["personId"])
+    .index("by_lead", ["leadId"]),
 });

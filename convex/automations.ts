@@ -12,8 +12,16 @@ import {
   LIMITS,
   SUBJECT_LABEL,
   TRIGGER_SUBJECTS,
+  EXIT_KIND_LABEL,
+  FREQUENCY_CAP,
+  TRIGGER_LABEL,
+  isValidFrequencyCap,
   checkGraphShape,
   describeNode,
+  nodeFunnel,
+  percent,
+  renderTemplate,
+  stepOrder,
   describeTrigger,
   isLive,
   simulate,
@@ -29,10 +37,19 @@ import {
   enroll,
   finish,
   logStep,
+  pauseRun,
+  resumeAllHeld,
   resumeHeld,
+  resumeRun,
   runStep,
   stepFailed,
 } from "./lib/automations/engine";
+import {
+  SAFETY_KEYS,
+  killSwitchOn,
+  readSafety,
+  write as writeSetting,
+} from "./lib/automations/safety";
 import {
   deliver as deliverMessage,
   emailProvider,
@@ -40,6 +57,7 @@ import {
 } from "./lib/automations/delivery";
 import {
   loadSubject,
+  recipientFor,
   subjectFacts,
   subjectVars,
 } from "./lib/automations/subject";
@@ -51,7 +69,12 @@ import {
   vTrigger,
 } from "./lib/automations/validators";
 import { fail, invalid, notFound } from "./lib/errors";
-import { managerMutation, memberMutation, memberQuery } from "./lib/functions";
+import {
+  adminMutation,
+  managerMutation,
+  memberMutation,
+  memberQuery,
+} from "./lib/functions";
 import { memberIndex } from "./lib/records";
 
 const MAX_ENROLLMENTS_SCAN = 5000;
@@ -233,7 +256,7 @@ export const catalog = memberQuery({
   },
 });
 
-/** Per step: how many runs reached it, are on it now, and which path they took. */
+/** Per step: how many runs reached it, went on, are on it now, and which path they took. */
 export const nodeStats = memberQuery({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
@@ -242,33 +265,7 @@ export const nodeStats = memberQuery({
       .withIndex("by_automation", (q) => q.eq("automationId", id))
       .order("desc")
       .take(MAX_ENROLLMENTS_SCAN);
-    const stats: Record<
-      string,
-      {
-        entered: number;
-        current: number;
-        ports: Record<string, number>;
-        lastAt: number | null;
-      }
-    > = {};
-    const at = (nodeId: string) =>
-      (stats[nodeId] ??= { entered: 0, current: 0, ports: {}, lastAt: null });
-    for (const enrollment of enrollments) {
-      const seen = new Set<string>();
-      for (const entry of enrollment.history) {
-        const item = at(entry.nodeId);
-        if (!seen.has(entry.nodeId)) item.entered++;
-        seen.add(entry.nodeId);
-        item.ports[entry.outcome] = (item.ports[entry.outcome] ?? 0) + 1;
-        item.lastAt = Math.max(item.lastAt ?? 0, entry.at);
-      }
-      if (isLive(enrollment.status)) {
-        const item = at(enrollment.currentNodeId);
-        item.current++;
-        if (!seen.has(enrollment.currentNodeId)) item.entered++;
-      }
-    }
-    return stats;
+    return nodeFunnel(enrollments);
   },
 });
 
@@ -354,7 +351,9 @@ export const enrollments = memberQuery({
         enrolledAt: row.enrolledAt,
         finishedAt: row.finishedAt ?? null,
         exitReason: row.exitReason ?? null,
-        held: Boolean(row.heldAt),
+        held: Boolean(row.heldAt) && !row.pausedById,
+        paused: Boolean(row.pausedById),
+        replied: Boolean(row.repliedAt),
         subject: await subjectName(ctx, row),
       });
     }
@@ -404,7 +403,8 @@ export const forRecord = memberQuery({
             ? automation.name
             : "Deleted automation",
         status: row.status,
-        held: Boolean(row.heldAt),
+        held: Boolean(row.heldAt) && !row.pausedById,
+        paused: Boolean(row.pausedById),
         step:
           node && automation
             ? describeNode(
@@ -755,7 +755,14 @@ export const remove = managerMutation({
         )
         .collect();
       for (const enrollment of live) {
-        await finish(ctx, enrollment, "exited", "The automation was deleted");
+        await finish(
+          ctx,
+          enrollment,
+          "exited",
+          "The automation was deleted",
+          undefined,
+          "deleted",
+        );
         ended++;
       }
     }
@@ -796,7 +803,14 @@ export const exitEnrollment = memberMutation({
     const enrollment = await ctx.db.get(id);
     if (!enrollment) notFound("Run");
     if (!isLive(enrollment.status)) fail("conflict", "This run already ended");
-    await finish(ctx, enrollment, "exited", `Removed by ${ctx.viewer.name}`);
+    await finish(
+      ctx,
+      enrollment,
+      "exited",
+      `Removed by ${ctx.viewer.name}`,
+      undefined,
+      "manual",
+    );
   },
 });
 
@@ -844,7 +858,8 @@ export const claimMessage = internalMutation({
     if (
       !message ||
       message.status !== "queued" ||
-      message.provider === "outbox"
+      message.provider === "outbox" ||
+      (await killSwitchOn(ctx))
     ) {
       return null;
     }
@@ -976,5 +991,382 @@ export const deliver = internalAction({
             retryable: result.retryable,
           },
     );
+  },
+});
+
+// ── Manual enrolment (public contract) ──────────────────────────────────────
+
+const MAX_ENROL = 200;
+const CONTEXT_LIMITS = { keys: 10, value: 500 } as const;
+const CONTEXT_KEY = /^(prospect\.)?[a-zA-Z][a-zA-Z0-9]{0,39}$/;
+
+const vEnrolSubject = v.object({
+  kind: vSubjectKind,
+  id: v.string(),
+  /** Values for `{{prospect.*}}`: `{ talkingPoint: "…" }` or `{ "prospect.talkingPoint": "…" }`. */
+  context: v.optional(v.record(v.string(), v.string())),
+});
+
+function cleanContext(context: Record<string, string> | undefined) {
+  if (!context) return undefined;
+  const entries = Object.entries(context).filter(([, value]) => value.trim());
+  if (entries.length > CONTEXT_LIMITS.keys) {
+    invalid("context", `Use up to ${CONTEXT_LIMITS.keys} values per record`);
+  }
+  const out: Record<string, string> = {};
+  for (const [key, value] of entries) {
+    if (!CONTEXT_KEY.test(key)) {
+      invalid("context", `“${key}” isn't a valid name`);
+    }
+    if (value.length > CONTEXT_LIMITS.value) {
+      invalid(
+        "context",
+        `Keep “${key}” under ${CONTEXT_LIMITS.value} characters`,
+      );
+    }
+    out[key.startsWith("prospect.") ? key : `prospect.${key}`] = value.trim();
+  }
+  return out;
+}
+
+/**
+ * Enrols records in an active automation by hand, up to 200 at a time.
+ * Records already running in it, or that went through it without
+ * re-enrolment allowed, are counted and skipped rather than failing the call.
+ */
+export const enrolMany = memberMutation({
+  args: {
+    automationId: v.id("automations"),
+    subjects: v.array(vEnrolSubject),
+  },
+  handler: async (ctx, { automationId, subjects }) => {
+    if (subjects.length === 0) invalid("subjects", "Pick at least one record");
+    if (subjects.length > MAX_ENROL) {
+      invalid("subjects", `Enrol up to ${MAX_ENROL} records at a time`);
+    }
+    const automation = await requireAutomation(ctx, automationId);
+    if (await killSwitchOn(ctx)) {
+      fail(
+        "conflict",
+        "Automations are stopped for the whole workspace. An admin can restart them in Settings → Workspace.",
+      );
+    }
+    if (automation.status !== "active" || !automation.published) {
+      fail("conflict", `“${automation.name}” isn't active`);
+    }
+    const counts = {
+      enrolled: 0,
+      alreadyRunning: 0,
+      alreadyFinished: 0,
+      skipped: 0,
+    };
+    const problems = new Map<string, number>();
+    const enrollmentIds: Id<"automationEnrollments">[] = [];
+    const seen = new Set<string>();
+    for (const subject of subjects) {
+      const key = subjectKey(subject.kind, subject.id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const result = await enroll(
+        ctx,
+        automation,
+        { kind: subject.kind, id: subject.id },
+        `Enrolled by ${ctx.viewer.name}`,
+        ctx.viewer._id,
+        cleanContext(subject.context),
+      );
+      if (result.outcome === "enrolled") {
+        counts.enrolled++;
+        enrollmentIds.push(result.enrollmentId);
+      } else if (result.outcome === "already") counts.alreadyRunning++;
+      else if (result.outcome === "finished") counts.alreadyFinished++;
+      else {
+        counts.skipped++;
+        problems.set(result.message, (problems.get(result.message) ?? 0) + 1);
+      }
+    }
+    return {
+      automation: automation.name,
+      total: seen.size,
+      ...counts,
+      problems: [...problems].map(([message, count]) => ({ message, count })),
+      enrollmentIds,
+    };
+  },
+});
+
+/** Active automations a teammate can enrol this kind of record in. */
+export const manualTargets = memberQuery({
+  args: { kind: vSubjectKind },
+  handler: async (ctx, { kind }) => {
+    const active = await ctx.db
+      .query("automations")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+    return active
+      .filter((item) => !item.deletedAt && item.published?.subjectKind === kind)
+      .map((item) => ({
+        _id: item._id,
+        name: item.name,
+        trigger: TRIGGER_LABEL[item.published!.trigger.kind],
+        manual: item.published!.trigger.kind === "manual",
+        active: item.stats.active,
+      }))
+      .sort(
+        (a, b) =>
+          Number(b.manual) - Number(a.manual) || a.name.localeCompare(b.name),
+      );
+  },
+});
+
+export const pauseEnrollment = memberMutation({
+  args: { id: v.id("automationEnrollments") },
+  handler: async (ctx, { id }) => {
+    const enrollment = await ctx.db.get(id);
+    if (!enrollment) notFound("Run");
+    if (!isLive(enrollment.status)) fail("conflict", "This run already ended");
+    if (enrollment.pausedById) fail("conflict", "This run is already paused");
+    await pauseRun(ctx, enrollment, ctx.viewer._id, ctx.viewer.name);
+  },
+});
+
+export const resumeEnrollment = memberMutation({
+  args: { id: v.id("automationEnrollments") },
+  handler: async (ctx, { id }) => {
+    const enrollment = await ctx.db.get(id);
+    if (!enrollment) notFound("Run");
+    if (!isLive(enrollment.status)) fail("conflict", "This run already ended");
+    if (!enrollment.pausedById) fail("conflict", "This run isn't paused");
+    await resumeRun(ctx, enrollment, ctx.viewer.name);
+  },
+});
+
+// ── Analytics ───────────────────────────────────────────────────────────────
+
+const MESSAGE_STATUSES = ["queued", "sending", "sent", "failed"] as const;
+type MessageStatus = (typeof MESSAGE_STATUSES)[number];
+
+/** How the automation performs: runs by outcome, the step funnel, messages and replies. */
+export const analytics = memberQuery({
+  args: { id: v.id("automations") },
+  handler: async (ctx, { id }) => {
+    const automation = await ctx.db.get(id);
+    if (!automation || automation.deletedAt) return null;
+    const runs = await ctx.db
+      .query("automationEnrollments")
+      .withIndex("by_automation", (q) => q.eq("automationId", id))
+      .order("desc")
+      .take(MAX_ENROLLMENTS_SCAN);
+    const counts = {
+      enrolled: runs.length,
+      active: 0,
+      paused: 0,
+      completed: 0,
+      exited: 0,
+      failed: 0,
+    };
+    const exits = new Map<string, number>();
+    for (const run of runs) {
+      if (isLive(run.status)) {
+        counts.active++;
+        if (run.pausedById || run.heldAt) counts.paused++;
+      } else counts[run.status]++;
+      if (run.status === "exited" || run.status === "failed") {
+        const kind =
+          run.exitKind ?? (run.status === "failed" ? "failed" : "other");
+        exits.set(kind, (exits.get(kind) ?? 0) + 1);
+      }
+    }
+
+    const messages: Doc<"automationMessages">[] = [];
+    for (const status of MESSAGE_STATUSES) {
+      messages.push(
+        ...(await ctx.db
+          .query("automationMessages")
+          .withIndex("by_automation", (q) =>
+            q.eq("automationId", id).eq("status", status),
+          )
+          .collect()),
+      );
+    }
+    const byStatus = (channel: "email" | "whatsapp") =>
+      Object.fromEntries(
+        MESSAGE_STATUSES.map((status) => [
+          status,
+          messages.filter(
+            (message) =>
+              message.channel === channel && message.status === status,
+          ).length,
+        ]),
+      ) as Record<MessageStatus, number>;
+    const outbox = messages.filter(
+      (message) => message.provider === "outbox" && message.status === "queued",
+    ).length;
+
+    const messaged = new Set(messages.map((message) => message.enrollmentId));
+    const contacted = runs.filter((run) => messaged.has(run._id));
+    const replied = contacted.filter((run) => run.repliedAt).length;
+
+    const graph = (automation.published?.graph ?? automation.graph) as Graph;
+    const funnel = nodeFunnel(runs);
+    const names = await nameLookup(ctx);
+    const trigger = automation.published?.trigger ?? automation.trigger;
+    const steps = stepOrder(graph)
+      .map((nodeId) => graph.nodes.find((node) => node.id === nodeId))
+      .filter((node) => node !== undefined)
+      .map((node) => ({
+        nodeId: node.id,
+        kind: node.kind,
+        title: node.title?.trim() || describeNode(node, trigger, names),
+        reached: funnel[node.id]?.reached ?? 0,
+        passed: funnel[node.id]?.passed ?? 0,
+        current: funnel[node.id]?.current ?? 0,
+        skipped: funnel[node.id]?.skipped ?? 0,
+        ended: funnel[node.id]?.ended ?? 0,
+      }));
+
+    return {
+      counts,
+      truncated: runs.length >= MAX_ENROLLMENTS_SCAN,
+      exits: [...exits]
+        .map(([kind, count]) => ({
+          kind,
+          label: EXIT_KIND_LABEL[kind as keyof typeof EXIT_KIND_LABEL] ?? kind,
+          count,
+        }))
+        .sort((a, b) => b.count - a.count),
+      steps,
+      messages: {
+        total: messages.length,
+        outbox,
+        email: byStatus("email"),
+        whatsapp: byStatus("whatsapp"),
+      },
+      replies: {
+        contacted: contacted.length,
+        replied,
+        rate: percent(replied, contacted.length),
+      },
+    };
+  },
+});
+
+// ── Template preview ────────────────────────────────────────────────────────
+
+/** Fills message text for one record, as a send would, and reports variables left empty. */
+export const preview = memberQuery({
+  args: {
+    target: vTarget,
+    texts: v.array(v.string()),
+    context: v.optional(v.record(v.string(), v.string())),
+    channel: v.optional(v.union(v.literal("email"), v.literal("whatsapp"))),
+  },
+  handler: async (ctx, { target, texts, context, channel }) => {
+    if (texts.length > 20) invalid("texts", "Preview up to 20 texts");
+    const subject = await loadSubject(ctx, target);
+    if (!subject) return null;
+    const recipient = await recipientFor(ctx, subject, channel ?? "email");
+    const vars = await subjectVars(
+      ctx,
+      subject,
+      recipient,
+      cleanContext(context),
+    );
+    return {
+      record: subject.name,
+      recipient: recipient
+        ? {
+            name: recipient.name,
+            address:
+              (channel === "whatsapp" ? recipient.phone : recipient.email) ??
+              null,
+          }
+        : null,
+      results: texts.map((text) => renderTemplate(text, vars)),
+    };
+  },
+});
+
+// ── Safety ──────────────────────────────────────────────────────────────────
+
+export const safety = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const current = await readSafety(ctx);
+    const by = current.killSwitch
+      ? await ctx.db.get(current.killSwitch.byId)
+      : null;
+    const held = current.killSwitch
+      ? (
+          await ctx.db
+            .query("automationEnrollments")
+            .withIndex("by_status", (q) => q.eq("status", "waiting"))
+            .take(MAX_ENROLLMENTS_SCAN)
+        ).filter((row) => row.heldAt && !row.pausedById).length
+      : 0;
+    return {
+      killSwitch: current.killSwitch
+        ? { at: current.killSwitch.at, by: by?.name ?? "An admin" }
+        : null,
+      held,
+      frequencyCap: current.frequencyCap,
+      frequencyCapIsDefault: current.frequencyCapIsDefault,
+      frequencyCapLimits: FREQUENCY_CAP,
+    };
+  },
+});
+
+/**
+ * Stops or restarts every automation. While stopped, runs hold where they
+ * are, nothing new enrols and queued messages aren't delivered; restarting
+ * picks all of them back up. Returns the previous state for undo.
+ */
+export const setKillSwitch = adminMutation({
+  args: { on: v.boolean() },
+  handler: async (ctx, { on }) => {
+    const previous = (await readSafety(ctx)).killSwitch !== null;
+    if (on === previous) return { previous, resumed: 0, requeued: 0 };
+    if (on) {
+      await writeSetting(
+        ctx,
+        SAFETY_KEYS.killSwitch,
+        JSON.stringify({ at: Date.now(), byId: ctx.viewer._id }),
+      );
+      return { previous, resumed: 0, requeued: 0 };
+    }
+    await writeSetting(ctx, SAFETY_KEYS.killSwitch, null);
+    const resumed = await resumeAllHeld(ctx);
+    const queued = await ctx.db
+      .query("automationMessages")
+      .withIndex("by_status", (q) => q.eq("status", "queued"))
+      .collect();
+    let requeued = 0;
+    for (const message of queued) {
+      if (message.provider === "outbox") continue;
+      await ctx.scheduler.runAfter(0, internal.automations.deliver, {
+        messageId: message._id,
+      });
+      requeued++;
+    }
+    return { previous, resumed, requeued };
+  },
+});
+
+/** Most automated messages one person may get in 7 days; `null` restores the default. */
+export const setFrequencyCap = adminMutation({
+  args: { value: v.union(v.number(), v.null()) },
+  handler: async (ctx, { value }) => {
+    if (value !== null && !isValidFrequencyCap(value)) {
+      invalid(
+        "frequencyCap",
+        `Use a whole number from ${FREQUENCY_CAP.min} to ${FREQUENCY_CAP.max}`,
+      );
+    }
+    const previous = await writeSetting(
+      ctx,
+      SAFETY_KEYS.frequencyCap,
+      value === null ? null : String(value),
+    );
+    return { previous: previous === null ? null : Number(previous) };
   },
 });

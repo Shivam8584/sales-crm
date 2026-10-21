@@ -1,3 +1,4 @@
+import { dayAsDate, istToday } from "@/lib/domain/day";
 import {
   CURRENCIES,
   formatMoney,
@@ -5,29 +6,27 @@ import {
   type Money,
 } from "@/lib/domain/money";
 
-/** Today's calendar day in the viewer's timezone, as `YYYY-MM-DD`. */
+/** Today in India, where the team works, as `YYYY-MM-DD`. */
 export function today() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
+  return istToday();
 }
 
 const SHORT_DAY = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
+  timeZone: "UTC",
 });
 const LONG_DAY = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
   year: "numeric",
+  timeZone: "UTC",
 });
 
 export function formatDay(day: string) {
-  const date = new Date(`${day}T00:00:00`);
-  return date.getFullYear() === new Date().getFullYear()
-    ? SHORT_DAY.format(date)
-    : LONG_DAY.format(date);
+  return day.slice(0, 4) === istToday().slice(0, 4)
+    ? SHORT_DAY.format(dayAsDate(day))
+    : LONG_DAY.format(dayAsDate(day));
 }
 
 /** One compact total per currency; currencies are never added together. */

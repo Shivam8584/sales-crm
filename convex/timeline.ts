@@ -1,18 +1,29 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { startOfIstDay } from "../lib/domain/day";
 import { fail, invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import { isOpen } from "./lib/leads";
+import { notifyFollowers } from "./lib/follows";
+import { notifyMentions, resolveMentions } from "./lib/mentions";
+import { assertCan } from "./lib/permissions";
 import { memberIndex, memberRef } from "./lib/records";
-import type { RecordRefs } from "./lib/timeline";
+import {
+  INTERACTION_KINDS,
+  isInteraction,
+  type RecordRefs,
+} from "./lib/timeline";
 import { literals, vCallOutcome } from "./lib/validators";
+import { addedMentions } from "../lib/domain/mentions";
+
+export { isInteraction };
 
 const MAX_BODY = 10_000;
 const PAGE = 200;
 
-const LOGGABLE = ["note", "call", "email", "meeting", "whatsapp"] as const;
-const vLoggable = literals(LOGGABLE);
+const vLoggable = literals(INTERACTION_KINDS);
 
 const vTarget = v.union(
   v.object({ accountId: v.id("accounts") }),
@@ -54,18 +65,10 @@ function entriesFor(ctx: QueryCtx, target: typeof vTarget.type, since = 0) {
 }
 
 const DAY = 24 * 60 * 60_000;
-// Days are counted in India time, where the team works.
-const IST_OFFSET = 330 * 60_000;
-const INTERACTIONS = new Set<string>(LOGGABLE);
-
-export function isInteraction(kind: string) {
-  return INTERACTIONS.has(kind);
-}
 
 /** Start of the window that holds `days` India-time days, today included. */
 export function windowStart(days: number, now: number) {
-  const today = Math.floor((now + IST_OFFSET) / DAY);
-  return (today - days + 1) * DAY - IST_OFFSET;
+  return startOfIstDay(now) - (days - 1) * DAY;
 }
 
 /** Counts per bucket of `size` days across the window, oldest first. */
@@ -91,22 +94,27 @@ export async function latestInteraction(
   target: { accountId: Id<"accounts"> } | { personId: Id<"people"> },
 ) {
   const latest = await Promise.all(
-    LOGGABLE.map((kind) =>
-      "accountId" in target
+    INTERACTION_KINDS.map((kind) =>
+      ("accountId" in target
         ? ctx.db
             .query("timeline")
             .withIndex("by_account_kind", (q) =>
               q.eq("accountId", target.accountId).eq("kind", kind),
             )
-            .order("desc")
-            .first()
         : ctx.db
             .query("timeline")
             .withIndex("by_person_kind", (q) =>
               q.eq("personId", target.personId).eq("kind", kind),
             )
-            .order("desc")
-            .first(),
+      )
+        .order("desc")
+        .filter((q) =>
+          q.and(
+            q.neq(q.field("actorId"), undefined),
+            q.neq(q.field("automated"), true),
+          ),
+        )
+        .first(),
     ),
   );
   let last: Doc<"timeline"> | null = null;
@@ -130,7 +138,7 @@ export const activity = memberQuery({
     const now = Date.now();
     const entries = (
       await entriesFor(ctx, target, windowStart(days, now)).collect()
-    ).filter((entry) => isInteraction(entry.kind));
+    ).filter(isInteraction);
     const count = (...kinds: string[]) =>
       entries.filter((entry) => kinds.includes(entry.kind)).length;
     return {
@@ -150,46 +158,67 @@ export const activity = memberQuery({
   },
 });
 
+async function withRefs(ctx: QueryCtx, entries: Doc<"timeline">[]) {
+  const members = await memberIndex(ctx);
+  const personIds = [
+    ...new Set(entries.map((entry) => entry.personId).filter(Boolean)),
+  ] as Id<"people">[];
+  const dealIds = [
+    ...new Set(entries.map((entry) => entry.dealId).filter(Boolean)),
+  ] as Id<"deals">[];
+  const people = new Map<Id<"people">, Doc<"people">>();
+  for (const id of personIds) {
+    const person = await ctx.db.get(id);
+    if (person) people.set(id, person);
+  }
+  const deals = new Map<Id<"deals">, Doc<"deals">>();
+  for (const id of dealIds) {
+    const deal = await ctx.db.get(id);
+    if (deal) deals.set(id, deal);
+  }
+  return entries.map((entry) => {
+    const person = entry.personId ? people.get(entry.personId) : undefined;
+    const deal = entry.dealId ? deals.get(entry.dealId) : undefined;
+    return {
+      ...entry,
+      actor: memberRef(members, entry.actorId),
+      mentioned: (entry.mentions ?? [])
+        .map((id) => memberRef(members, id))
+        .filter((member) => member !== null),
+      acked: (entry.acks ?? [])
+        .map((id) => memberRef(members, id))
+        .filter((member) => member !== null),
+      person: person
+        ? {
+            _id: person._id,
+            name: `${person.firstName} ${person.lastName}`.trim(),
+          }
+        : null,
+      deal: deal ? { _id: deal._id, title: deal.title } : null,
+    };
+  });
+}
+
 /**
- * Newest first. An account's timeline includes entries logged on its people
- * and deals.
+ * Newest first, the latest 200. An account's timeline includes entries logged
+ * on its people and deals. `page` walks the whole history.
  */
 export const forRecord = memberQuery({
   args: { target: vTarget },
   handler: async (ctx, { target }) => {
     const entries = await entriesFor(ctx, target).order("desc").take(PAGE);
-    const members = await memberIndex(ctx);
-    const personIds = [
-      ...new Set(entries.map((entry) => entry.personId).filter(Boolean)),
-    ] as Id<"people">[];
-    const dealIds = [
-      ...new Set(entries.map((entry) => entry.dealId).filter(Boolean)),
-    ] as Id<"deals">[];
-    const people = new Map<Id<"people">, Doc<"people">>();
-    for (const id of personIds) {
-      const person = await ctx.db.get(id);
-      if (person) people.set(id, person);
-    }
-    const deals = new Map<Id<"deals">, Doc<"deals">>();
-    for (const id of dealIds) {
-      const deal = await ctx.db.get(id);
-      if (deal) deals.set(id, deal);
-    }
-    return entries.map((entry) => {
-      const person = entry.personId ? people.get(entry.personId) : undefined;
-      const deal = entry.dealId ? deals.get(entry.dealId) : undefined;
-      return {
-        ...entry,
-        actor: memberRef(members, entry.actorId),
-        person: person
-          ? {
-              _id: person._id,
-              name: `${person.firstName} ${person.lastName}`.trim(),
-            }
-          : null,
-        deal: deal ? { _id: deal._id, title: deal.title } : null,
-      };
-    });
+    return await withRefs(ctx, entries);
+  },
+});
+
+/** Cursor-paginated `forRecord`, for `usePaginatedQuery`. */
+export const page = memberQuery({
+  args: { target: vTarget, paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { target, paginationOpts }) => {
+    const result = await entriesFor(ctx, target)
+      .order("desc")
+      .paginate(paginationOpts);
+    return { ...result, page: await withRefs(ctx, result.page) };
   },
 });
 
@@ -227,6 +256,12 @@ export const log = memberMutation({
     if ("leadId" in args.target) {
       lead = await ctx.db.get(args.target.leadId);
       if (!lead) notFound("Lead");
+      if (lead.erasedAt) {
+        fail(
+          "forbidden",
+          "This lead's data was erased, so nothing new can be logged",
+        );
+      }
       refs = {
         leadId: lead._id,
         accountId: lead.accountId,
@@ -251,7 +286,8 @@ export const log = memberMutation({
       refs = { accountId: args.target.accountId };
     }
 
-    const id = await ctx.db.insert("timeline", {
+    const mentions = await resolveMentions(ctx, body);
+    const entry = {
       ...refs,
       kind: args.kind,
       actorId: ctx.viewer._id,
@@ -260,8 +296,12 @@ export const log = memberMutation({
       body,
       durationMin: args.durationMin,
       outcome: args.kind === "call" ? args.outcome : undefined,
-    });
+      mentions: mentions.length ? mentions : undefined,
+    };
+    const id = await ctx.db.insert("timeline", entry);
     await touch(ctx, refs, occurredAt);
+    await notifyMentions(ctx, { _id: id, ...entry }, ctx.viewer, mentions);
+    await notifyFollowers(ctx, { _id: id, ...entry }, mentions);
 
     const firstTouch =
       lead !== null &&
@@ -289,9 +329,7 @@ async function editableEntry(
   if (entry.kind === "change" || entry.kind === "system") {
     fail("forbidden", "Automatic entries can't be changed");
   }
-  if (entry.actorId !== ctx.viewer._id && ctx.viewer.role !== "admin") {
-    fail("forbidden", "Only the author or an admin can change this");
-  }
+  assertCan(ctx.viewer, "timeline.edit", [entry.actorId]);
   const person = entry.personId ? await ctx.db.get(entry.personId) : null;
   if (person?.erasedAt) {
     fail("forbidden", "This person's data was erased and can't be changed");
@@ -307,7 +345,14 @@ export const edit = memberMutation({
     if (!text && entry.kind === "note")
       invalid("body", "Write something first");
     if (text.length > MAX_BODY) invalid("body", "That is too long");
-    await ctx.db.patch(id, { body: text || undefined, editedAt: Date.now() });
+    const mentions = await resolveMentions(ctx, text);
+    await ctx.db.patch(id, {
+      body: text || undefined,
+      editedAt: Date.now(),
+      mentions: mentions.length ? mentions : undefined,
+    });
+    const added = addedMentions(entry.mentions ?? [], mentions);
+    await notifyMentions(ctx, { ...entry, body: text }, ctx.viewer, added);
   },
 });
 
@@ -339,12 +384,13 @@ export const restore = memberMutation({
       durationMin: v.optional(v.number()),
       outcome: v.optional(vCallOutcome),
       editedAt: v.optional(v.number()),
+      automated: v.optional(v.boolean()),
+      mentions: v.optional(v.array(v.id("members"))),
+      acks: v.optional(v.array(v.id("members"))),
     }),
   },
   handler: async (ctx, { entry }) => {
-    if (entry.actorId !== ctx.viewer._id && ctx.viewer.role !== "admin") {
-      fail("forbidden", "Only the author or an admin can restore this");
-    }
+    assertCan(ctx.viewer, "timeline.edit", [entry.actorId]);
     return await ctx.db.insert("timeline", entry);
   },
 });

@@ -11,7 +11,6 @@ const STAGE_TONE: Record<LifecycleStage, TagTone> = {
   demo: "purple",
   signed_up: "teal",
   org_created: "teal",
-  gst_verified: "teal",
   funded: "amber",
   live: "green",
   activated: "green",

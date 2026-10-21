@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { slaClockStart } from "@/lib/domain/day";
 import type { LeadStatus } from "@/lib/domain/enums";
 import SegmentBar from "@/components/_common/segment-bar";
 import { cn } from "@/lib/utils";
@@ -19,15 +20,17 @@ export type SlaState =
   | { kind: "breached"; overMs: number }
   | { kind: "none" };
 
+/** The clock starts at the next 09:00 India time for leads that land out of hours. */
 export function slaState(lead: SlaLead, slaMs: number, now: number): SlaState {
+  const start = slaClockStart(lead._creationTime);
   if (lead.firstTouchedAt) {
-    const tookMs = Math.max(0, lead.firstTouchedAt - lead._creationTime);
+    const tookMs = Math.max(0, lead.firstTouchedAt - start);
     return { kind: "replied", tookMs, late: tookMs > slaMs };
   }
   if (lead.status === "disqualified" || lead.status === "converted") {
     return { kind: "none" };
   }
-  const remainingMs = lead._creationTime + slaMs - now;
+  const remainingMs = start + slaMs - now;
   if (remainingMs > 0 && !lead.slaBreachedAt) {
     return { kind: "pending", remainingMs };
   }
@@ -57,7 +60,10 @@ export function slaMeter(
   switch (state.kind) {
     case "pending": {
       const percent = slaMs
-        ? Math.min(100, ((slaMs - state.remainingMs) / slaMs) * 100)
+        ? Math.max(
+            0,
+            Math.min(100, ((slaMs - state.remainingMs) / slaMs) * 100),
+          )
         : 100;
       return {
         percent,
@@ -88,27 +94,29 @@ export function SlaCell({ lead, slaMs }: { lead: SlaLead; slaMs: number }) {
   const meter = slaMeter(state, slaMs);
   if (!meter) return <span className="text-fg-tertiary">—</span>;
   const [text, muted, title] =
-    state.kind === "pending"
-      ? [
-          countdown(state.remainingMs),
-          "left",
-          "Time left to make the first touch",
-        ]
-      : state.kind === "replied"
+    state.kind === "pending" && state.remainingMs > slaMs
+      ? ["9:00", "start", "Arrived out of hours; the clock starts at 09:00 IST"]
+      : state.kind === "pending"
         ? [
-            compactSpan(state.tookMs),
-            "to reply",
-            state.late
-              ? "First touch came after the SLA"
-              : "First touch within the SLA",
+            countdown(state.remainingMs),
+            "left",
+            "Time left to make the first touch",
           ]
-        : state.kind === "breached"
+        : state.kind === "replied"
           ? [
-              compactSpan(state.overMs),
-              "late",
-              "No first touch yet, past the SLA",
+              compactSpan(state.tookMs),
+              "to reply",
+              state.late
+                ? "First touch came after the SLA"
+                : "First touch within the SLA",
             ]
-          : ["", "", ""];
+          : state.kind === "breached"
+            ? [
+                compactSpan(state.overMs),
+                "late",
+                "No first touch yet, past the SLA",
+              ]
+            : ["", "", ""];
   return (
     <span
       title={title}

@@ -28,6 +28,7 @@ type Item = FunctionReturnType<typeof api.notifications.listMine>[number];
 const PREVIEW = 20;
 
 const TOAST_KINDS = new Set([
+  "mention",
   "lead_new",
   "lead_assigned",
   "lead_sla",

@@ -1,5 +1,6 @@
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { notifyFollowers } from "./follows";
 
 export type RecordRefs = {
   accountId?: Id<"accounts">;
@@ -9,6 +10,31 @@ export type RecordRefs = {
 };
 
 type Change = { field: string; from?: string; to?: string };
+
+export const INTERACTION_KINDS = [
+  "note",
+  "call",
+  "email",
+  "meeting",
+  "whatsapp",
+] as const;
+
+/**
+ * Something a teammate did with the customer. Automation sends (queued in the
+ * outbox or not) have no actor, so they never move last activity, the last
+ * interaction or a lead's first touch.
+ */
+export function isInteraction(entry: {
+  kind: string;
+  actorId?: unknown;
+  automated?: boolean;
+}) {
+  return (
+    (INTERACTION_KINDS as readonly string[]).includes(entry.kind) &&
+    entry.actorId !== undefined &&
+    !entry.automated
+  );
+}
 
 function display(value: unknown): string | undefined {
   if (value === undefined || value === null || value === "") return undefined;
@@ -40,13 +66,13 @@ export async function logChanges(
   changes: Change[],
 ) {
   if (changes.length === 0) return null;
-  return await ctx.db.insert("timeline", {
-    ...refs,
-    kind: "change",
-    actorId,
+  const entry = { ...refs, kind: "change" as const, actorId, changes };
+  const id = await ctx.db.insert("timeline", {
+    ...entry,
     occurredAt: Date.now(),
-    changes,
   });
+  await notifyFollowers(ctx, { _id: id, ...entry });
+  return id;
 }
 
 /** `subject` reads after the actor's name, e.g. "created the account". */
@@ -57,12 +83,11 @@ export async function logSystem(
   body?: string,
   actorId?: Id<"members">,
 ) {
-  return await ctx.db.insert("timeline", {
-    ...refs,
-    kind: "system",
-    actorId,
+  const entry = { ...refs, kind: "system" as const, actorId, subject, body };
+  const id = await ctx.db.insert("timeline", {
+    ...entry,
     occurredAt: Date.now(),
-    subject,
-    body,
   });
+  await notifyFollowers(ctx, { _id: id, ...entry });
+  return id;
 }

@@ -36,7 +36,7 @@ import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import LogOutIcon from "@/public/assets/icons/log-out.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
-import { StatusTag, StepIcons } from "./automation-parts";
+import { StatusTag, StepIcons, StoppedStatus } from "./automation-parts";
 import NewAutomationDialog from "./new-automation-dialog";
 import TemplatesGallery from "./templates-gallery";
 
@@ -366,11 +366,14 @@ export default function AutomationsPage() {
       <PageHeader
         title="Automations"
         meta={
-          counts && (
-            <PageStatus tone={counts.active ? "success" : "neutral"}>
-              <span className="tabular-nums">{counts.active} active</span>
-            </PageStatus>
-          )
+          <>
+            {counts && (
+              <PageStatus tone={counts.active ? "success" : "neutral"}>
+                <span className="tabular-nums">{counts.active} active</span>
+              </PageStatus>
+            )}
+            <StoppedStatus />
+          </>
         }
       />
       <PageViews

@@ -35,6 +35,7 @@ import {
   PanelSection,
   TemplateInput,
 } from "./form-bits";
+import TemplatePreview from "./template-preview";
 
 const ASSIGNEE_LABEL: Record<Assignee, string> = {
   owner: "Record owner",
@@ -304,7 +305,11 @@ function BuildFields({
               onChange={(title) => set({ title })}
             />
           </Field>
-          <Field label="Notes" htmlFor={`${id}-notes`}>
+          <Field
+            label="Notes"
+            htmlFor={`${id}-notes`}
+            error={fieldErrors.notes}
+          >
             <TemplateInput
               id={`${id}-notes`}
               multiline
@@ -375,6 +380,7 @@ function BuildFields({
               />
             </Field>
           </div>
+          <TemplatePreview node={node} />
         </>
       );
     }
@@ -392,7 +398,7 @@ function BuildFields({
               value={config.subject ?? ""}
               disabled={readOnly}
               invalid={Boolean(fieldErrors.subject)}
-              placeholder="Quick question, {{first_name}}"
+              placeholder="Quick question, {{person.firstName|there}}"
               onChange={(value) => set({ subject: value })}
             />
           </Field>
@@ -412,6 +418,7 @@ function BuildFields({
             />
           </Field>
           <DeliveryNote channel="email" />
+          <TemplatePreview node={node} />
         </>
       );
     }
@@ -504,6 +511,7 @@ function BuildFields({
             )}
           </PanelSection>
           <DeliveryNote channel="whatsapp" />
+          <TemplatePreview node={node} />
         </>
       );
     }
@@ -553,6 +561,7 @@ function BuildFields({
               onChange={(message) => set({ message })}
             />
           </Field>
+          <TemplatePreview node={node} />
         </>
       );
     }

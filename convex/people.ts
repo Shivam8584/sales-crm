@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import type { MutationCtx } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   cleanTags,
@@ -12,6 +13,9 @@ import {
 import { personName } from "../lib/domain/labels";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
+import { findPerson } from "./lib/identity";
+import { assertCanReassign } from "./lib/ownership";
+import { assertCan } from "./lib/permissions";
 import {
   checkImportSize,
   findMember,
@@ -86,14 +90,11 @@ async function clean(ctx: MutationCtx, patch: Patch, selfId?: Id<"people">) {
     } else {
       const email = normalizeEmail(patch.email);
       if (!email) invalid("email", "Enter a valid email address");
-      const taken = await ctx.db
-        .query("people")
-        .withIndex("by_email", (q) => q.eq("email", email))
-        .first();
-      if (taken && taken._id !== selfId && !taken.archivedAt) {
+      const taken = await findPerson(ctx, { email }, selfId);
+      if (taken) {
         fail(
           "conflict",
-          `${taken.firstName} ${taken.lastName} already uses this email`,
+          `${personName(taken)} already uses this email`,
           "email",
         );
       }
@@ -107,6 +108,14 @@ async function clean(ctx: MutationCtx, patch: Patch, selfId?: Id<"people">) {
       const phone = normalizePhone(patch.phone);
       if (!phone)
         invalid("phone", "Enter a mobile number, or include the country code");
+      const taken = await findPerson(ctx, { phone }, selfId);
+      if (taken) {
+        fail(
+          "conflict",
+          `${personName(taken)} already uses this number`,
+          "phone",
+        );
+      }
       out.phone = phone;
     }
   }
@@ -187,10 +196,20 @@ function toClient(
   };
 }
 
+async function accountsOf(ctx: QueryCtx, people: Doc<"people">[]) {
+  const accounts = new Map<Id<"accounts">, Doc<"accounts">>();
+  for (const person of people) {
+    if (!person.accountId || accounts.has(person.accountId)) continue;
+    const account = await ctx.db.get(person.accountId);
+    if (account) accounts.set(account._id, account);
+  }
+  return accounts;
+}
+
 export const list = memberQuery({
   args: { accountId: v.optional(v.id("accounts")) },
   handler: async (ctx, { accountId }) => {
-    const [people, accounts, members] = await Promise.all([
+    const [people, members] = await Promise.all([
       accountId
         ? ctx.db
             .query("people")
@@ -201,15 +220,38 @@ export const list = memberQuery({
             .withIndex("by_updated")
             .order("desc")
             .collect(),
-      ctx.db.query("accounts").collect(),
       memberIndex(ctx),
     ]);
-    const accountById = new Map(
-      accounts.map((account) => [account._id, account]),
-    );
-    return people
-      .filter((person) => !person.archivedAt)
-      .map((person) => toClient(person, members, accountById));
+    const visible = people.filter((person) => !person.archivedAt);
+    const accounts = await accountsOf(ctx, visible);
+    return visible.map((person) => toClient(person, members, accounts));
+  },
+});
+
+/** Cursor-paginated people, recently updated first, optionally one owner's. */
+export const page = memberQuery({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    ownerId: v.optional(v.id("members")),
+  },
+  handler: async (ctx, { paginationOpts, ownerId }) => {
+    const base = ownerId
+      ? ctx.db
+          .query("people")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      : ctx.db.query("people").withIndex("by_updated");
+    const result = await base
+      .filter((q) => q.eq(q.field("archivedAt"), undefined))
+      .order("desc")
+      .paginate(paginationOpts);
+    const [members, accounts] = await Promise.all([
+      memberIndex(ctx),
+      accountsOf(ctx, result.page),
+    ]);
+    return {
+      ...result,
+      page: result.page.map((person) => toClient(person, members, accounts)),
+    };
   },
 });
 
@@ -387,15 +429,7 @@ export const importRows = memberMutation({
           tags: (input.tags ?? "").split(/[,;|]/),
         });
         const phone = fields.phone;
-        const samePhone =
-          phone &&
-          (phones.has(phone) ||
-            (
-              await ctx.db
-                .query("people")
-                .withIndex("by_phone", (q) => q.eq("phone", phone))
-                .collect()
-            ).some((person) => !person.archivedAt));
+        const samePhone = phone && phones.has(phone);
         if (fields.email && emails.has(fields.email)) {
           results.push({
             row,
@@ -408,7 +442,7 @@ export const importRows = memberMutation({
           results.push({
             row,
             status: "duplicate",
-            message: `Someone already has ${phone}`,
+            message: `${phone} appears earlier in the file`,
           });
           continue;
         }
@@ -478,6 +512,17 @@ export const update = memberMutation({
     if (person.erasedAt) {
       fail("forbidden", "This person's data was erased and can't be edited");
     }
+    if (patch.ownerId !== undefined && patch.ownerId !== person.ownerId) {
+      await assertCanReassign(
+        ctx,
+        ctx.viewer,
+        "person.reassign",
+        [person.ownerId],
+        {
+          personId: person._id,
+        },
+      );
+    }
     const fields = await clean(ctx, patch, id);
     const before = snapshot(person);
     const changes = diff(person, fields, LABELS);
@@ -522,8 +567,19 @@ export const setArchived = memberMutation({
     for (const id of ids) {
       const person = await requirePerson(ctx, id);
       if (Boolean(person.archivedAt) === archived) continue;
+      assertCan(ctx.viewer, "person.archive", [person.ownerId]);
       if (!archived && person.erasedAt) {
         fail("forbidden", "Erased people stay archived");
+      }
+      const twin = archived
+        ? null
+        : await findPerson(
+            ctx,
+            { email: person.email, phone: person.phone },
+            person._id,
+          );
+      if (twin) {
+        fail("conflict", `${personName(twin)} now has the same email or phone`);
       }
       await ctx.db.patch(id, {
         archivedAt: archived ? now : undefined,

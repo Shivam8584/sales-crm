@@ -19,7 +19,7 @@ import { DetailHero, DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
 import AccountVerification from "@/features/enrichment/account-verification";
 import MemberPicker from "@/features/members/member-picker";
-import AccountPlatform from "@/features/platform/account-platform";
+import PlatformHealthLine from "@/features/platform/platform-health-line";
 import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import type { LifecycleStage } from "@/lib/domain/enums";
@@ -83,13 +83,19 @@ export default function AccountPeek({
           This account no longer exists.
         </p>
       ) : (
-        <PeekBody key={account._id} account={account} />
+        <PeekBody key={account._id} account={account} onClose={onClose} />
       )}
     </>
   );
 }
 
-function PeekBody({ account }: { account: Account }) {
+function PeekBody({
+  account,
+  onClose,
+}: {
+  account: Account;
+  onClose: () => void;
+}) {
   const update = useMutation(api.accounts.update);
   const save = useRecordUpdate(update, account._id);
   const people = useQuery(api.people.list, { accountId: account._id });
@@ -113,6 +119,7 @@ function PeekBody({ account }: { account: Account }) {
           </a>
         )}
       </DetailHero>
+      <PlatformHealthLine accountId={account._id} onNavigate={onClose} />
       <AccountSummary account={account} people={people} />
       <PipelineHealth accountId={account._id} deals={deals} />
       <ActivityTrend target={{ accountId: account._id }} />
@@ -156,7 +163,6 @@ function PeekBody({ account }: { account: Account }) {
         </Properties>
       </DetailSection>
       <AccountVerification accountId={account._id} />
-      <AccountPlatform accountId={account._id} />
       <DetailSection title="Recent activity" divider={false}>
         <Timeline target={{ accountId: account._id }} compact />
       </DetailSection>

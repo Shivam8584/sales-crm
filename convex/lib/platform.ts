@@ -49,6 +49,7 @@ import type { HealthCampaign, HealthInput } from "../../lib/domain/health";
 import { nextOwner } from "./assignment";
 import { emitAutomationTrigger } from "./automations/engine";
 import { createLead, isOpen, leadHref } from "./leads";
+import { findAccount, findPerson } from "./identity";
 import { personSearchText } from "./records";
 import { logSystem, type RecordRefs } from "./timeline";
 import { notify, notifyMany, leadershipIds } from "../notifications";
@@ -396,7 +397,6 @@ export function nextStage(
   if (PRE_PATH.includes(current)) return target;
   const at = pathIndex(current);
   if (at >= 0) {
-    if (current === "gst_verified" && target === "org_created") return target;
     return index > at ? target : null;
   }
   if (!REVIVABLE.includes(current) || !options.activity) return null;
@@ -618,20 +618,11 @@ export async function personByPlatformUser(ctx: QueryCtx, userId: string) {
 }
 
 async function personByEmail(ctx: QueryCtx, email: string) {
-  const people = await ctx.db
-    .query("people")
-    .withIndex("by_email", (q) => q.eq("email", email))
-    .collect();
-  return people.find((person) => !person.archivedAt) ?? null;
+  return await findPerson(ctx, { email });
 }
 
 async function accountByDomain(ctx: QueryCtx, domain: string | null) {
-  if (!domain) return null;
-  const accounts = await ctx.db
-    .query("accounts")
-    .withIndex("by_domain", (q) => q.eq("domain", domain))
-    .collect();
-  return accounts.find((account) => !account.archivedAt) ?? null;
+  return domain ? await findAccount(ctx, { domain }) : null;
 }
 
 function emailDomain(email: string | undefined) {
@@ -739,7 +730,11 @@ export async function upsertMember(
   const byUser = await personByPlatformUser(ctx, member.userId);
   if (byUser?.erasedAt) return null;
   const known =
-    byUser ?? (memberEmail ? await personByEmail(ctx, memberEmail) : null);
+    byUser ??
+    (await findPerson(ctx, {
+      email: memberEmail,
+      phone: member.phone ? phone(member.phone) : undefined,
+    }));
   const tags = member.roles.flatMap(
     (item) => ORG_ROLE_TAG[item as OrgRole] ?? [],
   );
@@ -754,7 +749,14 @@ export async function upsertMember(
     );
     const patch: Partial<Doc<"people">> = {};
     if (!linked.title) patch.title = ORG_ROLE_TITLE[role];
-    if (!linked.phone && member.phone) patch.phone = phone(member.phone);
+    const memberPhone = member.phone ? phone(member.phone) : undefined;
+    if (
+      !linked.phone &&
+      memberPhone &&
+      !(await findPerson(ctx, { phone: memberPhone }, known._id))
+    ) {
+      patch.phone = memberPhone;
+    }
     const missing = tags.filter((tag) => !linked.tags.includes(tag));
     if (missing.length) patch.tags = [...linked.tags, ...missing];
     if (Object.keys(patch).length) {
@@ -858,9 +860,11 @@ async function onSignedUp(
   data: PlatformEventData["user.signed_up"],
 ): Promise<Outcome> {
   const domainAccount = await accountByDomain(ctx, emailDomain(data.email));
-  const known =
-    (await personByPlatformUser(ctx, data.user_id)) ??
-    (data.email ? await personByEmail(ctx, data.email) : null);
+  const known = await findPerson(ctx, {
+    platformUserId: data.user_id,
+    email: data.email,
+    phone: data.phone,
+  });
 
   if (known) {
     const person = await linkPerson(
@@ -964,6 +968,13 @@ async function onOrgCreated(
         ? candidate
         : null;
     account =
+      (gst?.ok
+        ? await findAccount(
+            ctx,
+            { gstin: gst.gstin, domain: data.website },
+            { unlinkedOnly: true },
+          )
+        : null) ??
       unlinked(await accountByDomain(ctx, companyDomain(data.website))) ??
       unlinked(person?.accountId ? await ctx.db.get(person.accountId) : null) ??
       unlinked(lead?.accountId ? await ctx.db.get(lead.accountId) : null) ??

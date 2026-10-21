@@ -16,12 +16,14 @@ import { NODE_WIDTH } from "./geometry";
 
 export type RunMark = "active" | "done" | "skipped" | "idle";
 
+export type StepCounts = { reached: number; passed: number; current: number };
+
 type NodeCardProps = {
   node: GraphNode;
   title: string;
   detail: string | null;
   issues: string[];
-  live: number;
+  counts?: StepCounts;
   selected: boolean;
   targeted: boolean;
   dragging: boolean;
@@ -48,7 +50,7 @@ function NodeCard({
   title,
   detail,
   issues,
-  live,
+  counts,
   selected,
   targeted,
   dragging,
@@ -62,6 +64,8 @@ function NodeCard({
 }: NodeCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   const meta = NODE_META[node.kind];
+  const live = counts?.current ?? 0;
+  const reached = counts?.reached ?? 0;
 
   useEffect(() => {
     const element = ref.current;
@@ -101,7 +105,7 @@ function NodeCard({
       <div
         role="button"
         tabIndex={0}
-        aria-label={`${meta.label}: ${title}${issues.length ? `, ${issues.length} to fix` : ""}`}
+        aria-label={`${meta.label}: ${title}${issues.length ? `, ${issues.length} to fix` : ""}${reached ? `, ${reached} reached, ${counts?.passed ?? 0} passed` : ""}`}
         onPointerDown={(event) => onNodePointerDown(node.id, event)}
         onDoubleClick={() => onOpen(node.id)}
         onKeyDown={onKeyDown}
@@ -180,6 +184,23 @@ function NodeCard({
             <span className="text-fg-tertiary line-clamp-2">{detail}</span>
           )}
         </div>
+        {reached > 0 && runMark === "idle" && (
+          <div className="flex h-5 items-center gap-1.5 px-1.5 pt-1 text-xs leading-4 font-medium text-(--accent) tabular-nums">
+            <span title="Runs that reached this step">
+              {reached.toLocaleString("en-IN")} reached
+            </span>
+            {node.kind !== "exit" && (
+              <>
+                <span aria-hidden className="opacity-50">
+                  ·
+                </span>
+                <span title="Runs that went on from this step">
+                  {(counts?.passed ?? 0).toLocaleString("en-IN")} passed
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {hasInput(node) && <span aria-hidden className={cn(handle, "-top-1")} />}

@@ -1,8 +1,9 @@
 import { v } from "convex/values";
+import { can } from "./lib/permissions";
 import { internalMutation } from "./_generated/server";
 import { accountHealth, weakestFactors } from "../lib/domain/health";
 import { ACTIVATION_STAGES } from "../lib/domain/platform";
-import { PRIORITIES, ROLE_RANK } from "../lib/domain/enums";
+import { PRIORITIES } from "../lib/domain/enums";
 import { fail } from "./lib/errors";
 import type { Doc } from "./_generated/dataModel";
 import {
@@ -28,10 +29,7 @@ import {
 } from "./lib/activation";
 
 function canManageAccount(viewer: Viewer, account: Doc<"accounts">) {
-  return (
-    account.ownerId === viewer._id ||
-    ROLE_RANK[viewer.role] >= ROLE_RANK.manager
-  );
+  return can(viewer, "activation.task", [account.ownerId]);
 }
 
 /** The activation funnel across linked brands, and every brand stuck on a step. */

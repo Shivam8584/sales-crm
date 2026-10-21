@@ -1,5 +1,6 @@
 "use client";
 
+import { istToday } from "@/lib/domain/day";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -32,11 +33,7 @@ const COUNTS: Record<string, { key: CountKey; label: string; alert: boolean }> =
     "/inbox": { key: "inbox", label: "unread", alert: true },
   };
 
-function localDay() {
-  const now = new Date();
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
+const localDay = () => istToday();
 
 /** Sidebar body shared by the desktop rail and the mobile drawer. */
 export default function SidebarContent({

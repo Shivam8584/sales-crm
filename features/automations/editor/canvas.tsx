@@ -54,7 +54,7 @@ import {
   type OpenPort,
   type Point,
 } from "./geometry";
-import NodeCard, { type RunMark } from "./node-card";
+import NodeCard, { type RunMark, type StepCounts } from "./node-card";
 
 type PaletteDrag = {
   kind: NodeKind;
@@ -174,7 +174,8 @@ type CanvasProps = {
   readOnly: boolean;
   describe: (node: GraphNode) => { title: string; detail: string | null };
   issues: Record<string, string[]>;
-  live: Record<string, number>;
+  /** Real runs per step, shown under each card. */
+  counts: Record<string, StepCounts>;
   /** Overlays such as the step panel; they reach canvas actions through `useCanvasApi`. */
   children?: ReactNode;
 };
@@ -185,7 +186,7 @@ export default function Canvas({
   readOnly,
   describe,
   issues,
-  live,
+  counts,
   children,
 }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -886,7 +887,7 @@ export default function Canvas({
               title={text.title}
               detail={text.detail}
               issues={issues[node.id] ?? []}
-              live={live[node.id] ?? 0}
+              counts={counts[node.id]}
               selected={selection?.type === "node" && selection.id === node.id}
               targeted={link?.target === node.id}
               dragging={draggingNode === node.id}

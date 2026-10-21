@@ -1,4 +1,5 @@
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { istDay } from "../../lib/domain/day";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { LifecycleStage, Priority } from "../../lib/domain/enums";
 import {
@@ -479,9 +480,7 @@ export function stallAccount(account: Doc<"accounts">): StallAccount {
 
 /** Today in India, where the team works, as `YYYY-MM-DD`. */
 export function indiaDay(now: number) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
-    now,
-  );
+  return istDay(now);
 }
 
 /** Marks an automated task done on the brand's behalf and says why on the timeline. */

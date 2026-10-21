@@ -326,10 +326,9 @@ export const ACTIVATION_STEP_LABEL: Record<ActivationStage, string> = {
   activated: "Activated",
 };
 
-/** Position on the path, or -1. The v1 `gst_verified` stage counts as `org_created`. */
+/** Position on the path, or -1. */
 export function pathIndex(stage: LifecycleStage | undefined | null) {
   if (!stage) return -1;
-  if (stage === "gst_verified") return 1;
   return (ACTIVATION_STAGES as readonly string[]).indexOf(stage);
 }
 

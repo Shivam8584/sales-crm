@@ -1,5 +1,6 @@
 "use client";
 
+import { dayStart, istToday } from "@/lib/domain/day";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -98,8 +99,7 @@ function matches(deal: DealRow, query: string) {
 }
 
 function startOfMonth() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  return dayStart(`${istToday().slice(0, 7)}-01`);
 }
 
 function closeMatches(deal: DealRow, filter: string, today: string) {

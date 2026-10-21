@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import type { MutationCtx } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { LIFECYCLE_STAGES } from "../lib/domain/enums";
 import { STAGE_LABEL } from "../lib/domain/labels";
@@ -11,6 +12,9 @@ import { sourceFamily } from "./lib/enrichment";
 import { emitAutomationTrigger } from "./lib/automations/engine";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
+import { findAccount } from "./lib/identity";
+import { assertCanReassign } from "./lib/ownership";
+import { assertCan } from "./lib/permissions";
 import {
   accountName,
   checkImportSize,
@@ -88,6 +92,20 @@ async function clean(ctx: MutationCtx, patch: Patch, selfId?: Id<"accounts">) {
     } else {
       const check = checkGstin(patch.gstin);
       if (!check.ok) invalid("gstin", "Enter a valid 15-character GSTIN");
+      const pan = panRoot(check.gstin);
+      const siblings = pan
+        ? await ctx.db
+            .query("accounts")
+            .withIndex("by_pan_root", (q) => q.eq("panRoot", pan))
+            .collect()
+        : [];
+      const other = siblings.find(
+        (item) =>
+          item._id !== selfId && !item.archivedAt && item.gstin === check.gstin,
+      );
+      if (other) {
+        fail("conflict", `${other.name} already has this GSTIN`, "gstin");
+      }
       out.gstin = check.gstin;
       out.panRoot = panRoot(check.gstin) ?? undefined;
     }
@@ -106,40 +124,92 @@ function snapshot(account: Doc<"accounts">): Patch {
   };
 }
 
+function toRow(
+  account: Doc<"accounts">,
+  members: Awaited<ReturnType<typeof memberIndex>>,
+  peopleCount: number,
+) {
+  return {
+    _id: account._id,
+    _creationTime: account._creationTime,
+    name: account.name,
+    domain: account.domain ?? null,
+    logoUrl: account.logoUrl ?? null,
+    stage: account.stage,
+    tags: account.tags,
+    gstin: account.gstin ?? null,
+    linked: Boolean(account.platformOrgId),
+    owner: memberRef(members, account.ownerId),
+    peopleCount,
+    lastActivityAt: account.lastActivityAt ?? null,
+    archivedAt: account.archivedAt ?? null,
+  };
+}
+
+async function countPeople(ctx: QueryCtx, accountId: Id<"accounts">) {
+  const people = await ctx.db
+    .query("people")
+    .withIndex("by_account", (q) => q.eq("accountId", accountId))
+    .collect();
+  return people.filter((person) => !person.archivedAt).length;
+}
+
+/** Every account, recently updated first; the list page sorts and filters it in the browser. */
 export const list = memberQuery({
   args: { includeArchived: v.optional(v.boolean()) },
   handler: async (ctx, { includeArchived }) => {
-    const [accounts, people, members] = await Promise.all([
+    const [accounts, members] = await Promise.all([
       ctx.db.query("accounts").withIndex("by_updated").order("desc").collect(),
-      ctx.db.query("people").collect(),
       memberIndex(ctx),
     ]);
-    const peopleCount = new Map<Id<"accounts">, number>();
-    for (const person of people) {
-      if (person.accountId && !person.archivedAt) {
-        peopleCount.set(
-          person.accountId,
-          (peopleCount.get(person.accountId) ?? 0) + 1,
-        );
-      }
-    }
-    return accounts
-      .filter((account) => includeArchived || !account.archivedAt)
-      .map((account) => ({
-        _id: account._id,
-        _creationTime: account._creationTime,
-        name: account.name,
-        domain: account.domain ?? null,
-        logoUrl: account.logoUrl ?? null,
-        stage: account.stage,
-        tags: account.tags,
-        gstin: account.gstin ?? null,
-        linked: Boolean(account.platformOrgId),
-        owner: memberRef(members, account.ownerId),
-        peopleCount: peopleCount.get(account._id) ?? 0,
-        lastActivityAt: account.lastActivityAt ?? null,
-        archivedAt: account.archivedAt ?? null,
-      }));
+    const visible = accounts.filter(
+      (account) => includeArchived || !account.archivedAt,
+    );
+    return await Promise.all(
+      visible.map(async (account) =>
+        toRow(account, members, await countPeople(ctx, account._id)),
+      ),
+    );
+  },
+});
+
+/** Cursor-paginated accounts, recently updated first, optionally one owner's or one stage's. */
+export const page = memberQuery({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    ownerId: v.optional(v.id("members")),
+    stage: v.optional(vLifecycleStage),
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const { ownerId, stage } = args;
+    const base = ownerId
+      ? ctx.db
+          .query("accounts")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      : stage
+        ? ctx.db
+            .query("accounts")
+            .withIndex("by_stage", (q) => q.eq("stage", stage))
+        : ctx.db.query("accounts").withIndex("by_updated");
+    const result = await base
+      .filter((q) =>
+        q.and(
+          args.includeArchived ? true : q.eq(q.field("archivedAt"), undefined),
+          ownerId && stage ? q.eq(q.field("stage"), stage) : true,
+        ),
+      )
+      .order("desc")
+      .paginate(args.paginationOpts);
+    const members = await memberIndex(ctx);
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map(async (account) =>
+          toRow(account, members, await countPeople(ctx, account._id)),
+        ),
+      ),
+    };
   },
 });
 
@@ -313,6 +383,7 @@ export const importRows = memberMutation({
         .map((account) => [account.name.toLowerCase(), account.name]),
     );
     const domains = new Set<string>();
+    const pans = new Set<string>();
     const results: ImportResult[] = [];
     for (const [row, input] of rows.entries()) {
       try {
@@ -327,7 +398,14 @@ export const importRows = memberMutation({
           tags: (input.tags ?? "").split(/[,;|]/),
         });
         const key = fields.name!.toLowerCase();
-        const existing = names.get(key);
+        const existing =
+          names.get(key) ??
+          (
+            await findAccount(ctx, {
+              gstin: fields.gstin,
+              domain: fields.domain,
+            })
+          )?.name;
         if (existing) {
           results.push({
             row,
@@ -344,8 +422,17 @@ export const importRows = memberMutation({
           });
           continue;
         }
+        if (fields.panRoot && pans.has(fields.panRoot)) {
+          results.push({
+            row,
+            status: "duplicate",
+            message: "The same business (PAN) appears earlier in the file",
+          });
+          continue;
+        }
         names.set(key, fields.name!);
         if (fields.domain) domains.add(fields.domain);
+        if (fields.panRoot) pans.add(fields.panRoot);
         if (dryRun) {
           results.push({ row, status: "ready" });
         } else {
@@ -365,6 +452,17 @@ export const update = memberMutation({
   args: { id: v.id("accounts"), patch: v.object(editable) },
   handler: async (ctx, { id, patch }) => {
     const account = await requireAccount(ctx, id);
+    if (patch.ownerId !== undefined && patch.ownerId !== account.ownerId) {
+      await assertCanReassign(
+        ctx,
+        ctx.viewer,
+        "account.reassign",
+        [account.ownerId],
+        {
+          accountId: account._id,
+        },
+      );
+    }
     const fields = await clean(ctx, patch, id);
     const before = snapshot(account);
     const changes = diff(
@@ -403,6 +501,21 @@ export const setArchived = memberMutation({
     for (const id of ids) {
       const account = await requireAccount(ctx, id);
       if (Boolean(account.archivedAt) === archived) continue;
+      assertCan(ctx.viewer, "account.archive", [account.ownerId]);
+      const twin = archived
+        ? null
+        : await findAccount(
+            ctx,
+            { domain: account.domain, gstin: account.gstin },
+            { exclude: account._id },
+          );
+      if (
+        twin &&
+        ((account.domain && twin.domain === account.domain) ||
+          (account.gstin && twin.gstin === account.gstin))
+      ) {
+        fail("conflict", `${twin.name} now uses the same website or GSTIN`);
+      }
       await ctx.db.patch(id, {
         archivedAt: archived ? now : undefined,
         updatedAt: now,
@@ -427,6 +540,15 @@ export const setOwner = memberMutation({
     for (const id of ids) {
       const account = await requireAccount(ctx, id);
       if (account.ownerId === ownerId) continue;
+      await assertCanReassign(
+        ctx,
+        ctx.viewer,
+        "account.reassign",
+        [account.ownerId],
+        {
+          accountId: account._id,
+        },
+      );
       const from = await ctx.db.get(account.ownerId);
       previous.push({ id, ownerId: account.ownerId });
       await ctx.db.patch(id, { ownerId, updatedAt: now });

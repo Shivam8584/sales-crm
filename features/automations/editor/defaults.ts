@@ -24,7 +24,7 @@ export function defaultConfig(
       };
     case "create_task":
       return {
-        title: "Follow up with {{name}}",
+        title: "Follow up with {{record.name}}",
         assignee: "owner",
         dueInDays: 0,
         priority: "normal",
@@ -32,18 +32,18 @@ export function defaultConfig(
     case "send_email":
       return {
         subject: "",
-        body: "Hi {{first_name}},\n\n\n\n{{owner_first_name}}",
+        body: "Hi {{person.firstName|there}},\n\n\n\n{{owner.firstName}}",
         purpose: "sales_outreach",
       };
     case "send_whatsapp":
       return {
         template: "",
         language: "en",
-        params: ["{{first_name}}"],
+        params: ["{{person.firstName|there}}"],
         purpose: "sales_outreach",
       };
     case "notify":
-      return { to: "owner", message: "{{name}} needs a look" };
+      return { to: "owner", message: "{{record.name}} needs a look" };
     case "update_field": {
       const field = updateFieldsFor(subject)[0];
       return { field, value: updateValues(subject, field)?.[0]?.value ?? "" };

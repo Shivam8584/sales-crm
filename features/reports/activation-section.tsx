@@ -1,14 +1,19 @@
 import Tag from "@/components/_ui/tag";
 import SegmentBar from "@/components/_common/segment-bar";
-import type { Report } from "@/convex/lib/reports";
+import type { timeToActivate } from "@/convex/lib/reports";
 import { STAGE_LABEL } from "@/lib/domain/labels";
 import { count, days } from "./format";
+
+type Activation = ReturnType<typeof timeToActivate>;
 
 /** Median days between activation stages as segmented meters, with the slowest step called out. */
 export default function ActivationChart({
   activation,
+  previous,
 }: {
-  activation: Report["activation"];
+  activation: Activation;
+  /** The period before, to show each median against. */
+  previous?: Activation;
 }) {
   const longest = Math.max(
     1,
@@ -26,8 +31,9 @@ export default function ActivationChart({
         </span>
       </p>
       <ol className="flex flex-col gap-4" aria-label="Activation steps">
-        {activation.steps.map((step) => {
+        {activation.steps.map((step, index) => {
           const slowest = step.from === activation.slowest;
+          const before = previous?.steps[index];
           return (
             <li key={step.from} className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
@@ -41,9 +47,16 @@ export default function ActivationChart({
                     </Tag>
                   )}
                 </span>
-                <span className="lead-style shrink-0 font-medium tabular-nums">
-                  <span className="sr-only">Median </span>
-                  {days(step.medianMs)}
+                <span className="lead-style flex shrink-0 items-baseline gap-2 tabular-nums">
+                  {step.p90Ms !== null && (
+                    <span className="caption-style text-fg-tertiary">
+                      p90 {days(step.p90Ms)}
+                    </span>
+                  )}
+                  <span className="font-medium">
+                    <span className="sr-only">Median </span>
+                    {days(step.medianMs)}
+                  </span>
                 </span>
               </div>
               <SegmentBar
@@ -57,6 +70,8 @@ export default function ActivationChart({
               <span className="caption-style text-fg-tertiary tabular-nums">
                 {count(step.completed)} completed in period ·{" "}
                 {count(step.waiting)} waiting now
+                {before?.medianMs != null &&
+                  ` · previous period ${days(before.medianMs)}`}
               </span>
             </li>
           );

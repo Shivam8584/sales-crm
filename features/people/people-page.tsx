@@ -1,5 +1,6 @@
 "use client";
 
+import { istToday } from "@/lib/domain/day";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
@@ -13,6 +14,7 @@ import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
 import SelectionBar from "@/components/data-table/selection-bar";
+import AddToAutomation from "@/features/automations/add-to-automation";
 import {
   compareBy,
   type Column,
@@ -184,7 +186,7 @@ function activeWithin(row: PersonRow, window: string, now: number) {
 }
 
 function exportRows(rows: PersonRow[]) {
-  const day = new Date().toISOString().slice(0, 10);
+  const day = istToday();
   downloadCsv(`people-${day}.csv`, [
     [
       "First name",
@@ -657,6 +659,11 @@ export default function PeoplePage() {
           noun={["person", "people"]}
           onClear={() => setSelected(new Set())}
         >
+          <AddToAutomation
+            kind="person"
+            ids={selectedIds}
+            onDone={() => setSelected(new Set())}
+          />
           <Button variant="ghost" size="xs" onClick={() => void archive()}>
             Archive
           </Button>

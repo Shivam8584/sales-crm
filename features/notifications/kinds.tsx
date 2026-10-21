@@ -1,16 +1,22 @@
 import type { ComponentType, SVGProps } from "react";
 import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
+import AtSignIcon from "@/public/assets/icons/at-sign.svg";
+import AutomationIcon from "@/public/assets/icons/automation.svg";
 import BellIcon from "@/public/assets/icons/bell.svg";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import CalendarIcon from "@/public/assets/icons/calendar.svg";
+import EyeIcon from "@/public/assets/icons/eye.svg";
 import MessageIcon from "@/public/assets/icons/message.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
+import { NOTIFICATION_GROUPS } from "@/lib/domain/notifications";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 const KIND_ICON: Record<string, Icon> = {
+  mention: AtSignIcon,
+  follow: EyeIcon,
   lead_new: TargetIcon,
   lead_assigned: UserPlusIcon,
   lead_repeat: MessageIcon,
@@ -20,7 +26,9 @@ const KIND_ICON: Record<string, Icon> = {
   demo_rescheduled: CalendarIcon,
   demo_cancelled: CalendarIcon,
   platform_org: BuildingIcon,
+  platform_gst_failed: AlertIcon,
   proposal_approval: ClipboardIcon,
+  automation: AutomationIcon,
 };
 
 export function KindIcon({
@@ -37,18 +45,4 @@ export function KindIcon({
 export const isUrgentKind = (kind: string) => kind === "lead_sla";
 
 /** Inbox filter groups; each maps to the notification kinds it covers. */
-export const KIND_GROUPS = [
-  {
-    value: "leads",
-    label: "Leads",
-    kinds: ["lead_new", "lead_assigned", "lead_repeat", "lead_signup"],
-  },
-  { value: "sla", label: "SLA alerts", kinds: ["lead_sla"] },
-  {
-    value: "demos",
-    label: "Demos",
-    kinds: ["demo_booked", "demo_rescheduled", "demo_cancelled"],
-  },
-  { value: "approvals", label: "Approvals", kinds: ["proposal_approval"] },
-  { value: "platform", label: "Platform", kinds: ["platform_org"] },
-] as const;
+export const KIND_GROUPS = NOTIFICATION_GROUPS;

@@ -26,23 +26,29 @@ import {
   describeTrigger,
   evaluateConditions,
   formatIst,
+  frequencyHoldUntil,
+  FREQUENCY_WINDOW_DAYS,
   goalMet,
   isLive,
   istDay,
   matchesTrigger,
+  missingMessage,
   nextDayWindow,
   nextNodeId,
+  nodeTexts,
   renderTemplate,
   sendTime,
   subjectKey,
   waitTimeout,
   waitUntil,
+  type ExitKind,
   type GraphNode,
   type PortId,
   type SubjectKind,
   type Trigger,
   type TriggerEvent,
 } from "../../../lib/domain/automations";
+import { killSwitchOn, readSafety } from "./safety";
 import { nextOwner } from "../assignment";
 import { upsertAutomatedTask } from "../tasks";
 import { logSystem, type RecordRefs } from "../timeline";
@@ -159,6 +165,7 @@ export async function finish(
   status: "completed" | "exited" | "failed",
   reason: string,
   nodeId?: string,
+  kind?: ExitKind,
 ) {
   if (!isLive(enrollment.status)) return;
   const now = Date.now();
@@ -166,6 +173,11 @@ export async function finish(
     status,
     finishedAt: now,
     exitReason: reason,
+    exitKind:
+      status === "completed"
+        ? undefined
+        : (kind ?? (status === "failed" ? "failed" : undefined)),
+    pausedById: undefined,
     nextRunAt: undefined,
     waitStartedAt: undefined,
     waitingFor: undefined,
@@ -198,7 +210,7 @@ export async function finish(
 export type EnrollOutcome =
   | { outcome: "enrolled"; enrollmentId: Id<"automationEnrollments"> }
   | {
-      outcome: "already" | "inactive" | "wrong_kind" | "missing";
+      outcome: "already" | "finished" | "inactive" | "wrong_kind" | "missing";
       message: string;
     };
 
@@ -208,6 +220,7 @@ export async function enroll(
   ref: SubjectRef,
   source: string,
   enrolledById?: Id<"members">,
+  context?: Record<string, string>,
 ): Promise<EnrollOutcome> {
   const published = automation.published;
   if (automation.status !== "active" || !published || automation.deletedAt) {
@@ -238,7 +251,7 @@ export async function enroll(
   }
   if (previous.length && !published.settings.allowReenroll) {
     return {
-      outcome: "already",
+      outcome: "finished",
       message: `Already went through “${automation.name}”`,
     };
   }
@@ -264,6 +277,7 @@ export async function enroll(
     enrolledAt: now,
     enrolledById,
     source,
+    context: context && Object.keys(context).length ? context : undefined,
     history: [],
   });
   const enrollment = (await ctx.db.get(id))!;
@@ -310,6 +324,7 @@ export async function emitAutomationTrigger(
     const keys = subjectKeys(input.refs);
     await checkGoals(ctx, keys);
     await wakeWaiting(ctx, keys, event);
+    if (await killSwitchOn(ctx)) return;
     for (const automation of active) {
       const published = automation.published;
       if (!published || automation.deletedAt) continue;
@@ -357,7 +372,14 @@ async function checkGoals(ctx: MutationCtx, keys: string[]) {
         facts = (await subjectFacts(ctx, subject)).facts;
       }
       if (goalMet(goal, facts)) {
-        await finish(ctx, enrollment, "exited", "Reached the goal");
+        await finish(
+          ctx,
+          enrollment,
+          "exited",
+          "Reached the goal",
+          undefined,
+          "goal",
+        );
       }
     }
   }
@@ -377,6 +399,7 @@ async function wakeWaiting(
       .collect();
     for (const enrollment of waiting) {
       if (
+        enrollment.pausedById ||
         !enrollment.waitingFor ||
         !matchesTrigger(enrollment.waitingFor, event)
       ) {
@@ -442,7 +465,7 @@ export async function resumeHeld(
     .collect();
   let resumed = 0;
   for (const enrollment of waiting) {
-    if (!enrollment.heldAt) continue;
+    if (!enrollment.heldAt || enrollment.pausedById) continue;
     resumed++;
     await scheduleStep(
       ctx,
@@ -457,6 +480,68 @@ export async function resumeHeld(
   return resumed;
 }
 
+/** After the kill switch is lifted: every active automation's held runs. */
+export async function resumeAllHeld(ctx: MutationCtx) {
+  const active = await ctx.db
+    .query("automations")
+    .withIndex("by_status", (q) => q.eq("status", "active"))
+    .collect();
+  let resumed = 0;
+  for (const automation of active) {
+    if (automation.deletedAt) continue;
+    resumed += await resumeHeld(ctx, automation._id);
+  }
+  return resumed;
+}
+
+/** Holds one run by hand; it stays put until resumed, even across re-activation. */
+export async function pauseRun(
+  ctx: MutationCtx,
+  enrollment: Enrollment,
+  byId: Id<"members">,
+  byName: string,
+) {
+  await ctx.db.patch(enrollment._id, {
+    pausedById: byId,
+    heldAt: enrollment.heldAt ?? Date.now(),
+    status: "waiting",
+    seq: enrollment.seq + 1,
+    stepKey: `${enrollment._id}:${enrollment.seq + 1}`,
+  });
+  await logStep(
+    ctx,
+    enrollment,
+    "info",
+    `Paused by ${byName}`,
+    enrollment.currentNodeId,
+  );
+}
+
+export async function resumeRun(
+  ctx: MutationCtx,
+  enrollment: Enrollment,
+  byName: string,
+) {
+  await logStep(
+    ctx,
+    enrollment,
+    "info",
+    `Resumed by ${byName}`,
+    enrollment.currentNodeId,
+  );
+  const fresh = { ...enrollment, pausedById: undefined };
+  await scheduleStep(
+    ctx,
+    fresh,
+    {
+      pausedById: undefined,
+      heldAt: undefined,
+      status: enrollment.nextRunAt ? "waiting" : "running",
+    },
+    enrollment.nextRunAt,
+  );
+}
+
 // ── Steps ───────────────────────────────────────────────────────────────────
 
 type Outcome =
@@ -469,7 +554,7 @@ type Outcome =
     }
   | { type: "defer"; at: number; message: string }
   | { type: "wait"; at: number; waitingFor?: Trigger; message: string }
-  | { type: "exit"; reason: string };
+  | { type: "exit"; reason: string; kind: ExitKind };
 
 type StepContext = {
   automation: Automation;
@@ -495,20 +580,31 @@ export async function runStep(
   ) {
     return "stale";
   }
+  if (enrollment.pausedById) return "paused";
   const automation = await ctx.db.get(enrollment.automationId);
   if (!automation || automation.deletedAt) {
-    await finish(ctx, enrollment, "exited", "The automation was deleted");
+    await finish(
+      ctx,
+      enrollment,
+      "exited",
+      "The automation was deleted",
+      undefined,
+      "deleted",
+    );
     return "exited";
   }
   const now = Date.now();
-  if (automation.status !== "active" || !automation.published) {
+  const killed = await killSwitchOn(ctx);
+  if (killed || automation.status !== "active" || !automation.published) {
     if (!enrollment.heldAt) {
       await ctx.db.patch(enrollment._id, { status: "waiting", heldAt: now });
       await logStep(
         ctx,
         enrollment,
         "info",
-        "Held: the automation is paused",
+        killed
+          ? "Held: automations are stopped for the whole workspace"
+          : "Held: the automation is paused",
         enrollment.currentNodeId,
       );
     }
@@ -531,6 +627,8 @@ export async function runStep(
       enrollment,
       "exited",
       `Its step was removed in version ${published.version}`,
+      undefined,
+      "step_removed",
     );
     return "exited";
   }
@@ -542,6 +640,7 @@ export async function runStep(
       "exited",
       subject?.gone ?? "The record was deleted",
       node.id,
+      "record_gone",
     );
     return "exited";
   }
@@ -550,20 +649,30 @@ export async function runStep(
   if (settings.goal.length) {
     const { facts } = await subjectFacts(ctx, subject);
     if (goalMet(settings.goal, facts)) {
-      await finish(ctx, enrollment, "exited", "Reached the goal", node.id);
+      await finish(
+        ctx,
+        enrollment,
+        "exited",
+        "Reached the goal",
+        node.id,
+        "goal",
+      );
       return "exited";
     }
   }
-  if (
-    settings.stopOnReply &&
-    (await repliedSince(ctx, subject, enrollment.enrolledAt))
-  ) {
+  const replied = settings.stopOnReply
+    ? await repliedSince(ctx, subject, enrollment.enrolledAt)
+    : null;
+  if (replied) {
     await finish(
       ctx,
       enrollment,
       "exited",
-      "A teammate logged a reply or conversation",
+      replied === "inbound"
+        ? "They replied"
+        : "A teammate logged a conversation with them",
       node.id,
+      "replied",
     );
     return "exited";
   }
@@ -621,7 +730,14 @@ export async function runStep(
       );
       return "waiting";
     case "exit":
-      await finish(ctx, enrollment, "exited", outcome.reason, node.id);
+      await finish(
+        ctx,
+        enrollment,
+        "exited",
+        outcome.reason,
+        node.id,
+        outcome.kind,
+      );
       return "exited";
   }
 }
@@ -704,6 +820,7 @@ async function execute(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
       return {
         type: "exit",
         reason: configOf(node, "exit").reason?.trim() || "Reached an exit step",
+        kind: "exit_step",
       };
   }
 }
@@ -761,6 +878,21 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
     };
   }
   const to = recipientAddress(recipient, channel)!;
+  const vars = await subjectVars(ctx, subject, recipient, enrollment.context);
+  const missing = [
+    ...new Set(
+      nodeTexts(node).flatMap((text) => renderTemplate(text, vars).missing),
+    ),
+  ];
+  if (missing.length) {
+    return {
+      type: "next",
+      port: "out",
+      level: "warning",
+      skipped: true,
+      message: `Skipped the ${CHANNEL_NOUN[channel]}: ${missingMessage(missing)}`,
+    };
+  }
 
   const at = sendTime(published.settings, now);
   if (at > now) {
@@ -783,6 +915,36 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
       message: `Daily cap of ${published.settings.dailyCap} messages reached; holding until ${formatIst(next)}`,
     };
   }
+  const { frequencyCap } = await readSafety(ctx);
+  const since = now - FREQUENCY_WINDOW_DAYS * DAY;
+  const recent = recipient.personId
+    ? await ctx.db
+        .query("automationMessages")
+        .withIndex("by_person", (q) =>
+          q.eq("personId", recipient.personId).gt("_creationTime", since),
+        )
+        .collect()
+    : await ctx.db
+        .query("automationMessages")
+        .withIndex("by_lead", (q) =>
+          q.eq("leadId", recipient.leadId).gt("_creationTime", since),
+        )
+        .collect();
+  const holdUntil = frequencyHoldUntil(
+    recent
+      .filter((item) => item.status !== "failed" && item.stepKey !== stepKey)
+      .map((item) => item._creationTime),
+    now,
+    frequencyCap,
+  );
+  if (holdUntil !== null) {
+    const next = sendTime(published.settings, holdUntil);
+    return {
+      type: "defer",
+      at: next,
+      message: `Frequency cap: ${recipient.name} already got ${frequencyCap} automated ${frequencyCap === 1 ? "message" : "messages"} in the last ${FREQUENCY_WINDOW_DAYS} days; holding until ${formatIst(next)}`,
+    };
+  }
   const existing = await ctx.db
     .query("automationMessages")
     .withIndex("by_step_key", (q) => q.eq("stepKey", stepKey))
@@ -796,7 +958,6 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
     };
   }
 
-  const vars = await subjectVars(ctx, subject, recipient);
   const status = channel === "email" ? emailProvider() : whatsappProvider();
   const provider = status.provider;
   const outbox = provider === "outbox";
@@ -835,6 +996,8 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
     ...refs,
     kind: channel,
     occurredAt: now,
+    automated: true,
+    direction: "outbound",
     subject: subjectLine ?? template,
     body: `${statusLine}\n\n${content}`,
   });
@@ -929,7 +1092,7 @@ async function taskStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
       message: "Skipped the task: nobody active to assign it to",
     };
   }
-  const vars = await subjectVars(ctx, subject);
+  const vars = await subjectVars(ctx, subject, undefined, enrollment.context);
   const title = renderTemplate(config.title, vars).text.trim();
   const notes = config.notes
     ? renderTemplate(config.notes, vars).text.trim()
@@ -960,7 +1123,7 @@ async function notifyStep(
   ctx: MutationCtx,
   step: StepContext,
 ): Promise<Outcome> {
-  const { node, subject, automation } = step;
+  const { node, subject, automation, enrollment } = step;
   const config = configOf(node, "notify");
   const recipient =
     config.to === "member"
@@ -978,7 +1141,7 @@ async function notifyStep(
   }
   const message = renderTemplate(
     config.message,
-    await subjectVars(ctx, subject),
+    await subjectVars(ctx, subject, undefined, enrollment.context),
   ).text.trim();
   await notify(ctx, recipient._id, {
     kind: "automation",
@@ -1169,6 +1332,8 @@ async function linkStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
         item,
         "exited",
         `Removed by the automation “${automation.name}”`,
+        undefined,
+        "automation",
       );
     }
     return {
@@ -1200,4 +1365,95 @@ async function linkStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
         skipped: true,
         message: `Not added: ${result.message}`,
       };
+}
+
+// ── Replies ─────────────────────────────────────────────────────────────────
+
+/** A reply this soon after a run ended still counts towards its reply rate. */
+const REPLY_GRACE_MS = 14 * DAY;
+
+const CHANNEL_WORD = { email: "email", whatsapp: "WhatsApp" } as const;
+
+export type ReplyInput = {
+  refs: RecordRefs;
+  channel: "email" | "whatsapp";
+  at: number;
+  dealIds?: Id<"deals">[];
+};
+
+/**
+ * A contact replied: their runs are marked replied, live runs that stop on
+ * reply exit (unless a step is waiting for exactly this reply), and reply
+ * triggers and waits fire.
+ */
+export async function recordReply(ctx: MutationCtx, input: ReplyInput) {
+  const event: TriggerEvent = {
+    kind: "reply_received",
+    refs: input.refs,
+    value: input.channel,
+    at: input.at,
+  };
+  const keys = [
+    ...subjectKeys(input.refs),
+    ...(input.dealIds ?? []).map((id) => subjectKey("deal", id)),
+  ];
+  let exited = 0;
+  let marked = 0;
+  const statuses = [
+    "running",
+    "waiting",
+    "completed",
+    "exited",
+    "failed",
+  ] as const;
+  for (const key of new Set(keys)) {
+    for (const status of statuses) {
+      const rows = await ctx.db
+        .query("automationEnrollments")
+        .withIndex("by_subject", (q) =>
+          q.eq("subjectKey", key).eq("status", status),
+        )
+        .collect();
+      for (const enrollment of rows) {
+        const live = isLive(enrollment.status);
+        if (!live && (enrollment.finishedAt ?? 0) < input.at - REPLY_GRACE_MS) {
+          continue;
+        }
+        if (!enrollment.repliedAt) {
+          await ctx.db.patch(enrollment._id, { repliedAt: input.at });
+          marked++;
+        }
+        if (!live) continue;
+        const awaited =
+          enrollment.waitingFor && matchesTrigger(enrollment.waitingFor, event);
+        const automation = await ctx.db.get(enrollment.automationId);
+        const stops = automation?.published?.settings.stopOnReply ?? false;
+        if (stops && !awaited) {
+          await finish(
+            ctx,
+            { ...enrollment, repliedAt: enrollment.repliedAt ?? input.at },
+            "exited",
+            `They replied by ${CHANNEL_WORD[input.channel]}`,
+            undefined,
+            "replied",
+          );
+          exited++;
+        } else if (!awaited) {
+          await logStep(
+            ctx,
+            enrollment,
+            "info",
+            `They replied by ${CHANNEL_WORD[input.channel]}; the run carries on because “stop when they engage” is off`,
+            enrollment.currentNodeId,
+          );
+        }
+      }
+    }
+  }
+  await emitAutomationTrigger(ctx, {
+    kind: "reply_received",
+    refs: input.refs,
+    value: input.channel,
+  });
+  return { exited, marked };
 }

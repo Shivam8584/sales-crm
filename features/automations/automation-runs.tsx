@@ -44,13 +44,23 @@ function When({ at }: { at: number | null }) {
 export function RunStatus({
   status,
   held,
+  paused = false,
 }: {
   status: Run["status"];
   held: boolean;
+  paused?: boolean;
 }) {
+  const live = isLive(status);
   return (
-    <Tag tone={held ? "neutral" : ENROLLMENT_TONE[status]} size="xs">
-      {held ? "Held (paused)" : ENROLLMENT_STATUS_LABEL[status]}
+    <Tag
+      tone={live && (held || paused) ? "neutral" : ENROLLMENT_TONE[status]}
+      size="xs"
+    >
+      {live && paused
+        ? "Paused"
+        : live && held
+          ? "Held"
+          : ENROLLMENT_STATUS_LABEL[status]}
     </Tag>
   );
 }
@@ -71,6 +81,8 @@ export default function AutomationRuns({
 }) {
   const runs = useQuery(api.automations.enrollments, { id });
   const exit = useMutation(api.automations.exitEnrollment);
+  const pauseRun = useMutation(api.automations.pauseEnrollment);
+  const resumeRun = useMutation(api.automations.resumeEnrollment);
   const [sort, setSort] = useState<SortState>({ id: "enrolled", dir: "desc" });
 
   const stepOf = (run: Run) => {
@@ -82,6 +94,23 @@ export default function AutomationRuns({
     try {
       await exit({ id: run._id });
       toast(`Removed ${run.subject.name} from the automation`);
+    } catch (error) {
+      toast(readError(error).message, { tone: "danger" });
+    }
+  }
+
+  async function togglePause(run: Run) {
+    try {
+      if (run.paused) {
+        await resumeRun({ id: run._id });
+        toast(`Resumed ${run.subject.name}`);
+      } else {
+        await pauseRun({ id: run._id });
+        toast(
+          `Paused ${run.subject.name}`,
+          () => void resumeRun({ id: run._id }),
+        );
+      }
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }
@@ -104,9 +133,18 @@ export default function AutomationRuns({
     {
       id: "status",
       header: "Status",
-      width: "8rem",
+      width: "10rem",
       sortValue: (run) => run.status,
-      cell: (run) => <RunStatus status={run.status} held={run.held} />,
+      cell: (run) => (
+        <span className="flex items-center gap-1.5">
+          <RunStatus status={run.status} held={run.held} paused={run.paused} />
+          {run.replied && (
+            <Tag tone="green" size="xs">
+              Replied
+            </Tag>
+          )}
+        </span>
+      ),
     },
     {
       id: "step",
@@ -131,7 +169,15 @@ export default function AutomationRuns({
       minViewport: 1000,
       sortValue: (run) => run.nextRunAt ?? run.finishedAt,
       cell: (run) => (
-        <When at={isLive(run.status) ? run.nextRunAt : run.finishedAt} />
+        <When
+          at={
+            isLive(run.status)
+              ? run.paused
+                ? null
+                : run.nextRunAt
+              : run.finishedAt
+          }
+        />
       ),
     },
     {
@@ -159,6 +205,10 @@ export default function AutomationRuns({
         keyboard={false}
         rowMenu={(run) => [
           isLive(run.status) && {
+            label: run.paused ? "Resume run" : "Pause run",
+            onSelect: () => void togglePause(run),
+          },
+          isLive(run.status) && {
             label: "Remove from automation",
             icon: LogOutIcon,
             onSelect: () => void remove(run),
@@ -170,7 +220,11 @@ export default function AutomationRuns({
               <span className="truncate text-sm font-medium">
                 {run.subject.name}
               </span>
-              <RunStatus status={run.status} held={run.held} />
+              <RunStatus
+                status={run.status}
+                held={run.held}
+                paused={run.paused}
+              />
             </div>
             <span className="caption-style text-fg-tertiary truncate">
               {(isLive(run.status) ? stepOf(run) : run.exitReason) ?? "—"} ·

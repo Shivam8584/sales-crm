@@ -37,20 +37,23 @@ export default function PanelStatus({ node }: { node: GraphNode }) {
         ? `Test run: ${tested.message}`
         : stats?.current
           ? `${stats.current} ${stats.current === 1 ? "record is" : "records are"} on this step now`
-          : stats?.entered
+          : stats?.reached
             ? "Ready"
             : automation.status === "active"
               ? "No record has reached this step yet"
               : "Not live yet. Activate the automation to start enrolling.";
 
   const ports = portsOf(node);
-  const skipped = stats?.ports.skipped ?? 0;
-  const left = (stats?.ports.exited ?? 0) + (stats?.ports.failed ?? 0);
   const metrics = [
-    { label: "Reached", value: stats?.entered ?? 0 },
+    { label: "Reached", value: stats?.reached ?? 0 },
+    {
+      label: node.kind === "exit" ? "Ended here" : "Went on",
+      value: node.kind === "exit" ? (stats?.ended ?? 0) : (stats?.passed ?? 0),
+    },
     { label: "Here now", value: stats?.current ?? 0 },
-    { label: skipped ? "Skipped" : "Left here", value: skipped || left },
   ];
+  const skipped = stats?.skipped ?? 0;
+  const ended = node.kind === "exit" ? 0 : (stats?.ended ?? 0);
   const portCounts = ports.map((port) => ({
     port,
     count: stats?.ports[port] ?? 0,
@@ -72,7 +75,7 @@ export default function PanelStatus({ node }: { node: GraphNode }) {
           <span
             className={cn(
               "relative size-2.5 rounded-full",
-              stats?.entered || tested ? "bg-(--accent)" : "bg-overlay-4",
+              stats?.reached || tested ? "bg-(--accent)" : "bg-overlay-4",
             )}
           />
         </span>
@@ -102,6 +105,18 @@ export default function PanelStatus({ node }: { node: GraphNode }) {
           </div>
         ))}
       </div>
+
+      {(skipped > 0 || ended > 0) && (
+        <p className="caption-style text-fg-tertiary leading-snug">
+          {[
+            skipped > 0 &&
+              `${skipped.toLocaleString("en-IN")} skipped here (no consent, no address, an empty variable or nobody to assign)`,
+            ended > 0 && `${ended.toLocaleString("en-IN")} ended on this step`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      )}
 
       {ports.length > 1 && (
         <div className="flex flex-col gap-2">

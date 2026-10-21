@@ -1,16 +1,25 @@
 import { v } from "convex/values";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
+import {
+  internalMutation,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { DealStage } from "../lib/domain/enums";
+import { DEAL_STAGES, type DealStage } from "../lib/domain/enums";
 import { DEAL_STAGE_LABEL, personName } from "../lib/domain/labels";
 import { DEFAULT_CURRENCY, formatMoney } from "../lib/domain/money";
 import { cleanText, isValidDay } from "../lib/domain/normalize";
+import { PROPOSAL_CURRENCY } from "../lib/domain/pricing";
+import { dealStageEffects, isDealClosed } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
 import { invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
+import { assertCanReassign } from "./lib/ownership";
+import { assertCan } from "./lib/permissions";
 import schema from "./schema";
 import { assertMoney } from "./lib/money";
-import { checkLineCount } from "./lib/pricing";
 import {
   memberIndex,
   memberRef,
@@ -46,7 +55,7 @@ const editable = {
   lostReason: v.optional(v.union(v.string(), v.null())),
 };
 
-const isClosed = (stage: DealStage) => stage === "won" || stage === "lost";
+const isClosed = isDealClosed;
 
 function cleanTitle(input: string) {
   const title = cleanText(input);
@@ -150,18 +159,9 @@ function stageEffects(
   stage: DealStage,
   lostReason: string | undefined,
 ) {
-  if (stage === "lost" && !lostReason) {
-    invalid("lostReason", "Say why the deal was lost");
-  }
-  return {
-    stage,
-    closedAt: isClosed(stage)
-      ? deal.stage === stage
-        ? deal.closedAt
-        : Date.now()
-      : undefined,
-    lostReason: stage === "lost" ? lostReason : undefined,
-  };
+  const effects = dealStageEffects(deal, stage, lostReason, Date.now());
+  if (!effects.ok) invalid(effects.problem.field, effects.problem.message);
+  return { stage, closedAt: effects.closedAt, lostReason: effects.lostReason };
 }
 
 async function toClient(
@@ -204,21 +204,64 @@ async function toClient(
   });
 }
 
-/** Deals in board order; pass `accountId` for one account's deals. */
+const OPEN_STAGES = DEAL_STAGES.filter((stage) => !isClosed(stage));
+
+async function openDeals(ctx: QueryCtx) {
+  const columns = await Promise.all(
+    OPEN_STAGES.map((stage) =>
+      ctx.db
+        .query("deals")
+        .withIndex("by_stage_position", (q) => q.eq("stage", stage))
+        .collect(),
+    ),
+  );
+  return columns.flat();
+}
+
+/** Deals in board order; pass `accountId` for one account's deals, `open` to skip won and lost. */
 export const list = memberQuery({
-  args: { accountId: v.optional(v.id("accounts")) },
-  handler: async (ctx, { accountId }) => {
+  args: {
+    accountId: v.optional(v.id("accounts")),
+    open: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { accountId, open }) => {
     const [deals, members] = await Promise.all([
       accountId
         ? ctx.db
             .query("deals")
             .withIndex("by_account", (q) => q.eq("accountId", accountId))
             .collect()
-        : ctx.db.query("deals").collect(),
+            .then((rows) =>
+              open ? rows.filter((deal) => !isClosed(deal.stage)) : rows,
+            )
+        : open
+          ? openDeals(ctx)
+          : ctx.db.query("deals").collect(),
       memberIndex(ctx),
     ]);
     deals.sort((a, b) => a.position - b.position);
     return await toClient(ctx, deals, members);
+  },
+});
+
+/** Cursor-paginated deals in one stage: board order for open stages, latest closed first for won and lost. */
+export const page = memberQuery({
+  args: { paginationOpts: paginationOptsValidator, stage: vDealStage },
+  handler: async (ctx, { paginationOpts, stage }) => {
+    const result = isClosed(stage)
+      ? await ctx.db
+          .query("deals")
+          .withIndex("by_stage_closed", (q) => q.eq("stage", stage))
+          .order("desc")
+          .paginate(paginationOpts)
+      : await ctx.db
+          .query("deals")
+          .withIndex("by_stage_position", (q) => q.eq("stage", stage))
+          .paginate(paginationOpts);
+    return {
+      ...result,
+      page: await toClient(ctx, result.page, await memberIndex(ctx)),
+    };
   },
 });
 
@@ -317,6 +360,19 @@ export const update = memberMutation({
     if (patch.amount !== undefined) {
       const amount = assertMoney(patch.amount, "amount");
       if (
+        amount.currency !== deal.amount.currency &&
+        amount.currency !== PROPOSAL_CURRENCY &&
+        (await ctx.db
+          .query("proposals")
+          .withIndex("by_deal", (q) => q.eq("dealId", id))
+          .first())
+      ) {
+        invalid(
+          "amount",
+          `This deal has proposals priced in ${PROPOSAL_CURRENCY}; keep it in ${PROPOSAL_CURRENCY}`,
+        );
+      }
+      if (
         amount.amount !== deal.amount.amount ||
         amount.currency !== deal.amount.currency
       ) {
@@ -330,6 +386,15 @@ export const update = memberMutation({
     }
 
     if (patch.ownerId !== undefined && patch.ownerId !== deal.ownerId) {
+      await assertCanReassign(
+        ctx,
+        ctx.viewer,
+        "deal.reassign",
+        [deal.ownerId],
+        {
+          dealId: id,
+        },
+      );
       const owner = await requireActiveMember(ctx, patch.ownerId, "ownerId");
       const from = await ctx.db.get(deal.ownerId);
       next.ownerId = patch.ownerId;
@@ -473,26 +538,21 @@ export const move = memberMutation({
 const vStoredProposal = schema.tables.proposals.validator.omit("dealId");
 
 /**
- * Deletes immediately with the deal's proposals, and unlinks its tasks; the
- * client keeps the returned copy to offer undo. Timeline entries keep the old
- * deal id so the account's history still reads right, and `restore` re-points them.
+ * Deletes immediately and unlinks its tasks; the client keeps the returned
+ * copy to offer undo. Timeline entries and proposals keep the old deal id, so
+ * the account's history still reads right and `restore` can re-point them;
+ * proposals are never taken back from the client, so approvals can't be forged.
  */
 export const remove = memberMutation({
   args: { id: v.id("deals") },
   handler: async (ctx, { id }) => {
     const deal = await ctx.db.get(id);
     if (!deal) notFound("Deal");
-    const proposals = [];
-    for (const proposal of await ctx.db
-      .query("proposals")
-      .withIndex("by_deal", (q) => q.eq("dealId", id))
-      .collect()) {
-      const { _id, _creationTime, dealId, ...stored } = proposal;
-      void _creationTime;
-      void dealId;
-      await ctx.db.delete(_id);
-      proposals.push(stored);
-    }
+    assertCan(ctx.viewer, "deal.delete", [deal.ownerId]);
+    await ctx.scheduler.runAfter(UNDO_KEEP_MS, internal.deals.purgeProposals, {
+      dealId: id,
+    });
+    const proposals: never[] = [];
     const taskIds: Id<"tasks">[] = [];
     for (const task of await ctx.db
       .query("tasks")
@@ -515,6 +575,21 @@ export const remove = memberMutation({
   },
 });
 
+const UNDO_KEEP_MS = 24 * 60 * 60_000;
+
+/** A day after a delete, drops proposals left behind if the deal wasn't restored. */
+export const purgeProposals = internalMutation({
+  args: { dealId: v.id("deals") },
+  handler: async (ctx, { dealId }) => {
+    if (await ctx.db.get(dealId)) return;
+    const orphans = await ctx.db
+      .query("proposals")
+      .withIndex("by_deal", (q) => q.eq("dealId", dealId))
+      .collect();
+    for (const proposal of orphans) await ctx.db.delete(proposal._id);
+  },
+});
+
 export const restore = memberMutation({
   args: {
     previousId: v.id("deals"),
@@ -534,11 +609,20 @@ export const restore = memberMutation({
     proposals: v.optional(v.array(vStoredProposal)),
     taskIds: v.optional(v.array(v.id("tasks"))),
   },
-  handler: async (ctx, { previousId, deal, proposals = [], taskIds = [] }) => {
+  handler: async (ctx, { previousId, deal, taskIds = [] }) => {
     const account = await requireAccount(ctx, deal.accountId);
     const owner = await ctx.db.get(deal.ownerId);
+    const effects = dealStageEffects(
+      { stage: deal.stage, closedAt: deal.closedAt },
+      deal.stage,
+      cleanReason(deal.lostReason),
+      Date.now(),
+    );
+    if (!effects.ok) invalid(effects.problem.field, effects.problem.message);
     const id = await ctx.db.insert("deals", {
       ...deal,
+      closedAt: effects.closedAt,
+      lostReason: effects.lostReason,
       title: cleanTitle(deal.title),
       amount: assertMoney(deal.amount, "amount"),
       ownerId: owner ? deal.ownerId : ctx.viewer._id,
@@ -561,12 +645,12 @@ export const restore = memberMutation({
       const task = await ctx.db.get(taskId);
       if (task && !task.dealId) await ctx.db.patch(taskId, { dealId: id });
     }
-    const versions = new Set<number>();
+    const proposals = await ctx.db
+      .query("proposals")
+      .withIndex("by_deal", (q) => q.eq("dealId", previousId))
+      .collect();
     for (const proposal of proposals) {
-      if (versions.has(proposal.version)) continue;
-      versions.add(proposal.version);
-      checkLineCount(proposal.lines.length);
-      await ctx.db.insert("proposals", { ...proposal, dealId: id });
+      await ctx.db.patch(proposal._id, { dealId: id });
     }
     await logSystem(
       ctx,

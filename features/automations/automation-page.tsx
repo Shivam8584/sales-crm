@@ -50,6 +50,8 @@ import NodePanel from "./editor/node-panel";
 import TestRunDialog from "./editor/test-run-dialog";
 import { stopTestRun } from "./editor/test-run";
 import { STATUS_TONE } from "./node-meta";
+import { StoppedStatus } from "./automation-parts";
+import AutomationAnalytics from "./automation-analytics";
 import AutomationRuns from "./automation-runs";
 
 const CRUMBS = [{ label: "Automations", href: "/automations" }];
@@ -241,12 +243,16 @@ function Editor({ automation }: { automation: AutomationDoc }) {
     }
     return out;
   }, [issues, graph.nodes]);
-  const live = useMemo(
+  const counts = useMemo(
     () =>
       Object.fromEntries(
         Object.entries(nodeStats ?? {}).map(([key, value]) => [
           key,
-          value.current,
+          {
+            reached: value.reached,
+            passed: value.passed,
+            current: value.current,
+          },
         ]),
       ),
     [nodeStats],
@@ -449,6 +455,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
                   Unpublished changes
                 </Tag>
               )}
+              <StoppedStatus />
             </>
           }
           actions={
@@ -506,11 +513,12 @@ function Editor({ automation }: { automation: AutomationDoc }) {
           }
         />
         <PageViews
-          value={view === "runs" ? "runs" : "editor"}
+          value={view === "runs" || view === "analytics" ? view : "editor"}
           onChange={setView}
           views={[
             { id: "editor", label: "Editor" },
             { id: "runs", label: "Runs", count: stats.enrolled },
+            { id: "analytics", label: "Analytics" },
           ]}
         />
         <PageToolbar
@@ -574,7 +582,9 @@ function Editor({ automation }: { automation: AutomationDoc }) {
           )}
         </PageToolbar>
 
-        {view === "runs" ? (
+        {view === "analytics" ? (
+          <AutomationAnalytics id={id} />
+        ) : view === "runs" ? (
           <AutomationRuns
             id={id}
             graph={automation.graph}
@@ -588,7 +598,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
             readOnly={readOnly}
             describe={describe}
             issues={issuesByNode}
-            live={live}
+            counts={counts}
           >
             <NodePanel issues={issues} />
           </Canvas>

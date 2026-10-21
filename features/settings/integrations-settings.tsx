@@ -18,6 +18,7 @@ import BellIcon from "@/public/assets/icons/bell.svg";
 import CalendarIcon from "@/public/assets/icons/calendar.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import DemoFormCard from "./demo-form-card";
+import PlatformSyncCard from "./platform-sync-card";
 import {
   AdminOnly,
   Code,
@@ -64,6 +65,7 @@ function IntegrationList() {
   return (
     <>
       <PlatformCard platform={status.platform} />
+      <PlatformSyncCard />
       <KycCard kyc={status.kyc} />
       <AlertsCard alerts={status.alerts} />
       <CalcomCard calcom={status.calcom} />

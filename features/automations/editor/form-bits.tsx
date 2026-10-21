@@ -1,12 +1,21 @@
 "use client";
 
-import { useId, useRef, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { Command as CommandPrimitive } from "cmdk";
 import { Input } from "@/components/_ui/input";
 import {
-  TEMPLATE_VARIABLES,
-  TEMPLATE_VARIABLE_LABEL,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/_ui/popover";
+import {
+  VARIABLE_GROUPS,
+  templateIssues,
+  variablesFor,
+  type SubjectKind,
 } from "@/lib/domain/automations";
 import { cn } from "@/lib/utils";
+import { useEditor } from "./editor-context";
 
 /** Section heading inside the side panel. */
 export function PanelSection({
@@ -95,7 +104,7 @@ export function ChoicePills({
   );
 }
 
-/** Text input or textarea with buttons that insert `{{variables}}` at the cursor. */
+/** Text input or textarea with a picker that inserts `{{variables}}` at the cursor. */
 export function TemplateInput({
   id,
   value,
@@ -115,7 +124,9 @@ export function TemplateInput({
   invalid?: boolean;
   rows?: number;
 }) {
+  const { automation } = useEditor();
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const issues = templateIssues(value, automation.subjectKind);
   const insert = (name: string) => {
     const element = ref.current;
     const token = `{{${name}}}`;
@@ -133,12 +144,12 @@ export function TemplateInput({
     value,
     placeholder,
     disabled,
-    "aria-invalid": invalid || undefined,
+    "aria-invalid": invalid || issues.length > 0 || undefined,
     onChange: (event: { target: { value: string } }) =>
       onChange(event.target.value),
   };
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       {multiline ? (
         <textarea
           {...common}
@@ -149,25 +160,92 @@ export function TemplateInput({
         <Input {...common} className="aria-invalid:border-danger" />
       )}
       {!disabled && (
-        <div
-          className="flex flex-wrap items-center gap-1"
-          aria-label="Insert a variable"
-          role="group"
-        >
-          {TEMPLATE_VARIABLES.map((name) => (
-            <button
-              key={name}
-              type="button"
-              title={TEMPLATE_VARIABLE_LABEL[name]}
-              onClick={() => insert(name)}
-              className="text-fg-tertiary hover:text-foreground hover:bg-overlay-2 focus-visible:ring-ring duration-fast rounded-md px-1.5 py-0.5 font-mono text-[11px] leading-4 transition-colors outline-none focus-visible:ring-2"
-            >
-              {`{{${name}}}`}
-            </button>
-          ))}
-        </div>
+        <VariablePicker subject={automation.subjectKind} onPick={insert} />
       )}
     </div>
+  );
+}
+
+/** Searchable list of the variables a record of this kind can fill. */
+function VariablePicker({
+  subject,
+  onPick,
+}: {
+  subject: SubjectKind;
+  onPick: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const commandRef = useRef<HTMLDivElement>(null);
+  const variables = variablesFor(subject);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger className="text-fg-tertiary hover:text-foreground hover:bg-overlay-2 data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground focus-visible:ring-ring duration-fast inline-flex h-6 items-center gap-1 self-start rounded-md px-1.5 font-mono text-[11px] leading-4 transition-colors outline-none focus-visible:ring-2">
+        {"{{ }}"}
+        <span className="font-sans">Insert variable</span>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-80 p-0"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          commandRef.current?.querySelector("input")?.focus();
+        }}
+      >
+        <CommandPrimitive
+          ref={commandRef}
+          loop
+          label="Variables"
+          className="flex flex-col outline-none"
+        >
+          <CommandPrimitive.Input
+            placeholder="Search variables…"
+            className="border-line-strong placeholder:text-fg-tertiary h-10 border-b bg-transparent px-3 text-sm outline-none"
+          />
+          <CommandPrimitive.List className="scrollbar-none max-h-80 overflow-y-auto p-1">
+            <CommandPrimitive.Empty className="caption-style text-fg-tertiary py-6 text-center">
+              No matches
+            </CommandPrimitive.Empty>
+            {VARIABLE_GROUPS.map((group) => {
+              const items = variables.filter((item) => item.group === group);
+              if (!items.length) return null;
+              return (
+                <CommandPrimitive.Group
+                  key={group}
+                  heading={group}
+                  className="[&_[cmdk-group-heading]]:text-fg-tertiary [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium"
+                >
+                  {items.map((item) => (
+                    <CommandPrimitive.Item
+                      key={item.key}
+                      value={`${group} ${item.label} ${item.key}`}
+                      onSelect={() => {
+                        setOpen(false);
+                        onPick(item.key);
+                      }}
+                      className="data-[selected=true]:bg-overlay-2 flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1 outline-none"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {item.label}
+                      </span>
+                      <span className="text-fg-tertiary truncate font-mono text-[11px]">
+                        {item.key}
+                      </span>
+                    </CommandPrimitive.Item>
+                  ))}
+                </CommandPrimitive.Group>
+              );
+            })}
+          </CommandPrimitive.List>
+          <p className="caption-style text-fg-tertiary border-line-strong border-t px-3 py-2 leading-snug">
+            Add a fallback for empty values:{" "}
+            <span className="text-fg-secondary font-mono">
+              {"{{person.firstName|there}}"}
+            </span>
+            . Without one, a message with an empty variable is skipped.
+          </p>
+        </CommandPrimitive>
+      </PopoverContent>
+    </Popover>
   );
 }
 

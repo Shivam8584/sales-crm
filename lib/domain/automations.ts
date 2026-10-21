@@ -98,6 +98,7 @@ export const TRIGGER_KINDS = [
   "platform_event",
   "stall_started",
   "task_completed",
+  "reply_received",
   "manual",
 ] as const;
 export type TriggerKind = (typeof TRIGGER_KINDS)[number];
@@ -110,6 +111,7 @@ export const TRIGGER_LABEL: Record<TriggerKind, string> = {
   platform_event: "Platform event",
   stall_started: "Activation stall started",
   task_completed: "Task completed",
+  reply_received: "Reply received",
   manual: "Manual enrolment",
 };
 
@@ -122,6 +124,7 @@ export const TRIGGER_SUBJECTS: Record<TriggerKind, SubjectKind[]> = {
   platform_event: ["account", "person", "lead"],
   stall_started: ["account"],
   task_completed: ["account", "deal", "lead", "person"],
+  reply_received: ["person", "lead", "account"],
   manual: ["account", "person", "lead", "deal"],
 };
 
@@ -139,13 +142,22 @@ export type Trigger = {
   /** With a move to paused: why. */
   pauseReasons?: string[];
   ruleIds?: string[];
+  /** With `reply_received`: the channels the reply came in on. */
+  channels?: string[];
+};
+
+export const REPLY_CHANNELS = ["email", "whatsapp"] as const;
+export type ReplyChannel = (typeof REPLY_CHANNELS)[number];
+export const REPLY_CHANNEL_LABEL: Record<ReplyChannel, string> = {
+  email: "Email",
+  whatsapp: "WhatsApp",
 };
 
 /** What the CRM emits when something happens; `value` is the thing a trigger filters on. */
 export type TriggerEvent = {
   kind: Exclude<TriggerKind, "manual">;
   refs: Refs;
-  /** Lead kind, new lead status, new stage, platform event type or stall rule id. */
+  /** Lead kind, new lead status, new stage, platform event type, stall rule id or reply channel. */
   value?: string;
   /** Lead source, for lead_created. */
   source?: string;
@@ -172,6 +184,8 @@ export function triggerValues(trigger: Trigger): string[] | undefined {
       return trigger.eventTypes;
     case "stall_started":
       return trigger.ruleIds;
+    case "reply_received":
+      return trigger.channels;
     default:
       return undefined;
   }
@@ -748,43 +762,296 @@ export function describeDuration(
 
 // ── Templates ({{variables}}) ───────────────────────────────────────────────
 
-export const TEMPLATE_VARIABLES = [
-  "first_name",
-  "name",
-  "company",
-  "owner_name",
-  "owner_first_name",
-  "deal_title",
+export const VARIABLE_GROUPS = [
+  "Recipient",
+  "Account",
+  "Lead",
+  "Deal",
+  "Owner",
+  "Platform",
+  "Prospect",
+  "Record",
 ] as const;
-export type TemplateVariable = (typeof TEMPLATE_VARIABLES)[number];
+export type VariableGroup = (typeof VARIABLE_GROUPS)[number];
 
-export const TEMPLATE_VARIABLE_LABEL: Record<TemplateVariable, string> = {
-  first_name: "Recipient's first name",
-  name: "Record name",
-  company: "Company",
-  owner_name: "Owner's name",
-  owner_first_name: "Owner's first name",
-  deal_title: "Deal title",
+export type VariableDef = {
+  key: string;
+  label: string;
+  group: VariableGroup;
+  /** Records the value can exist for; elsewhere the variable is a mistake. */
+  subjects: readonly SubjectKind[];
+  example: string;
 };
 
-const VARIABLE = /\{\{\s*([a-z_]+)\s*\}\}/g;
+export const VARIABLES: readonly VariableDef[] = [
+  {
+    key: "person.firstName",
+    label: "First name",
+    group: "Recipient",
+    subjects: SUBJECT_KINDS,
+    example: "Asha",
+  },
+  {
+    key: "person.lastName",
+    label: "Last name",
+    group: "Recipient",
+    subjects: SUBJECT_KINDS,
+    example: "Menon",
+  },
+  {
+    key: "person.fullName",
+    label: "Full name",
+    group: "Recipient",
+    subjects: SUBJECT_KINDS,
+    example: "Asha Menon",
+  },
+  {
+    key: "person.title",
+    label: "Job title",
+    group: "Recipient",
+    subjects: SUBJECT_KINDS,
+    example: "Founder",
+  },
+  {
+    key: "person.email",
+    label: "Email",
+    group: "Recipient",
+    subjects: SUBJECT_KINDS,
+    example: "asha@kesar.in",
+  },
+  {
+    key: "account.name",
+    label: "Company name",
+    group: "Account",
+    subjects: SUBJECT_KINDS,
+    example: "Kesar Foods",
+  },
+  {
+    key: "account.domain",
+    label: "Website",
+    group: "Account",
+    subjects: SUBJECT_KINDS,
+    example: "kesar.in",
+  },
+  {
+    key: "account.stage",
+    label: "Stage",
+    group: "Account",
+    subjects: SUBJECT_KINDS,
+    example: "Funded",
+  },
+  {
+    key: "lead.source",
+    label: "Source",
+    group: "Lead",
+    subjects: ["lead"],
+    example: "Website",
+  },
+  {
+    key: "lead.kind",
+    label: "Kind",
+    group: "Lead",
+    subjects: ["lead"],
+    example: "Demo request",
+  },
+  {
+    key: "lead.company",
+    label: "Company on the form",
+    group: "Lead",
+    subjects: ["lead"],
+    example: "Kesar Foods",
+  },
+  {
+    key: "deal.title",
+    label: "Title",
+    group: "Deal",
+    subjects: ["deal"],
+    example: "Diwali launch",
+  },
+  {
+    key: "deal.amount",
+    label: "Amount",
+    group: "Deal",
+    subjects: ["deal"],
+    example: "₹2,50,000",
+  },
+  {
+    key: "deal.stage",
+    label: "Stage",
+    group: "Deal",
+    subjects: ["deal"],
+    example: "Proposal",
+  },
+  {
+    key: "owner.name",
+    label: "Owner's name",
+    group: "Owner",
+    subjects: SUBJECT_KINDS,
+    example: "Shivam Gupta",
+  },
+  {
+    key: "owner.firstName",
+    label: "Owner's first name",
+    group: "Owner",
+    subjects: SUBJECT_KINDS,
+    example: "Shivam",
+  },
+  {
+    key: "owner.email",
+    label: "Owner's email",
+    group: "Owner",
+    subjects: SUBJECT_KINDS,
+    example: "shivam@hypedrive.in",
+  },
+  {
+    key: "platform.balance",
+    label: "Wallet balance",
+    group: "Platform",
+    subjects: SUBJECT_KINDS,
+    example: "₹12,500",
+  },
+  {
+    key: "platform.liveCampaigns",
+    label: "Live campaigns",
+    group: "Platform",
+    subjects: SUBJECT_KINDS,
+    example: "2",
+  },
+  {
+    key: "platform.stage",
+    label: "Activation stage",
+    group: "Platform",
+    subjects: SUBJECT_KINDS,
+    example: "First campaign live",
+  },
+  {
+    key: "prospect.talkingPoint",
+    label: "Talking point",
+    group: "Prospect",
+    subjects: SUBJECT_KINDS,
+    example: "your 4.1★ rating on Nykaa",
+  },
+  {
+    key: "record.name",
+    label: "Record name",
+    group: "Record",
+    subjects: SUBJECT_KINDS,
+    example: "Kesar Foods",
+  },
+];
 
-export function templateVariables(text: string) {
-  return [...text.matchAll(VARIABLE)].map((match) => match[1]);
+export const VARIABLE = new Map(VARIABLES.map((item) => [item.key, item]));
+
+/** Names used before the dotted library, still accepted in saved messages. */
+export const VARIABLE_ALIASES: Record<string, string> = {
+  first_name: "person.firstName",
+  name: "record.name",
+  company: "account.name",
+  owner_name: "owner.name",
+  owner_first_name: "owner.firstName",
+  deal_title: "deal.title",
+};
+
+/** `prospect.*` values are supplied per record at enrolment, so any name there is allowed. */
+const PROSPECT_KEY = /^prospect\.[a-zA-Z][a-zA-Z0-9]{0,39}$/;
+
+export const canonicalVariable = (name: string) =>
+  VARIABLE_ALIASES[name] ?? name;
+
+export function variableDef(name: string): VariableDef | undefined {
+  const key = canonicalVariable(name);
+  const known = VARIABLE.get(key);
+  if (known) return known;
+  if (PROSPECT_KEY.test(key)) {
+    return {
+      key,
+      label: key.slice("prospect.".length),
+      group: "Prospect",
+      subjects: SUBJECT_KINDS,
+      example: "",
+    };
+  }
+  return undefined;
 }
 
-/** Fills `{{variables}}`; `missing` lists the ones without a value. */
+export const variablesFor = (subject: SubjectKind) =>
+  VARIABLES.filter((item) => item.subjects.includes(subject));
+
+const TOKEN = /\{\{\s*([A-Za-z_][\w.]*)\s*(?:\|([^{}]*))?\}\}/g;
+
+export type TemplateToken = { name: string; fallback: string | null };
+
+export function templateTokens(text: string): TemplateToken[] {
+  return [...text.matchAll(TOKEN)].map((match) => ({
+    name: match[1],
+    fallback: match[2] === undefined ? null : match[2].trim(),
+  }));
+}
+
+export function templateVariables(text: string) {
+  return templateTokens(text).map((token) => token.name);
+}
+
+/**
+ * Fills `{{variables}}`, using `{{name|fallback}}` when the value is empty
+ * (`{{name|}}` allows blank); `missing` lists the ones left empty with no fallback.
+ */
 export function renderTemplate(
   text: string,
   vars: Partial<Record<string, string>>,
 ) {
   const missing = new Set<string>();
-  const out = text.replace(VARIABLE, (_, key: string) => {
-    const value = vars[key];
-    if (!value) missing.add(key);
-    return value ?? "";
+  const out = text.replace(TOKEN, (_, name: string, fallback?: string) => {
+    const value = vars[canonicalVariable(name)] ?? vars[name];
+    if (value) return value;
+    if (fallback !== undefined) return fallback.trim();
+    missing.add(name);
+    return "";
   });
   return { text: out, missing: [...missing] };
+}
+
+/** Unknown names, and names that can never have a value for this kind of record. */
+export function templateIssues(text: string, subject: SubjectKind) {
+  const issues: string[] = [];
+  for (const { name } of templateTokens(text)) {
+    const def = variableDef(name);
+    if (!def) issues.push(`Unknown variable {{${name}}}`);
+    else if (!def.subjects.includes(subject)) {
+      issues.push(
+        `{{${name}}} is always empty for ${SUBJECT_LABEL[subject][1]}`,
+      );
+    }
+  }
+  return [...new Set(issues)];
+}
+
+/** The message steps' text, for previews and the missing-value check. */
+export function nodeTexts(node: Pick<GraphNode, "kind" | "config">) {
+  const config = node.config as Record<string, unknown>;
+  const text = (value: unknown) => (typeof value === "string" ? value : "");
+  switch (node.kind) {
+    case "send_email":
+      return [text(config.subject), text(config.body)];
+    case "send_whatsapp":
+      return Array.isArray(config.params) ? config.params.map(text) : [];
+    case "create_task":
+      return [text(config.title), text(config.notes)];
+    case "notify":
+      return [text(config.message)];
+    default:
+      return [];
+  }
+}
+
+/** Why a message wasn't sent when variables came out empty. */
+export function missingMessage(missing: string[]) {
+  const names = missing.map((name) => `{{${name}}}`);
+  const list =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `${list} ${names.length === 1 ? "has" : "have"} no value for this record. Add a fallback like {{${missing[0]}|there}}, or {{${missing[0]}|}} to leave it blank.`;
 }
 
 // ── Validation ──────────────────────────────────────────────────────────────
@@ -848,6 +1115,9 @@ function checkTrigger(
   if (trigger.kind === "platform_event" && !trigger.eventTypes?.length) {
     push("Pick at least one platform event", "eventTypes");
   }
+  if (unknown(trigger.channels, REPLY_CHANNELS).length) {
+    push("Unknown channel", "channels");
+  }
   if (context.ruleIds && unknown(trigger.ruleIds, context.ruleIds).length) {
     push("Unknown stall rule", "ruleIds");
   }
@@ -900,11 +1170,13 @@ function checkConditions(
   });
 }
 
-function checkVariables(text: string, push: (message: string) => void) {
-  const unknown = templateVariables(text).filter(
-    (name) => !TEMPLATE_VARIABLES.includes(name as TemplateVariable),
-  );
-  if (unknown.length) push(`Unknown variable {{${unknown[0]}}}`);
+function checkVariables(
+  text: string,
+  subject: SubjectKind,
+  push: (message: string) => void,
+) {
+  const [first] = templateIssues(text, subject);
+  if (first) push(first);
 }
 
 function checkWait(
@@ -978,7 +1250,12 @@ function checkNode(
       if (!value.title?.trim()) push("Give the task a title", "title");
       else if (value.title.length > LIMITS.title)
         push("Shorten the task title", "title");
-      checkVariables(value.title ?? "", (message) => push(message, "title"));
+      checkVariables(value.title ?? "", subject, (message) =>
+        push(message, "title"),
+      );
+      checkVariables(value.notes ?? "", subject, (message) =>
+        push(message, "notes"),
+      );
       if (!ASSIGNEES.includes(value.assignee))
         push("Pick who gets the task", "assignee");
       if (value.assignee === "member")
@@ -1002,8 +1279,10 @@ function checkNode(
       if (!value.body?.trim()) push("Write the email", "body");
       else if (value.body.length > LIMITS.body)
         push("Shorten the email", "body");
-      checkVariables(`${value.subject ?? ""} ${value.body ?? ""}`, (message) =>
-        push(message, "body"),
+      checkVariables(
+        `${value.subject ?? ""} ${value.body ?? ""}`,
+        subject,
+        (message) => push(message, "body"),
       );
       checkPurpose(value.purpose, push);
       return;
@@ -1022,7 +1301,7 @@ function checkNode(
         push(`Use up to ${LIMITS.params} parameters`, "params");
       (value.params ?? []).forEach((param, index) => {
         if (!param.trim()) push(`Fill in parameter {{${index + 1}}}`, "params");
-        checkVariables(param, (message) => push(message, "params"));
+        checkVariables(param, subject, (message) => push(message, "params"));
       });
       checkPurpose(value.purpose, push);
       return;
@@ -1032,7 +1311,7 @@ function checkNode(
       if (!value.message?.trim()) push("Write the message", "message");
       else if (value.message.length > LIMITS.message)
         push("Shorten the message", "message");
-      checkVariables(value.message ?? "", (message) =>
+      checkVariables(value.message ?? "", subject, (message) =>
         push(message, "message"),
       );
       if (value.to !== "owner" && value.to !== "member")
@@ -1350,6 +1629,8 @@ export function describeTrigger(trigger: Trigger, names: NameLookup = {}) {
       return `A brand gets stuck: ${listLabel(trigger.ruleIds, (value) => names.rule?.(value) ?? value, "any step")}`;
     case "task_completed":
       return "A teammate completes a task on the record";
+    case "reply_received":
+      return `They reply by ${listLabel(trigger.channels, (value) => lookup(REPLY_CHANNEL_LABEL, value)?.replace(/^E/, "e") ?? value, "email or WhatsApp")}`;
     case "manual":
       return "A teammate enrols the record by hand";
   }
@@ -1430,6 +1711,291 @@ export function describeNode(
     case "exit":
       return configOf(node, "exit").reason?.trim() || "End of the automation";
   }
+}
+
+// ── Runs: exits, funnel, frequency ──────────────────────────────────────────
+
+export const EXIT_KINDS = [
+  "goal",
+  "replied",
+  "manual",
+  "exit_step",
+  "automation",
+  "record_gone",
+  "deleted",
+  "step_removed",
+  "failed",
+] as const;
+export type ExitKind = (typeof EXIT_KINDS)[number];
+
+export const EXIT_KIND_LABEL: Record<ExitKind | "other", string> = {
+  goal: "Reached the goal",
+  replied: "Replied or engaged",
+  manual: "Removed by a teammate",
+  exit_step: "Reached an exit step",
+  automation: "Removed by another automation",
+  record_gone: "Record archived or erased",
+  deleted: "Automation deleted",
+  step_removed: "Step removed in a new version",
+  failed: "A step kept failing",
+  other: "Other",
+};
+
+export type RunSummary = {
+  status: EnrollmentStatus;
+  currentNodeId: string;
+  history: { nodeId: string; outcome: string; at: number }[];
+};
+
+export type NodeFunnel = {
+  /** Runs that arrived at the step. */
+  reached: number;
+  /** Runs that went on from it, including skipped sends. */
+  passed: number;
+  /** Runs on it now. */
+  current: number;
+  skipped: number;
+  /** Runs that ended on it: exited, failed, or completed with nothing after. */
+  ended: number;
+  ports: Record<string, number>;
+  lastAt: number | null;
+};
+
+const END_OUTCOMES = new Set(["completed", "exited", "failed"]);
+
+/** Per step: how many runs reached it, went on, are on it now and which path they took. */
+export function nodeFunnel(runs: RunSummary[]) {
+  const stats: Record<string, NodeFunnel> = {};
+  const at = (nodeId: string) =>
+    (stats[nodeId] ??= {
+      reached: 0,
+      passed: 0,
+      current: 0,
+      skipped: 0,
+      ended: 0,
+      ports: {},
+      lastAt: null,
+    });
+  for (const run of runs) {
+    const reached = new Set<string>();
+    const passed = new Set<string>();
+    for (const entry of run.history) {
+      const item = at(entry.nodeId);
+      reached.add(entry.nodeId);
+      item.ports[entry.outcome] = (item.ports[entry.outcome] ?? 0) + 1;
+      item.lastAt = Math.max(item.lastAt ?? 0, entry.at);
+      if (END_OUTCOMES.has(entry.outcome)) {
+        if (!passed.has(entry.nodeId)) item.ended++;
+      } else {
+        passed.add(entry.nodeId);
+        if (entry.outcome === "skipped") item.skipped++;
+      }
+    }
+    if (isLive(run.status)) {
+      at(run.currentNodeId).current++;
+      reached.add(run.currentNodeId);
+    }
+    for (const nodeId of reached) at(nodeId).reached++;
+    for (const nodeId of passed) at(nodeId).passed++;
+  }
+  return stats;
+}
+
+/** Steps in the order a run meets them: breadth-first from the trigger, then anything unconnected. */
+export function stepOrder(graph: Graph) {
+  const trigger = graph.nodes.find((node) => node.kind === "trigger");
+  const order: string[] = [];
+  const seen = new Set<string>();
+  const queue = trigger ? [trigger.id] : [];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    order.push(id);
+    const next = graph.edges
+      .filter((edge) => edge.source === id)
+      .sort((a, b) => PORTS.indexOf(a.port) - PORTS.indexOf(b.port));
+    for (const edge of next) queue.push(edge.target);
+  }
+  for (const node of [...graph.nodes].sort((a, b) => a.y - b.y || a.x - b.x)) {
+    if (!seen.has(node.id)) order.push(node.id);
+  }
+  return order;
+}
+
+export const FREQUENCY_WINDOW_DAYS = 7;
+export const FREQUENCY_CAP = { min: 1, max: 20, default: 3 } as const;
+
+/**
+ * When the next message may go to someone who already got `sent` (epoch ms)
+ * in the rolling window, or null when they're under the cap.
+ */
+export function frequencyHoldUntil(sent: number[], now: number, cap: number) {
+  const window = FREQUENCY_WINDOW_DAYS * DAY;
+  const recent = sent.filter((at) => at > now - window).sort((a, b) => a - b);
+  if (recent.length < cap) return null;
+  return recent[recent.length - cap] + window;
+}
+
+export const isValidFrequencyCap = (value: number) =>
+  Number.isInteger(value) &&
+  value >= FREQUENCY_CAP.min &&
+  value <= FREQUENCY_CAP.max;
+
+/** Share of `part` in `whole` as a whole percentage; null when there's nothing to divide. */
+export const percent = (part: number, whole: number) =>
+  whole > 0 ? Math.round((part / whole) * 100) : null;
+
+// ── Inbound replies ─────────────────────────────────────────────────────────
+
+export type Address = { email: string | null; name: string | null };
+
+/** `Asha Menon <asha@kesar.in>`, a bare address, or `{email, name}`. */
+export function parseAddress(input: unknown): Address {
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    const value = input as Record<string, unknown>;
+    const email = typeof value.email === "string" ? value.email : null;
+    const name = typeof value.name === "string" ? value.name : null;
+    return {
+      email: email?.trim().toLowerCase() || null,
+      name: name?.trim() || null,
+    };
+  }
+  if (typeof input !== "string") return { email: null, name: null };
+  const angled = /^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(input);
+  if (angled) {
+    return {
+      email: angled[2].trim().toLowerCase() || null,
+      name: angled[1].trim() || null,
+    };
+  }
+  return { email: input.trim().toLowerCase() || null, name: null };
+}
+
+const QUOTE_HEADER =
+  /^(on\s.+wrote:|-{2,}\s*original message\s*-{2,}|from:\s.+)$/i;
+
+/** The new part of a reply: drops quoted lines and everything after an "On … wrote:" header. */
+export function stripQuoted(text: string) {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const kept: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (QUOTE_HEADER.test(trimmed)) break;
+    if (trimmed.startsWith(">")) continue;
+    kept.push(line);
+  }
+  const out = kept.join("\n").trim();
+  return out || text.trim();
+}
+
+/** Plain text from simple HTML email bodies. */
+export function htmlToText(html: string) {
+  return html
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Epoch ms from an ISO string, epoch seconds or epoch ms; null when unreadable. */
+export function parseTimestamp(input: unknown): number | null {
+  if (typeof input === "number" && Number.isFinite(input)) {
+    return input < 1e12 ? Math.round(input * 1000) : Math.round(input);
+  }
+  if (typeof input === "string" && input.trim()) {
+    if (/^\d+(\.\d+)?$/.test(input.trim()))
+      return parseTimestamp(Number(input));
+    const at = Date.parse(input.replace(/ UTC$/, "Z").replace(" ", "T"));
+    return Number.isFinite(at) ? at : null;
+  }
+  return null;
+}
+
+export type ChatwootMessage = {
+  id: string;
+  channel: ReplyChannel;
+  content: string;
+  at: number | null;
+  email: string | null;
+  phone: string | null;
+  name: string | null;
+  conversationId: string | null;
+  orgId: string | null;
+};
+
+export type ChatwootParse =
+  | { ok: true; message: ChatwootMessage }
+  | { ok: false; ignored: string };
+
+const CHATWOOT_CHANNEL: Record<string, ReplyChannel> = {
+  "Channel::Email": "email",
+  "Channel::Whatsapp": "whatsapp",
+};
+
+const record = (value: unknown) =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const str = (value: unknown) =>
+  typeof value === "string" && value.trim()
+    ? value.trim()
+    : typeof value === "number"
+      ? String(value)
+      : null;
+
+/** An incoming customer message from a Chatwoot `message_created` webhook. */
+export function parseChatwoot(payload: Record<string, unknown>): ChatwootParse {
+  if (payload.event !== "message_created")
+    return { ok: false, ignored: `event ${String(payload.event)}` };
+  const type = payload.message_type;
+  if (type !== "incoming" && type !== 0)
+    return { ok: false, ignored: "not an incoming message" };
+  if (payload.private === true) return { ok: false, ignored: "private note" };
+  const id = str(payload.id);
+  if (!id) return { ok: false, ignored: "no message id" };
+  const conversation = record(payload.conversation);
+  const sender = {
+    ...record(record(conversation.meta).sender),
+    ...record(payload.sender),
+  };
+  const channelName =
+    str(conversation.channel) ?? str(record(payload.inbox).channel_type);
+  let channel = channelName ? CHATWOOT_CHANNEL[channelName] : undefined;
+  const rawPhone = str(sender.phone_number);
+  if (!channel && channelName === "Channel::TwilioSms" && rawPhone) {
+    const source = str(record(conversation.contact_inbox).source_id) ?? "";
+    if (source.startsWith("whatsapp:")) channel = "whatsapp";
+  }
+  if (!channel)
+    return { ok: false, ignored: `channel ${channelName ?? "unknown"}` };
+  const attributes = {
+    ...record(conversation.additional_attributes),
+    ...record(conversation.custom_attributes),
+  };
+  return {
+    ok: true,
+    message: {
+      id,
+      channel,
+      content: str(payload.content) ?? "",
+      at: parseTimestamp(payload.created_at),
+      email: str(sender.email)?.toLowerCase() ?? null,
+      phone: rawPhone?.replace(/^whatsapp:/, "") ?? null,
+      name: str(sender.name),
+      conversationId: str(conversation.display_id) ?? str(conversation.id),
+      orgId: str(attributes.hd_org_id),
+    },
+  };
 }
 
 // ── Dry run ─────────────────────────────────────────────────────────────────
@@ -1576,22 +2142,30 @@ function simulateNode(
           message: `Would skip: ${decision?.message ?? "no consent on record"}`,
         };
       }
+      const texts = nodeTexts(node);
+      const missing = [
+        ...new Set(texts.flatMap((text) => renderTemplate(text, vars).missing)),
+      ];
+      if (missing.length) {
+        return {
+          ...base,
+          port: "out",
+          outcome: "skipped",
+          message: `Would skip: ${missingMessage(missing)}`,
+        };
+      }
       const sendAt = sendTime(draft.settings, at);
       const when =
         sendAt === at ? "now" : `at ${formatIst(sendAt)} (quiet hours)`;
       if (node.kind === "send_email") {
         const config = configOf(node, "send_email");
         const subject = renderTemplate(config.subject, vars);
-        const missing = [
-          ...subject.missing,
-          ...renderTemplate(config.body, vars).missing,
-        ];
         return {
           ...base,
           at: sendAt,
           port: "out",
           outcome: "done",
-          message: `Would queue the email “${subject.text}” ${when}${missing.length ? ` · empty {{${missing[0]}}}` : ""}`,
+          message: `Would queue the email “${subject.text}” ${when}`,
         };
       }
       const config = configOf(node, "send_whatsapp");

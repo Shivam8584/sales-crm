@@ -196,21 +196,6 @@ export const retryParked = internalMutation({
   },
 });
 
-/** Moves accounts left on the v1 `gst_verified` stage to `org_created`, where v2 puts them. */
-export const migrateV2 = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const legacy = await ctx.db
-      .query("accounts")
-      .withIndex("by_stage", (q) => q.eq("stage", "gst_verified"))
-      .collect();
-    for (const account of legacy) {
-      await ctx.db.patch(account._id, { stage: "org_created" });
-    }
-    return { moved: legacy.length };
-  },
-});
-
 const money = (amount: number) => ({ amount, currency: "INR" as const });
 
 export const forAccount = memberQuery({

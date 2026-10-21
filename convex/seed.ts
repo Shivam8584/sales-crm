@@ -1,4 +1,5 @@
 import { internalMutation, type MutationCtx } from "./_generated/server";
+import { istToday } from "../lib/domain/day";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type {
@@ -541,8 +542,7 @@ async function seedWorkspace(ctx: MutationCtx) {
   const member = (index: number) => members[index % members.length];
   const admin = members.find((item) => item.role === "admin") ?? members[0];
   const now = Date.now();
-  const dayKey = (days: number) =>
-    new Date(now + days * DAY).toISOString().slice(0, 10);
+  const dayKey = (days: number) => istToday(days, now);
 
   const accounts = new Map<string, Doc<"accounts">>();
   const people = new Map<string, Doc<"people">[]>();

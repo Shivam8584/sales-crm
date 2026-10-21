@@ -18,6 +18,7 @@ import {
   type LoggableKind,
   type TimelineTarget,
 } from "./kinds";
+import MentionTextarea, { useMentionDraft } from "./mention-textarea";
 
 const PLACEHOLDER: Record<LoggableKind, string> = {
   note: "Write a note…",
@@ -48,7 +49,7 @@ export default function TimelineComposer({
   const log = useMutation(api.timeline.log);
   const bodyId = useId();
   const [kind, setKindState] = useState<LoggableKind>(readLastKind);
-  const [body, setBody] = useState("");
+  const draft = useMentionDraft();
   const [outcome, setOutcome] = useState<CallOutcome>("connected");
   const [duration, setDuration] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +62,7 @@ export default function TimelineComposer({
     } catch {}
   }
 
-  const canSubmit = kind === "note" ? body.trim().length > 0 : true;
+  const canSubmit = kind === "note" ? draft.text.trim().length > 0 : true;
 
   async function submit(event?: FormEvent) {
     event?.preventDefault();
@@ -72,11 +73,11 @@ export default function TimelineComposer({
       const { firstTouch } = await log({
         target,
         kind,
-        body: body.trim() || undefined,
+        body: draft.encoded() || undefined,
         outcome: kind === "call" ? outcome : undefined,
         durationMin: duration ? Number(duration) : undefined,
       });
-      setBody("");
+      draft.reset();
       setDuration("");
       toast(
         firstTouch
@@ -130,10 +131,9 @@ export default function TimelineComposer({
       <label htmlFor={bodyId} className="sr-only">
         {KIND_META[kind].label}
       </label>
-      <textarea
+      <MentionTextarea
         id={bodyId}
-        value={body}
-        onChange={(event) => setBody(event.target.value)}
+        draft={draft}
         onKeyDown={onKeyDown}
         placeholder={PLACEHOLDER[kind]}
         rows={2}
@@ -174,6 +174,8 @@ export default function TimelineComposer({
           </span>
         )}
         <span className="caption-style text-fg-tertiary ml-auto flex items-center gap-1 max-sm:hidden">
+          <Kbd>@</Kbd>
+          <span className="mr-2">to mention</span>
           <Kbd>{MOD_KEY}</Kbd>
           <Kbd>↵</Kbd>
         </span>

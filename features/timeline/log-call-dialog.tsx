@@ -15,7 +15,6 @@ import {
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
-import { Textarea } from "@/components/_ui/textarea";
 import OptionPicker from "@/components/fields/option-picker";
 import { CALL_OUTCOMES, type CallOutcome } from "@/lib/domain/enums";
 import { CALL_OUTCOME_LABEL } from "@/lib/domain/labels";
@@ -23,6 +22,7 @@ import { readError } from "@/lib/errors";
 import { MOD_KEY } from "@/lib/keyboard";
 import { toast } from "@/stores/toast-store";
 import type { TimelineTarget } from "./kinds";
+import MentionTextarea, { useMentionDraft } from "./mention-textarea";
 
 type Errors = Partial<Record<"durationMin" | "body" | "form", string>>;
 
@@ -37,14 +37,14 @@ export default function LogCallDialog({
   const log = useMutation(api.timeline.log);
   const [outcome, setOutcome] = useState<CallOutcome>("connected");
   const [duration, setDuration] = useState("");
-  const [body, setBody] = useState("");
+  const draft = useMentionDraft();
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
 
   function reset() {
     setOutcome("connected");
     setDuration("");
-    setBody("");
+    draft.reset();
     setErrors({});
   }
 
@@ -58,7 +58,7 @@ export default function LogCallDialog({
         kind: "call",
         outcome,
         durationMin: duration ? Number(duration) : undefined,
-        body: body.trim() || undefined,
+        body: draft.encoded() || undefined,
       });
       onClose();
       toast(`Call with ${call.name} logged`);
@@ -119,11 +119,11 @@ export default function LogCallDialog({
               </Field>
             </div>
             <Field label="Notes" htmlFor="log-call-notes" error={errors.body}>
-              <Textarea
+              <MentionTextarea
                 id="log-call-notes"
                 autoFocus
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
+                draft={draft}
+                aria-invalid={errors.body ? true : undefined}
                 onKeyDown={(event) => {
                   if (
                     event.key === "Enter" &&
@@ -134,8 +134,8 @@ export default function LogCallDialog({
                   }
                 }}
                 rows={4}
-                placeholder="What was discussed?"
-                className="min-h-24"
+                placeholder="What was discussed? Type @ to mention a teammate."
+                className="border-input bg-secondary text-foreground duration-fast ease-power3-out placeholder:text-fg-tertiary hover:border-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 aria-invalid:border-danger field-sizing-content max-h-40 min-h-24 w-full resize-none rounded-lg border px-3 py-2.5 text-sm leading-snug transition-[border-color,box-shadow] outline-none focus-visible:ring-3 pointer-coarse:text-base"
               />
             </Field>
             {errors.form && (

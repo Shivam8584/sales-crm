@@ -1,12 +1,17 @@
+import { TIME_ZONE, istDay, istToday } from "./domain/day";
+
 const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+// Business times read in India time on every device, like the server writes them.
 const SHORT_DATE = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
+  timeZone: TIME_ZONE,
 });
 const LONG_DATE = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
   year: "numeric",
+  timeZone: TIME_ZONE,
 });
 const DATE_TIME = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
@@ -14,6 +19,7 @@ const DATE_TIME = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
   hour: "numeric",
   minute: "2-digit",
+  timeZone: TIME_ZONE,
 });
 
 const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
@@ -37,7 +43,7 @@ export function relativeTime(at: number, now = Date.now()) {
 
 export function shortDate(at: number) {
   const date = new Date(at);
-  return date.getFullYear() === new Date().getFullYear()
+  return istDay(at).slice(0, 4) === istToday().slice(0, 4)
     ? SHORT_DATE.format(date)
     : LONG_DATE.format(date);
 }

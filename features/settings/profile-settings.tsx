@@ -31,6 +31,7 @@ import SunIcon from "@/public/assets/icons/sun.svg";
 import KeyboardIcon from "@/public/assets/icons/message-question.svg";
 import SessionIcon from "@/public/assets/icons/arrow-right.svg";
 import { SettingsRow, SettingsSection } from "./settings-ui";
+import NotificationPreferences from "@/features/notifications/notification-preferences";
 
 const MAX_NAME = 80;
 
@@ -112,6 +113,8 @@ export default function ProfileSettings() {
           <ThemePicker />
         </SettingsRow>
       </SettingsSection>
+
+      <NotificationPreferences />
 
       <SettingsSection
         icon={KeyboardIcon}

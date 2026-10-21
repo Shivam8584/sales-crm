@@ -55,6 +55,7 @@ import {
 } from "./deal-fields";
 import { isOpenStage } from "./stage";
 import type { DealRow } from "./use-deal-actions";
+import FollowButton from "@/features/notifications/follow-button";
 
 const CRUMBS = [{ label: "Deals", href: "/deals" }];
 
@@ -140,42 +141,45 @@ function DealView({ deal }: { deal: DealRow }) {
         crumbs={CRUMBS}
         title={deal.title}
         actions={
-          <PageActions
-            label="Deal actions"
-            primaryItem={
-              open && {
-                label: "Mark won",
-                icon: CheckCircleIcon,
-                onSelect: () => void save({ stage: "won" }, "Stage"),
+          <>
+            <FollowButton target={{ dealId: deal._id }} />
+            <PageActions
+              label="Deal actions"
+              primaryItem={
+                open && {
+                  label: "Mark won",
+                  icon: CheckCircleIcon,
+                  onSelect: () => void save({ stage: "won" }, "Stage"),
+                }
               }
-            }
-            primary={
-              open && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => void save({ stage: "won" }, "Stage")}
-                >
-                  Mark won
-                </Button>
-              )
-            }
-            actions={[
-              { label: "Add task", icon: PlusIcon, onSelect: addTask },
-              deal.account && {
-                label: "Open account",
-                icon: BuildingIcon,
-                href: `/accounts/${deal.account._id}`,
-              },
-              {
-                label: "Delete deal",
-                icon: TrashIcon,
-                tone: "danger",
-                separated: true,
-                onSelect: () => remove(deal, true),
-              },
-            ]}
-          />
+              primary={
+                open && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => void save({ stage: "won" }, "Stage")}
+                  >
+                    Mark won
+                  </Button>
+                )
+              }
+              actions={[
+                { label: "Add task", icon: PlusIcon, onSelect: addTask },
+                deal.account && {
+                  label: "Open account",
+                  icon: BuildingIcon,
+                  href: `/accounts/${deal.account._id}`,
+                },
+                {
+                  label: "Delete deal",
+                  icon: TrashIcon,
+                  tone: "danger",
+                  separated: true,
+                  onSelect: () => remove(deal, true),
+                },
+              ]}
+            />
+          </>
         }
       />
       <RecordLayout

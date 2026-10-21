@@ -29,6 +29,8 @@ import {
   OPS_FOR,
   OP_LABEL,
   PAUSE_REASON_OPTIONS,
+  REPLY_CHANNELS,
+  REPLY_CHANNEL_LABEL,
   TRIGGER_KINDS,
   TRIGGER_LABEL,
   TRIGGER_SUBJECTS,
@@ -171,6 +173,19 @@ export default function PanelRules({
               automation; the rest wait for tomorrow.
             </li>
             <li>
+              <span className="text-foreground font-medium">
+                Frequency cap.
+              </span>{" "}
+              Held while the person already got the workspace’s limit of
+              automated messages in the last 7 days, across all automations.
+            </li>
+            <li>
+              <span className="text-foreground font-medium">
+                Empty variables.
+              </span>{" "}
+              Skipped when a variable without a fallback has no value.
+            </li>
+            <li>
               <span className="text-foreground font-medium">Once per run.</span>{" "}
               A retry never sends twice.
             </li>
@@ -303,10 +318,17 @@ function TriggerFilters({
           Any task on the record that a teammate marks done.
         </p>
       );
+    case "reply_received":
+      return pills(
+        "channels",
+        "Replied on",
+        opts(REPLY_CHANNELS, REPLY_CHANNEL_LABEL),
+      );
     case "manual":
       return (
         <p className="caption-style text-fg-tertiary leading-snug">
-          Teammates enrol records from the Automations tab on a record page.
+          Teammates add records with “Add to automation” on a list’s selection
+          bar or a record’s Automations tab.
         </p>
       );
   }
@@ -548,7 +570,7 @@ function AutomationRules() {
       <PanelSection title="Exit and limits">
         <ToggleRow
           label="Stop when they engage"
-          description="Exit when a teammate logs an email, WhatsApp, call or meeting on the record after it enrolled."
+          description="Exit when they reply by email or WhatsApp, or a teammate logs an email, WhatsApp, call or meeting on the record after it enrolled."
           control={(controlId) => (
             <Switch
               id={controlId}

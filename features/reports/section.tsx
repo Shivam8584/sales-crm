@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { DetailSection } from "@/components/record/detail";
+import Skeleton from "@/components/_ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { Trend } from "./format";
 
@@ -129,5 +130,43 @@ export function Delta({
       </span>
       <span className="text-fg-tertiary truncate">{label}</span>
     </span>
+  );
+}
+
+/** Placeholder rows shaped like a meter chart. */
+export function ChartSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="flex flex-col gap-4 p-4 sm:p-5">
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className="flex items-center gap-4">
+          <Skeleton className="h-3 w-24 shrink-0" />
+          <Skeleton
+            className="h-4"
+            style={{ width: `${Math.max(12, 90 - index * 8)}%` }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Dims a report while it reloads for new filters, keeping the old figures readable. */
+export function Reloading({
+  loading,
+  children,
+}: {
+  loading: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      aria-busy={loading}
+      className={cn(
+        "duration-base flex flex-col gap-5 transition-opacity",
+        loading && "opacity-60",
+      )}
+    >
+      {children}
+    </div>
   );
 }

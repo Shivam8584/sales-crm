@@ -12,6 +12,7 @@ import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
 import SelectionBar from "@/components/data-table/selection-bar";
+import AddToAutomation from "@/features/automations/add-to-automation";
 import OptionPicker from "@/components/fields/option-picker";
 import {
   compareBy,
@@ -28,12 +29,14 @@ import {
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
+import { HealthBadge, useHealthIndex } from "@/features/platform/health-badge";
 import LogCallDialog from "@/features/timeline/log-call-dialog";
 import type { TimelineTarget } from "@/features/timeline/kinds";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { downloadCsv } from "@/lib/csv";
 import { LIFECYCLE_STAGES, type LifecycleStage } from "@/lib/domain/enums";
+import { HEALTH_BAND_LABEL } from "@/lib/domain/health";
 import { STAGE_LABEL } from "@/lib/domain/labels";
 import { formatMoney, toMajor, type Money } from "@/lib/domain/money";
 import { readError } from "@/lib/errors";
@@ -60,11 +63,13 @@ import {
 } from "./record-cells";
 
 type Stats = FunctionReturnType<typeof api.accounts.listStats>[number];
+type AccountHealth = NonNullable<ReturnType<typeof useHealthIndex>>[string];
 
 export type AccountRow = FunctionReturnType<typeof api.accounts.list>[number] &
   Omit<Stats, "accountId" | "pipeline"> & {
     pipeline: Money[];
     activation: number | null;
+    health: AccountHealth | null;
   };
 
 const ALL = "all";
@@ -77,6 +82,8 @@ const VIEWS = [
   { id: "mine", label: "My accounts" },
   { id: "stuck", label: "Stuck" },
   { id: "activated", label: "Activated" },
+  { id: "at_risk", label: "At risk" },
+  { id: "expansion", label: "Expansion" },
   { id: "archived", label: "Archived" },
 ] as const;
 type View = (typeof VIEWS)[number]["id"];
@@ -91,6 +98,10 @@ function inView(row: AccountRow, view: View, viewerId: string) {
       return row.stuck;
     case "activated":
       return row.stage === "activated" || row.stage === "expanding";
+    case "at_risk":
+      return row.health?.band === "at_risk";
+    case "expansion":
+      return (row.health?.signals.length ?? 0) > 0;
     default:
       return true;
   }
@@ -122,6 +133,19 @@ const COLUMNS: Column<AccountRow>[] = [
     cell: (row) => <StageAndTags stage={row.stage} tags={row.tags} />,
   },
   {
+    id: "health",
+    header: "Health",
+    width: "5.5rem",
+    defaultDir: "asc",
+    sortValue: (row) => row.health?.score ?? null,
+    cell: (row) =>
+      row.health ? (
+        <HealthBadge score={row.health.score} band={row.health.band} />
+      ) : (
+        dash
+      ),
+  },
+  {
     id: "owner",
     header: "Owner",
     width: "minmax(8.75rem,1fr)",
@@ -135,7 +159,7 @@ const COLUMNS: Column<AccountRow>[] = [
     width: "6.5rem",
     align: "end",
     defaultDir: "desc",
-    minViewport: 1100,
+    minViewport: 1536,
     sortValue: (row) => row.openDeals,
     cell: (row) => (row.openDeals ? row.openDeals : dash),
   },
@@ -182,9 +206,10 @@ const SORT_OPTIONS = [
   { value: "pipeline", label: "Pipeline value" },
   { value: "deals", label: "Open deals" },
   { value: "activation", label: "Activation" },
+  { value: "health", label: "Health, weakest first" },
   { value: "name", label: "Name" },
 ];
-const SORT_DIR: Record<string, "asc" | "desc"> = { name: "asc" };
+const SORT_DIR: Record<string, "asc" | "desc"> = { name: "asc", health: "asc" };
 
 const ACTIVITY_OPTIONS = [
   { value: ALL, label: "Any time" },
@@ -224,6 +249,7 @@ function exportRows(rows: AccountRow[]) {
       "Pipeline",
       "On platform",
       "Activation",
+      "Health",
       "GSTIN",
       "GST verified",
       "Tags",
@@ -243,6 +269,9 @@ function exportRows(rows: AccountRow[]) {
         .join(" + "),
       row.onPlatform ? "Yes" : "No",
       row.activation === null ? "" : `${activationPercent(row.activation)}%`,
+      row.health
+        ? `${row.health.score} ${HEALTH_BAND_LABEL[row.health.band]}`
+        : "",
       row.gstin ?? "",
       row.gstVerified ? "Yes" : "No",
       row.tags.join(", "),
@@ -259,6 +288,7 @@ export default function AccountsPage() {
   const members = useMembers();
   const accounts = useQuery(api.accounts.list, { includeArchived: true });
   const stats = useQuery(api.accounts.listStats, {});
+  const health = useHealthIndex();
   const setOwner = useMutation(api.accounts.setOwner);
   const setArchived = useMutation(api.accounts.setArchived);
   const importRows = useMutation(api.accounts.importRows);
@@ -325,22 +355,23 @@ export default function AccountsPage() {
         trend: item?.trend ?? [],
         lastInteraction: item?.lastInteraction ?? null,
         activation: activationSteps(onPlatform, account.stage),
+        health: health?.[account._id] ?? null,
       };
     });
-  }, [accounts, stats]);
+  }, [accounts, stats, health]);
 
   const counts = useMemo(() => {
-    if (!all || !stats) return undefined;
+    if (!all || !stats || !health) return undefined;
     return Object.fromEntries(
       VIEWS.map((item) => [
         item.id,
         all.filter((row) => inView(row, item.id, viewer._id)).length,
       ]),
     ) as Record<View, number>;
-  }, [all, stats, viewer._id]);
+  }, [all, stats, health, viewer._id]);
 
   const rows = useMemo(() => {
-    if (!all || !stats) return undefined;
+    if (!all || !stats || !health) return undefined;
     return all.filter(
       (row) =>
         inView(row, view, viewer._id) &&
@@ -352,7 +383,18 @@ export default function AccountsPage() {
         activeWithin(row, activity, now) &&
         (!search.trim() || matches(row, search)),
     );
-  }, [all, stats, view, stage, owner, activity, search, viewer._id, now]);
+  }, [
+    all,
+    stats,
+    health,
+    view,
+    stage,
+    owner,
+    activity,
+    search,
+    viewer._id,
+    now,
+  ]);
 
   const filtered =
     stage !== ALL || owner !== ALL || activity !== ALL || search.trim() !== "";
@@ -701,6 +743,11 @@ export default function AccountsPage() {
           >
             Assign
           </OptionPicker>
+          <AddToAutomation
+            kind="account"
+            ids={selectedIds}
+            onDone={() => setSelected(new Set())}
+          />
           <Button
             variant="ghost"
             size="xs"
@@ -739,6 +786,16 @@ const EMPTY_VIEW: Record<
     description:
       "Brands land here once their first enrollment is approved on Hypedrive.",
   },
+  at_risk: {
+    title: "No brands at risk",
+    description:
+      "Brands on Hypedrive whose health drops below 45 show up here: unfunded wallets, paused campaigns, review backlogs or going quiet.",
+  },
+  expansion: {
+    title: "No expansion signals yet",
+    description:
+      "Brands that sell out a campaign, top up repeatedly, list on a new marketplace, near a renewal or grow their team show up here.",
+  },
   archived: {
     title: "Nothing archived",
     description: "Archived accounts stay here, ready to restore.",
@@ -764,7 +821,10 @@ function AccountCard({ row }: { row: AccountRow }) {
       </span>
       <span className="caption-style flex items-center justify-between gap-3 pl-11">
         <StageAndTags stage={row.stage} tags={row.tags} max={1} />
-        <span className="text-fg-secondary min-w-0">
+        <span className="text-fg-secondary flex min-w-0 items-center gap-3">
+          {row.health && (
+            <HealthBadge score={row.health.score} band={row.health.band} />
+          )}
           <LastInteractionCell last={row.lastInteraction} />
         </span>
       </span>

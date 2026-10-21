@@ -78,9 +78,9 @@ export default function Kpis({ report }: { report: Report }) {
       />
       <MetricTile
         icon={ClockIcon}
-        label="Median speed to lead"
+        label="Speed to lead"
         value={duration(speed.medianMs)}
-        detail={`p90 ${duration(speed.p90Ms)}`}
+        detail={`Median · p90 ${duration(speed.p90Ms)}`}
         delta={
           <Delta
             value={

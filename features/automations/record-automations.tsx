@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
-import OptionPicker from "@/components/fields/option-picker";
 import {
   SUBJECT_LABEL,
   isLive,
@@ -16,6 +16,7 @@ import { readError } from "@/lib/errors";
 import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import AddToAutomation from "./add-to-automation";
 import { RunStatus } from "./automation-runs";
 
 export type AutomationTarget =
@@ -23,6 +24,10 @@ export type AutomationTarget =
   | { personId: Id<"people"> }
   | { leadId: Id<"leads"> }
   | { dealId: Id<"deals"> };
+
+type RecordRun = FunctionReturnType<
+  typeof api.automations.forRecord
+>["runs"][number];
 
 function subjectOf(target: AutomationTarget): {
   kind: SubjectKind;
@@ -34,34 +39,38 @@ function subjectOf(target: AutomationTarget): {
   return { kind: "deal", id: target.dealId };
 }
 
-/** A record's automation runs, with enrol and remove; for a record page tab. */
+/** A record's automation runs, with add, pause, resume and remove; for a record page tab. */
 export function RecordAutomations({ target }: { target: AutomationTarget }) {
   const subject = subjectOf(target);
   const data = useQuery(api.automations.forRecord, { target: subject });
-  const enrol = useMutation(api.automations.enrollRecord);
   const exit = useMutation(api.automations.exitEnrollment);
+  const pause = useMutation(api.automations.pauseEnrollment);
+  const resume = useMutation(api.automations.resumeEnrollment);
   const noun = SUBJECT_LABEL[subject.kind][0];
 
-  async function onEnrol(id: string | null) {
-    if (!id) return;
-    const name =
-      data?.available.find((item) => item._id === id)?.name ?? "the automation";
+  async function run(
+    action: () => Promise<unknown>,
+    message: string,
+    undo?: () => void,
+  ) {
     try {
-      await enrol({ id: id as Id<"automations">, target: subject });
-      toast(`Enrolled in ${name}`);
+      await action();
+      toast(message, undo);
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }
   }
 
-  async function onRemove(id: Id<"automationEnrollments">, name: string) {
-    try {
-      await exit({ id });
-      toast(`Removed from ${name}`);
-    } catch (error) {
-      toast(readError(error).message, { tone: "danger" });
-    }
-  }
+  const onPause = (item: RecordRun) =>
+    run(
+      () => pause({ id: item._id }),
+      `Paused in ${item.automation}`,
+      () => void resume({ id: item._id }),
+    );
+  const onResume = (item: RecordRun) =>
+    run(() => resume({ id: item._id }), `Resumed in ${item.automation}`);
+  const onRemove = (item: RecordRun) =>
+    run(() => exit({ id: item._id }), `Removed from ${item.automation}`);
 
   if (data === undefined) {
     return (
@@ -72,35 +81,28 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
     );
   }
 
-  const enrolButton = data.available.length > 0 && (
-    <OptionPicker
-      value={null}
-      label="Enrol in an automation"
+  const addButton = data.available.length > 0 && (
+    <AddToAutomation
+      kind={subject.kind}
+      ids={[subject.id]}
       align="end"
-      searchPlaceholder="Search automations…"
-      options={data.available.map((item) => ({
-        value: item._id,
-        label: item.name,
-      }))}
-      onChange={(id) => void onEnrol(id)}
-      className="h-control-sm mx-0 px-2.5 text-xs"
+      side="bottom"
+      className="h-control-sm"
     >
-      <span className="flex items-center gap-1.5">
-        <PlusIcon aria-hidden className="size-2.5" />
-        Enrol in automation
-      </span>
-    </OptionPicker>
+      <PlusIcon aria-hidden className="size-2.5" />
+      Add to automation
+    </AddToAutomation>
   );
 
   return (
     <div className="flex flex-col gap-3">
-      {(data.runs.length > 0 || enrolButton) && (
+      {(data.runs.length > 0 || addButton) && (
         <div className="flex items-center justify-between gap-2">
           <span className="caption-style text-fg-tertiary">
-            {data.runs.filter((run) => isLive(run.status)).length} running ·{" "}
+            {data.runs.filter((item) => isLive(item.status)).length} running ·{" "}
             {data.runs.length} total
           </span>
-          {enrolButton}
+          {addButton}
         </div>
       )}
       {data.runs.length === 0 ? (
@@ -109,7 +111,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
           <span className="caption-style text-fg-tertiary leading-snug">
             Automations enrol this {noun} when their trigger fires.
             {data.available.length
-              ? " You can also enrol it by hand."
+              ? " You can also add it by hand."
               : ` No active automation runs on ${SUBJECT_LABEL[subject.kind][1]} yet.`}
           </span>
           {data.available.length === 0 && (
@@ -120,47 +122,63 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
         </div>
       ) : (
         <ul className="bg-card shadow-card flex flex-col overflow-hidden rounded-xl">
-          {data.runs.map((run) => {
-            const live = isLive(run.status);
+          {data.runs.map((item) => {
+            const live = isLive(item.status);
             const detail = live
               ? [
-                  run.step,
-                  run.nextRunAt && `next ${relativeTime(run.nextRunAt)}`,
+                  item.step,
+                  !item.paused &&
+                    item.nextRunAt &&
+                    `next ${relativeTime(item.nextRunAt)}`,
                 ]
                   .filter(Boolean)
                   .join(" · ")
-              : run.exitReason;
+              : item.exitReason;
             return (
               <li
-                key={run._id}
-                className="border-border group/run flex items-center gap-3 px-4 py-3 not-last:border-b"
+                key={item._id}
+                className="border-border flex items-center gap-3 px-4 py-3 not-last:border-b max-sm:flex-wrap"
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <Link
-                      href={`/automations/${run.automationId}`}
+                      href={`/automations/${item.automationId}`}
                       className="hover:text-foreground focus-visible:ring-ring truncate rounded-sm text-sm font-medium outline-none hover:underline focus-visible:ring-2"
                     >
-                      {run.automation}
+                      {item.automation}
                     </Link>
-                    <RunStatus status={run.status} held={run.held} />
+                    <RunStatus
+                      status={item.status}
+                      held={item.held}
+                      paused={item.paused}
+                    />
                   </div>
                   <span className="caption-style text-fg-tertiary truncate">
                     {detail ? `${detail} · ` : ""}
-                    <time title={dateTime(run.enrolledAt)}>
-                      enrolled {relativeTime(run.enrolledAt)}
+                    <time title={dateTime(item.enrolledAt)}>
+                      enrolled {relativeTime(item.enrolledAt)}
                     </time>
                   </span>
                 </div>
                 {live && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => void onRemove(run._id, run.automation)}
-                    className="shrink-0"
-                  >
-                    Remove
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        void (item.paused ? onResume(item) : onPause(item))
+                      }
+                    >
+                      {item.paused ? "Resume" : "Pause"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => void onRemove(item)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 )}
               </li>
             );

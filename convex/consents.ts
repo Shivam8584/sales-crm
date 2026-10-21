@@ -47,7 +47,7 @@ import {
 import { memberIndex, memberRef, requirePerson } from "./lib/records";
 import { logSystem } from "./lib/timeline";
 import { vChannel } from "./lib/validators";
-import { isInteraction } from "./timeline";
+import { isInteraction } from "./lib/timeline";
 
 const DAY = 24 * 60 * 60_000;
 const MAX_REVIEW = 100;
@@ -366,7 +366,7 @@ async function lastInteraction(
           .query("timeline")
           .withIndex("by_lead", (q) => q.eq("leadId", target.leadId));
   for await (const entry of query.order("desc")) {
-    if (isInteraction(entry.kind)) return entry.occurredAt;
+    if (isInteraction(entry)) return entry.occurredAt;
   }
   return null;
 }

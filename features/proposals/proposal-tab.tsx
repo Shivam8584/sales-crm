@@ -1,5 +1,6 @@
 "use client";
 
+import { istToday } from "@/lib/domain/day";
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -63,12 +64,7 @@ import {
 
 const newKey = () => crypto.randomUUID().slice(0, 8);
 
-function localDay(offsetDays = 0) {
-  const date = new Date(Date.now() + offsetDays * 86_400_000);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
+const localDay = (offsetDays = 0) => istToday(offsetDays);
 
 const BAND_TONE = {
   below_floor: "text-danger",

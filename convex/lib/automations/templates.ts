@@ -80,8 +80,8 @@ export const TEMPLATES: AutomationTemplate[] = [
         row: 1,
         from: ["trigger", "out"],
         config: {
-          subject: "Your Hypedrive demo, {{first_name}}",
-          body: "Hi {{first_name}},\n\nThanks for asking for a demo of Hypedrive. I'm {{owner_first_name}}, and I'll walk you through how brands like {{company}} get honest reviews and UGC from real buyers on the marketplaces you sell on.\n\nI'll call you shortly to find a time that works. If it's easier, reply with a slot.\n\n{{owner_first_name}}",
+          subject: "Your Hypedrive demo with {{owner.firstName}}",
+          body: "Hi {{person.firstName|there}},\n\nThanks for asking for a demo of Hypedrive. I'm {{owner.firstName}}, and I'll walk you through how brands like {{account.name}} get honest reviews and UGC from real buyers on the marketplaces you sell on.\n\nI'll call you shortly to find a time that works. If it's easier, reply with a slot.\n\n{{owner.firstName}}",
           purpose: "sales_outreach",
         },
       },
@@ -91,7 +91,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         row: 2,
         from: ["email", "out"],
         config: {
-          title: "Call {{name}} to confirm the demo",
+          title: "Call {{record.name}} to confirm the demo",
           notes:
             "Confirm the slot, the marketplaces they sell on and their monthly orders.",
           assignee: "owner",
@@ -127,7 +127,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         config: {
           template: "demo_follow_up",
           language: "en",
-          params: ["{{first_name}}", "{{owner_first_name}}"],
+          params: ["{{person.firstName|there}}", "{{owner.firstName}}"],
           purpose: "sales_outreach",
         },
       },
@@ -177,7 +177,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         config: {
           template: "wallet_topup_nudge",
           language: "en",
-          params: ["{{first_name}}", "{{company}}"],
+          params: ["{{person.firstName|there}}", "{{account.name}}"],
           purpose: "sales_outreach",
         },
       },
@@ -212,7 +212,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         col: -2,
         from: ["still-unfunded", "yes"],
         config: {
-          title: "Call {{company}} about their first top-up",
+          title: "Call {{account.name}} about their first top-up",
           notes:
             "Send a UPI top-up link on WhatsApp, share their virtual account for bank transfers and recap what a first campaign returns.",
           assignee: "owner",
@@ -253,7 +253,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         config: {
           to: "owner",
           message:
-            "{{company}}'s campaign paused: out of funds. It won't resume on its own after a top-up.",
+            "{{account.name}}'s campaign paused: out of funds. It won't resume on its own after a top-up.",
         },
       },
       {
@@ -262,7 +262,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         row: 2,
         from: ["alert", "out"],
         config: {
-          title: "Get {{company}} to top up and resume their campaign",
+          title: "Get {{account.name}} to top up and resume their campaign",
           notes:
             "A top-up alone doesn't resume the campaign. Confirm the payment, then have them press Resume (or resume it with them on a call).",
           assignee: "owner",
@@ -278,7 +278,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         config: {
           template: "campaign_paused_funds",
           language: "en",
-          params: ["{{first_name}}", "{{company}}"],
+          params: ["{{person.firstName|there}}", "{{account.name}}"],
           purpose: "sales_outreach",
         },
       },
@@ -315,7 +315,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         config: {
           to: "owner",
           message:
-            "{{company}} is still paused two days later. Escalate or call again.",
+            "{{account.name}} is still paused two days later. Escalate or call again.",
         },
       },
     ]),
@@ -360,7 +360,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         from: ["still-proposal", "yes"],
         config: {
           subject: "Following up on your Hypedrive proposal",
-          body: "Hi {{first_name}},\n\nChecking in on the proposal for {{deal_title}}. Happy to walk through the numbers or adjust the slots and bonus to fit your budget.\n\nWould a 15-minute call this week help?\n\n{{owner_first_name}}",
+          body: "Hi {{person.firstName|there}},\n\nChecking in on the proposal for {{deal.title}}. Happy to walk through the numbers or adjust the slots and bonus to fit your budget.\n\nWould a 15-minute call this week help?\n\n{{owner.firstName}}",
           purpose: "sales_outreach",
         },
       },
@@ -379,7 +379,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         col: -1,
         from: ["email", "out"],
         config: {
-          title: "Follow up on the proposal for {{deal_title}}",
+          title: "Follow up on the proposal for {{deal.title}}",
           assignee: "owner",
           dueInDays: 2,
           priority: "normal",
@@ -416,7 +416,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         config: {
           to: "owner",
           message:
-            "{{company}} just ended a campaign. Plan the renewal while results are fresh.",
+            "{{account.name}} just ended a campaign. Plan the renewal while results are fresh.",
         },
       },
       {
@@ -425,8 +425,8 @@ export const TEMPLATES: AutomationTemplate[] = [
         row: 3,
         from: ["alert", "out"],
         config: {
-          subject: "What's next after your campaign, {{first_name}}?",
-          body: "Hi {{first_name}},\n\nYour campaign on Hypedrive has wrapped up. I'd love to share what worked for {{company}} and plan the next one: new SKUs, another marketplace or a bigger slot count.\n\nWhen's a good time to talk?\n\n{{owner_first_name}}",
+          subject: "What's next for {{account.name}} after this campaign?",
+          body: "Hi {{person.firstName|there}},\n\nYour campaign on Hypedrive has wrapped up. I'd love to share what worked for {{account.name}} and plan the next one: new SKUs, another marketplace or a bigger slot count.\n\nWhen's a good time to talk?\n\n{{owner.firstName}}",
           purpose: "sales_outreach",
         },
       },
@@ -443,7 +443,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         row: 5,
         from: ["wait", "out"],
         config: {
-          title: "Renewal call with {{company}}",
+          title: "Renewal call with {{account.name}}",
           notes: "Review the last campaign's results and propose the next one.",
           assignee: "owner",
           dueInDays: 0,

@@ -10,6 +10,7 @@ import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
 import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
 import SettingsIcon from "@/public/assets/icons/settings.svg";
 import AutomationIcon from "@/public/assets/icons/automation.svg";
+import EyeIcon from "@/public/assets/icons/eye.svg";
 
 export type NavItem = {
   href: string;
@@ -33,6 +34,12 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Pipeline",
     items: [
+      {
+        href: "/prospecting",
+        label: "Prospecting",
+        icon: EyeIcon,
+        shortcut: "O",
+      },
       { href: "/leads", label: "Leads", icon: TargetIcon, shortcut: "L" },
       { href: "/deals", label: "Deals", icon: ClipboardIcon, shortcut: "D" },
       {

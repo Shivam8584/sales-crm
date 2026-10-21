@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import {
   httpAction,
   internalMutation,
@@ -32,9 +33,18 @@ import {
   normalizeEmail,
   normalizePhone,
 } from "../lib/domain/normalize";
+import { slaClockStart, slaDueAt } from "../lib/domain/day";
+import {
+  isLeadReopen,
+  leadConvertProblem,
+  leadStatusProblem,
+} from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
 import { fail, invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
+import { findAccount, findPerson } from "./lib/identity";
+import { reassignedBy } from "./lib/ownership";
+import { canAssignLead, assertCanAssignLead } from "./lib/permissions";
 import {
   allowedOrigins,
   clientIp,
@@ -90,6 +100,30 @@ async function requireLead(ctx: MutationCtx, id: Id<"leads">) {
   return lead;
 }
 
+function toRow(
+  lead: Doc<"leads">,
+  members: Awaited<ReturnType<typeof memberIndex>>,
+) {
+  return {
+    _id: lead._id,
+    _creationTime: lead._creationTime,
+    kind: lead.kind,
+    name: lead.name,
+    email: lead.email ?? null,
+    phone: lead.phone ?? null,
+    companyName: lead.companyName,
+    source: lead.source,
+    channel: leadChannel(lead),
+    utm: lead.utm,
+    status: lead.status,
+    owner: memberRef(members, lead.ownerId),
+    firstTouchedAt: lead.firstTouchedAt ?? null,
+    slaBreachedAt: lead.slaBreachedAt ?? null,
+    demoAt: lead.demoAt ?? null,
+  };
+}
+
+/** The newest 2,000 leads; `page` walks them all. */
 export const list = memberQuery({
   args: {},
   handler: async (ctx) => {
@@ -99,23 +133,41 @@ export const list = memberQuery({
     ]);
     return {
       slaMs: (await leadSlaSeconds(ctx)) * 1000,
-      leads: leads.map((lead) => ({
-        _id: lead._id,
-        _creationTime: lead._creationTime,
-        kind: lead.kind,
-        name: lead.name,
-        email: lead.email ?? null,
-        phone: lead.phone ?? null,
-        companyName: lead.companyName,
-        source: lead.source,
-        channel: leadChannel(lead),
-        utm: lead.utm,
-        status: lead.status,
-        owner: memberRef(members, lead.ownerId),
-        firstTouchedAt: lead.firstTouchedAt ?? null,
-        slaBreachedAt: lead.slaBreachedAt ?? null,
-        demoAt: lead.demoAt ?? null,
-      })),
+      leads: leads.map((lead) => toRow(lead, members)),
+    };
+  },
+});
+
+/** Cursor-paginated leads, newest first, optionally by status and owner. */
+export const page = memberQuery({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    status: v.optional(vLeadStatus),
+    ownerId: v.optional(v.id("members")),
+  },
+  handler: async (ctx, { paginationOpts, status, ownerId }) => {
+    const base =
+      ownerId && status
+        ? ctx.db
+            .query("leads")
+            .withIndex("by_owner_status", (q) =>
+              q.eq("ownerId", ownerId).eq("status", status),
+            )
+        : status
+          ? ctx.db
+              .query("leads")
+              .withIndex("by_status", (q) => q.eq("status", status))
+          : ctx.db.query("leads");
+    const result = await base
+      .filter((q) =>
+        ownerId && !status ? q.eq(q.field("ownerId"), ownerId) : true,
+      )
+      .order("desc")
+      .paginate(paginationOpts);
+    const members = await memberIndex(ctx);
+    return {
+      ...result,
+      page: result.page.map((lead) => toRow(lead, members)),
     };
   },
 });
@@ -303,7 +355,7 @@ export const create = memberMutation({
     if (duplicate) {
       fail(
         "conflict",
-        `${duplicate.name} already has an open lead from today`,
+        `${duplicate.name} already has an open lead from the last 24 hours`,
         fields.email ? "email" : "phone",
       );
     }
@@ -371,13 +423,15 @@ function statusText(status: LeadStatus, reason?: DisqualifyReason) {
     : LEAD_STATUS_LABEL[status];
 }
 
-function checkStatus(status: LeadStatus, reason: DisqualifyReason | undefined) {
-  if (status === "converted") {
-    fail("invalid", "Use Convert to turn a lead into an account", "status");
-  }
-  if (status === "disqualified" && !reason) {
-    invalid("reason", "Pick a reason to disqualify this lead");
-  }
+function checkStatus(
+  from: LeadStatus,
+  status: LeadStatus,
+  reason: DisqualifyReason | undefined,
+) {
+  const problem = leadStatusProblem(from, status, reason);
+  if (!problem) return;
+  if (from === "converted") fail("conflict", problem.message);
+  invalid(problem.field, problem.message);
 }
 
 /** Moves an open lead to `status`, logging the change; returns what it was. */
@@ -410,6 +464,15 @@ async function applyStatus(
       to: statusText(status, nextReason),
     },
   ]);
+  if (isLeadReopen(lead.status, status)) {
+    await logSystem(
+      ctx,
+      { leadId: lead._id },
+      "reopened the lead",
+      undefined,
+      ctx.viewer._id,
+    );
+  }
   await emitAutomationTrigger(ctx, {
     kind: "lead_status_changed",
     refs: {
@@ -431,10 +494,7 @@ export const setStatus = memberMutation({
   },
   handler: async (ctx, { id, status, reason }) => {
     const lead = await requireLead(ctx, id);
-    if (lead.status === "converted") {
-      fail("conflict", "This lead is already converted");
-    }
-    checkStatus(status, reason);
+    checkStatus(lead.status, status, reason);
     const { status: from, reason: fromReason } = await applyStatus(
       ctx,
       lead,
@@ -461,7 +521,7 @@ export const setStatusMany = memberMutation({
     reason: v.optional(vDisqualifyReason),
   },
   handler: async (ctx, { ids, status, reason }) => {
-    checkStatus(status, reason);
+    checkStatus("new", status, reason);
     const previous = [];
     let skipped = 0;
     for (const id of uniqueIds(ids)) {
@@ -524,6 +584,12 @@ export const assign = memberMutation({
   handler: async (ctx, { id, ownerId }) => {
     const lead = await requireLead(ctx, id);
     if (ownerId) await requireActiveMember(ctx, ownerId, "ownerId");
+    if (
+      ownerId !== (lead.ownerId ?? null) &&
+      !(await reassignedBy(ctx, { leadId: id }, ctx.viewer._id))
+    ) {
+      assertCanAssignLead(ctx.viewer, lead.ownerId, ownerId);
+    }
     const previous = await applyOwner(ctx, lead, ownerId);
     if (ownerId && ownerId !== previous && ownerId !== ctx.viewer._id) {
       await notify(ctx, ownerId, {
@@ -550,6 +616,7 @@ export const assignMany = memberMutation({
     for (const id of uniqueIds(ids)) {
       const lead = await ctx.db.get(id);
       if (!lead) continue;
+      assertCanAssignLead(ctx.viewer, lead.ownerId, ownerId);
       const before = await applyOwner(ctx, lead, ownerId);
       previous.push({ id, ownerId: before });
       if (before !== ownerId) moved.push(lead);
@@ -593,6 +660,12 @@ export const restoreOwners = memberMutation({
       if (item.ownerId) {
         const owner = await ctx.db.get(item.ownerId);
         if (owner?.status !== "active") continue;
+      }
+      if (
+        !canAssignLead(ctx.viewer, lead.ownerId, item.ownerId) &&
+        !(await reassignedBy(ctx, { leadId: lead._id }, ctx.viewer._id))
+      ) {
+        continue;
       }
       await applyOwner(ctx, lead, item.ownerId);
     }
@@ -653,46 +726,20 @@ export const update = memberMutation({
   },
 });
 
+/** The account a lead belongs to: the one it is linked to, else by GSTIN PAN or website. */
 async function matchAccount(ctx: QueryCtx, lead: Doc<"leads">) {
-  const pan = lead.gstin ? panRoot(lead.gstin) : null;
-  if (pan) {
-    const byPan = await ctx.db
-      .query("accounts")
-      .withIndex("by_pan_root", (q) => q.eq("panRoot", pan))
-      .collect();
-    const match = byPan.find((account) => !account.archivedAt);
-    if (match) return match;
-  }
-  const domain = companyDomain(lead.website);
-  if (domain) {
-    const byDomain = await ctx.db
-      .query("accounts")
-      .withIndex("by_domain", (q) => q.eq("domain", domain))
-      .collect();
-    const match = byDomain.find((account) => !account.archivedAt);
-    if (match) return match;
-  }
-  return null;
+  const linked = lead.accountId ? await ctx.db.get(lead.accountId) : null;
+  if (linked && !linked.archivedAt) return linked;
+  return await findAccount(ctx, {
+    gstin: lead.gstin,
+    domain: lead.website ?? lead.email?.split("@")[1],
+  });
 }
 
 async function matchPerson(ctx: QueryCtx, lead: Doc<"leads">) {
-  if (lead.email) {
-    const byEmail = await ctx.db
-      .query("people")
-      .withIndex("by_email", (q) => q.eq("email", lead.email))
-      .collect();
-    const match = byEmail.find((person) => !person.archivedAt);
-    if (match) return match;
-  }
-  if (lead.phone) {
-    const byPhone = await ctx.db
-      .query("people")
-      .withIndex("by_phone", (q) => q.eq("phone", lead.phone))
-      .collect();
-    const match = byPhone.find((person) => !person.archivedAt);
-    if (match) return match;
-  }
-  return null;
+  const linked = lead.personId ? await ctx.db.get(lead.personId) : null;
+  if (linked && !linked.archivedAt && !linked.erasedAt) return linked;
+  return await findPerson(ctx, { email: lead.email, phone: lead.phone });
 }
 
 /**
@@ -703,9 +750,9 @@ export const convert = memberMutation({
   args: { id: v.id("leads") },
   handler: async (ctx, { id }) => {
     const lead = await requireLead(ctx, id);
-    if (lead.status === "converted") {
-      fail("conflict", "This lead is already converted");
-    }
+    const problem = leadConvertProblem(lead.status);
+    if (problem) fail("conflict", problem.message);
+    if (lead.erasedAt) fail("forbidden", "This lead's data was erased");
     const now = Date.now();
     const ownerId = lead.ownerId ?? ctx.viewer._id;
     const actor = ctx.viewer._id;
@@ -723,7 +770,10 @@ export const convert = memberMutation({
       }
       await ctx.db.patch(account._id, patch);
     } else {
-      const domain = companyDomain(lead.website) ?? undefined;
+      const domain =
+        companyDomain(lead.website) ??
+        companyDomain(lead.email?.split("@")[1]) ??
+        undefined;
       const accountId = await ctx.db.insert("accounts", {
         name: lead.companyName,
         domain,
@@ -754,8 +804,20 @@ export const convert = memberMutation({
     if (person) {
       const patch: Partial<Doc<"people">> = { updatedAt: now };
       if (!person.accountId) patch.accountId = account._id;
-      if (!person.email && lead.email) patch.email = lead.email;
-      if (!person.phone && lead.phone) patch.phone = lead.phone;
+      if (
+        !person.email &&
+        lead.email &&
+        !(await findPerson(ctx, { email: lead.email }, person._id))
+      ) {
+        patch.email = lead.email;
+      }
+      if (
+        !person.phone &&
+        lead.phone &&
+        !(await findPerson(ctx, { phone: lead.phone }, person._id))
+      ) {
+        patch.phone = lead.phone;
+      }
       const next = { ...person, ...patch };
       const accountName =
         next.accountId === account._id
@@ -880,11 +942,18 @@ export const checkSla = internalMutation({
       return;
     }
     const now = Date.now();
+    const slaMs = (await leadSlaSeconds(ctx)) * 1000;
+    const due = slaDueAt(lead._creationTime, slaMs);
+    // The SLA may have been lengthened since this check was scheduled.
+    if (due > now + 1000) {
+      await ctx.scheduler.runAt(due, internal.leads.checkSla, { id });
+      return;
+    }
     await ctx.db.patch(id, { slaBreachedAt: now });
     const owner = lead.ownerId ? await ctx.db.get(lead.ownerId) : null;
     await notifyMany(ctx, [lead.ownerId, ...(await leadershipIds(ctx))], {
       kind: "lead_sla",
-      title: `No reply to ${lead.name} in ${spokenDuration(now - lead._creationTime)}`,
+      title: `No reply to ${lead.name} in ${spokenDuration(now - slaClockStart(lead._creationTime))}`,
       body: `${lead.companyName} · ${owner ? `Owner: ${owner.name}` : "Unassigned"}`,
       href: leadHref(id),
     });

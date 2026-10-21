@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
+import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
+import { ENTRY_ANCHOR } from "@/lib/domain/notifications";
 import {
   FILTERS,
   KIND_META,
@@ -24,6 +26,8 @@ import {
   type TimelineTarget,
 } from "./kinds";
 import TimelineComposer from "./timeline-composer";
+import EntryBody from "./entry-body";
+import MentionTextarea, { useMentionDraft } from "./mention-textarea";
 
 type Entry = FunctionReturnType<typeof api.timeline.forRecord>[number];
 
@@ -100,6 +104,7 @@ export default function Timeline({
   );
   const groups = useMemo(() => groupByDay(visible ?? []), [visible]);
   const onAccount = "accountId" in target;
+  const highlight = useEntryAnchor(entries, () => setFilter("all"));
 
   return (
     <div className="flex flex-col gap-5">
@@ -178,6 +183,7 @@ export default function Timeline({
                     last={index === group.entries.length - 1}
                     showContext={onAccount}
                     readOnly={readOnly}
+                    highlighted={highlight === entry._id}
                   />
                 ))}
               </ol>
@@ -187,6 +193,52 @@ export default function Timeline({
       )}
     </div>
   );
+}
+
+const HIGHLIGHT_MS = 2400;
+
+/**
+ * Scrolls to and briefly highlights the entry named by `#entry-<id>`, the
+ * link a mention or follow notification carries; once per hash.
+ */
+function useEntryAnchor(entries: Entry[] | undefined, showAll: () => void) {
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const handled = useRef<string | null>(null);
+  const showAllRef = useRef(showAll);
+  useEffect(() => {
+    showAllRef.current = showAll;
+  });
+
+  useEffect(() => {
+    if (!entries) return;
+    function check() {
+      const hash = window.location.hash.slice(1);
+      if (!hash.startsWith(ENTRY_ANCHOR) || handled.current === hash) return;
+      const id = hash.slice(ENTRY_ANCHOR.length);
+      if (!entries?.some((entry) => entry._id === id)) return;
+      handled.current = hash;
+      showAllRef.current();
+      setHighlight(id);
+      requestAnimationFrame(() => {
+        const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        document.getElementById(hash)?.scrollIntoView({
+          block: "center",
+          behavior: reduce ? "auto" : "smooth",
+        });
+      });
+    }
+    check();
+    window.addEventListener("hashchange", check);
+    return () => window.removeEventListener("hashchange", check);
+  }, [entries]);
+
+  useEffect(() => {
+    if (!highlight) return;
+    const timer = setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlight]);
+
+  return highlight;
 }
 
 function Rail({ last, compact }: { last: boolean; compact: boolean }) {
@@ -221,14 +273,18 @@ function TimelineItem({
   last,
   showContext,
   readOnly,
+  highlighted,
 }: {
   entry: Entry;
   last: boolean;
   showContext: boolean;
   readOnly: boolean;
+  highlighted: boolean;
 }) {
   if (entry.kind === "change" || entry.kind === "system") {
-    return <AutomaticItem entry={entry} last={last} />;
+    return (
+      <AutomaticItem entry={entry} last={last} highlighted={highlighted} />
+    );
   }
   return (
     <LoggedItem
@@ -236,17 +292,38 @@ function TimelineItem({
       last={last}
       showContext={showContext}
       readOnly={readOnly}
+      highlighted={highlighted}
     />
   );
 }
 
-function AutomaticItem({ entry, last }: { entry: Entry; last: boolean }) {
+/** The outline a linked entry flashes with; it fades out when the highlight ends. */
+const ANCHOR =
+  "scroll-mt-24 before:pointer-events-none before:absolute before:-inset-x-2.5 before:-top-1.5 before:bottom-1.5 before:rounded-xl before:ring-2 before:ring-transparent before:transition-[box-shadow,background-color] before:duration-slow before:content-['']";
+const ANCHOR_ON = "before:ring-selected/45 before:bg-selected/5";
+
+function AutomaticItem({
+  entry,
+  last,
+  highlighted,
+}: {
+  entry: Entry;
+  last: boolean;
+  highlighted: boolean;
+}) {
   const meta = KIND_META[entry.kind];
   const actorName = entry.actor?.name ?? "Hypedrive";
   const changes = entry.changes ?? [];
 
   return (
-    <li className="animate-item-in relative flex gap-3 pb-3.5">
+    <li
+      id={`${ENTRY_ANCHOR}${entry._id}`}
+      className={cn(
+        "animate-item-in relative flex gap-3 pb-3.5",
+        ANCHOR,
+        highlighted && ANCHOR_ON,
+      )}
+    >
       <Rail last={last} compact />
       <span className="flex w-7 shrink-0 justify-center">
         <span className="bg-overlay-2 text-fg-tertiary flex size-5.5 items-center justify-center rounded-md">
@@ -354,21 +431,26 @@ function LoggedItem({
   last,
   showContext,
   readOnly,
+  highlighted,
 }: {
   entry: Entry;
   last: boolean;
   showContext: boolean;
   readOnly: boolean;
+  highlighted: boolean;
 }) {
   const viewer = useViewer();
   const remove = useMutation(api.timeline.remove);
   const restore = useMutation(api.timeline.restore);
   const edit = useMutation(api.timeline.edit);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(entry.body ?? "");
+  const draft = useMentionDraft();
   const meta = KIND_META[entry.kind];
   const canManage =
     !readOnly && (entry.actorId === viewer._id || viewer.role === "admin");
+  const canAck = !readOnly && entry.actorId !== viewer._id;
+  const acked = entry.acked.some((member) => member._id === viewer._id);
+  const acknowledge = useAcknowledge();
   const actorName = entry.actor?.name ?? "Hypedrive";
   const details = [
     entry.outcome && CALL_OUTCOME_LABEL[entry.outcome],
@@ -390,7 +472,7 @@ function LoggedItem({
 
   async function onSave() {
     try {
-      await edit({ id: entry._id, body: draft });
+      await edit({ id: entry._id, body: draft.encoded() });
       setEditing(false);
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
@@ -398,7 +480,14 @@ function LoggedItem({
   }
 
   return (
-    <li className="group/item animate-item-in relative flex gap-3 pb-5">
+    <li
+      id={`${ENTRY_ANCHOR}${entry._id}`}
+      className={cn(
+        "group/item animate-item-in relative flex gap-3 pb-5",
+        ANCHOR,
+        highlighted && ANCHOR_ON,
+      )}
+    >
       <Rail last={last} compact={false} />
       <span className="bg-card shadow-card text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg">
         <meta.icon aria-hidden className="size-3.5" />
@@ -438,27 +527,55 @@ function LoggedItem({
               <span className="text-fg-tertiary"> · {details.join(" · ")}</span>
             )}
           </p>
-          {canManage && !editing && (
+          {(canManage || canAck) && !editing && (
             <span className="flex gap-0.5 self-center opacity-0 group-focus-within/item:opacity-100 group-hover/item:opacity-100 pointer-coarse:opacity-100">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Edit entry"
-                onClick={() => {
-                  setDraft(entry.body ?? "");
-                  setEditing(true);
-                }}
-              >
-                <EditIcon aria-hidden className="size-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Delete entry"
-                onClick={() => void onDelete()}
-              >
-                <TrashIcon aria-hidden className="size-3" />
-              </Button>
+              {canAck && (
+                <Tooltip
+                  content={acked ? "Remove acknowledgement" : "Acknowledge"}
+                >
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={
+                      acked ? "Remove acknowledgement" : "Acknowledge"
+                    }
+                    aria-pressed={acked}
+                    onClick={() => acknowledge(entry._id)}
+                    className={cn(acked && "text-info-foreground")}
+                  >
+                    <CheckCircleIcon aria-hidden className="size-3" />
+                  </Button>
+                </Tooltip>
+              )}
+              {canManage && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Edit entry"
+                    onClick={() => {
+                      draft.reset(
+                        entry.body ?? "",
+                        entry.mentioned.map((member) => ({
+                          id: member._id,
+                          name: member.name,
+                        })),
+                      );
+                      setEditing(true);
+                    }}
+                  >
+                    <EditIcon aria-hidden className="size-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Delete entry"
+                    onClick={() => void onDelete()}
+                  >
+                    <TrashIcon aria-hidden className="size-3" />
+                  </Button>
+                </>
+              )}
             </span>
           )}
           <Time at={entry.occurredAt} edited={Boolean(entry.editedAt)} />
@@ -466,10 +583,9 @@ function LoggedItem({
 
         {editing ? (
           <div className="flex flex-col gap-2">
-            <textarea
+            <MentionTextarea
               autoFocus
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              draft={draft}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.stopPropagation();
@@ -499,11 +615,87 @@ function LoggedItem({
         ) : (
           entry.body && (
             <p className="bg-card shadow-card text-fg-secondary rounded-lg px-4 py-3 text-sm leading-relaxed break-words whitespace-pre-wrap">
-              {entry.body}
+              <EntryBody body={entry.body} mentioned={entry.mentioned} />
             </p>
           )
         )}
+        {!editing && (
+          <Acknowledgements
+            entry={entry}
+            canAck={canAck}
+            onToggle={() => acknowledge(entry._id)}
+          />
+        )}
       </div>
     </li>
+  );
+}
+
+function useAcknowledge() {
+  const viewer = useViewer();
+  const acknowledge = useMutation(
+    api.mentions.acknowledge,
+  ).withOptimisticUpdate((store, { id }) => {
+    for (const { args, value } of store.getAllQueries(api.timeline.forRecord)) {
+      if (!value) continue;
+      store.setQuery(
+        api.timeline.forRecord,
+        args,
+        value.map((item) =>
+          item._id !== id
+            ? item
+            : {
+                ...item,
+                acked: item.acked.some((member) => member._id === viewer._id)
+                  ? item.acked.filter((member) => member._id !== viewer._id)
+                  : [...item.acked, { _id: viewer._id, name: viewer.name }],
+              },
+        ),
+      );
+    }
+  });
+  return (id: Entry["_id"]) =>
+    void acknowledge({ id }).catch((error) =>
+      toast(readError(error).message, { tone: "danger" }),
+    );
+}
+
+/** Who acknowledged an entry; a toggle for anyone but its author. */
+function Acknowledgements({
+  entry,
+  canAck,
+  onToggle,
+}: {
+  entry: Entry;
+  canAck: boolean;
+  onToggle: () => void;
+}) {
+  const viewer = useViewer();
+  if (entry.acked.length === 0) return null;
+  const mine = entry.acked.some((member) => member._id === viewer._id);
+  const names = entry.acked.map((member) =>
+    member._id === viewer._id ? "You" : member.name,
+  );
+  const label = `Acknowledged by ${names.join(", ")}`;
+  return (
+    <Tooltip content={canAck && mine ? `${label}. Click to undo.` : label}>
+      <button
+        type="button"
+        aria-disabled={!canAck}
+        aria-pressed={canAck ? mine : undefined}
+        aria-label={label}
+        onClick={() => canAck && onToggle()}
+        className={cn(
+          "caption-style text-fg-secondary bg-overlay-1 focus-visible:ring-ring duration-fast flex h-6 items-center gap-1 self-start rounded-full px-2 tabular-nums transition-colors outline-none focus-visible:ring-2",
+          canAck
+            ? "hover:bg-overlay-2 hover:text-foreground"
+            : "cursor-default",
+          mine && "bg-info-surface text-info-foreground hover:bg-info-surface",
+        )}
+      >
+        <CheckCircleIcon aria-hidden className="size-3" />
+        {entry.acked.length}
+      </button>
+    </Tooltip>
   );
 }

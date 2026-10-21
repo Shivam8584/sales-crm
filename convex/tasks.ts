@@ -1,13 +1,16 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { TASK_STATUSES, type TaskStatus } from "../lib/domain/enums";
 import { personName } from "../lib/domain/labels";
 import { cleanText } from "../lib/domain/normalize";
+import { taskCompletedAt } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
 import { invalid, notFound } from "./lib/errors";
-import { memberMutation, memberQuery } from "./lib/functions";
+import { memberMutation, memberQuery, type Viewer } from "./lib/functions";
+import { assertCan, can } from "./lib/permissions";
 import {
   memberIndex,
   memberRef,
@@ -27,6 +30,30 @@ import { logSystem } from "./lib/timeline";
 import { literals, vPriority, vTaskStatus } from "./lib/validators";
 
 const MAX_TITLE = 200;
+const UNDO_WINDOW_MS = 10 * 60_000;
+
+/** Assignees and managers reassign a task; whoever just handed it on may undo that. */
+function checkReassign(viewer: Viewer, task: Doc<"tasks">, now: number) {
+  const undoing =
+    task.reassignedById === viewer._id &&
+    now - (task.reassignedAt ?? 0) < UNDO_WINDOW_MS;
+  if (!undoing && !can(viewer, "task.reassign", [task.assigneeId])) {
+    assertCan(viewer, "task.reassign", [task.assigneeId]);
+  }
+}
+
+/** The fields that follow a status change: board position and completion time. */
+async function statusEffects(
+  ctx: QueryCtx,
+  task: Doc<"tasks">,
+  status: TaskStatus,
+  now: number,
+) {
+  return {
+    position: await endPosition(ctx, status),
+    completedAt: taskCompletedAt(task.status, status, task.completedAt, now),
+  };
+}
 const MAX_NOTES = 5_000;
 const RECENT_DONE_MS = 14 * 24 * 60 * 60_000;
 
@@ -276,6 +303,36 @@ export const list = memberQuery({
   },
 });
 
+/** Cursor-paginated tasks in one status, by board position; done tasks newest first. */
+export const page = memberQuery({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    status: vTaskStatus,
+    assigneeId: v.optional(v.id("members")),
+  },
+  handler: async (ctx, { paginationOpts, status, assigneeId }) => {
+    const result = assigneeId
+      ? await ctx.db
+          .query("tasks")
+          .withIndex("by_assignee_status_completed", (q) =>
+            q.eq("assigneeId", assigneeId).eq("status", status),
+          )
+          .order(status === "done" ? "desc" : "asc")
+          .paginate(paginationOpts)
+      : status === "done"
+        ? await ctx.db
+            .query("tasks")
+            .withIndex("by_status_completed", (q) => q.eq("status", "done"))
+            .order("desc")
+            .paginate(paginationOpts)
+        : await ctx.db
+            .query("tasks")
+            .withIndex("by_status_position", (q) => q.eq("status", status))
+            .paginate(paginationOpts);
+    return { ...result, page: await toClientList(ctx, result.page) };
+  },
+});
+
 export const get = memberQuery({
   args: { id: v.id("tasks") },
   handler: async (ctx, { id }) => {
@@ -329,7 +386,7 @@ export const create = memberMutation({
       dealId: args.dealId,
       leadId: args.leadId,
       position: await endPosition(ctx, status),
-      completedAt: status === "done" ? now : undefined,
+      completedAt: taskCompletedAt(null, status, undefined, now),
       updatedAt: now,
     });
     await logStatus(ctx, (await ctx.db.get(id))!, null);
@@ -344,11 +401,20 @@ export const update = memberMutation({
     const task = await ctx.db.get(id);
     if (!task) notFound("Task");
     const before = snapshot(task);
-    const fields = await clean(ctx, patch, task);
     const now = Date.now();
+    if (
+      patch.assigneeId !== undefined &&
+      patch.assigneeId !== task.assigneeId
+    ) {
+      checkReassign(ctx.viewer, task, now);
+    }
+    const fields = await clean(ctx, patch, task);
     if (fields.status && fields.status !== task.status) {
-      fields.position = await endPosition(ctx, fields.status);
-      fields.completedAt = fields.status === "done" ? now : undefined;
+      Object.assign(fields, await statusEffects(ctx, task, fields.status, now));
+    }
+    if (fields.assigneeId && fields.assigneeId !== task.assigneeId) {
+      fields.reassignedById = ctx.viewer._id;
+      fields.reassignedAt = now;
     }
     await ctx.db.patch(id, { ...fields, updatedAt: now });
     await logStatus(ctx, { ...task, ...fields }, task.status);
@@ -381,11 +447,23 @@ export const updateMany = memberMutation({
       const task = await ctx.db.get(id);
       if (!task) continue;
       const before = snapshot(task);
-      const fields = await clean(ctx, patch, task);
       const now = Date.now();
+      if (
+        patch.assigneeId !== undefined &&
+        patch.assigneeId !== task.assigneeId
+      ) {
+        checkReassign(ctx.viewer, task, now);
+      }
+      const fields = await clean(ctx, patch, task);
       if (fields.status && fields.status !== task.status) {
-        fields.position = await endPosition(ctx, fields.status);
-        fields.completedAt = fields.status === "done" ? now : undefined;
+        Object.assign(
+          fields,
+          await statusEffects(ctx, task, fields.status, now),
+        );
+      }
+      if (fields.assigneeId && fields.assigneeId !== task.assigneeId) {
+        fields.reassignedById = ctx.viewer._id;
+        fields.reassignedAt = now;
       }
       await ctx.db.patch(id, { ...fields, updatedAt: now });
       await logStatus(ctx, { ...task, ...fields }, task.status);
@@ -417,12 +495,12 @@ export const move = memberMutation({
     const previous = { status: task.status, position: task.position };
     const position = await positionBefore(ctx, status, id, beforeId);
     const now = Date.now();
-    const completedAt =
-      status === task.status
-        ? task.completedAt
-        : status === "done"
-          ? now
-          : undefined;
+    const completedAt = taskCompletedAt(
+      task.status,
+      status,
+      task.completedAt,
+      now,
+    );
     await ctx.db.patch(id, { status, position, completedAt, updatedAt: now });
     await logStatus(ctx, { ...task, status }, task.status);
     return previous;
@@ -440,12 +518,7 @@ export const place = memberMutation({
     await ctx.db.patch(id, {
       status,
       position,
-      completedAt:
-        status === task.status
-          ? task.completedAt
-          : status === "done"
-            ? now
-            : undefined,
+      completedAt: taskCompletedAt(task.status, status, task.completedAt, now),
       updatedAt: now,
     });
     await logStatus(ctx, { ...task, status }, task.status);
@@ -460,6 +533,7 @@ export const remove = memberMutation({
   handler: async (ctx, { id }) => {
     const task = await ctx.db.get(id);
     if (!task) notFound("Task");
+    assertCan(ctx.viewer, "task.delete", [task.assigneeId]);
     await ctx.db.delete(id);
     const refs = taskRefs(task);
     if (hasRefs(refs)) {
@@ -484,8 +558,16 @@ export const restore = memberMutation({
     const exists = async (id: Id<"accounts" | "people" | "deals" | "leads">) =>
       (await ctx.db.get(id)) !== null;
     const assignee = await ctx.db.get(task.assigneeId);
+    if (!Number.isFinite(task.position))
+      invalid("position", "Invalid position");
     const id = await ctx.db.insert("tasks", {
       ...task,
+      completedAt: taskCompletedAt(
+        task.status,
+        task.status,
+        task.completedAt,
+        Date.now(),
+      ),
       assigneeId:
         assignee?.status === "active" ? task.assigneeId : ctx.viewer._id,
       accountId:

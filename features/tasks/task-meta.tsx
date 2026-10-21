@@ -1,6 +1,7 @@
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
 import type { BadgeTone } from "@/components/_common/status-badge";
+import { dayAsDate, istToday } from "@/lib/domain/day";
 import type { Priority, TaskStatus } from "@/lib/domain/enums";
 import { cn } from "@/lib/utils";
 import BarChartIcon from "@/public/assets/icons/kanban/bar-chart-12.svg";
@@ -54,30 +55,29 @@ export function PriorityIcon({
   );
 }
 
-/** Local calendar day `days` from today, as `YYYY-MM-DD`. */
+/** The India calendar day `days` from today, as `YYYY-MM-DD`. */
 export function dayFromToday(days = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+  return istToday(days);
 }
 
-const WEEKDAY = new Intl.DateTimeFormat("en-IN", { weekday: "short" });
+// Days are parsed as UTC midnights, so they format in UTC to keep the date.
+const WEEKDAY = new Intl.DateTimeFormat("en-IN", {
+  weekday: "short",
+  timeZone: "UTC",
+});
 const DAY_MONTH = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
+  timeZone: "UTC",
 });
 const DAY_MONTH_YEAR = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
   year: "numeric",
+  timeZone: "UTC",
 });
 
-function parseDay(day: string) {
-  const [year, month, date] = day.split("-").map(Number);
-  return new Date(year, month - 1, date);
-}
+const parseDay = dayAsDate;
 
 /** "Today", "Tomorrow", "Fri" within the week, otherwise "24 Oct". */
 export function formatDay(day: string) {
@@ -88,7 +88,7 @@ export function formatDay(day: string) {
   if (day > dayFromToday(1) && day <= dayFromToday(6)) {
     return WEEKDAY.format(date);
   }
-  return date.getFullYear() === new Date().getFullYear()
+  return day.slice(0, 4) === dayFromToday(0).slice(0, 4)
     ? DAY_MONTH.format(date)
     : DAY_MONTH_YEAR.format(date);
 }

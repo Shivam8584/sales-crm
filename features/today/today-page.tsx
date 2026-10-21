@@ -1,5 +1,6 @@
 "use client";
 
+import { startOfIstDay } from "@/lib/domain/day";
 import {
   useEffect,
   useMemo,
@@ -98,19 +99,15 @@ function greeting(hour: number) {
   return "Good evening";
 }
 
-/** Tasks completed per local day, oldest first, ending today. */
+/** Tasks completed per India day, oldest first, ending today. */
 function completedPerDay(tasks: TaskRow[] | undefined, now: Date) {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const first = start.getTime() - (TREND_DAYS - 1) * DAY_MS;
+  const first = startOfIstDay(now.getTime()) - (TREND_DAYS - 1) * DAY_MS;
   const buckets = Array.from({ length: TREND_DAYS }, () => 0);
   for (const task of tasks ?? []) {
     if (task.status !== "done") continue;
     const at = task.completedAt ?? task.updatedAt;
     if (at < first) continue;
-    const day = new Date(at);
-    day.setHours(0, 0, 0, 0);
-    const index = Math.round((day.getTime() - first) / DAY_MS);
+    const index = Math.floor((at - first) / DAY_MS);
     if (index >= 0 && index < TREND_DAYS) buckets[index]++;
   }
   return buckets;
@@ -130,7 +127,7 @@ export default function TodayPage() {
   });
   const waiting = useQuery(api.leads.waiting, {});
   const desk = useQuery(api.activation.desk, {});
-  const deals = useQuery(api.deals.list, {});
+  const deals = useQuery(api.deals.list, { open: true });
   const accounts = useQuery(api.accounts.list, {});
   const accountStats = useQuery(api.accounts.listStats, {});
 

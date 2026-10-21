@@ -108,20 +108,26 @@ export function SpeedToLead({
   let body: ReactNode;
   switch (state.kind) {
     case "pending":
-      body = (
-        <>
+      body =
+        state.remainingMs > lead.slaMs ? (
           <BigNumber
-            value={countdown(state.remainingMs)}
-            caption={`Left to reach out · ${sla} SLA. Calling, emailing or messaging from here stops the clock.`}
+            value="09:00"
+            caption={`Arrived out of hours. The ${sla} SLA clock starts at 09:00 IST; reaching out sooner still counts.`}
           />
-          <MeterRow
-            label="SLA used"
-            percent={meter!.percent}
-            tone={meter!.tone}
-            value={`${compactSpan(lead.slaMs - state.remainingMs)} of ${sla}`}
-          />
-        </>
-      );
+        ) : (
+          <>
+            <BigNumber
+              value={countdown(state.remainingMs)}
+              caption={`Left to reach out · ${sla} SLA. Calling, emailing or messaging from here stops the clock.`}
+            />
+            <MeterRow
+              label="SLA used"
+              percent={meter!.percent}
+              tone={meter!.tone}
+              value={`${compactSpan(lead.slaMs - state.remainingMs)} of ${sla}`}
+            />
+          </>
+        );
       break;
     case "replied":
       body = (

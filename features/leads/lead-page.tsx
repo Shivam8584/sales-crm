@@ -46,6 +46,7 @@ import {
   SpeedToLead,
 } from "./lead-sections";
 import { useLeadActions } from "./use-lead-actions";
+import FollowButton from "@/features/notifications/follow-button";
 
 const CRUMBS = [{ label: "Leads", href: "/leads" }];
 
@@ -167,31 +168,34 @@ function LeadView({ lead }: { lead: Lead }) {
         crumbs={CRUMBS}
         title={lead.name}
         actions={
-          <PageActions
-            primary={primary}
-            primaryItem={
-              converted
-                ? lead.account && {
-                    label: `Open ${lead.account.name}`,
-                    icon: BuildingIcon,
-                    href: `/accounts/${lead.account._id}`,
-                  }
-                : {
-                    label: "Convert",
-                    icon: BuildingIcon,
-                    onSelect: () => void runConvert(),
-                  }
-            }
-            label="Lead actions"
-            actions={[
-              lead.owner?._id !== viewer._id && {
-                label: "Assign to me",
-                icon: UserPlusIcon,
-                onSelect: () => void assign(lead, viewer._id),
-              },
-              { label: "Copy link", icon: LinkIcon, onSelect: copyLink },
-            ]}
-          />
+          <>
+            <FollowButton target={{ leadId: lead._id }} />
+            <PageActions
+              primary={primary}
+              primaryItem={
+                converted
+                  ? lead.account && {
+                      label: `Open ${lead.account.name}`,
+                      icon: BuildingIcon,
+                      href: `/accounts/${lead.account._id}`,
+                    }
+                  : {
+                      label: "Convert",
+                      icon: BuildingIcon,
+                      onSelect: () => void runConvert(),
+                    }
+              }
+              label="Lead actions"
+              actions={[
+                lead.owner?._id !== viewer._id && {
+                  label: "Assign to me",
+                  icon: UserPlusIcon,
+                  onSelect: () => void assign(lead, viewer._id),
+                },
+                { label: "Copy link", icon: LinkIcon, onSelect: copyLink },
+              ]}
+            />
+          </>
         }
       />
       <RecordLayout

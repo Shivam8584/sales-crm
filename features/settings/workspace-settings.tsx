@@ -19,6 +19,7 @@ import { PageStatus } from "@/components/shell/page";
 import { ROLE_TONE } from "@/features/team/roles";
 import PrivacySettings from "@/features/consent/privacy-settings";
 import PricingPolicySettings from "@/features/proposals/pricing-policy-settings";
+import AutomationSafety from "@/features/automations/automation-safety";
 import ClockIcon from "@/public/assets/icons/clock.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
@@ -50,6 +51,7 @@ export default function WorkspaceSettings() {
       </SettingsIntro>
       <WorkspaceForm />
       <PricingPolicySettings />
+      <AutomationSafety />
       <PrivacySettings />
     </AdminOnly>
   );

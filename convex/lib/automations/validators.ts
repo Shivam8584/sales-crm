@@ -3,6 +3,7 @@ import {
   AUTOMATION_STATUSES,
   CONDITION_OPS,
   ENROLLMENT_STATUSES,
+  EXIT_KINDS,
   NODE_KINDS,
   PORTS,
   SUBJECT_KINDS,
@@ -13,6 +14,7 @@ import { literals } from "../validators";
 export const vAutomationStatus = literals(AUTOMATION_STATUSES);
 export const vEnrollmentStatus = literals(ENROLLMENT_STATUSES);
 export const vSubjectKind = literals(SUBJECT_KINDS);
+export const vExitKind = literals(EXIT_KINDS);
 
 const list = v.optional(v.array(v.string()));
 
@@ -27,6 +29,7 @@ export const vTrigger = v.object({
   campaignStatuses: list,
   pauseReasons: list,
   ruleIds: list,
+  channels: list,
 });
 
 export const vCondition = v.object({
