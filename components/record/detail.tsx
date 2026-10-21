@@ -128,7 +128,7 @@ export function StatTile({
   return (
     <div
       className={cn(
-        "bg-overlay-1 shadow-hairline flex min-w-0 flex-col gap-3 rounded-xl p-3",
+        "border-line-strong flex min-w-0 flex-col gap-3 rounded-lg border p-2.75",
         className,
       )}
     >

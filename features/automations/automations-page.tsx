@@ -10,7 +10,6 @@ import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import SegmentedControl from "@/components/_ui/segmented-control";
 import Skeleton from "@/components/_ui/skeleton";
-import StatCard from "@/components/_ui/stat-card";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
@@ -32,10 +31,7 @@ import { isEditableTarget } from "@/lib/keyboard";
 import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import AutomationIcon from "@/public/assets/icons/automation.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import LogOutIcon from "@/public/assets/icons/log-out.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
-import UsersIcon from "@/public/assets/icons/users.svg";
 import { StatusTag, StepIcons, StoppedStatus } from "./automation-parts";
 import NewAutomationDialog from "./new-automation-dialog";
 import TemplatesGallery from "./templates-gallery";
@@ -459,35 +455,31 @@ export default function AutomationsPage() {
             )}
           </PageToolbar>
           {automations?.length !== 0 && (
-            <div className="grid shrink-0 grid-cols-2 gap-3 px-4 pt-4 pb-1 max-sm:hidden sm:gap-4 sm:px-6 sm:pt-5 lg:grid-cols-4">
-              <StatCard
-                size="sm"
-                label="Live automations"
-                icon={AutomationIcon}
-                value={counts?.active}
-                context={counts ? `of ${counts.all}` : undefined}
-              />
-              <StatCard
-                size="sm"
-                label="Records in progress"
-                icon={UsersIcon}
-                iconTone="info"
-                value={totals?.active}
-              />
-              <StatCard
-                size="sm"
-                label="Completed runs"
-                icon={CheckCircleIcon}
-                iconTone="success"
-                value={totals?.completed}
-              />
-              <StatCard
-                size="sm"
-                label="Exited early"
-                icon={LogOutIcon}
-                value={totals?.exited}
-              />
-            </div>
+            <dl
+              aria-label="Automations summary"
+              className="flex shrink-0 flex-wrap gap-x-6 gap-y-3 px-4 pt-3 pb-1 max-sm:hidden sm:gap-x-10"
+            >
+              {(
+                [
+                  [
+                    "Live automations",
+                    counts && `${counts.active} of ${counts.all}`,
+                  ],
+                  ["Records in progress", totals?.active],
+                  ["Completed runs", totals?.completed],
+                  ["Exited early", totals?.exited],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="flex min-w-0 flex-col gap-1">
+                  <dt className="caption-style text-fg-tertiary truncate">
+                    {label}
+                  </dt>
+                  <dd className="lead-style font-medium tabular-nums">
+                    {value ?? <Skeleton className="my-1 h-3 w-10" />}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           )}
           {grid ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">

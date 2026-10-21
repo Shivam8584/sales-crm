@@ -32,22 +32,16 @@ import Kbd from "@/components/_ui/kbd";
 import SegmentedControl from "@/components/_ui/segmented-control";
 import SelectField from "@/components/_ui/select-field";
 import Skeleton from "@/components/_ui/skeleton";
-import StatCard from "@/components/_ui/stat-card";
 import { Switch } from "@/components/_ui/switch";
 import Tag, { type TagTone } from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
-import Sparkline from "@/components/_common/sparkline";
 import { toast } from "@/stores/toast-store";
 import BellIcon from "@/public/assets/icons/bell.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
 import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
 import FilterIcon from "@/public/assets/icons/filter.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
-import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
-import WalletIcon from "@/public/assets/icons/wallet.svg";
 
 const BUTTON_VARIANTS = [
   "primary",
@@ -100,7 +94,6 @@ const STATES = [
     className: "bg-danger-surface border-danger-border text-danger-foreground",
   },
 ];
-const TREND = [0, 1, 0, 2, 3, 1, 0, 4, 2, 5, 3, 0, 2, 6];
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -120,7 +113,6 @@ export default function PrimitivesDemo() {
   const [segment, setSegment] = useState("unread");
   const [stage, setStage] = useState<string>("Qualified");
   const [dialog, setDialog] = useState(false);
-  const [focus, setFocus] = useState<string | null>(null);
 
   return (
     <>
@@ -259,66 +251,6 @@ export default function PrimitivesDemo() {
       </Row>
 
       <Divider />
-
-      <Row label="StatCard">
-        <div className="grid w-full gap-3 sm:grid-cols-2">
-          <StatCard
-            label="Completed"
-            icon={CheckCircleIcon}
-            iconTone="success"
-            value={18}
-            context="last 14 days"
-            change={{ label: "+3 today", tone: "positive" }}
-          >
-            <Sparkline
-              values={TREND}
-              className="w-full gap-1 [&>span]:flex-1"
-            />
-          </StatCard>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              {
-                id: "leads",
-                label: "Leads waiting",
-                icon: UserPlusIcon,
-                value: 2,
-                tone: "danger" as const,
-              },
-              { id: "today", label: "Due today", icon: ClockIcon, value: 5 },
-              {
-                id: "deals",
-                label: "Closing soon",
-                icon: WalletIcon,
-                value: 0,
-              },
-              {
-                id: "load",
-                label: "Loading",
-                icon: ClockIcon,
-                value: undefined,
-              },
-            ].map((item) => (
-              <StatCard
-                key={item.id}
-                size="sm"
-                label={item.label}
-                icon={item.icon}
-                iconTone={item.tone ?? "neutral"}
-                value={item.value}
-                valueClassName={
-                  item.tone === "danger"
-                    ? "text-danger"
-                    : item.value === 0
-                      ? "text-fg-tertiary"
-                      : undefined
-                }
-                pressed={focus === item.id}
-                onClick={() => setFocus(focus === item.id ? null : item.id)}
-              />
-            ))}
-          </div>
-        </div>
-      </Row>
 
       <Row label="Card · CardHeader · Collapsible">
         <Card className="w-full">

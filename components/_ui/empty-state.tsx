@@ -1,5 +1,4 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
-import IconBadge from "@/components/_ui/icon-badge";
 import { cn } from "@/lib/utils";
 
 type EmptyStateProps = {
@@ -24,7 +23,11 @@ export default function EmptyState({
         className,
       )}
     >
-      {Icon && <IconBadge icon={Icon} size="lg" className="mb-2" />}
+      {Icon && (
+        <span className="bg-muted shadow-hairline mb-1 flex size-10 items-center justify-center rounded-full">
+          <Icon aria-hidden className="text-fg-secondary size-4" />
+        </span>
+      )}
       <span className="lead-style block font-medium text-balance">{title}</span>
       {description && (
         <span className="caption-style text-fg-tertiary block max-w-sm leading-snug text-balance">
