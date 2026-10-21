@@ -9,6 +9,7 @@ import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
 import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
 import SettingsIcon from "@/public/assets/icons/settings.svg";
+import AutomationIcon from "@/public/assets/icons/automation.svg";
 
 export type NavItem = {
   href: string;
@@ -39,6 +40,12 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Activation",
         icon: AlertTriangleIcon,
         shortcut: "V",
+      },
+      {
+        href: "/automations",
+        label: "Automations",
+        icon: AutomationIcon,
+        shortcut: "U",
       },
     ],
   },
