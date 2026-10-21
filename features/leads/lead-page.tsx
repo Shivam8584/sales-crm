@@ -10,10 +10,7 @@ import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
 import InlineText from "@/components/fields/inline-text";
 import { Properties, Property } from "@/components/record/properties";
-import RecordLayout, {
-  RecordHeader,
-  RecordSection,
-} from "@/components/record/record-layout";
+import RecordLayout, { RecordHeader } from "@/components/record/record-layout";
 import RecordTabs from "@/components/record/record-tabs";
 import {
   useCommandActions,
@@ -29,27 +26,24 @@ import { useRecordUpdate } from "@/hooks/use-record-update";
 import { useViewer } from "@/hooks/use-viewer";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
-import { dateTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
+import { ASIDE_SECTION } from "@/features/accounts/account-insights";
 import LeadContactButtons from "./lead-contact";
+import { LeadMessage, LeadStatusControl, type Lead } from "./lead-fields";
+import { DemoTag, SourceTag } from "./lead-meta";
 import {
-  LeadConsents,
-  LeadMessage,
-  LeadOwnerPicker,
-  LeadStatusControl,
-  Value,
-  When,
-  attributionRows,
-  conversionPreview,
-  type Lead,
-} from "./lead-fields";
-import { DemoTag } from "./lead-meta";
-import SlaIndicator from "./sla";
+  LeadAttribution,
+  LeadConsent,
+  LeadConversion,
+  LeadDetails,
+  LeadSummary,
+  SpeedToLead,
+} from "./lead-sections";
 import { useLeadActions } from "./use-lead-actions";
 
 const CRUMBS = [{ label: "Leads", href: "/leads" }];
@@ -132,8 +126,6 @@ function LeadView({ lead }: { lead: Lead }) {
     </Button>
   );
 
-  const attribution = attributionRows(lead);
-
   useTitleShortcut();
   useCommandActions(
     (
@@ -191,7 +183,7 @@ function LeadView({ lead }: { lead: Lead }) {
       <RecordLayout
         header={
           <RecordHeader
-            visual={<Avatar name={lead.name} size="lg" />}
+            visual={<Avatar name={lead.name} size="xl" />}
             title={
               <span data-record-title className="flex min-w-0">
                 <InlineText
@@ -204,6 +196,11 @@ function LeadView({ lead }: { lead: Lead }) {
             }
             subtitle={
               <>
+                <span className="flex min-w-0 flex-wrap items-center gap-0.75 gap-y-1">
+                  <LeadStatusControl lead={lead} />
+                  <SourceTag utm={lead.utm} channel={lead.channel} />
+                  {lead.demoAt && <DemoTag at={lead.demoAt} />}
+                </span>
                 <span className="min-w-0 truncate">
                   {lead.companyName}
                   <span className="text-fg-tertiary">
@@ -211,9 +208,6 @@ function LeadView({ lead }: { lead: Lead }) {
                     · {LEAD_KIND_LABEL[lead.kind]}
                   </span>
                 </span>
-                <LeadStatusControl lead={lead} />
-                <SlaIndicator lead={lead} slaMs={lead.slaMs} />
-                {lead.demoAt && <DemoTag at={lead.demoAt} />}
               </>
             }
             actions={<LeadContactButtons lead={lead} compact />}
@@ -221,73 +215,20 @@ function LeadView({ lead }: { lead: Lead }) {
         }
         aside={
           <>
-            <Properties title="Lead">
-              <Property label="Status">
-                <LeadStatusControl lead={lead} />
-              </Property>
-              <Property label="Owner">
-                <LeadOwnerPicker lead={lead} />
-              </Property>
-              <Property label="Source">
-                <Value>{lead.channel}</Value>
-              </Property>
-              <Property label="Received">
-                <When at={lead._creationTime} />
-              </Property>
-              <Property label="First touch">
-                {lead.firstTouchedAt ? (
-                  <When at={lead.firstTouchedAt} />
-                ) : (
-                  <SlaIndicator lead={lead} slaMs={lead.slaMs} />
-                )}
-              </Property>
-              {lead.demoAt && (
-                <Property label="Demo">
-                  <Value>{dateTime(lead.demoAt)}</Value>
-                </Property>
-              )}
-            </Properties>
-            <Properties title="Conversion">
-              {converted ? (
-                <>
-                  <Property label="Account">
-                    {lead.account ? (
-                      <Button
-                        variant="link"
-                        size="none"
-                        href={`/accounts/${lead.account._id}`}
-                        className="truncate text-sm"
-                      >
-                        {lead.account.name}
-                      </Button>
-                    ) : (
-                      <Value>{null}</Value>
-                    )}
-                  </Property>
-                  <Property label="Person">
-                    {lead.person ? (
-                      <Button
-                        variant="link"
-                        size="none"
-                        href={`/people/${lead.person._id}`}
-                        className="truncate text-sm"
-                      >
-                        {lead.person.name}
-                      </Button>
-                    ) : (
-                      <Value>{null}</Value>
-                    )}
-                  </Property>
-                  <Property label="Converted">
-                    <When at={lead.convertedAt} />
-                  </Property>
-                </>
-              ) : (
-                <p className="text-fg-secondary text-sm leading-snug">
-                  {conversionPreview(lead)}
-                </p>
-              )}
-            </Properties>
+            <LeadSummary
+              lead={lead}
+              actions={false}
+              className={ASIDE_SECTION}
+            />
+            <SpeedToLead lead={lead} className={ASIDE_SECTION} />
+            <LeadDetails lead={lead} className={ASIDE_SECTION} />
+            <LeadConversion lead={lead} className={ASIDE_SECTION} />
+            <LeadAttribution lead={lead} className={ASIDE_SECTION} />
+            <LeadConsent
+              lead={lead}
+              className={ASIDE_SECTION}
+              divider={false}
+            />
           </>
         }
       >
@@ -304,124 +245,97 @@ function LeadView({ lead }: { lead: Lead }) {
               ),
             },
             {
-              id: "details",
-              label: "Details",
+              id: "contact",
+              label: "Contact",
               content: (
-                <div className="flex flex-col gap-8">
-                  <RecordSection title="Contact">
-                    <Properties>
-                      <Property label="Name">
-                        <InlineText
-                          value={lead.name}
-                          label="Name"
-                          onSave={(name) => save({ name }, "Name")}
-                        />
-                      </Property>
-                      <Property label="Company">
-                        <InlineText
-                          value={lead.companyName}
-                          label="Company"
-                          onSave={(companyName) =>
-                            save({ companyName }, "Company")
-                          }
-                        />
-                      </Property>
-                      <Property label="Email">
-                        <InlineText
-                          value={lead.email ?? null}
-                          label="Email"
-                          type="email"
-                          placeholder="Add email"
-                          onSave={(email) =>
-                            save({ email: email || null }, "Email")
-                          }
-                        />
-                      </Property>
-                      <Property label="Phone">
-                        <InlineText
-                          value={lead.phone ?? null}
-                          label="Phone"
-                          type="tel"
-                          placeholder="Add phone"
-                          display={(phone) => (
-                            <span className="tabular-nums">
-                              {formatPhone(phone)}
-                            </span>
-                          )}
-                          onSave={(phone) =>
-                            save({ phone: phone || null }, "Phone")
-                          }
-                        />
-                      </Property>
-                      <Property
-                        label="Website"
-                        action={
-                          lead.website && (
-                            <a
-                              href={websiteHref(lead.website)}
-                              target="_blank"
-                              rel="noreferrer"
-                              aria-label={`Open ${lead.website}`}
-                              className={buttonVariants({
-                                variant: "ghost",
-                                size: "xs",
-                              })}
-                            >
-                              Open
-                            </a>
-                          )
-                        }
-                      >
-                        <InlineText
-                          value={lead.website ?? null}
-                          label="Website"
-                          type="url"
-                          placeholder="Add website"
-                          display={(website) =>
-                            website.replace(/^https?:\/\//i, "")
-                          }
-                          onSave={(website) =>
-                            save({ website: website || null }, "Website")
-                          }
-                        />
-                      </Property>
-                      <Property label="GSTIN">
-                        <InlineText
-                          value={lead.gstin ?? null}
-                          label="GSTIN"
-                          placeholder="Add GSTIN"
-                          display={(gstin) => (
-                            <span className="font-mono text-xs">{gstin}</span>
-                          )}
-                          onSave={(gstin) =>
-                            save({ gstin: gstin || null }, "GSTIN")
-                          }
-                        />
-                      </Property>
-                    </Properties>
-                  </RecordSection>
-                  <RecordSection title="Attribution">
-                    <Properties>
-                      {attribution.map(([label, value]) => (
-                        <Property key={label} label={label}>
-                          <span
-                            title={value}
-                            className={
-                              label === "Landing page" || label === "Referrer"
-                                ? "truncate font-mono text-xs"
-                                : "truncate text-sm"
-                            }
-                          >
-                            {value}
-                          </span>
-                        </Property>
-                      ))}
-                    </Properties>
-                  </RecordSection>
-                  <RecordSection title="Consent">
-                    <LeadConsents consents={lead.consents} />
-                  </RecordSection>
-                </div>
+                <Properties>
+                  <Property label="Name">
+                    <InlineText
+                      value={lead.name}
+                      label="Name"
+                      onSave={(name) => save({ name }, "Name")}
+                    />
+                  </Property>
+                  <Property label="Company">
+                    <InlineText
+                      value={lead.companyName}
+                      label="Company"
+                      onSave={(companyName) => save({ companyName }, "Company")}
+                    />
+                  </Property>
+                  <Property label="Email">
+                    <InlineText
+                      value={lead.email ?? null}
+                      label="Email"
+                      type="email"
+                      placeholder="Add email"
+                      onSave={(email) =>
+                        save({ email: email || null }, "Email")
+                      }
+                    />
+                  </Property>
+                  <Property label="Phone">
+                    <InlineText
+                      value={lead.phone ?? null}
+                      label="Phone"
+                      type="tel"
+                      placeholder="Add phone"
+                      display={(phone) => (
+                        <span className="tabular-nums">
+                          {formatPhone(phone)}
+                        </span>
+                      )}
+                      onSave={(phone) =>
+                        save({ phone: phone || null }, "Phone")
+                      }
+                    />
+                  </Property>
+                  <Property
+                    label="Website"
+                    action={
+                      lead.website && (
+                        <a
+                          href={websiteHref(lead.website)}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Open ${lead.website}`}
+                          className={buttonVariants({
+                            variant: "ghost",
+                            size: "xs",
+                          })}
+                        >
+                          Open
+                        </a>
+                      )
+                    }
+                  >
+                    <InlineText
+                      value={lead.website ?? null}
+                      label="Website"
+                      type="url"
+                      placeholder="Add website"
+                      display={(website) =>
+                        website.replace(/^https?:\/\//i, "")
+                      }
+                      onSave={(website) =>
+                        save({ website: website || null }, "Website")
+                      }
+                    />
+                  </Property>
+                  <Property label="GSTIN">
+                    <InlineText
+                      value={lead.gstin ?? null}
+                      label="GSTIN"
+                      placeholder="Add GSTIN"
+                      display={(gstin) => (
+                        <span className="font-mono text-xs">{gstin}</span>
+                      )}
+                      onSave={(gstin) =>
+                        save({ gstin: gstin || null }, "GSTIN")
+                      }
+                    />
+                  </Property>
+                </Properties>
               ),
             },
           ]}

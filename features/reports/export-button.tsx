@@ -3,6 +3,7 @@
 import Button from "@/components/_ui/button";
 import { downloadCsv, type CsvCell } from "@/lib/csv";
 import { toast } from "@/stores/toast-store";
+import ShareIcon from "@/public/assets/icons/share.svg";
 
 /** Downloads one report table as CSV; rows are built on click, from what's on screen. */
 export default function ExportButton({
@@ -28,7 +29,8 @@ export default function ExportButton({
         toast(`Exported ${label}`);
       }}
     >
-      Export CSV
+      <ShareIcon aria-hidden className="size-3" />
+      Export
     </Button>
   );
 }

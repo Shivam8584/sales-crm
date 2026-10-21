@@ -179,14 +179,3 @@ export function attributionRows(lead: Lead) {
   ];
   return rows.filter((row): row is [string, string] => Boolean(row[1]));
 }
-
-/** What converting will do, given the account and person it matched. */
-export function conversionPreview(lead: Lead) {
-  const account = lead.matches.account
-    ? `Links to ${lead.matches.account.name}`
-    : `Creates the account ${lead.companyName}`;
-  const person = lead.matches.person
-    ? `and ${lead.matches.person.name}, already in People.`
-    : `with ${lead.name} as a person.`;
-  return `${account} ${person}`;
-}

@@ -6,20 +6,29 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
-import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
+import { PageStatus } from "@/components/shell/page";
 import { PLATFORM_EVENTS } from "@/lib/domain/platform";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
+import Logo from "@/public/assets/images/_common/logo.svg";
+import BellIcon from "@/public/assets/icons/bell.svg";
+import CalendarIcon from "@/public/assets/icons/calendar.svg";
+import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import DemoFormCard from "./demo-form-card";
 import {
   AdminOnly,
+  Code,
+  ConfiguredTag,
   CopyField,
+  IconTile,
   IntegrationCard,
+  SettingsBlock,
+  SettingsIntro,
   SettingsRow,
-  SettingsTitle,
+  SettingsSkeleton,
   type Health,
 } from "./settings-ui";
 
@@ -32,10 +41,10 @@ const CALCOM_LINK = process.env.NEXT_PUBLIC_CALCOM_LINK?.trim();
 export default function IntegrationsSettings() {
   return (
     <AdminOnly>
-      <SettingsTitle
-        title="Integrations"
-        description="Systems that send data to the CRM or receive it. Secrets live in the Convex deployment's environment and are never shown here."
-      />
+      <SettingsIntro>
+        Systems that send data to the CRM or receive it. Secrets live in the
+        Convex deployment&apos;s environment and are never shown here.
+      </SettingsIntro>
       <IntegrationList />
     </AdminOnly>
   );
@@ -45,51 +54,40 @@ function IntegrationList() {
   const status = useQuery(api.settings.integrations, {});
   if (!status) {
     return (
-      <div className="flex flex-col gap-6">
-        {Array.from({ length: 3 }, (_, index) => (
-          <div
-            key={index}
-            className="bg-card border-border shadow-card flex flex-col gap-3 rounded-xl border p-4"
-          >
-            <Skeleton className="h-3.5 w-40" />
-            <Skeleton className="h-3 w-72 max-w-full" />
-            <Skeleton className="mt-2 h-9 w-full" />
-          </div>
-        ))}
-      </div>
+      <>
+        <SettingsSkeleton rows={3} />
+        <SettingsSkeleton />
+        <SettingsSkeleton />
+      </>
     );
   }
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <PlatformCard platform={status.platform} />
       <KycCard kyc={status.kyc} />
       <AlertsCard alerts={status.alerts} />
       <CalcomCard calcom={status.calcom} />
       <DemoFormCard />
-    </div>
+    </>
   );
 }
 
 function EnvHint({ children }: { children: ReactNode }) {
   return (
-    <p className="caption-style text-fg-tertiary px-4 py-3.5 leading-relaxed">
+    <p className="caption-style border-border bg-overlay-1 text-fg-secondary border-t px-6 py-3.5 leading-relaxed">
       {children}
     </p>
   );
 }
 
-function Code({ children }: { children: ReactNode }) {
-  return <code className="text-fg-secondary font-mono">{children}</code>;
-}
-
-function Configured({ on, label }: { on: boolean; label?: string }) {
+/** The logo artwork carries its own tile, so it is sized to line up with `IconTile`. */
+function BrandTile() {
   return (
-    <span
-      className={
-        on ? "lead-style text-foreground" : "lead-style text-fg-tertiary"
-      }
-    >
-      {label ?? (on ? "Set" : "Not set")}
+    <span className="flex size-10 shrink-0">
+      <Logo
+        aria-hidden
+        className="-mx-[5px] -mt-[1.25px] h-[51.25px] w-[50px] max-w-none shrink-0 overflow-visible"
+      />
     </span>
   );
 }
@@ -132,6 +130,7 @@ function PlatformCard({ platform }: { platform: Status["platform"] }) {
 
   return (
     <IntegrationCard
+      visual={<BrandTile />}
       title="Hypedrive platform"
       description="Sign-ups, organisations, GST checks, top-ups and campaigns from the platform update leads and accounts as they happen."
       health={platform.secretSet ? "connected" : "off"}
@@ -143,7 +142,7 @@ function PlatformCard({ platform }: { platform: Status["platform"] }) {
           event.
         </EnvHint>
       )}
-      <div className="flex flex-col gap-2 px-4 py-3.5">
+      <SettingsBlock>
         <span className="lead-style font-medium">Endpoint</span>
         {platform.endpoint ? (
           <CopyField
@@ -162,20 +161,22 @@ function PlatformCard({ platform }: { platform: Status["platform"] }) {
           <Code>X-Hypedrive-Signature: sha256=&lt;hex HMAC&gt;</Code>. The
           contract lives in <Code>lib/domain/platform.ts</Code>.
         </span>
-      </div>
-      <SettingsRow
-        label="Events understood"
-        description="Payloads only gain fields; a breaking change gets a new event name."
-        className="sm:items-start"
-      >
-        <span className="flex flex-wrap gap-1.5 sm:max-w-80 sm:justify-end">
+      </SettingsBlock>
+      <SettingsBlock>
+        <span className="flex flex-col gap-1.5">
+          <span className="lead-style font-medium">Events understood</span>
+          <span className="caption-style text-fg-tertiary leading-snug">
+            Payloads only gain fields; a breaking change gets a new event name.
+          </span>
+        </span>
+        <span className="flex flex-wrap gap-1.5">
           {PLATFORM_EVENTS.map((event) => (
             <Tag key={event} size="xs" className="font-mono text-[11px]">
               {event}
             </Tag>
           ))}
         </span>
-      </SettingsRow>
+      </SettingsBlock>
       <SettingsRow label="Last event received">
         {platform.lastReceivedAt ? (
           <Tooltip content={dateTime(platform.lastReceivedAt)}>
@@ -190,8 +191,8 @@ function PlatformCard({ platform }: { platform: Status["platform"] }) {
           <span className="lead-style text-fg-tertiary">None yet</span>
         )}
       </SettingsRow>
-      <div className="flex flex-col">
-        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+      <div className="border-border flex flex-col border-t">
+        <div className="flex flex-wrap items-center gap-3 px-6 py-4">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <span className="lead-style font-medium">Waiting events</span>
             <span className="caption-style text-fg-tertiary leading-snug">
@@ -202,7 +203,7 @@ function PlatformCard({ platform }: { platform: Status["platform"] }) {
           </div>
           {waitingCount > 0 && (
             <Button
-              variant="subtle"
+              variant="secondary"
               size="xs"
               loading={busy === "all"}
               disabled={busy !== null}
@@ -224,7 +225,7 @@ function PlatformCard({ platform }: { platform: Status["platform"] }) {
   );
 }
 
-const EVENT_TONE = { parked: "red", pending: "amber" } as const;
+const EVENT_TONE = { parked: "danger", pending: "warning" } as const;
 
 function WaitingTable({
   events,
@@ -236,22 +237,22 @@ function WaitingTable({
   onRetry: (event: WaitingEvent) => void;
 }) {
   return (
-    <ul
-      aria-label="Waiting platform events"
-      className="border-border divide-border divide-y border-t"
-    >
+    <ul aria-label="Waiting platform events" className="flex flex-col">
       {events.map((event) => {
         const status = event.status === "parked" ? "parked" : "pending";
         return (
-          <li key={event._id} className="flex items-center gap-3 px-4 py-2.5">
+          <li
+            key={event._id}
+            className="border-border flex min-h-10.5 items-center gap-3 border-t px-6 py-2"
+          >
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="lead-style truncate font-mono text-xs">
                   {event.type}
                 </span>
-                <Tag tone={EVENT_TONE[status]} size="xs" className="text-xs">
+                <PageStatus tone={EVENT_TONE[status]}>
                   {status === "parked" ? "Parked" : "Waiting"}
-                </Tag>
+                </PageStatus>
               </span>
               <span
                 className="caption-style text-fg-tertiary truncate"
@@ -272,7 +273,7 @@ function WaitingTable({
               </span>
             </Tooltip>
             <Button
-              variant="subtle"
+              variant="secondary"
               size="xs"
               loading={busy === event._id}
               disabled={busy !== null}
@@ -297,6 +298,7 @@ function KycCard({ kyc }: { kyc: Status["kyc"] }) {
         : "off";
   return (
     <IntegrationCard
+      visual={<IconTile icon={CheckCircleIcon} />}
       title="GST and DIN verification"
       description="Looks up GSTINs and director numbers through the KYC service and fills verified details on accounts and people."
       health={health}
@@ -318,7 +320,7 @@ function KycCard({ kyc }: { kyc: Status["kyc"] }) {
         label="Provider"
         description="The registry lookups go through kyc-service."
       >
-        <Configured
+        <ConfiguredTag
           on={kyc.mode !== null}
           label={
             kyc.mode === "live"
@@ -338,7 +340,7 @@ function KycCard({ kyc }: { kyc: Status["kyc"] }) {
           </>
         }
       >
-        <Configured
+        <ConfiguredTag
           on={kyc.signatureCheck}
           label={kyc.signatureCheck ? "Checked" : "Not checked"}
         />
@@ -350,6 +352,7 @@ function KycCard({ kyc }: { kyc: Status["kyc"] }) {
 function AlertsCard({ alerts }: { alerts: Status["alerts"] }) {
   return (
     <IntegrationCard
+      visual={<IconTile icon={BellIcon} />}
       title="Lead alerts"
       description="New leads, demo bookings and missed SLAs are posted to Slack and to a webhook of your choice."
       health={alerts.slack || alerts.webhook ? "connected" : "off"}
@@ -365,10 +368,10 @@ function AlertsCard({ alerts }: { alerts: Status["alerts"] }) {
         label="Slack"
         description={<Code>ALERT_SLACK_WEBHOOK_URL</Code>}
       >
-        <Configured on={alerts.slack} />
+        <ConfiguredTag on={alerts.slack} />
       </SettingsRow>
       <SettingsRow label="Webhook" description={<Code>ALERT_WEBHOOK_URL</Code>}>
-        <Configured on={alerts.webhook} />
+        <ConfiguredTag on={alerts.webhook} />
       </SettingsRow>
     </IntegrationCard>
   );
@@ -384,11 +387,12 @@ function CalcomCard({ calcom }: { calcom: Status["calcom"] }) {
         : "off";
   return (
     <IntegrationCard
+      visual={<IconTile icon={CalendarIcon} />}
       title="Cal.com"
       description="After the demo form, people pick a slot on your booking page. Bookings, reschedules and cancellations come back to the lead."
       health={health}
     >
-      <div className="flex flex-col gap-2 px-4 py-3.5">
+      <SettingsBlock>
         <span className="lead-style font-medium">Webhook URL</span>
         {calcom.endpoint ? (
           <CopyField
@@ -405,12 +409,12 @@ function CalcomCard({ calcom }: { calcom: Status["calcom"] }) {
           In Cal.com, add a webhook for booking created, rescheduled and
           cancelled, with the same secret as <Code>CALCOM_WEBHOOK_SECRET</Code>.
         </span>
-      </div>
+      </SettingsBlock>
       <SettingsRow
         label="Webhook secret"
         description={<Code>CALCOM_WEBHOOK_SECRET</Code>}
       >
-        <Configured on={calcom.secretSet} />
+        <ConfiguredTag on={calcom.secretSet} />
       </SettingsRow>
       <SettingsRow
         label="Booking link"
@@ -429,7 +433,7 @@ function CalcomCard({ calcom }: { calcom: Status["calcom"] }) {
             {CALCOM_LINK}
           </span>
         ) : (
-          <Configured on={false} />
+          <ConfiguredTag on={false} />
         )}
       </SettingsRow>
     </IntegrationCard>

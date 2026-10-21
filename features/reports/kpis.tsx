@@ -1,6 +1,11 @@
-import type { ReactNode } from "react";
 import Skeleton from "@/components/_ui/skeleton";
 import type { Report } from "@/convex/lib/reports";
+import ActivityIcon from "@/public/assets/icons/activity.svg";
+import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
+import ClockIcon from "@/public/assets/icons/clock.svg";
+import TargetIcon from "@/public/assets/icons/target-05.svg";
+import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
+import WalletIcon from "@/public/assets/icons/wallet.svg";
 import {
   count,
   duration,
@@ -10,36 +15,9 @@ import {
   totals,
   trend,
 } from "./format";
-import { Delta } from "./section";
+import { Delta, MetricTile } from "./section";
 
-function Kpi({
-  label,
-  value,
-  detail,
-  delta,
-}: {
-  label: string;
-  value: ReactNode;
-  detail?: ReactNode;
-  delta?: ReactNode;
-}) {
-  return (
-    <div className="bg-card shadow-card flex min-w-0 flex-col gap-2.5 rounded-xl px-3.5 py-3">
-      <span className="caption-style text-fg-secondary truncate">{label}</span>
-      <span className="truncate text-xl leading-none font-semibold tabular-nums">
-        {value}
-      </span>
-      <span className="flex min-h-4 flex-col gap-1">
-        {detail && (
-          <span className="caption-style text-fg-tertiary truncate tabular-nums">
-            {detail}
-          </span>
-        )}
-        {delta}
-      </span>
-    </div>
-  );
-}
+const GRID = "grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6";
 
 const pts = (current: number | null, previous: number | null) =>
   current === null || previous === null
@@ -61,8 +39,9 @@ export default function Kpis({ report }: { report: Report }) {
       : null;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-      <Kpi
+    <div className={GRID}>
+      <MetricTile
+        icon={UserPlusIcon}
         label="New leads"
         value={count(leads)}
         delta={
@@ -72,8 +51,9 @@ export default function Kpis({ report }: { report: Report }) {
           />
         }
       />
-      <Kpi
-        label="Converted to account"
+      <MetricTile
+        icon={TargetIcon}
+        label="Converted"
         value={count(converted)}
         detail={`${percent(rate(converted, leads))} of leads`}
         delta={
@@ -83,7 +63,8 @@ export default function Kpis({ report }: { report: Report }) {
           />
         }
       />
-      <Kpi
+      <MetricTile
+        icon={ActivityIcon}
         label="Activated"
         value={count(activated)}
         detail={`${percent(rate(activated, leads))} of leads`}
@@ -94,7 +75,8 @@ export default function Kpis({ report }: { report: Report }) {
           />
         }
       />
-      <Kpi
+      <MetricTile
+        icon={ClockIcon}
         label="Median speed to lead"
         value={duration(speed.medianMs)}
         detail={`p90 ${duration(speed.p90Ms)}`}
@@ -109,7 +91,8 @@ export default function Kpis({ report }: { report: Report }) {
           />
         }
       />
-      <Kpi
+      <MetricTile
+        icon={CheckCircleIcon}
         label="Touched within SLA"
         value={percent(speed.withinRate)}
         detail={`${count(speed.breached)} breached`}
@@ -120,7 +103,8 @@ export default function Kpis({ report }: { report: Report }) {
           />
         }
       />
-      <Kpi
+      <MetricTile
+        icon={WalletIcon}
         label="Deals won"
         value={count(report.pipeline.won.count)}
         detail={totals(report.pipeline.won.totals, "No value yet")}
@@ -137,14 +121,14 @@ export default function Kpis({ report }: { report: Report }) {
 
 export function KpisSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+    <div className={GRID}>
       {Array.from({ length: 6 }, (_, index) => (
         <div
           key={index}
-          className="bg-card shadow-card flex flex-col gap-3 rounded-xl px-3.5 py-3"
+          className="border-line-strong flex flex-col gap-3 rounded-lg border p-2.75"
         >
           <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-5 w-10" />
+          <Skeleton className="h-6 w-10" />
           <Skeleton className="h-3 w-24" />
         </div>
       ))}

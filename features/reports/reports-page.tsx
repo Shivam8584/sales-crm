@@ -9,7 +9,13 @@ import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
 import FilterMenu from "@/components/_common/filter-menu";
-import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
+import {
+  Page,
+  PageHeader,
+  PageStatus,
+  PageToolbar,
+  PageViews,
+} from "@/components/shell/page";
 import {
   PERIODS,
   UNASSIGNED,
@@ -26,7 +32,7 @@ import ActivationChart from "./activation-section";
 import { count, duration, range } from "./format";
 import FunnelChart from "./funnel-chart";
 import Kpis, { KpisSkeleton } from "./kpis";
-import PeriodPicker, { PERIOD_LABEL } from "./period-picker";
+import { PERIOD_LABEL } from "./periods";
 import PipelineChart from "./pipeline-chart";
 import { Panel, ReportSection } from "./section";
 import SourceTable from "./source-table";
@@ -121,9 +127,26 @@ export default function ReportsPage() {
 
   return (
     <Page>
-      <PageHeader title="Reports" />
+      <PageHeader
+        title="Reports"
+        meta={
+          report && (
+            <PageStatus tone="info">
+              <span className="tabular-nums">
+                {range(report.windows.current)}
+              </span>
+            </PageStatus>
+          )
+        }
+      />
+      <PageViews
+        param="period"
+        label="Period"
+        value={period}
+        onChange={(next) => setPeriod(next)}
+        views={PERIODS.map((id) => ({ id, label: PERIOD_LABEL[id].long }))}
+      />
       <PageToolbar>
-        <PeriodPicker value={period} onChange={setPeriod} />
         <FilterMenu
           label="Source"
           value={source}
@@ -143,9 +166,7 @@ export default function ReportsPage() {
         )}
         {report && (
           <span className="caption-style text-fg-tertiary ml-auto tabular-nums max-md:hidden">
-            {range(report.windows.current)}
-            <span className="text-fg-disabled"> vs </span>
-            {range(report.windows.previous)}
+            Compared with {range(report.windows.previous)}
           </span>
         )}
       </PageToolbar>
@@ -154,7 +175,7 @@ export default function ReportsPage() {
         <div
           aria-busy={loading}
           className={cn(
-            "duration-base mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-6 transition-opacity sm:px-6",
+            "duration-base mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 transition-opacity sm:px-6",
             loading && report && "opacity-60",
           )}
         >
@@ -163,7 +184,15 @@ export default function ReportsPage() {
               ? `${PERIOD_LABEL[period].long}, ${range(report.windows.current)}, compared with ${range(report.windows.previous)}`
               : "Loading report"}
           </p>
-          {report ? <Kpis report={report} /> : <KpisSkeleton />}
+          <ReportSection
+            id="overview"
+            title="Overview"
+            description={`${PERIOD_LABEL[period].long}, each figure against the period before.`}
+          >
+            <Panel className="px-4 py-4 sm:px-5">
+              {report ? <Kpis report={report} /> : <KpisSkeleton />}
+            </Panel>
+          </ReportSection>
 
           <ReportSection
             id="funnel"
@@ -235,7 +264,7 @@ export default function ReportsPage() {
               )}
             </Panel>
             {report && report.direct.accounts > 0 && (
-              <p className="lead-style text-fg-secondary leading-snug">
+              <p className="lead-style text-fg-secondary border-border border-t px-4 py-3 leading-snug sm:px-5">
                 Plus {count(report.direct.accounts)}{" "}
                 {report.direct.accounts === 1 ? "account" : "accounts"} added
                 directly, not from a lead:{" "}
@@ -268,7 +297,7 @@ export default function ReportsPage() {
               </>
             }
           >
-            <Panel className="flex flex-col overflow-hidden">
+            <Panel className="flex flex-col">
               {report ? (
                 <SourceTable
                   filtered={filtered}
@@ -320,7 +349,7 @@ export default function ReportsPage() {
             )}
           </ReportSection>
 
-          <div className="grid gap-10 lg:grid-cols-2 lg:gap-6">
+          <div className="grid items-stretch gap-5 lg:grid-cols-2">
             <ReportSection
               id="activation"
               title="Time to activate"

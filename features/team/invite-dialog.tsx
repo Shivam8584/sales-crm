@@ -23,6 +23,7 @@ import { readError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { copyText, inviteUrl } from "./invite-link";
 import { ROLE_DESCRIPTION } from "./roles";
+import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 
 type Errors = Partial<Record<"email" | "form", string>>;
 type Sent = { email: string; role: Role; url: string };
@@ -111,7 +112,10 @@ export default function InviteDialog({
                 only and expires in 7 days.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col gap-5 px-6 py-5">
+            <fieldset className="shadow-divider flex min-w-0 flex-col gap-4 px-6 py-5">
+              <legend className="eyebrow-style text-fg-secondary float-left mb-0 w-full">
+                Invitee
+              </legend>
               <Field
                 label="Email"
                 htmlFor="invite-email"
@@ -131,47 +135,47 @@ export default function InviteDialog({
                   className="aria-invalid:border-danger"
                 />
               </Field>
-              <fieldset className="flex flex-col gap-2">
-                <legend className="caption-style text-fg-secondary mb-2">
-                  Role
-                </legend>
-                <div className="flex flex-col gap-1.5">
-                  {ROLES.map((value) => (
-                    <label
-                      key={value}
-                      className={cn(
-                        "border-input has-focus-visible:ring-selected/20 has-focus-visible:border-selected duration-fast flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-[border-color,background-color,box-shadow] has-focus-visible:ring-3",
-                        role === value
-                          ? "border-selected bg-overlay-1"
-                          : "hover:bg-overlay-1",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="invite-role"
-                        value={value}
-                        checked={role === value}
-                        onChange={() => setRole(value)}
-                        className="accent-selected mt-0.5 size-3.5 shrink-0"
-                      />
-                      <span className="flex min-w-0 flex-col gap-1">
-                        <span className="text-sm leading-none font-medium">
-                          {ROLE_LABEL[value]}
-                        </span>
-                        <span className="caption-style text-fg-tertiary leading-snug">
-                          {ROLE_DESCRIPTION[value]}
-                        </span>
+            </fieldset>
+            <fieldset className="flex min-w-0 flex-col gap-4 px-6 py-5">
+              <legend className="eyebrow-style text-fg-secondary float-left mb-0 w-full">
+                Role
+              </legend>
+              <div className="flex flex-col gap-1.5">
+                {ROLES.map((value) => (
+                  <label
+                    key={value}
+                    className={cn(
+                      "border-input has-focus-visible:ring-selected/20 has-focus-visible:border-selected duration-fast flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-[border-color,background-color,box-shadow] has-focus-visible:ring-3",
+                      role === value
+                        ? "border-selected bg-overlay-1"
+                        : "hover:bg-overlay-1",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="invite-role"
+                      value={value}
+                      checked={role === value}
+                      onChange={() => setRole(value)}
+                      className="accent-selected mt-0.5 size-3.5 shrink-0"
+                    />
+                    <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <span className="flex items-center gap-2 text-sm leading-none font-medium">
+                        {ROLE_LABEL[value]}
                       </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+                      <span className="caption-style text-fg-tertiary leading-snug">
+                        {ROLE_DESCRIPTION[value]}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
               {errors.form && (
                 <p role="alert" className="caption-style text-danger">
                   {errors.form}
                 </p>
               )}
-            </div>
+            </fieldset>
             <DialogFooter>
               <DialogClose asChild>
                 <Button variant="subtle" size="sm">
@@ -184,6 +188,7 @@ export default function InviteDialog({
                 size="sm"
                 loading={saving}
               >
+                <UserPlusIcon aria-hidden className="size-3" />
                 Create invite
               </Button>
             </DialogFooter>

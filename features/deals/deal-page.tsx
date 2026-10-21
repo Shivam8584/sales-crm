@@ -30,6 +30,7 @@ import AccountPicker from "@/features/accounts/account-picker";
 import MemberPicker from "@/features/members/member-picker";
 import RecordTasks from "@/features/tasks/record-tasks";
 import { TaskChecklistSkeleton } from "@/features/tasks/task-checklist";
+import ProposalTab from "@/features/proposals/proposal-tab";
 import Timeline from "@/features/timeline/timeline";
 import { personName } from "@/lib/domain/labels";
 import { formatMoney } from "@/lib/domain/money";
@@ -282,6 +283,11 @@ function DealView({ deal }: { deal: DealRow }) {
               id: "activity",
               label: "Activity",
               content: <Timeline target={{ dealId: deal._id }} />,
+            },
+            {
+              id: "proposal",
+              label: "Proposal",
+              content: <ProposalTab deal={deal} />,
             },
             {
               id: "people",

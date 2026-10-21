@@ -74,7 +74,7 @@ function Details() {
       </ul>
 
       <div className="border-border flex flex-col gap-4 border-t pt-8">
-        <h2 className="h3-style">What happens next</h2>
+        <h2 className="eyebrow-style font-normal">What happens next</h2>
         <ol className="flex flex-col gap-3.5">
           {STEPS.map((step, index) => (
             <li key={step} className="flex items-center gap-3.5">
@@ -111,10 +111,13 @@ export default function DemoPage({
   return (
     <div className="flex min-h-dvh flex-col">
       <ForcedTheme theme={theme} />
-      <header className="mx-auto flex h-16 w-full max-w-6xl items-center gap-2.5 px-5 sm:px-8">
-        <Logo aria-hidden className="size-7 overflow-visible" />
-        <span className="lead-style font-semibold tracking-[-0.01em]">
-          Hypedrive
+      <header className="mx-auto flex h-16 w-full max-w-6xl items-center gap-2 px-5 sm:px-8">
+        <Logo aria-hidden className="size-8 shrink-0 overflow-visible" />
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="lead-style font-medium tracking-[-0.01em]">
+            Hypedrive
+          </span>
+          <span className="caption-style text-fg-tertiary">Talk to sales</span>
         </span>
       </header>
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-10 px-5 pt-6 pb-16 sm:px-8 sm:pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:grid-rows-[auto_1fr] lg:gap-x-20 lg:gap-y-12 lg:pt-16">

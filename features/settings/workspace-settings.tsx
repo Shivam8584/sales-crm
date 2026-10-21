@@ -15,11 +15,14 @@ import { useMembers } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
+import { PageStatus } from "@/components/shell/page";
+import { ROLE_TONE } from "@/features/team/roles";
+import PrivacySettings from "@/features/consent/privacy-settings";
 import {
   AdminOnly,
+  SettingsIntro,
   SettingsRow,
   SettingsSection,
-  SettingsTitle,
 } from "./settings-ui";
 
 const SLA_KEY = "leads.slaMinutes";
@@ -37,11 +40,12 @@ function minutes(value: number) {
 export default function WorkspaceSettings() {
   return (
     <AdminOnly>
-      <SettingsTitle
-        title="Workspace"
-        description="Rules that apply to everyone: how fast new leads must be contacted, who gets them, and who can join."
-      />
+      <SettingsIntro>
+        Rules that apply to everyone: how fast new leads must be contacted, who
+        gets them, and who can join.
+      </SettingsIntro>
       <WorkspaceForm />
+      <PrivacySettings />
     </AdminOnly>
   );
 }
@@ -101,13 +105,13 @@ function WorkspaceForm() {
           ) : environment.allowedDomains.length > 0 ? (
             <span className="flex flex-wrap gap-1.5 sm:justify-end">
               {environment.allowedDomains.map((domain) => (
-                <Tag key={domain} size="sm">
-                  {domain}
+                <Tag key={domain} size="sm" className="font-mono text-xs">
+                  @{domain}
                 </Tag>
               ))}
             </span>
           ) : (
-            <span className="lead-style text-fg-tertiary">Invite only</span>
+            <PageStatus tone="neutral">Invite only</PageStatus>
           )}
         </SettingsRow>
       </SettingsSection>
@@ -186,7 +190,7 @@ function SlaRow({ settings }: { settings: Settings }) {
           <div className="flex items-center gap-2">
             {!isDefault && !dirty && (
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="xs"
                 onClick={() => void save(null)}
                 disabled={saving}
@@ -227,9 +231,9 @@ function SlaRow({ settings }: { settings: Settings }) {
             </div>
             <Button
               type="submit"
-              variant={dirty ? "primary" : "subtle"}
+              variant={dirty ? "primary" : "secondary"}
               size="control"
-              className="px-3.5"
+              className="h-9 px-4"
               disabled={!dirty}
               loading={saving}
             >
@@ -306,10 +310,10 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
           ? "New leads rotate through every active member, including people who join later. Untick someone to leave them out."
           : `New leads rotate through ${chosen.length} of ${members?.length ?? "…"} active members.`
       }
-      actions={
+      action={
         !everyone && (
           <Button
-            variant="ghost"
+            variant="secondary"
             size="xs"
             onClick={() =>
               void save([], "New leads now rotate through everyone")
@@ -327,7 +331,7 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
           <RowSkeleton />
         </>
       ) : (
-        <ul aria-label="Lead rotation" className="divide-border divide-y">
+        <ul aria-label="Lead rotation" className="flex flex-col">
           {members.map((member) => {
             const included = everyone || chosen.includes(member._id);
             const id = `rotation-${member._id}`;
@@ -335,7 +339,7 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
               <li key={member._id}>
                 <label
                   htmlFor={id}
-                  className="hover:bg-overlay-1 duration-fast flex h-12 cursor-pointer items-center gap-3 px-4 transition-colors"
+                  className="border-border hover:bg-overlay-1 duration-fast flex h-12 cursor-pointer items-center gap-3 border-t px-6 transition-colors"
                 >
                   <Checkbox
                     id={id}
@@ -344,16 +348,21 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
                       toggle(member._id, member.name, checked === true)
                     }
                   />
-                  <Avatar name={member.name} size="md" />
+                  <Avatar name={member.name} size="sm" />
                   <span className="lead-style min-w-0 flex-1 truncate">
                     {member.name}
                   </span>
-                  <span className="caption-style text-fg-tertiary shrink-0">
-                    {included ? "In rotation" : "Not in rotation"}
-                    <span className="max-sm:hidden">
-                      {" "}
-                      · {ROLE_LABEL[member.role]}
-                    </span>
+                  <Tag
+                    tone={ROLE_TONE[member.role]}
+                    size="xs"
+                    className="max-sm:hidden"
+                  >
+                    {ROLE_LABEL[member.role]}
+                  </Tag>
+                  <span className="flex w-24 shrink-0 justify-end">
+                    <PageStatus tone={included ? "success" : "neutral"}>
+                      {included ? "In rotation" : "Left out"}
+                    </PageStatus>
                   </span>
                 </label>
               </li>
@@ -367,7 +376,7 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
 
 function RowSkeleton() {
   return (
-    <div className="flex h-12 items-center gap-3 px-4">
+    <div className="border-border flex h-12 items-center gap-3 border-t px-6">
       <Skeleton className="h-3 w-40" />
       <Skeleton className="ml-auto h-3 w-16" />
     </div>

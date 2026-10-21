@@ -6,7 +6,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import { readError } from "@/lib/errors";
-import Logo from "@/public/assets/images/_common/logo.svg";
+import AuthCard, { LogoTile } from "./auth-card";
 import SignIn from "./sign-in";
 
 const INVITE_PARAM = "invite";
@@ -69,10 +69,13 @@ function Splash() {
   return (
     <main
       aria-busy
-      className="flex min-h-dvh items-center justify-center"
       aria-label="Loading workspace"
+      className="flex min-h-dvh flex-col items-center justify-center gap-4 px-4"
     >
-      <Logo aria-hidden className="size-9 animate-pulse overflow-visible" />
+      <LogoTile className="animate-pulse motion-reduce:animate-none" />
+      <p className="caption-style text-fg-tertiary" role="status">
+        Opening your workspace…
+      </p>
     </main>
   );
 }
@@ -85,20 +88,20 @@ function Blocked({
   onSignOut: () => void;
 }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4">
-      <div className="flex max-w-80 flex-col items-center gap-3 text-center">
-        <Logo aria-hidden className="size-9 overflow-visible" />
-        <h1>You can&apos;t enter this workspace</h1>
-        <p className="text-fg-secondary text-sm leading-snug">{message}</p>
+    <AuthCard title="You can't enter this workspace" description={message}>
+      <div className="border-border flex flex-col gap-3 border-t px-6 py-5">
+        <p className="caption-style text-fg-tertiary text-center leading-snug">
+          Signed in with the wrong account? Sign out and use your work email.
+        </p>
         <Button
           variant="secondary"
-          size="sm"
+          size="md"
           onClick={onSignOut}
-          className="mt-2"
+          className="w-full"
         >
           Sign out
         </Button>
       </div>
-    </main>
+    </AuthCard>
   );
 }

@@ -13,26 +13,26 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/_ui/sheet";
-import Skeleton from "@/components/_ui/skeleton";
-import { Properties, Property } from "@/components/record/properties";
+import { DetailHero, DetailSection } from "@/components/record/detail";
+import { PeekSkeleton } from "@/features/accounts/account-peek";
 import Timeline from "@/features/timeline/timeline";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
-import { formatPhone } from "@/lib/domain/normalize";
+import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
+import TargetIcon from "@/public/assets/icons/target-05.svg";
 import XIcon from "@/public/assets/icons/x.svg";
-import LeadContactButtons from "./lead-contact";
+import { LeadStatusControl, type Lead } from "./lead-fields";
+import { DemoTag, SourceTag } from "./lead-meta";
 import {
-  LeadMessage,
-  LeadOwnerPicker,
-  LeadStatusControl,
-  Value,
-  When,
-  conversionPreview,
-  type Lead,
-} from "./lead-fields";
-import { DemoTag } from "./lead-meta";
+  LeadAttribution,
+  LeadConsent,
+  LeadConversion,
+  LeadDetails,
+  LeadMessageSection,
+  LeadSummary,
+  SpeedToLead,
+} from "./lead-sections";
 import LeadStatusMenu from "./lead-status-menu";
-import SlaIndicator from "./sla";
 import { useLeadActions } from "./use-lead-actions";
 
 /** Quick look at a lead from the list: triage, contact and convert without leaving it. */
@@ -48,7 +48,10 @@ export default function LeadPeek({
   return (
     <>
       <SheetHeader>
-        <SheetTitle>Lead</SheetTitle>
+        <div className="flex min-w-0 items-center gap-2">
+          <TargetIcon aria-hidden className="text-icon size-3.5 shrink-0" />
+          <SheetTitle>Lead details</SheetTitle>
+        </div>
         <SheetDescription className="sr-only">
           Contact details, status and activity for this lead
         </SheetDescription>
@@ -61,6 +64,7 @@ export default function LeadPeek({
               onClick={onClose}
             >
               Open page
+              <ArrowRightIcon aria-hidden className="size-3" />
             </Button>
           )}
           <SheetClose asChild>
@@ -71,17 +75,7 @@ export default function LeadPeek({
         </div>
       </SheetHeader>
       {lead === undefined ? (
-        <div aria-busy className="flex flex-col gap-4 px-6 py-6">
-          <div className="flex items-center gap-3">
-            <Skeleton className="size-10 rounded-full" />
-            <span className="flex flex-col gap-2">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-3 w-28" />
-            </span>
-          </div>
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-32 w-full rounded-xl" />
-        </div>
+        <PeekSkeleton />
       ) : lead === null ? (
         <p className="text-fg-secondary px-6 py-6">
           This lead no longer exists.
@@ -107,64 +101,17 @@ function PeekBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   return (
     <>
       <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-4 px-6 pt-6 pb-5">
-          <div className="flex items-start gap-3.5">
-            <Avatar name={lead.name} size="lg" />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <h2 className="truncate text-lg leading-6 font-semibold">
-                {lead.name}
-              </h2>
-              <p className="caption-style text-fg-secondary truncate">
-                {lead.companyName} · {LEAD_KIND_LABEL[lead.kind]}
-              </p>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1">
-                <LeadStatusControl lead={lead} />
-                <SlaIndicator lead={lead} slaMs={lead.slaMs} />
-                {lead.demoAt && <DemoTag at={lead.demoAt} />}
-              </div>
-            </div>
-          </div>
-          <LeadContactButtons lead={lead} />
-        </div>
-
-        <div className="border-border flex flex-col gap-5 border-t px-6 py-5">
-          <Properties>
-            <Property label="Owner">
-              <LeadOwnerPicker lead={lead} />
-            </Property>
-            <Property label="Email">
-              <Value>{lead.email}</Value>
-            </Property>
-            <Property label="Phone">
-              <Value>
-                {lead.phone && (
-                  <span className="tabular-nums">
-                    {formatPhone(lead.phone)}
-                  </span>
-                )}
-              </Value>
-            </Property>
-            <Property label="Source">
-              <Value>{lead.channel}</Value>
-            </Property>
-            <Property label="Received">
-              <When at={lead._creationTime} />
-            </Property>
-          </Properties>
-          {lead.message && <LeadMessage message={lead.message} />}
-          {!converted && (
-            <p className="caption-style text-fg-tertiary leading-snug">
-              Convert: {conversionPreview(lead)}
-            </p>
-          )}
-        </div>
-
-        <div className="border-border flex flex-col gap-3 border-t px-6 py-5">
-          <h3 className="caption-style text-fg-tertiary font-medium">
-            Activity
-          </h3>
-          <Timeline target={{ leadId: lead._id }} />
-        </div>
+        <LeadHero lead={lead} />
+        <LeadSummary lead={lead} />
+        <SpeedToLead lead={lead} />
+        <LeadDetails lead={lead} />
+        {lead.message && <LeadMessageSection message={lead.message} />}
+        <LeadConversion lead={lead} onNavigate={onClose} />
+        <LeadAttribution lead={lead} />
+        <LeadConsent lead={lead} />
+        <DetailSection title="Recent activity" divider={false}>
+          <Timeline target={{ leadId: lead._id }} compact />
+        </DetailSection>
       </div>
 
       <SheetFooter>
@@ -221,5 +168,22 @@ function PeekBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
         )}
       </SheetFooter>
     </>
+  );
+}
+
+/** Avatar, name, status, source and demo, then the company. */
+function LeadHero({ lead }: { lead: Lead }) {
+  return (
+    <DetailHero
+      visual={<Avatar name={lead.name} size="xl" />}
+      title={lead.name}
+    >
+      <LeadStatusControl lead={lead} />
+      <SourceTag utm={lead.utm} channel={lead.channel} />
+      {lead.demoAt && <DemoTag at={lead.demoAt} />}
+      <span className="caption-style text-fg-secondary basis-full truncate">
+        {lead.companyName} · {LEAD_KIND_LABEL[lead.kind]}
+      </span>
+    </DetailHero>
   );
 }

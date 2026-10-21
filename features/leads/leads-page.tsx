@@ -6,19 +6,29 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
-import CountBadge from "@/components/_ui/count-badge";
 import EmptyState from "@/components/_ui/empty-state";
-import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
-import RowAction from "@/components/data-table/row-action";
 import SelectionBar from "@/components/data-table/selection-bar";
 import OptionPicker from "@/components/fields/option-picker";
-import type { Column, SortState } from "@/components/data-table/types";
-import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
+import {
+  compareBy,
+  type Column,
+  type SortState,
+} from "@/components/data-table/types";
+import {
+  CreateButton,
+  ExportButton,
+  Page,
+  PageHeader,
+  PageStatus,
+  PageToolbar,
+  PageViews,
+} from "@/components/shell/page";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
+import { downloadCsv } from "@/lib/csv";
 import {
   LEAD_KINDS,
   LEAD_STATUSES,
@@ -26,14 +36,22 @@ import {
   type LeadStatus,
 } from "@/lib/domain/enums";
 import { LEAD_KIND_LABEL, LEAD_STATUS_LABEL } from "@/lib/domain/labels";
+import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
-import EyeIcon from "@/public/assets/icons/eye.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
+import XIcon from "@/public/assets/icons/x.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
-import { ChannelTag, DemoTag, compactSpan, ownerOptions } from "./lead-meta";
+import DisqualifyDialog from "./disqualify-dialog";
+import {
+  DemoCell,
+  OwnerCell,
+  SourceTag,
+  compactSpan,
+  ownerOptions,
+} from "./lead-meta";
 import LeadStatusMenu from "./lead-status-menu";
-import SlaIndicator, { slaState, useNow } from "./sla";
+import { SlaCell, slaState, useNow } from "./sla";
 import { useBulkLeadActions, useLeadActions } from "./use-lead-actions";
 
 type LeadsData = FunctionReturnType<typeof api.leads.list>;
@@ -44,9 +62,16 @@ const MINE = "mine";
 const UNASSIGNED = "unassigned";
 const DEFAULT_SORT: SortState = { id: "sla", dir: "asc" };
 
+const SORT_OPTIONS = [
+  { value: "sla", label: "SLA urgency" },
+  { value: "age", label: "Newest" },
+  { value: "demo", label: "Demo date" },
+  { value: "lead", label: "Name" },
+];
+
 function matches(row: LeadRow, query: string) {
   const text =
-    `${row.name} ${row.companyName} ${row.email ?? ""} ${row.phone ?? ""} ${row.channel} ${row.utm.campaign ?? ""}`.toLowerCase();
+    `${row.name} ${row.companyName} ${row.email ?? ""} ${row.phone ?? ""} ${row.channel} ${row.utm.campaign ?? ""} ${row.owner?.name ?? ""}`.toLowerCase();
   return query
     .toLowerCase()
     .split(/\s+/)
@@ -54,20 +79,76 @@ function matches(row: LeadRow, query: string) {
     .every((word) => text.includes(word));
 }
 
+function isClosed(row: LeadRow) {
+  return row.status === "disqualified" || row.status === "converted";
+}
+
+function median(values: number[]) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function iso(at: number | null) {
+  return at ? new Date(at).toISOString() : "";
+}
+
+function exportRows(rows: LeadRow[]) {
+  const day = new Date().toISOString().slice(0, 10);
+  downloadCsv(`leads-${day}.csv`, [
+    [
+      "Name",
+      "Company",
+      "Email",
+      "Phone",
+      "Kind",
+      "Status",
+      "Source",
+      "Campaign",
+      "Owner",
+      "Received",
+      "First touch",
+      "Speed to lead (min)",
+      "Demo",
+    ],
+    ...rows.map((row) => [
+      row.name,
+      row.companyName,
+      row.email ?? "",
+      row.phone ?? "",
+      LEAD_KIND_LABEL[row.kind],
+      LEAD_STATUS_LABEL[row.status],
+      row.channel,
+      row.utm.campaign ?? "",
+      row.owner?.name ?? "",
+      iso(row._creationTime),
+      iso(row.firstTouchedAt),
+      row.firstTouchedAt
+        ? Math.round((row.firstTouchedAt - row._creationTime) / 6000) / 10
+        : "",
+      iso(row.demoAt),
+    ]),
+  ]);
+}
+
 /** The inbound lead inbox: triage by status, watch the SLA, peek or open a lead. */
 export default function LeadsPage() {
   const viewer = useViewer();
   const members = useMembers();
   const data = useQuery(api.leads.list);
-  const { assign } = useLeadActions();
+  const { assign, setStatus } = useLeadActions();
   const bulk = useBulkLeadActions();
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
   const now = useNow(true, 30_000);
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useUrlState("q", "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [status, setStatusTab] = useUrlState("status", "new");
+  const [disqualifying, setDisqualifying] = useState<LeadRow | null>(null);
+  const [statusParam, setStatusView] = useUrlState("status", "new");
   const [owner, setOwner] = useUrlState("owner", ANY);
   const [channel, setChannel] = useUrlState("source", ANY);
   const [kind, setKind] = useUrlState("kind", ANY);
@@ -76,21 +157,28 @@ export default function LeadsPage() {
     `${DEFAULT_SORT.id}:${DEFAULT_SORT.dir}`,
   );
 
+  const status: LeadStatus = (LEAD_STATUSES as readonly string[]).includes(
+    statusParam,
+  )
+    ? (statusParam as LeadStatus)
+    : "new";
   const slaMs = data?.slaMs ?? 0;
 
   const columns: Column<LeadRow>[] = [
     {
       id: "lead",
       header: "Lead",
-      width: "minmax(15rem,2fr)",
+      width: "minmax(14rem,1.8fr)",
       sortValue: (row) => row.name,
       cell: (row) => (
         <>
-          <Avatar name={row.name} size="sm" />
+          <Avatar name={row.name} />
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="truncate font-medium">{row.name}</span>
+            <span className="truncate" title={row.name}>
+              {row.name}
+            </span>
             <span
-              className="text-fg-tertiary truncate font-normal"
+              className="text-fg-tertiary truncate"
               title={`${row.companyName} · ${LEAD_KIND_LABEL[row.kind]}`}
             >
               {row.companyName}
@@ -102,31 +190,22 @@ export default function LeadsPage() {
     {
       id: "source",
       header: "Source",
-      width: "minmax(8rem,1fr)",
+      width: "minmax(9rem,1fr)",
+      minViewport: 900,
       sortValue: (row) => row.channel,
-      cell: (row) => <ChannelTag channel={row.channel} />,
+      cell: (row) => <SourceTag utm={row.utm} channel={row.channel} />,
     },
     {
       id: "owner",
       header: "Owner",
-      width: "minmax(9rem,1fr)",
+      width: "minmax(8.75rem,1fr)",
+      minViewport: 1000,
       sortValue: (row) => row.owner?.name ?? null,
-      cell: (row) => (
-        <OptionPicker
-          value={row.owner?._id ?? null}
-          label={`Owner of ${row.name}`}
-          placeholder="Unassigned"
-          searchPlaceholder="Search teammates…"
-          clearLabel="Unassign"
-          options={ownerOptions(members, row.owner)}
-          onChange={(value) => void assign(row, value)}
-          className="mx-0 -ml-1.5"
-        />
-      ),
+      cell: (row) => <OwnerCell owner={row.owner} />,
     },
     {
       id: "sla",
-      header: "First touch",
+      header: "SLA",
       width: "minmax(9.5rem,1fr)",
       sortValue: (row) => {
         const state = slaState(row, slaMs, now);
@@ -134,34 +213,29 @@ export default function LeadsPage() {
         if (state.kind === "breached") return -state.overMs;
         return null;
       },
-      cell: (row) => <SlaIndicator lead={row} slaMs={slaMs} />,
+      cell: (row) => <SlaCell lead={row} slaMs={slaMs} />,
     },
     {
       id: "demo",
       header: "Demo",
-      width: "8rem",
+      width: "minmax(8.5rem,0.9fr)",
       minViewport: 1100,
       sortValue: (row) => row.demoAt,
-      cell: (row) =>
-        row.demoAt ? (
-          <DemoTag at={row.demoAt} />
-        ) : (
-          <span className="text-fg-tertiary">—</span>
-        ),
+      cell: (row) => <DemoCell at={row.demoAt} now={now} />,
     },
     {
       id: "age",
-      header: "Received",
-      width: "6.5rem",
+      header: "Age",
+      width: "5.5rem",
       align: "end",
       defaultDir: "asc",
       sortValue: (row) => now - row._creationTime,
       cell: (row) => (
         <span
-          className="text-fg-secondary whitespace-nowrap tabular-nums"
-          title={new Date(row._creationTime).toLocaleString("en-IN")}
+          className="whitespace-nowrap tabular-nums"
+          title={`Received ${new Date(row._creationTime).toLocaleString("en-IN")}`}
         >
-          {compactSpan(now - row._creationTime)} ago
+          {compactSpan(now - row._creationTime)}
         </span>
       ),
     },
@@ -193,14 +267,19 @@ export default function LeadsPage() {
   }, [leads, owner, channel, kind, search, viewer._id]);
 
   const counts = useMemo(() => {
+    if (!filtered) return undefined;
     const result = Object.fromEntries(
       LEAD_STATUSES.map((value) => [value, 0]),
     ) as Record<LeadStatus, number>;
-    for (const row of filtered ?? []) result[row.status]++;
+    for (const row of filtered) result[row.status]++;
     return result;
   }, [filtered]);
 
-  const rows = filtered?.filter((row) => row.status === status);
+  const rows = useMemo(
+    () => filtered?.filter((row) => row.status === status),
+    [filtered, status],
+  );
+
   const breached = useMemo(
     () =>
       (leads ?? []).filter(
@@ -208,6 +287,31 @@ export default function LeadsPage() {
       ).length,
     [leads, slaMs, now],
   );
+  const openCount = leads?.filter((row) => !isClosed(row)).length;
+
+  const stats = useMemo(() => {
+    if (!rows) return null;
+    let within = 0;
+    let judged = 0;
+    const speeds: number[] = [];
+    for (const row of rows) {
+      const state = slaState(row, slaMs, now);
+      if (state.kind === "replied") {
+        speeds.push(state.tookMs);
+        judged++;
+        if (!state.late) within++;
+      } else if (state.kind === "breached") {
+        judged++;
+      }
+    }
+    return {
+      untouched: rows.filter((row) => !row.firstTouchedAt && !isClosed(row))
+        .length,
+      median: median(speeds),
+      within: judged ? Math.round((within / judged) * 100) : null,
+    };
+  }, [rows, slaMs, now]);
+
   const selectedIds = (rows ?? [])
     .filter((row) => selected.has(row._id))
     .map((row) => row._id);
@@ -217,6 +321,7 @@ export default function LeadsPage() {
     setSelected(new Set());
     void bulk.setStatus(ids, next, reason);
   }
+
   const channels = useMemo(
     () => [...new Set((leads ?? []).map((row) => row.channel))].sort(),
     [leads],
@@ -231,6 +336,23 @@ export default function LeadsPage() {
     setKind(ANY);
   }
 
+  function exportView() {
+    if (!rows) return;
+    const column = columns.find((item) => item.id === sort.id);
+    const sorted = column?.sortValue
+      ? [...rows].sort(compareBy(column, sort.dir))
+      : rows;
+    exportRows(sorted);
+    toast(
+      `Exported ${sorted.length} ${sorted.length === 1 ? "lead" : "leads"}`,
+    );
+  }
+
+  const sortMenu = SORT_OPTIONS.some((option) => option.value === sort.id)
+    ? sort.id
+    : DEFAULT_SORT.id;
+  const dash = <span className="text-fg-tertiary">—</span>;
+
   return (
     <Page>
       <PageHeader
@@ -238,75 +360,61 @@ export default function LeadsPage() {
         meta={
           leads && (
             <>
-              <span className="caption-style text-fg-tertiary tabular-nums">
-                {leads.length}
-              </span>
+              <PageStatus tone="neutral">
+                <span className="tabular-nums">{openCount} open</span>
+              </PageStatus>
               {breached > 0 && (
                 <button
                   type="button"
                   onClick={() => {
-                    setStatusTab("new");
+                    setStatusView("new");
                     setSortParam("sla:asc");
                   }}
-                  className="caption-style text-danger hover:bg-overlay-1 focus-visible:ring-ring flex items-center gap-1.5 rounded-full px-2 py-0.5 tabular-nums outline-none focus-visible:ring-2"
+                  aria-label={`${breached} past SLA. Show them first`}
+                  className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
                 >
-                  <span
-                    aria-hidden
-                    className="size-1.5 rounded-full bg-current"
-                  />
-                  {breached} past SLA
+                  <PageStatus tone="danger">
+                    <span className="tabular-nums">{breached} past SLA</span>
+                  </PageStatus>
                 </button>
               )}
             </>
           )
         }
-        actions={
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setCreate({ type: "lead" })}
-          >
-            <PlusIcon aria-hidden className="size-3" />
-            New lead
-          </Button>
-        }
       />
-      <Tabs
+      <PageViews
+        label="Lead status"
         value={status}
-        onValueChange={(next) => {
-          setStatusTab(next);
+        onChange={(next) => {
+          setStatusView(next);
           setSelected(new Set());
         }}
+        views={LEAD_STATUSES.map((value) => ({
+          id: value,
+          label: LEAD_STATUS_LABEL[value],
+          count: counts?.[value],
+        }))}
+      />
+      <PageToolbar
+        actions={
+          <>
+            <ExportButton disabled={!rows?.length} onClick={exportView} />
+            <CreateButton onClick={() => setCreate({ type: "lead" })}>
+              New lead
+            </CreateButton>
+          </>
+        }
       >
-        <TabsList
-          aria-label="Lead status"
-          className="border-border scrollbar-none gap-5 overflow-x-auto border-b px-4"
-        >
-          {LEAD_STATUSES.map((value) => (
-            <TabsTrigger key={value} value={value} className="shrink-0 py-3">
-              <span className="flex items-center gap-1.5">
-                {LEAD_STATUS_LABEL[value]}
-                {data && (
-                  <CountBadge
-                    className={
-                      value === "new" && counts.new > 0
-                        ? "text-foreground"
-                        : undefined
-                    }
-                  >
-                    {counts[value]}
-                  </CountBadge>
-                )}
-              </span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      <PageToolbar>
         <SearchInput
           value={search}
           onChange={setSearch}
           placeholder="Search leads"
+        />
+        <FilterMenu
+          label="Sort by"
+          value={sortMenu}
+          options={SORT_OPTIONS}
+          onChange={(id) => setSortParam(`${id}:asc`)}
         />
         <FilterMenu
           label="Owner"
@@ -351,7 +459,7 @@ export default function LeadsPage() {
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <DataTable
-          label={`${LEAD_STATUS_LABEL[status as LeadStatus] ?? "New"} leads`}
+          label={`${LEAD_STATUS_LABEL[status]} leads`}
           columns={columns}
           rows={rows}
           getId={(row) => row._id}
@@ -362,46 +470,40 @@ export default function LeadsPage() {
           selected={selected}
           onSelectedChange={setSelected}
           onPeek={(row) => setPeek({ type: "lead", id: row._id })}
-          rowActions={(row) => (
-            <>
-              {row.owner?._id !== viewer._id && (
-                <RowAction
-                  label="Assign to me"
-                  icon={UserPlusIcon}
-                  onClick={() => void assign(row, viewer._id)}
-                />
-              )}
-              <RowAction
-                label="Peek"
-                icon={EyeIcon}
-                shortcut="Space"
-                onClick={() => setPeek({ type: "lead", id: row._id })}
-              />
-            </>
-          )}
-          renderCard={(row) => (
-            <span className="flex items-start gap-3">
-              <Avatar name={row.name} size="md" />
-              <span className="flex min-w-0 flex-1 flex-col gap-2">
-                <span className="lead-style truncate font-medium">
-                  {row.name}
-                  <span className="text-fg-tertiary font-normal">
-                    {" "}
-                    · {row.companyName}
-                  </span>
-                </span>
-                <span className="flex min-w-0 items-center gap-2">
-                  <SlaIndicator lead={row} slaMs={slaMs} />
-                  <span className="caption-style text-fg-tertiary truncate">
-                    {row.owner?.name ?? "Unassigned"} · {row.channel}
-                  </span>
-                </span>
-              </span>
-              <span className="caption-style text-fg-tertiary pt-0.5 tabular-nums">
-                {compactSpan(now - row._creationTime)}
-              </span>
-            </span>
-          )}
+          rowMenu={(row) => [
+            row.owner?._id !== viewer._id && {
+              label: "Assign to me",
+              icon: UserPlusIcon,
+              onSelect: () => void assign(row, viewer._id),
+            },
+            !isClosed(row) && {
+              label: "Disqualify…",
+              icon: XIcon,
+              tone: "danger",
+              onSelect: () => setDisqualifying(row),
+            },
+          ]}
+          footer={[
+            { label: "Leads in view", value: rows?.length ?? 0 },
+            { label: "Untouched", value: stats?.untouched ?? 0 },
+            {
+              label: "Median speed to lead",
+              value: stats?.median == null ? dash : compactSpan(stats.median),
+            },
+            {
+              label: "Within SLA",
+              value:
+                stats?.within == null ? (
+                  dash
+                ) : (
+                  <>
+                    {stats.within}
+                    <span className="text-fg-tertiary">%</span>
+                  </>
+                ),
+            },
+          ]}
+          renderCard={(row) => <LeadCard row={row} slaMs={slaMs} now={now} />}
           empty={
             hasFilters ? (
               <EmptyState
@@ -420,7 +522,7 @@ export default function LeadsPage() {
                 title={
                   status === "new"
                     ? "Inbox zero"
-                    : `No ${LEAD_STATUS_LABEL[status as LeadStatus]?.toLowerCase() ?? ""} leads`
+                    : `No ${LEAD_STATUS_LABEL[status].toLowerCase()} leads`
                 }
                 description={
                   status === "new"
@@ -452,7 +554,11 @@ export default function LeadsPage() {
             align="start"
             clearLabel="Unassign"
             searchPlaceholder="Search teammates…"
-            onChange={(id) => void bulk.assign(selectedIds, id)}
+            onChange={(id) => {
+              const ids = selectedIds;
+              setSelected(new Set());
+              void bulk.assign(ids, id);
+            }}
             options={ownerOptions(members, null)}
             className="h-control-sm mx-0 px-2.5 text-xs"
           >
@@ -481,6 +587,46 @@ export default function LeadsPage() {
           )}
         </SelectionBar>
       </div>
+      <DisqualifyDialog
+        lead={disqualifying}
+        onClose={() => setDisqualifying(null)}
+        onPick={(reason) =>
+          disqualifying && void setStatus(disqualifying, "disqualified", reason)
+        }
+      />
     </Page>
+  );
+}
+
+function LeadCard({
+  row,
+  slaMs,
+  now,
+}: {
+  row: LeadRow;
+  slaMs: number;
+  now: number;
+}) {
+  return (
+    <span className="flex flex-col gap-2.5">
+      <span className="flex items-center gap-3">
+        <Avatar name={row.name} size="md" />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="lead-style truncate font-medium">{row.name}</span>
+          <span className="caption-style text-fg-tertiary truncate">
+            {row.companyName} · {row.owner?.name ?? "Unassigned"}
+          </span>
+        </span>
+        <span className="caption-style text-fg-tertiary shrink-0 tabular-nums">
+          {compactSpan(now - row._creationTime)}
+        </span>
+      </span>
+      <span className="caption-style flex items-center justify-between gap-3 pl-10">
+        <SourceTag utm={row.utm} channel={row.channel} />
+        <span className="text-fg-secondary min-w-0 shrink-0">
+          <SlaCell lead={row} slaMs={slaMs} />
+        </span>
+      </span>
+    </span>
   );
 }

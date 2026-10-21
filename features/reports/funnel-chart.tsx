@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Tag from "@/components/_ui/tag";
+import SegmentBar from "@/components/_common/segment-bar";
 import {
   FIRST_PLATFORM_STEP,
   type FunnelStepKey,
@@ -13,7 +14,10 @@ const GROUPS: Record<number, string> = {
   [FIRST_PLATFORM_STEP]: "On the platform",
 };
 
-/** Horizontal funnel with step and overall conversion; the previous period shows as a tick on each track. */
+const GRID =
+  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:grid-cols-[11.5rem_minmax(0,1fr)_3.5rem_3.5rem_5.5rem_4.5rem]";
+
+/** Funnel steps as segmented meters scaled to the larger period, with step, overall and previous-period figures. */
 export default function FunnelChart({
   funnel,
   previous,
@@ -24,7 +28,6 @@ export default function FunnelChart({
   /** The list behind a step, e.g. accounts at that stage today. */
   hrefFor: (key: FunnelStepKey) => string;
 }) {
-  const hasPrevious = previous.some((value) => value > 0);
   const scale = Math.max(1, funnel.steps[0].count, previous[0] ?? 0);
   const dropIndex = funnel.steps.findIndex(
     (step) => step.key === funnel.biggestDrop,
@@ -33,7 +36,7 @@ export default function FunnelChart({
   const before = dropIndex > 0 ? funnel.steps[dropIndex - 1] : null;
 
   return (
-    <div className="flex flex-col gap-4 p-4 sm:p-5">
+    <div className="flex flex-col gap-4 px-4 py-4 sm:px-5">
       {drop && before && (
         <p className="lead-style text-fg-secondary leading-snug">
           Biggest drop:{" "}
@@ -44,20 +47,16 @@ export default function FunnelChart({
           {count(before.count)}).
         </p>
       )}
-      <div className="caption-style text-fg-tertiary hidden grid-cols-[12.5rem_1fr_4rem_5.5rem_4.5rem] items-center gap-x-4 sm:grid">
+      <div
+        className={cn(
+          GRID,
+          "caption-style text-fg-tertiary hidden tabular-nums sm:grid",
+        )}
+      >
         <span>Step</span>
-        <span className="flex items-center gap-1.5">
-          {hasPrevious && (
-            <>
-              <span
-                aria-hidden
-                className="bg-fg-tertiary h-3 w-0.5 rounded-full"
-              />
-              Previous period
-            </>
-          )}
-        </span>
+        <span>Share of leads</span>
         <span className="text-right">Count</span>
+        <span className="text-right">Prev.</span>
         <span className="text-right">From previous</span>
         <span className="text-right">Of leads</span>
       </div>
@@ -65,7 +64,6 @@ export default function FunnelChart({
         {funnel.steps.map((step, index) => {
           const isDrop = index === dropIndex;
           const platform = index >= FIRST_PLATFORM_STEP;
-          const width = (step.count / scale) * 100;
           const prior = previous[index] ?? 0;
           return (
             <li key={step.key} className="flex flex-col">
@@ -81,7 +79,8 @@ export default function FunnelChart({
               )}
               <div
                 className={cn(
-                  "grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-lg py-1.5 sm:grid-cols-[12.5rem_1fr_4rem_5.5rem_4.5rem]",
+                  GRID,
+                  "rounded-lg py-1.5",
                   isDrop &&
                     "-mx-2 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] px-2",
                 )}
@@ -104,32 +103,19 @@ export default function FunnelChart({
                     </Tag>
                   )}
                 </span>
-                <span
-                  aria-hidden
-                  className="bg-overlay-1 relative col-span-2 row-start-2 h-5 rounded-sm sm:col-span-1 sm:row-start-auto"
-                >
-                  <span
-                    className={cn(
-                      "duration-slow absolute inset-y-0 left-0 rounded-sm transition-[width]",
-                      platform ? "bg-trend" : "bg-selected",
-                      step.count > 0 && "min-w-1",
-                    )}
-                    style={{ width: `${width}%` }}
-                  />
-                  {prior > 0 && (
-                    <span
-                      className="bg-fg-tertiary absolute -inset-y-0.5 w-0.5 -translate-x-1/2 rounded-full"
-                      style={{ left: `${(prior / scale) * 100}%` }}
-                    />
-                  )}
-                </span>
+                <SegmentBar
+                  percent={(step.count / scale) * 100}
+                  segments={40}
+                  tone={isDrop ? "danger" : platform ? "success" : "auto"}
+                  className="col-span-2 row-start-2 w-full sm:col-span-1 sm:row-start-auto"
+                />
                 <span className="lead-style flex items-baseline justify-end gap-2 text-right tabular-nums sm:contents">
                   <span className="font-medium sm:text-right">
                     {count(step.count)}
-                    <span className="sr-only">
-                      {" "}
-                      (previous period {count(prior)})
-                    </span>
+                  </span>
+                  <span className="text-fg-tertiary max-sm:hidden sm:text-right">
+                    <span className="sr-only">previous period </span>
+                    {count(prior)}
                   </span>
                   <span
                     className={cn(
@@ -137,9 +123,6 @@ export default function FunnelChart({
                       isDrop && "text-danger font-medium",
                     )}
                   >
-                    <span className="sm:hidden">
-                      {index === 0 ? "" : "Step "}
-                    </span>
                     <span className="sr-only">from previous step </span>
                     {index === 0 ? "" : percent(step.stepRate)}
                   </span>

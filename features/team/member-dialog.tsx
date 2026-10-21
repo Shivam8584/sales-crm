@@ -10,12 +10,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/_ui/dialog";
+import Tag from "@/components/_ui/tag";
+import { Properties, Property } from "@/components/record";
 import { type Role } from "@/lib/domain/enums";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { StatusTag } from "./members-table";
-import { ROLE_DESCRIPTION, ROLE_OPTIONS } from "./roles";
+import { ROLE_DESCRIPTION, ROLE_OPTIONS, ROLE_TONE } from "./roles";
 import {
   lockReason,
   useMemberActions,
@@ -46,7 +48,7 @@ export default function MemberDialog({
         {member && (
           <>
             <DialogHeader className="flex-row items-center gap-3 pr-14">
-              <Avatar name={member.name} size="lg" />
+              <Avatar name={member.name} size="xl" />
               <div className="flex min-w-0 flex-col gap-1.5">
                 <DialogTitle className="truncate">{member.name}</DialogTitle>
                 <DialogDescription className="truncate">
@@ -54,48 +56,63 @@ export default function MemberDialog({
                 </DialogDescription>
               </div>
             </DialogHeader>
-            <dl className="grid grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-3 px-6 py-5 text-sm">
-              <dt className="text-fg-tertiary">Status</dt>
-              <dd>
-                <StatusTag status={member.status} />
-              </dd>
-              <dt className="text-fg-tertiary">Joined</dt>
-              <dd>{shortDate(member.joinedAt)}</dd>
-              <dt className="text-fg-tertiary self-start pt-1.5">Role</dt>
-              <dd className="flex flex-col gap-1.5">
-                {editable ? (
+            <div className="flex flex-col gap-4 px-6 py-5">
+              <Properties>
+                <Property label="Status">
+                  <StatusTag status={member.status} />
+                </Property>
+                <Property label="Joined">
+                  <span className="text-sm">{shortDate(member.joinedAt)}</span>
+                </Property>
+                {!editable && (
+                  <Property label="Role">
+                    <Tag tone={ROLE_TONE[member.role]} size="sm">
+                      {ROLE_LABEL[member.role]}
+                    </Tag>
+                  </Property>
+                )}
+              </Properties>
+              {editable && (
+                <div className="flex flex-col gap-2">
+                  <span
+                    id="member-role-label"
+                    className="caption-style text-fg-secondary"
+                  >
+                    Role
+                  </span>
                   <div
                     role="group"
-                    aria-label={`Role for ${member.name}`}
-                    className="bg-muted flex rounded-lg p-0.5"
+                    aria-labelledby="member-role-label"
+                    className="flex flex-wrap gap-1.5"
                   >
-                    {ROLE_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        aria-pressed={member.role === option.value}
-                        onClick={() =>
-                          void setRole(member, option.value as Role)
-                        }
-                        className={cn(
-                          "focus-visible:ring-ring duration-fast h-7 flex-1 rounded-md text-xs font-medium transition-colors outline-none focus-visible:ring-2",
-                          member.role === option.value
-                            ? "bg-card text-foreground shadow-raised"
-                            : "text-fg-secondary hover:text-foreground",
-                        )}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+                    {ROLE_OPTIONS.map((option) => {
+                      const checked = member.role === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={checked}
+                          onClick={() =>
+                            void setRole(member, option.value as Role)
+                          }
+                          className={cn(
+                            "focus-visible:ring-ring duration-fast ease-power3-out flex h-8 items-center rounded-full border px-3 text-xs leading-none font-medium transition-[background-color,border-color,color] outline-none focus-visible:ring-2",
+                            checked
+                              ? "border-selected bg-overlay-1 text-foreground"
+                              : "border-input text-fg-secondary hover:bg-overlay-1 hover:text-foreground",
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <span className="pt-1.5">{ROLE_LABEL[member.role]}</span>
-                )}
-                <span className="caption-style text-fg-tertiary leading-snug">
-                  {ROLE_DESCRIPTION[member.role]}
-                </span>
-              </dd>
-            </dl>
+                </div>
+              )}
+              <p className="caption-style text-fg-tertiary leading-snug">
+                {ROLE_DESCRIPTION[member.role]}
+              </p>
+            </div>
             {isAdmin && (
               <DialogFooter className="justify-between">
                 <span className="caption-style text-fg-tertiary leading-snug">
@@ -103,7 +120,7 @@ export default function MemberDialog({
                 </span>
                 {member.status === "active" ? (
                   <Button
-                    variant="subtle"
+                    variant="secondary"
                     size="sm"
                     disabled={!!locked}
                     className="text-danger"

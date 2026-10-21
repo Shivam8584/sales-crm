@@ -15,6 +15,7 @@ import Skeleton from "@/components/_ui/skeleton";
 import { Properties, Property } from "@/components/record/properties";
 import AccountLogo from "@/features/accounts/account-logo";
 import MemberPicker from "@/features/members/member-picker";
+import ProposalSummary from "@/features/proposals/proposal-summary";
 import Timeline from "@/features/timeline/timeline";
 import { personName } from "@/lib/domain/labels";
 import XIcon from "@/public/assets/icons/x.svg";
@@ -150,6 +151,9 @@ function PeekBody({ deal, onClose }: { deal: DealRow; onClose: () => void }) {
                 </span>
               </button>
             </DealPeopleMenu>
+          </Property>
+          <Property label="Proposal">
+            <ProposalSummary dealId={deal._id} onNavigate={onClose} />
           </Property>
           {deal.stage === "lost" && deal.lostReason && (
             <Property label="Lost reason">

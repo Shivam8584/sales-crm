@@ -7,10 +7,15 @@ import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
+import Tag from "@/components/_ui/tag";
 import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
+import { ROLE_TONE } from "@/features/team/roles";
+import type { Role } from "@/lib/domain/enums";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
-import Logo from "@/public/assets/images/_common/logo.svg";
+import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
+import MailIcon from "@/public/assets/icons/mail.svg";
+import AuthCard from "./auth-card";
 
 type Flow = "signIn" | "signUp";
 
@@ -57,114 +62,157 @@ export default function SignIn() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4 py-10">
-      <div className="bg-card shadow-card flex w-full max-w-90 flex-col rounded-xl">
-        <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-2 text-center">
-          <Logo aria-hidden className="size-10 overflow-visible" />
-          <h1>Hypedrive CRM</h1>
-          <p className="caption-style text-fg-secondary leading-snug">
-            {flow === "signIn"
-              ? "Sign in to see your team's pipeline."
-              : "Create an account to join your team's pipeline."}
-          </p>
-        </div>
-
-        <Tabs
-          value={flow}
-          onValueChange={(value) => {
-            setFlow(value as Flow);
-            setError(null);
-          }}
+    <AuthCard
+      title={
+        invite
+          ? "Join your team on Hypedrive"
+          : flow === "signIn"
+            ? "Sign in to Hypedrive"
+            : "Create your account"
+      }
+      description={
+        flow === "signIn"
+          ? "Pick up your team's pipeline where you left it."
+          : "Set a password to start working leads, accounts and deals."
+      }
+    >
+      <Tabs
+        value={flow}
+        onValueChange={(value) => {
+          setFlow(value as Flow);
+          setError(null);
+        }}
+      >
+        <TabsList
+          aria-label="Sign in or create an account"
+          className="justify-center gap-6 px-6 shadow-[inset_0_-1px_0_var(--border)]"
         >
-          <TabsList className="justify-center px-6 shadow-[inset_0_-1px_0_var(--border)]">
-            <TabsTrigger value="signIn">Sign in</TabsTrigger>
-            <TabsTrigger value="signUp">Create account</TabsTrigger>
-          </TabsList>
-        </Tabs>
+          <TabsTrigger value="signIn" className="py-3">
+            Sign in
+          </TabsTrigger>
+          <TabsTrigger value="signUp" className="py-3">
+            Create account
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-4 px-6 pt-5 pb-6"
-        >
-          {token && invite !== undefined && (
-            <p
-              role="status"
-              className="caption-style bg-muted text-fg-secondary rounded-lg px-3 py-2.5 leading-snug"
-            >
-              {invite ? (
-                <>
-                  You&apos;ve been invited to join as{" "}
-                  <span className="text-foreground font-medium">
-                    {ROLE_LABEL[invite.role]}
-                  </span>
-                  .
-                </>
-              ) : (
-                "This invite link has expired or was revoked. Ask an admin for a new one."
-              )}
-            </p>
-          )}
-          {flow === "signUp" && (
-            <Field label="Full name" htmlFor="auth-name">
-              <Input
-                id="auth-name"
-                name="name"
-                autoComplete="name"
-                required
-                placeholder="Priya Sharma"
-              />
-            </Field>
-          )}
-          <Field label="Work email" htmlFor="auth-email">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4 px-6 pt-5 pb-6"
+      >
+        {token && invite !== undefined && <InviteNote invite={invite} />}
+        {flow === "signUp" && (
+          <Field label="Full name" htmlFor="auth-name">
             <Input
-              key={invite?.email ?? "email"}
-              id="auth-email"
-              name="email"
-              defaultValue={invite?.email}
-              readOnly={!!invite}
-              className="read-only:bg-muted read-only:text-fg-secondary"
-              type="email"
-              autoComplete="email"
-              spellCheck={false}
+              id="auth-name"
+              name="name"
+              autoComplete="name"
               required
-              placeholder="you@company.com"
+              placeholder="Priya Sharma"
             />
           </Field>
-          <Field
-            label="Password"
-            htmlFor="auth-password"
-            hint={
-              flow === "signUp"
-                ? `At least ${MIN_PASSWORD} characters.`
-                : undefined
+        )}
+        <Field label="Work email" htmlFor="auth-email">
+          <Input
+            key={invite?.email ?? "email"}
+            id="auth-email"
+            name="email"
+            defaultValue={invite?.email}
+            readOnly={!!invite}
+            className="read-only:bg-muted read-only:text-fg-secondary"
+            type="email"
+            autoComplete="email"
+            spellCheck={false}
+            required
+            placeholder="you@company.com"
+          />
+        </Field>
+        <Field
+          label="Password"
+          htmlFor="auth-password"
+          hint={
+            flow === "signUp"
+              ? `At least ${MIN_PASSWORD} characters.`
+              : undefined
+          }
+        >
+          <Input
+            id="auth-password"
+            name="password"
+            type="password"
+            autoComplete={
+              flow === "signIn" ? "current-password" : "new-password"
             }
+            required
+            aria-describedby={
+              flow === "signUp" ? "auth-password-hint" : undefined
+            }
+          />
+        </Field>
+        {error && (
+          <p
+            role="alert"
+            className="caption-style text-danger flex items-start gap-1.5 leading-snug"
           >
-            <Input
-              id="auth-password"
-              name="password"
-              type="password"
-              autoComplete={
-                flow === "signIn" ? "current-password" : "new-password"
-              }
-              required
-            />
-          </Field>
-          {error && (
-            <p role="alert" className="caption-style text-danger leading-snug">
-              {error}
-            </p>
-          )}
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            loading={pending}
-            className="mt-1 w-full"
-          >
-            {flow === "signIn" ? "Sign in" : "Create account"}
-          </Button>
-        </form>
+            <AlertIcon aria-hidden className="mt-px size-3 shrink-0" />
+            {error}
+          </p>
+        )}
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          loading={pending}
+          className="mt-1 w-full"
+        >
+          {flow === "signIn" ? "Sign in" : "Create account"}
+        </Button>
+      </form>
+    </AuthCard>
+  );
+}
+
+function InviteNote({
+  invite,
+}: {
+  invite: { email: string; role: Role } | null;
+}) {
+  if (!invite) {
+    return (
+      <div
+        role="status"
+        className="border-border bg-overlay-1 flex items-start gap-3 rounded-xl border p-3 text-left"
+      >
+        <span className="bg-muted shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full">
+          <AlertIcon aria-hidden className="text-warning size-3.5" />
+        </span>
+        <p className="caption-style text-fg-secondary pt-0.5 leading-snug">
+          This invite link has expired or was revoked. Ask an admin for a new
+          one, or sign in if you already have an account.
+        </p>
       </div>
-    </main>
+    );
+  }
+  return (
+    <div
+      role="status"
+      className="border-border bg-overlay-1 flex items-center gap-3 rounded-xl border p-3 text-left"
+    >
+      <span className="bg-muted shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full">
+        <MailIcon aria-hidden className="text-fg-secondary size-3.5" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span className="lead-style font-medium">You&apos;re invited</span>
+        <span
+          className="caption-style text-fg-tertiary truncate"
+          title={invite.email}
+        >
+          {invite.email}
+        </span>
+      </span>
+      <Tag tone={ROLE_TONE[invite.role]} size="sm">
+        {ROLE_LABEL[invite.role]}
+      </Tag>
+    </div>
   );
 }

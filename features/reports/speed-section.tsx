@@ -7,9 +7,11 @@ import type { Column, SortState } from "@/components/data-table/types";
 import type { SpeedStats } from "@/convex/lib/reports";
 import { useUrlState } from "@/hooks/use-url-state";
 import { cn } from "@/lib/utils";
+import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
+import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import ClockIcon from "@/public/assets/icons/clock.svg";
 import { count, duration, percent } from "./format";
-import { Panel } from "./section";
+import { MetricTile, Panel } from "./section";
 
 export type OwnerRow = SpeedStats & {
   ownerId: string;
@@ -88,30 +90,6 @@ function columns(slaLabel: string): Column<OwnerRow>[] {
   ];
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "danger";
-}) {
-  return (
-    <div className="bg-background flex min-w-0 flex-col gap-2 px-4 py-3.5">
-      <dt className="caption-style text-fg-tertiary truncate">{label}</dt>
-      <dd
-        className={cn(
-          "text-lg leading-none font-semibold tabular-nums",
-          tone === "danger" && "text-danger",
-        )}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
 /** Speed-to-lead headline numbers and the same numbers per owner. */
 export default function SpeedSection({
   speed,
@@ -137,30 +115,55 @@ export default function SpeedSection({
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <Panel className="overflow-hidden">
-        <dl className="bg-border grid grid-cols-2 gap-px sm:grid-cols-4">
-          <Stat label="Median" value={duration(speed.medianMs)} />
-          <Stat label="p90" value={duration(speed.p90Ms)} />
-          <Stat
-            label={`Within ${slaLabel} SLA`}
-            value={
-              speed.withinRate === null
-                ? "—"
-                : `${percent(speed.withinRate)} (${count(speed.within)}/${count(speed.due)})`
-            }
-          />
-          <Stat
-            label="Breached"
-            value={count(speed.breached)}
-            tone={speed.breached > 0 ? "danger" : undefined}
-          />
-        </dl>
+    <>
+      <Panel className="grid grid-cols-2 gap-2 px-4 py-4 sm:grid-cols-4 sm:px-5">
+        <MetricTile
+          icon={ClockIcon}
+          label="Median"
+          value={duration(speed.medianMs)}
+        />
+        <MetricTile
+          icon={ClockIcon}
+          label="p90"
+          value={duration(speed.p90Ms)}
+        />
+        <MetricTile
+          icon={CheckCircleIcon}
+          label={`Within ${slaLabel} SLA`}
+          value={percent(speed.withinRate)}
+          detail={`${count(speed.within)} of ${count(speed.due)} leads`}
+        />
+        <MetricTile
+          icon={AlertIcon}
+          label="Breached"
+          value={count(speed.breached)}
+          tone={speed.breached > 0 ? "danger" : undefined}
+        />
       </Panel>
-      <Panel className="flex flex-col overflow-hidden">
+      <Panel className="flex flex-col">
         <DataTable
+          footer={[
+            {
+              label: owners.length === 1 ? "Owner" : "Owners",
+              value: owners.length,
+            },
+            {
+              label: "Leads",
+              value: count(owners.reduce((sum, row) => sum + row.leads, 0)),
+            },
+            { label: "Within SLA", value: percent(speed.withinRate) },
+            {
+              label: "Breached",
+              value: (
+                <span className={cn(speed.breached > 0 && "text-danger")}>
+                  {count(speed.breached)}
+                </span>
+              ),
+            },
+          ]}
           label="Speed to lead by owner"
           keyboard={false}
+          actionColumn={false}
           columns={cols}
           rows={owners}
           getId={(row) => row.ownerId}
@@ -200,6 +203,6 @@ export default function SpeedSection({
           }
         />
       </Panel>
-    </div>
+    </>
   );
 }

@@ -13,7 +13,13 @@ import {
 } from "@/components/_ui/select";
 import { EMBED_HEIGHT_MESSAGE } from "@/features/demo/embed-resizer";
 import { LEAD_LIMITS, type Utm } from "@/lib/domain/leads";
-import { CopyField, IntegrationCard } from "./settings-ui";
+import CursorIcon from "@/public/assets/icons/cursor-click.svg";
+import {
+  CopyField,
+  IconTile,
+  IntegrationCard,
+  SettingsBlock,
+} from "./settings-ui";
 
 const UTM_FIELDS = [
   { key: "source", label: "Source", placeholder: "linkedin" },
@@ -86,6 +92,7 @@ export default function DemoFormCard() {
 
   return (
     <IntegrationCard
+      visual={<IconTile icon={CursorIcon} />}
       title="Demo form"
       description="The public form at /demo creates a lead, assigns an owner and starts the SLA clock. Tag links per campaign so reports show where leads came from."
       action={
@@ -93,14 +100,14 @@ export default function DemoFormCard() {
           href={link}
           target="_blank"
           rel="noopener"
-          className={buttonVariants({ variant: "subtle", size: "xs" })}
+          className={buttonVariants({ variant: "secondary", size: "xs" })}
         >
           Open form
         </a>
       }
     >
-      <div className="flex flex-col gap-4 px-4 py-4">
-        <div className="flex items-center gap-3">
+      <SettingsBlock className="gap-4">
+        <div className="flex h-6 items-center gap-3">
           <span className="lead-style min-w-0 flex-1 font-medium">
             Campaign tags
           </span>
@@ -137,8 +144,8 @@ export default function DemoFormCard() {
         <Field label="Link" htmlFor={`${id}-link`}>
           <CopyField id={`${id}-link`} label="Demo form link" value={link} />
         </Field>
-      </div>
-      <div className="flex flex-col gap-3 px-4 py-4">
+      </SettingsBlock>
+      <SettingsBlock>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <span className="lead-style font-medium">Embed on a website</span>
@@ -169,7 +176,7 @@ export default function DemoFormCard() {
           value={embed}
           multiline
         />
-      </div>
+      </SettingsBlock>
     </IntegrationCard>
   );
 }

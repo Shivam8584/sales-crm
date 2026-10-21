@@ -3,6 +3,7 @@
 import DataTable from "@/components/data-table/data-table";
 import type { Column, SortState } from "@/components/data-table/types";
 import EmptyState from "@/components/_ui/empty-state";
+import SegmentBar from "@/components/_common/segment-bar";
 import type { SourceRow } from "@/convex/lib/reports";
 import { useUrlState } from "@/hooks/use-url-state";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
@@ -11,12 +12,18 @@ import { count, duration, percent, rate } from "./format";
 const DEFAULT_SORT: SortState = { id: "leads", dir: "desc" };
 
 function share(part: number, whole: number) {
+  const value = rate(part, whole);
   return (
-    <span className="flex items-baseline gap-1.5">
-      <span>{percent(rate(part, whole))}</span>
-      <span className="caption-style text-fg-tertiary w-6 text-left">
-        {count(part)}
-      </span>
+    <span
+      className="flex items-center gap-1.5 tabular-nums"
+      title={`${count(part)} of ${count(whole)} leads`}
+    >
+      <SegmentBar
+        percent={(value ?? 0) * 100}
+        segments={10}
+        className="w-11 shrink-0"
+      />
+      <span className="w-[4ch] text-right">{percent(value)}</span>
     </span>
   );
 }
@@ -29,7 +36,7 @@ function rateColumn(
   return {
     id,
     header,
-    width: "minmax(6.5rem,1fr)",
+    width: "minmax(7.5rem,1fr)",
     align: "end",
     defaultDir: "desc",
     sortValue: (row) => rate(pick(row), row.leads),
@@ -94,10 +101,37 @@ export default function SourceTable({
     dir: sortDir === "asc" ? "asc" : "desc",
   };
 
+  const sum = (pick: (row: SourceRow) => number) =>
+    rows.reduce((total, row) => total + pick(row), 0);
+  const leads = sum((row) => row.leads);
+
   return (
     <DataTable
       label="Conversion by source"
+      footer={[
+        { label: rows.length === 1 ? "Source" : "Sources", value: rows.length },
+        { label: "Leads", value: count(leads) },
+        {
+          label: "Converted",
+          value: percent(
+            rate(
+              sum((row) => row.converted),
+              leads,
+            ),
+          ),
+        },
+        {
+          label: "Activated",
+          value: percent(
+            rate(
+              sum((row) => row.activated),
+              leads,
+            ),
+          ),
+        },
+      ]}
       keyboard={false}
+      actionColumn={false}
       columns={COLUMNS}
       rows={rows}
       getId={(row) => row.key}

@@ -9,8 +9,8 @@ import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import FilterMenu from "@/components/_common/filter-menu";
 import SearchInput from "@/components/data-table/search-input";
-import type { SortState } from "@/components/data-table/types";
-import { SettingsTitle } from "@/features/settings/settings-ui";
+import type { FooterStat, SortState } from "@/components/data-table/types";
+import { PageToolbar, PageViews } from "@/components/shell/page";
 import { useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { ROLES } from "@/lib/domain/enums";
@@ -41,9 +41,11 @@ export default function TeamPage() {
   const viewer = useViewer();
   const isAdmin = viewer.role === "admin" && viewer.status === "active";
   const team = useQuery(api.members.team, {});
+  const invites = useQuery(api.invites.list, isAdmin ? {} : "skip");
   const params = useSearchParams();
 
-  const [search, setSearch] = useState("");
+  const [viewParam, setView] = useUrlState("view", "members");
+  const [search, setSearch] = useUrlState("q", "");
   const [role, setRole] = useUrlState("role", ANY);
   const [status, setStatus] = useUrlState("status", ANY);
   const [sortParam, setSortParam] = useUrlState(
@@ -53,6 +55,7 @@ export default function TeamPage() {
   const [inviteParam, setInviteParam] = useUrlState("invite");
   const [memberParam, setMemberParam] = useUrlState("member");
   const [links, setLinks] = useState<Record<string, string>>({});
+  const view = isAdmin && viewParam === "invites" ? "invites" : "members";
 
   const [sortId, sortDir] = sortParam.split(":");
   const sort: SortState = {
@@ -72,8 +75,32 @@ export default function TeamPage() {
   );
 
   const filtered = role !== ANY || status !== ANY || search.trim() !== "";
-  const activeCount = team?.filter((member) => member.status === "active");
   const openMember = team?.find((member) => member._id === memberParam);
+  const openInvites = invites?.filter(
+    (invite) => invite.status === "pending" || invite.status === "expired",
+  );
+  const pendingInvites = invites?.filter(
+    (invite) => invite.status === "pending",
+  );
+
+  const footer: FooterStat[] = [
+    { label: "Members in view", value: rows?.length ?? 0 },
+    {
+      label: "Admins",
+      value: rows?.filter((member) => member.role === "admin").length ?? 0,
+    },
+    isAdmin
+      ? { label: "Pending invites", value: pendingInvites?.length ?? 0 }
+      : {
+          label: "Reps",
+          value: rows?.filter((member) => member.role === "rep").length ?? 0,
+        },
+    {
+      label: "Deactivated",
+      value:
+        rows?.filter((member) => member.status === "deactivated").length ?? 0,
+    },
+  ];
 
   function clearFilters() {
     setSearch("");
@@ -85,95 +112,118 @@ export default function TeamPage() {
     setLinks((current) => ({ ...current, [id]: url }));
   }
 
+  const inviteButton = isAdmin && (
+    <Button
+      variant="primary"
+      size="sm"
+      onClick={() => setInviteParam("1")}
+      className="h-control-md py-0"
+    >
+      <UserPlusIcon aria-hidden className="size-3" />
+      Invite
+    </Button>
+  );
+
   return (
     <>
-      <SettingsTitle
-        title="Team"
-        meta={activeCount && `${activeCount.length} active`}
-        description="Everyone in the workspace and what they can do."
-        actions={
-          isAdmin && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setInviteParam("1")}
-            >
-              <UserPlusIcon aria-hidden className="size-3" />
-              Invite
-            </Button>
-          )
-        }
-      />
-      <div className="flex flex-wrap items-center gap-2 pb-3">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search members"
-        />
-        <FilterMenu
-          label="Role"
-          value={role}
-          onChange={setRole}
-          options={[
-            { value: ANY, label: "Any" },
-            ...ROLES.map((value) => ({ value, label: ROLE_LABEL[value] })),
+      {isAdmin && (
+        <PageViews
+          label="Team views"
+          value={view}
+          onChange={setView}
+          views={[
+            {
+              id: "members",
+              label: "Members",
+              count: team?.filter((member) => member.status === "active")
+                .length,
+            },
+            { id: "invites", label: "Invites", count: openInvites?.length },
           ]}
         />
-        <FilterMenu
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          options={[
-            { value: ANY, label: "Any" },
-            { value: "active", label: "Active" },
-            { value: "deactivated", label: "Deactivated" },
-          ]}
-        />
-        {filtered && (
-          <Button variant="ghost" size="xs" onClick={clearFilters}>
-            Clear
-          </Button>
-        )}
-        {rows && filtered && (
-          <span className="caption-style text-fg-tertiary ml-auto tabular-nums">
-            {rows.length} of {team?.length}
-          </span>
-        )}
-      </div>
+      )}
 
-      <div className="border-border overflow-hidden rounded-xl border">
-        <MembersTable
-          members={rows}
-          team={team ?? []}
-          viewerId={viewer._id}
-          isAdmin={isAdmin}
-          sort={sort}
-          onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
-          memberHref={(member) => {
-            const query = new URLSearchParams(params);
-            query.set("member", member._id);
-            return `/settings/team?${query}`;
-          }}
-          empty={
-            <EmptyState
-              icon={UsersIcon}
-              title="No members match"
-              description="Try another search or clear the filters."
-              action={
-                <Button variant="secondary" size="sm" onClick={clearFilters}>
-                  Clear filters
-                </Button>
+      {view === "members" ? (
+        <>
+          <PageToolbar actions={inviteButton}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search members"
+            />
+            <FilterMenu
+              label="Role"
+              value={role}
+              onChange={setRole}
+              options={[
+                { value: ANY, label: "Any" },
+                ...ROLES.map((value) => ({ value, label: ROLE_LABEL[value] })),
+              ]}
+            />
+            <FilterMenu
+              label="Status"
+              value={status}
+              onChange={setStatus}
+              options={[
+                { value: ANY, label: "Any" },
+                { value: "active", label: "Active" },
+                { value: "deactivated", label: "Deactivated" },
+              ]}
+            />
+            {filtered && (
+              <Button variant="ghost" size="xs" onClick={clearFilters}>
+                Clear
+              </Button>
+            )}
+          </PageToolbar>
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <MembersTable
+              members={rows}
+              team={team ?? []}
+              viewerId={viewer._id}
+              isAdmin={isAdmin}
+              sort={sort}
+              onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
+              memberHref={(member) => {
+                const query = new URLSearchParams(params);
+                query.set("member", member._id);
+                return `/settings/team?${query}`;
+              }}
+              footer={footer}
+              empty={
+                <EmptyState
+                  icon={UsersIcon}
+                  title="No members match"
+                  description="Try another search or clear the filters."
+                  action={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={clearFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  }
+                />
               }
             />
-          }
-        />
-      </div>
-      {isAdmin && (
-        <InvitesSection
-          links={links}
-          onLink={addLink}
-          onInvite={() => setInviteParam("1")}
-        />
+          </div>
+        </>
+      ) : (
+        <>
+          <PageToolbar actions={inviteButton}>
+            <p className="caption-style text-fg-tertiary truncate leading-snug max-sm:hidden">
+              Links work for one email and expire after 7 days. Joined and
+              revoked invites stay here for 14 days.
+            </p>
+          </PageToolbar>
+          <InvitesSection
+            invites={invites}
+            links={links}
+            onLink={addLink}
+            onInvite={() => setInviteParam("1")}
+          />
+        </>
       )}
 
       {isAdmin && (

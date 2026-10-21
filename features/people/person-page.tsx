@@ -54,7 +54,7 @@ import TargetIcon from "@/public/assets/icons/target-05.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import ConsentRecords from "./consent-records";
-import ContactActions from "./contact-actions";
+import GuardedContactActions from "@/features/consent/contact-guard";
 import PersonDeals from "./person-deals";
 
 type Person = NonNullable<FunctionReturnType<typeof api.people.get>>;
@@ -279,7 +279,7 @@ function PersonView({ person }: { person: Person }) {
               title="Contact"
               className={cn(ASIDE_SECTION, "gap-2")}
             >
-              <ContactActions person={person} className="mb-1" />
+              <GuardedContactActions person={person} className="mb-1" />
               <Properties>
                 <Property label="Email">
                   <InlineText

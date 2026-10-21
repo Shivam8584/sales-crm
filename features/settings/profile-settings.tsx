@@ -4,23 +4,30 @@ import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
+import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import Kbd from "@/components/_ui/kbd";
-import { ROLE_DESCRIPTION } from "@/features/team/roles";
+import Tag from "@/components/_ui/tag";
+import Tooltip from "@/components/_ui/tooltip";
+import { DetailHero, Properties, Property } from "@/components/record";
+import { PageStatus } from "@/components/shell/page";
+import { ROLE_DESCRIPTION, ROLE_TONE } from "@/features/team/roles";
 import { useViewer } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { cleanText } from "@/lib/domain/normalize";
 import { readError } from "@/lib/errors";
 import { MOD_KEY } from "@/lib/keyboard";
 import { setThemePreference, useThemePreference } from "@/lib/theme";
+import { dateTime, shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import MonitorIcon from "@/public/assets/icons/monitor.svg";
 import MoonIcon from "@/public/assets/icons/moon.svg";
 import SunIcon from "@/public/assets/icons/sun.svg";
-import { SettingsRow, SettingsSection, SettingsTitle } from "./settings-ui";
+import { SettingsRow, SettingsSection } from "./settings-ui";
 
 const MAX_NAME = 80;
 
@@ -46,27 +53,43 @@ export default function ProfileSettings() {
 
   return (
     <>
-      <SettingsTitle
-        title="Profile"
-        description="How you appear to your team, and how the CRM looks for you."
-      />
-
-      <SettingsSection title="Account">
-        <NameRow key={viewer.name} name={viewer.name} />
-        <SettingsRow
-          label="Email"
-          description="Used to sign in. Ask an admin to move you to a new address."
+      <div className="bg-card border-border shadow-card flex flex-col overflow-hidden rounded-xl border">
+        <DetailHero
+          visual={<Avatar name={viewer.name} size="xl" />}
+          title={viewer.name}
         >
-          <span className="lead-style text-fg-secondary truncate sm:max-w-64">
-            {viewer.email}
-          </span>
-        </SettingsRow>
-        <SettingsRow label="Role" description={ROLE_DESCRIPTION[viewer.role]}>
-          <span className="lead-style text-fg-secondary">
+          <Tag tone={ROLE_TONE[viewer.role]} size="sm">
             {ROLE_LABEL[viewer.role]}
-          </span>
-        </SettingsRow>
-      </SettingsSection>
+          </Tag>
+          <PageStatus>Active</PageStatus>
+        </DetailHero>
+        <div className="flex flex-col gap-5 px-6 py-5">
+          <h3 className="eyebrow-style font-normal">Account</h3>
+          <NameField key={viewer.name} name={viewer.name} />
+          <Properties>
+            <Property label="Email">
+              <span
+                className="text-fg-secondary truncate text-sm"
+                title={viewer.email}
+              >
+                {viewer.email}
+              </span>
+            </Property>
+            <Property label="Role">
+              <span className="text-fg-secondary truncate text-sm">
+                {ROLE_DESCRIPTION[viewer.role]}
+              </span>
+            </Property>
+            <Property label="Member since">
+              <Tooltip content={dateTime(viewer.joinedAt)}>
+                <span tabIndex={0} className="rounded-sm text-sm">
+                  {shortDate(viewer.joinedAt)}
+                </span>
+              </Tooltip>
+            </Property>
+          </Properties>
+        </div>
+      </div>
 
       <SettingsSection title="Appearance">
         <SettingsRow
@@ -79,9 +102,9 @@ export default function ProfileSettings() {
 
       <SettingsSection
         title="Keyboard shortcuts"
-        actions={
+        action={
           <Button
-            variant="subtle"
+            variant="secondary"
             size="xs"
             onClick={() => setShortcutsOpen(true)}
           >
@@ -90,11 +113,11 @@ export default function ProfileSettings() {
           </Button>
         }
       >
-        <ul className="divide-border flex flex-col divide-y">
+        <ul aria-label="Common shortcuts" className="flex flex-col">
           {SHORTCUTS.map((item) => (
             <li
               key={item.label}
-              className="flex h-11 items-center justify-between gap-4 px-4"
+              className="border-border flex h-11 items-center justify-between gap-4 border-t px-6"
             >
               <span className="lead-style text-fg-secondary truncate">
                 {item.label}
@@ -114,7 +137,7 @@ export default function ProfileSettings() {
           label="Sign out"
           description="Ends your session in this browser."
         >
-          <Button variant="subtle" size="sm" onClick={() => void signOut()}>
+          <Button variant="secondary" size="sm" onClick={() => void signOut()}>
             Sign out
           </Button>
         </SettingsRow>
@@ -123,7 +146,7 @@ export default function ProfileSettings() {
   );
 }
 
-function NameRow({ name }: { name: string }) {
+function NameField({ name }: { name: string }) {
   const update = useMutation(api.members.updateProfile);
   const [value, setValue] = useState(name);
   const [error, setError] = useState<string>();
@@ -156,56 +179,47 @@ function NameRow({ name }: { name: string }) {
 
   return (
     <form onSubmit={submit} noValidate>
-      <SettingsRow
+      <Field
         label="Display name"
         htmlFor="profile-name"
-        description="Shown on records you own, in the timeline and in mentions."
-        className="sm:items-start"
+        error={error}
+        hint="Shown on records you own, in the timeline and in mentions."
       >
-        <div className="flex w-full flex-col gap-2 sm:w-72">
-          <div className="flex gap-2">
-            <Input
-              id="profile-name"
-              value={value}
-              maxLength={MAX_NAME + 20}
-              autoComplete="name"
-              onChange={(event) => {
-                setValue(event.target.value);
+        <div className="flex gap-2">
+          <Input
+            id="profile-name"
+            value={value}
+            maxLength={MAX_NAME + 20}
+            autoComplete="name"
+            onChange={(event) => {
+              setValue(event.target.value);
+              setError(undefined);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && dirty) {
+                event.stopPropagation();
+                setValue(name);
                 setError(undefined);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && dirty) {
-                  event.stopPropagation();
-                  setValue(name);
-                  setError(undefined);
-                }
-              }}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? "profile-name-error" : undefined}
-              className="aria-invalid:border-danger"
-            />
-            <Button
-              type="submit"
-              variant={dirty ? "primary" : "subtle"}
-              size="control"
-              className="px-3.5"
-              disabled={!dirty}
-              loading={saving}
-            >
-              Save
-            </Button>
-          </div>
-          {error && (
-            <span
-              id="profile-name-error"
-              role="alert"
-              className="caption-style text-danger leading-snug"
-            >
-              {error}
-            </span>
-          )}
+              }
+            }}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={
+              error ? "profile-name-error" : "profile-name-hint"
+            }
+            className="aria-invalid:border-danger"
+          />
+          <Button
+            type="submit"
+            variant={dirty ? "primary" : "secondary"}
+            size="control"
+            className="h-9 px-4"
+            disabled={!dirty}
+            loading={saving}
+          >
+            Save
+          </Button>
         </div>
-      </SettingsRow>
+      </Field>
     </form>
   );
 }
@@ -235,7 +249,7 @@ function ThemePicker() {
       role="radiogroup"
       aria-label="Theme"
       onKeyDown={onKeyDown}
-      className="bg-muted flex w-full rounded-lg p-0.5 sm:w-auto"
+      className="flex w-full flex-wrap gap-1.5 sm:w-auto"
     >
       {THEMES.map((option) => {
         const checked = theme === option.value;
@@ -248,10 +262,10 @@ function ThemePicker() {
             tabIndex={checked ? 0 : -1}
             onClick={() => setThemePreference(option.value)}
             className={cn(
-              "focus-visible:ring-ring duration-fast flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-2 sm:flex-none",
+              "focus-visible:ring-ring duration-fast ease-power3-out flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full border px-3 text-xs leading-none font-medium transition-[background-color,border-color,color] outline-none focus-visible:ring-2 sm:flex-none",
               checked
-                ? "bg-card text-foreground shadow-raised"
-                : "text-fg-secondary hover:text-foreground",
+                ? "border-selected bg-overlay-1 text-foreground"
+                : "border-input text-fg-secondary hover:bg-overlay-1 hover:text-foreground",
             )}
           >
             <option.icon aria-hidden className="size-3.5" />

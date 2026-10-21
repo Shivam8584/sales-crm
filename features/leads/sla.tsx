@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { LeadStatus } from "@/lib/domain/enums";
+import SegmentBar from "@/components/_common/segment-bar";
 import { cn } from "@/lib/utils";
-import ClockIcon from "@/public/assets/icons/clock.svg";
 import { compactSpan } from "./lead-meta";
 
 type SlaLead = {
@@ -34,9 +34,104 @@ export function slaState(lead: SlaLead, slaMs: number, now: number): SlaState {
   return { kind: "breached", overMs: Math.max(0, -remainingMs) };
 }
 
-function countdown(ms: number) {
+export function countdown(ms: number) {
   const total = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+export function isSlaOpen(lead: SlaLead) {
+  return (
+    !lead.firstTouchedAt &&
+    lead.status !== "disqualified" &&
+    lead.status !== "converted"
+  );
+}
+
+type MeterTone = "danger" | "warning" | "success";
+
+/** How much of the SLA a lead has used, and the tone that goes with it. */
+export function slaMeter(
+  state: SlaState,
+  slaMs: number,
+): { percent: number; tone: MeterTone } | null {
+  switch (state.kind) {
+    case "pending": {
+      const percent = slaMs
+        ? Math.min(100, ((slaMs - state.remainingMs) / slaMs) * 100)
+        : 100;
+      return {
+        percent,
+        tone:
+          state.remainingMs < 60_000
+            ? "danger"
+            : percent >= 50
+              ? "warning"
+              : "success",
+      };
+    }
+    case "replied":
+      return {
+        percent: slaMs ? Math.min(100, (state.tookMs / slaMs) * 100) : 100,
+        tone: state.late ? "warning" : "success",
+      };
+    case "breached":
+      return { percent: 100, tone: "danger" };
+    default:
+      return null;
+  }
+}
+
+/** Table cell: a small meter of the SLA used, then the countdown, reply time or overrun. */
+export function SlaCell({ lead, slaMs }: { lead: SlaLead; slaMs: number }) {
+  const now = useNow(isSlaOpen(lead), 1000);
+  const state = slaState(lead, slaMs, now);
+  const meter = slaMeter(state, slaMs);
+  if (!meter) return <span className="text-fg-tertiary">—</span>;
+  const [text, muted, title] =
+    state.kind === "pending"
+      ? [
+          countdown(state.remainingMs),
+          "left",
+          "Time left to make the first touch",
+        ]
+      : state.kind === "replied"
+        ? [
+            compactSpan(state.tookMs),
+            "to reply",
+            state.late
+              ? "First touch came after the SLA"
+              : "First touch within the SLA",
+          ]
+        : state.kind === "breached"
+          ? [
+              compactSpan(state.overMs),
+              "late",
+              "No first touch yet, past the SLA",
+            ]
+          : ["", "", ""];
+  return (
+    <span
+      title={title}
+      className="flex min-w-0 items-center gap-2 whitespace-nowrap tabular-nums"
+    >
+      <SegmentBar
+        percent={meter.percent}
+        segments={8}
+        tone={meter.tone}
+        className="h-3 w-11 shrink-0 px-px"
+        segmentClassName="h-2"
+      />
+      <span
+        className={cn(
+          "truncate",
+          state.kind === "breached" && "text-danger",
+          state.kind === "pending" && meter.tone === "danger" && "text-danger",
+        )}
+      >
+        {text} <span className="text-fg-tertiary">{muted}</span>
+      </span>
+    </span>
+  );
 }
 
 /** The current time, refreshed every `intervalMs` while `active`. */
@@ -48,61 +143,4 @@ export function useNow(active: boolean, intervalMs: number) {
     return () => clearInterval(timer);
   }, [active, intervalMs]);
   return now;
-}
-
-/** Speed-to-lead status: a live countdown until the first touch, then how long it took. */
-export default function SlaIndicator({
-  lead,
-  slaMs,
-  className,
-}: {
-  lead: SlaLead;
-  slaMs: number;
-  className?: string;
-}) {
-  const open =
-    !lead.firstTouchedAt &&
-    lead.status !== "disqualified" &&
-    lead.status !== "converted";
-  const now = useNow(open, 1000);
-  const state = slaState(lead, slaMs, now);
-  const base = cn(
-    "caption-style inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums",
-    className,
-  );
-
-  switch (state.kind) {
-    case "pending":
-      return (
-        <span
-          className={cn(
-            base,
-            state.remainingMs < 60_000 ? "text-warning" : "text-foreground",
-          )}
-        >
-          <ClockIcon aria-hidden className="size-3" />
-          {countdown(state.remainingMs)}
-          <span className="text-fg-tertiary">left</span>
-        </span>
-      );
-    case "replied":
-      return (
-        <span
-          className={cn(base, state.late ? "text-warning" : "text-success")}
-          title={state.late ? "First touch came after the SLA" : undefined}
-        >
-          <span aria-hidden className="size-1.5 rounded-full bg-current" />
-          Replied in {compactSpan(state.tookMs)}
-        </span>
-      );
-    case "breached":
-      return (
-        <span className={cn(base, "text-danger font-medium")}>
-          <span aria-hidden className="size-1.5 rounded-full bg-current" />
-          Breached by {compactSpan(state.overMs)}
-        </span>
-      );
-    default:
-      return <span className={cn(base, "text-fg-tertiary")}>—</span>;
-  }
 }

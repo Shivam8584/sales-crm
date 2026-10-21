@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -10,8 +17,15 @@ import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Kbd from "@/components/_ui/kbd";
 import Skeleton from "@/components/_ui/skeleton";
-import { Page, PageHeader } from "@/components/shell/page";
+import { BigNumber, DetailSection } from "@/components/record/detail";
+import {
+  CreateButton,
+  Page,
+  PageHeader,
+  PageStatus,
+} from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
+import { TrendCell } from "@/features/accounts/record-cells";
 import { StageTag } from "@/features/accounts/stage";
 import { isOpenStage } from "@/features/deals/stage";
 import TaskComposer from "@/features/tasks/task-composer";
@@ -26,9 +40,14 @@ import { isEditableTarget } from "@/lib/keyboard";
 import { relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
+import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
+import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
+import ClockIcon from "@/public/assets/icons/clock.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import TargetIcon from "@/public/assets/icons/target-05.svg";
+import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
+import WalletIcon from "@/public/assets/icons/wallet.svg";
 import {
   DealItem,
   LeadItem,
@@ -40,6 +59,10 @@ import {
 } from "./today-rows";
 
 const RECENT_ACCOUNTS = 6;
+const CARD_SECTION =
+  "gap-2 px-0 pt-3 pb-0 [&>div:first-child]:px-4 sm:[&>div:first-child]:px-5";
+const TREND_DAYS = 14;
+const DAY_MS = 24 * 60 * 60_000;
 const OVERLAY = "[role=dialog], [role=menu], [role=listbox]";
 const FULL_DATE = new Intl.DateTimeFormat("en-IN", {
   weekday: "long",
@@ -59,16 +82,37 @@ type Section = {
   id: SectionId;
   title: string;
   stat: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   items: Item[] | undefined;
   tone?: "danger" | "warning";
   empty: string;
   href?: { label: string; to: string };
+  /** Narrow column next to the task list on wide screens. */
+  aside?: boolean;
 };
 
 function greeting(hour: number) {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+/** Tasks completed per local day, oldest first, ending today. */
+function completedPerDay(tasks: TaskRow[] | undefined, now: Date) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const first = start.getTime() - (TREND_DAYS - 1) * DAY_MS;
+  const buckets = Array.from({ length: TREND_DAYS }, () => 0);
+  for (const task of tasks ?? []) {
+    if (task.status !== "done") continue;
+    const at = task.completedAt ?? task.updatedAt;
+    if (at < first) continue;
+    const day = new Date(at);
+    day.setHours(0, 0, 0, 0);
+    const index = Math.round((day.getTime() - first) / DAY_MS);
+    if (index >= 0 && index < TREND_DAYS) buckets[index]++;
+  }
+  return buckets;
 }
 
 /** The rep's daily cockpit: leads to answer, tasks by due date, stuck brands and deals closing soon. */
@@ -87,15 +131,15 @@ export default function TodayPage() {
   const desk = useQuery(api.activation.desk, {});
   const deals = useQuery(api.deals.list, {});
   const accounts = useQuery(api.accounts.list, {});
+  const accountStats = useQuery(api.accounts.listStats, {});
 
   const [focus, setFocus] = useState<SectionId | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<SectionId>>(new Set());
   const [cursor, setCursor] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const [now] = useState(() => new Date());
 
   const today = dayFromToday(0);
   const weekAhead = dayFromToday(7);
-  const now = new Date();
 
   const sections = useMemo((): Section[] => {
     const open = tasks
@@ -111,6 +155,7 @@ export default function TodayPage() {
         id: "leads",
         title: "Leads waiting",
         stat: "Leads waiting",
+        icon: UserPlusIcon,
         items: waiting?.leads.map((lead) => ({
           kind: "lead",
           id: lead._id,
@@ -127,6 +172,7 @@ export default function TodayPage() {
         id: "overdue",
         title: "Overdue",
         stat: "Overdue",
+        icon: AlertTriangleIcon,
         items: taskItems((task) =>
           Boolean(task.dueDate && task.dueDate < today),
         ),
@@ -137,6 +183,7 @@ export default function TodayPage() {
         id: "today",
         title: "Due today",
         stat: "Due today",
+        icon: ClockIcon,
         items: taskItems((task) => task.dueDate === today),
         empty: "Nothing due today. Plan a follow-up so tomorrow starts warm.",
       },
@@ -144,6 +191,7 @@ export default function TodayPage() {
         id: "upcoming",
         title: "Next 7 days",
         stat: "Next 7 days",
+        icon: CalendarIcon,
         items: taskItems((task) =>
           Boolean(
             task.dueDate && task.dueDate > today && task.dueDate <= weekAhead,
@@ -156,6 +204,8 @@ export default function TodayPage() {
         id: "stuck",
         title: "Stuck brands you own",
         stat: "Stuck brands",
+        icon: TargetIcon,
+        aside: true,
         items: desk?.rows
           .filter((row) => row.owner?._id === viewer._id)
           .sort((a, b) => a.since - b.since)
@@ -178,7 +228,9 @@ export default function TodayPage() {
       {
         id: "deals",
         title: "Deals closing this week",
-        stat: "Closing this week",
+        stat: "Closing soon",
+        icon: WalletIcon,
+        aside: true,
         items: deals
           ?.filter(
             (deal) =>
@@ -195,15 +247,21 @@ export default function TodayPage() {
     ];
   }, [tasks, waiting, desk, deals, viewer._id, today, weekAhead]);
 
-  const visible = focus
-    ? sections.filter((section) => section.id === focus)
-    : sections;
+  const { main, aside } = useMemo(() => {
+    if (focus) {
+      return {
+        main: sections.filter((section) => section.id === focus),
+        aside: [],
+      };
+    }
+    return {
+      main: sections.filter((section) => !section.aside),
+      aside: sections.filter((section) => section.aside),
+    };
+  }, [sections, focus]);
   const navigable = useMemo(
-    () =>
-      visible.flatMap((section) =>
-        collapsed.has(section.id) ? [] : (section.items ?? []),
-      ),
-    [visible, collapsed],
+    () => [...main, ...aside].flatMap((section) => section.items ?? []),
+    [main, aside],
   );
   const activeCursor =
     cursor && navigable.some((item) => item.id === cursor) ? cursor : null;
@@ -213,14 +271,10 @@ export default function TodayPage() {
     (sum, section) => sum + (section.items?.length ?? 0),
     0,
   );
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const doneToday =
-    tasks?.filter(
-      (task) =>
-        task.status === "done" &&
-        (task.completedAt ?? 0) >= startOfDay.getTime(),
-    ).length ?? 0;
+  const trend = useMemo(() => completedPerDay(tasks, now), [tasks, now]);
+  const completed = trend.reduce((sum, value) => sum + value, 0);
+  const doneToday = trend[trend.length - 1];
+  const activeDays = trend.filter((value) => value > 0).length;
 
   function openItem(item: Item) {
     switch (item.kind) {
@@ -284,15 +338,6 @@ export default function TodayPage() {
       ?.scrollIntoView({ block: "nearest" });
   }, [activeCursor]);
 
-  function toggle(id: SectionId) {
-    setCollapsed((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   function renderItem(item: Item) {
     const props = { active: activeCursor === item.id, onHover: setCursor };
     switch (item.kind) {
@@ -314,139 +359,198 @@ export default function TodayPage() {
     }
   }
 
+  function renderSection(section: Section) {
+    const composer = section.id === "today" && composing;
+    return (
+      <CockpitCard
+        key={section.id}
+        section={section}
+        action={
+          section.id === "today" && !composing ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setComposing(true)}
+            >
+              <PlusIcon aria-hidden className="size-2.5" />
+              Add for today
+            </Button>
+          ) : undefined
+        }
+      >
+        {section.items === undefined ? (
+          <RowsSkeleton />
+        ) : section.items.length > 0 ? (
+          <ul className="divide-border border-border flex flex-col divide-y border-t">
+            {section.items.map(renderItem)}
+          </ul>
+        ) : (
+          !composer && (
+            <p className="caption-style text-fg-tertiary px-4 pb-4 leading-snug sm:px-5">
+              {section.empty}
+            </p>
+          )
+        )}
+        {composer && (
+          <div className="px-3 pb-3 sm:px-4">
+            <TaskComposer
+              assigneeId={viewer._id}
+              defaultDueDate={today}
+              label="New task due today"
+              onClose={() => setComposing(false)}
+              className="bg-raised shadow-card"
+            />
+          </div>
+        )}
+      </CockpitCard>
+    );
+  }
+
   const firstName = viewer.name.trim().split(/\s+/)[0];
 
   return (
     <Page>
       <PageHeader
         title="Today"
+        meta={<PageStatus tone="info">{FULL_DATE.format(now)}</PageStatus>}
         actions={
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setCreate({ type: "task" })}
-          >
-            <PlusIcon aria-hidden className="size-3" />
+          <CreateButton onClick={() => setCreate({ type: "task" })}>
             New task
-          </Button>
+          </CreateButton>
         }
       />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:py-8">
-          <div className="flex flex-col gap-5 lg:col-span-2">
-            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-              <div className="flex flex-col gap-1.5">
-                <h2 className="text-xl leading-tight font-semibold tracking-[-0.01em]">
-                  {greeting(now.getHours())}, {firstName}
-                </h2>
-                <p className="text-fg-secondary text-sm">
-                  {FULL_DATE.format(now)}
-                  {doneToday > 0 && (
-                    <span className="text-success">
-                      {" · "}
-                      {doneToday} done today
-                    </span>
-                  )}
-                </p>
-              </div>
-              <p className="caption-style text-fg-tertiary hidden items-center gap-1.5 lg:flex">
-                <Kbd>J</Kbd>
-                <Kbd>K</Kbd> to move · <Kbd>X</Kbd> to complete ·{" "}
-                <Kbd>Enter</Kbd> to open
-              </p>
-            </div>
-            <div
-              role="group"
-              aria-label="Focus on one section"
-              className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 sm:px-6 lg:py-7">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+            <h2 className="text-xl leading-tight font-semibold tracking-[-0.01em]">
+              {greeting(now.getHours())}, {firstName}
+            </h2>
+            <p className="caption-style text-fg-tertiary hidden items-center gap-1.5 lg:flex">
+              <Kbd>J</Kbd>
+              <Kbd>K</Kbd> to move · <Kbd>X</Kbd> to complete · <Kbd>Enter</Kbd>{" "}
+              to open
+            </p>
+          </div>
+
+          <section
+            aria-label="Your day at a glance"
+            className="border-border bg-background grid overflow-hidden rounded-xl border lg:grid-cols-[17rem_minmax(0,1fr)]"
+          >
+            <DetailSection
+              title="Completed"
+              divider={false}
+              className="border-border gap-3 px-4 py-4 max-lg:border-b sm:px-5 lg:border-r"
+              action={
+                <span className="caption-style text-fg-tertiary">
+                  Last {TREND_DAYS} days
+                </span>
+              }
             >
-              {sections.map((section) => (
-                <FocusStat
-                  key={section.id}
-                  section={section}
-                  active={focus === section.id}
-                  onClick={() =>
-                    setFocus(focus === section.id ? null : section.id)
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="flex min-w-0 flex-col gap-6">
-            {loaded && total === 0 && !focus ? (
-              <div className="border-border rounded-xl border border-dashed">
-                <EmptyState
-                  icon={CheckCircleIcon}
-                  title="All clear"
-                  description="No leads waiting, nothing due and no brand stuck. A good moment to plan the week's follow-ups."
-                  action={
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setCreate({ type: "task" })}
-                    >
-                      <PlusIcon aria-hidden className="size-3" />
-                      Plan a follow-up
-                    </Button>
-                  }
-                />
-              </div>
-            ) : (
-              visible.map((section) => (
-                <CockpitSection
-                  key={section.id}
-                  section={section}
-                  collapsed={collapsed.has(section.id)}
-                  onToggle={() => toggle(section.id)}
-                  action={
-                    section.id === "today" && !composing ? (
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => setComposing(true)}
-                      >
-                        <PlusIcon aria-hidden className="size-2.5" />
-                        Add for today
-                      </Button>
-                    ) : undefined
-                  }
+              {tasks === undefined ? (
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-7 w-28" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+              ) : (
+                <div
+                  role="img"
+                  aria-label={`${completed} tasks completed in the last ${TREND_DAYS} days, ${doneToday} today`}
                 >
-                  {section.items === undefined ? (
-                    <SectionSkeleton />
-                  ) : section.items.length > 0 ? (
-                    <ul className="bg-card shadow-card divide-border flex flex-col divide-y overflow-hidden rounded-2xl">
-                      {section.items.map(renderItem)}
-                    </ul>
-                  ) : (
-                    !(section.id === "today" && composing) && (
-                      <p className="caption-style text-fg-tertiary -mt-1 pl-5">
-                        {section.empty}
-                      </p>
-                    )
-                  )}
-                  {section.id === "today" && composing && (
-                    <TaskComposer
-                      assigneeId={viewer._id}
-                      defaultDueDate={today}
-                      label="New task due today"
-                      onClose={() => setComposing(false)}
-                      className="bg-card shadow-card"
-                    />
-                  )}
-                </CockpitSection>
-              ))
-            )}
-          </div>
+                  <BigNumber
+                    size="md"
+                    value={completed}
+                    trend={trend}
+                    caption={
+                      completed === 0
+                        ? "No tasks closed yet. Tick one off to start the streak."
+                        : `${doneToday} today · active on ${activeDays} of ${TREND_DAYS} days`
+                    }
+                  />
+                </div>
+              )}
+            </DetailSection>
+            <DetailSection
+              title="Focus"
+              divider={false}
+              className="gap-3 px-4 py-4 sm:px-5"
+              action={
+                focus && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setFocus(null)}
+                  >
+                    Show everything
+                  </Button>
+                )
+              }
+            >
+              <div
+                role="group"
+                aria-label="Focus on one section"
+                className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
+              >
+                {sections.map((section) => (
+                  <FocusTile
+                    key={section.id}
+                    section={section}
+                    active={focus === section.id}
+                    onClick={() =>
+                      setFocus(focus === section.id ? null : section.id)
+                    }
+                  />
+                ))}
+              </div>
+            </DetailSection>
+          </section>
 
-          <RecentAccounts accounts={accounts} viewerId={viewer._id} />
+          {loaded && total === 0 && !focus ? (
+            <div className="border-border bg-background rounded-xl border">
+              <EmptyState
+                icon={CheckCircleIcon}
+                title="All clear"
+                description="No leads waiting, nothing due and no brand stuck. A good moment to plan the week's follow-ups."
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setCreate({ type: "task" })}
+                  >
+                    <PlusIcon aria-hidden className="size-3" />
+                    Plan a follow-up
+                  </Button>
+                }
+              />
+            </div>
+          ) : (
+            <div
+              className={cn(
+                "grid items-start gap-5",
+                !focus && "lg:grid-cols-[minmax(0,1fr)_23rem]",
+              )}
+            >
+              <div className="flex min-w-0 flex-col gap-5">
+                {main.map(renderSection)}
+              </div>
+              {!focus && (
+                <div className="flex min-w-0 flex-col gap-5">
+                  {aside.map(renderSection)}
+                  <RecentAccounts
+                    accounts={accounts}
+                    stats={accountStats}
+                    viewerId={viewer._id}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </Page>
   );
 }
 
-function FocusStat({
+function FocusTile({
   section,
   active,
   onClick,
@@ -457,109 +561,87 @@ function FocusStat({
 }) {
   const count = section.items?.length;
   const alert = Boolean(count) && section.tone;
+  const Icon = section.icon;
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "bg-card shadow-card hover:bg-raised focus-visible:ring-ring duration-fast flex min-w-0 cursor-pointer flex-col gap-2.5 rounded-2xl px-3.5 py-3 text-left transition-colors outline-none focus-visible:ring-2 max-sm:flex-row-reverse max-sm:items-center max-sm:justify-end max-sm:gap-2 max-sm:px-3 max-sm:py-2.5",
-        active && "ring-selected bg-raised ring-2",
+        "border-line-strong hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex min-w-0 cursor-pointer flex-col gap-3 rounded-lg border p-2.75 text-left transition-colors outline-none focus-visible:ring-2 max-sm:flex-row max-sm:items-center max-sm:justify-between max-sm:gap-2",
+        active && "bg-overlay-2 hover:bg-overlay-2 border-fg-tertiary",
       )}
     >
-      <span className="caption-style text-fg-secondary truncate">
-        {section.stat}
+      <span className="caption-style text-fg-secondary flex min-w-0 items-center gap-1">
+        <Icon
+          aria-hidden
+          className={cn(
+            "size-3 shrink-0",
+            alert && section.tone === "danger" && "text-danger",
+            alert && section.tone === "warning" && "text-warning",
+          )}
+        />
+        <span className="truncate">{section.stat}</span>
       </span>
       <span
         className={cn(
-          "text-xl leading-none font-semibold tabular-nums max-sm:text-base",
+          "lead-style block truncate font-medium tabular-nums",
           alert && section.tone === "danger" && "text-danger",
           alert && section.tone === "warning" && "text-warning",
           count === 0 && "text-fg-tertiary",
         )}
       >
-        {count === undefined ? <Skeleton className="h-5 w-6" /> : count}
+        {count === undefined ? <Skeleton className="h-3.5 w-5" /> : count}
       </span>
     </button>
   );
 }
 
-function CockpitSection({
+/** A cockpit block in the record-detail style: eyebrow title, count, link, then rows edge to edge. */
+function CockpitCard({
   section,
-  collapsed,
-  onToggle,
   action,
   children,
 }: {
   section: Section;
-  collapsed: boolean;
-  onToggle: () => void;
   action?: ReactNode;
   children: ReactNode;
 }) {
   const count = section.items?.length;
-  const bodyId = `today-${section.id}`;
   return (
-    <section
-      aria-labelledby={`${bodyId}-title`}
-      className="flex flex-col gap-2.5"
-    >
-      <div className="flex h-7 items-center gap-2">
-        <button
-          type="button"
-          aria-expanded={!collapsed}
-          aria-controls={bodyId}
-          onClick={onToggle}
-          className="focus-visible:ring-ring -mx-1 flex min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1 py-0.5 outline-none focus-visible:ring-2"
-        >
-          <ChevronDownIcon
-            aria-hidden
-            className={cn(
-              "text-fg-tertiary duration-fast size-2.5 shrink-0 transition-transform",
-              collapsed && "-rotate-90",
+    <div className="border-border bg-background min-w-0 overflow-hidden rounded-xl border">
+      <DetailSection
+        title={section.title}
+        divider={false}
+        className={CARD_SECTION}
+        action={
+          <span className="flex items-center gap-2">
+            {action}
+            {section.href && (
+              <Link
+                href={section.href.to}
+                className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
+              >
+                {section.href.label}
+              </Link>
             )}
-          />
-          <h2
-            id={`${bodyId}-title`}
-            className={cn(
-              "lead-style truncate font-medium",
-              section.tone === "danger" && count ? "text-danger" : undefined,
-            )}
-          >
-            {section.title}
-          </h2>
-          {count !== undefined && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {count}
-            </span>
-          )}
-        </button>
-        <span className="ml-auto flex items-center gap-2">
-          {action}
-          {section.href && (
-            <Link
-              href={section.href.to}
-              className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
-            >
-              {section.href.label}
-            </Link>
-          )}
+          </span>
+        }
+      >
+        <span className="sr-only">
+          {count === undefined ? "Loading" : `${count} items`}
         </span>
-      </div>
-      {!collapsed && (
-        <div id={bodyId} className="flex flex-col gap-2">
-          {children}
-        </div>
-      )}
-    </section>
+        {children}
+      </DetailSection>
+    </div>
   );
 }
 
-function SectionSkeleton() {
+function RowsSkeleton() {
   return (
-    <div className="bg-card shadow-card divide-border flex flex-col divide-y rounded-2xl">
+    <div className="divide-border border-border flex flex-col divide-y border-t">
       {[0, 1].map((index) => (
-        <div key={index} className="flex h-13 items-center gap-3 px-4">
+        <div key={index} className="flex h-13 items-center gap-3 px-4 sm:px-5">
           <Skeleton className="size-4 rounded-sm" />
           <Skeleton className="h-3 w-48" />
           <Skeleton className="ml-auto h-3 w-14" />
@@ -571,76 +653,80 @@ function SectionSkeleton() {
 
 function RecentAccounts({
   accounts,
+  stats,
   viewerId,
 }: {
   accounts: FunctionReturnType<typeof api.accounts.list> | undefined;
+  stats: FunctionReturnType<typeof api.accounts.listStats> | undefined;
   viewerId: string;
 }) {
+  const trends = new Map(
+    (stats ?? []).map((item) => [item.accountId, item.trend]),
+  );
   const recent = accounts
     ?.filter((account) => account.owner?._id === viewerId)
     .sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0))
     .slice(0, RECENT_ACCOUNTS);
 
   return (
-    <aside
-      aria-labelledby="recent-title"
-      className="flex min-w-0 flex-col gap-2.5"
-    >
-      <div className="flex h-7 items-center justify-between gap-2">
-        <h2 id="recent-title" className="lead-style font-medium">
-          Recently touched
-        </h2>
-        <Link
-          href="/accounts?owner=mine"
-          className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
-        >
-          My accounts
-        </Link>
-      </div>
-      {recent === undefined ? (
-        <div className="flex flex-col gap-1">
-          {[0, 1, 2].map((index) => (
-            <div key={index} className="flex items-center gap-3 px-2 py-2">
-              <Skeleton className="size-6 rounded-md" />
-              <Skeleton className="h-3 w-32" />
-            </div>
-          ))}
-        </div>
-      ) : recent.length === 0 ? (
-        <p className="caption-style text-fg-tertiary">
-          Accounts you own show up here.{" "}
+    <div className="border-border bg-background min-w-0 overflow-hidden rounded-xl border">
+      <DetailSection
+        title="Recently touched"
+        divider={false}
+        className={CARD_SECTION}
+        action={
           <Link
-            href="/accounts"
-            className="text-fg-secondary hover:text-foreground underline underline-offset-2"
+            href="/accounts?view=mine"
+            className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
           >
-            Browse accounts
+            My accounts
           </Link>
-        </p>
-      ) : (
-        <ul className="-mx-2 flex flex-col">
-          {recent.map((account) => (
-            <li key={account._id}>
-              <Link
-                href={`/accounts/${account._id}`}
-                className="hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex items-center gap-3 rounded-lg px-2 py-2 transition-colors outline-none focus-visible:ring-2"
-              >
-                <AccountLogo account={account} size="sm" />
-                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="lead-style truncate font-medium">
-                    {account.name}
-                  </span>
-                  <span className="caption-style text-fg-tertiary truncate">
-                    {account.lastActivityAt
-                      ? relativeTime(account.lastActivityAt)
-                      : "No activity yet"}
-                  </span>
-                </span>
-                <StageTag stage={account.stage} />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </aside>
+        }
+      >
+        {recent === undefined ? (
+          <RowsSkeleton />
+        ) : recent.length === 0 ? (
+          <p className="caption-style text-fg-tertiary px-4 pb-4 leading-snug sm:px-5">
+            Accounts you own show up here.{" "}
+            <Link
+              href="/accounts"
+              className="text-fg-secondary hover:text-foreground underline underline-offset-2"
+            >
+              Browse accounts
+            </Link>
+          </p>
+        ) : (
+          <ul className="divide-border border-border flex flex-col divide-y border-t">
+            {recent.map((account) => {
+              const trend = trends.get(account._id);
+              return (
+                <li key={account._id}>
+                  <Link
+                    href={`/accounts/${account._id}`}
+                    className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
+                  >
+                    <AccountLogo account={account} size="sm" />
+                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="lead-style truncate leading-5 font-medium">
+                        {account.name}
+                      </span>
+                      <span className="caption-style text-fg-tertiary truncate">
+                        {account.lastActivityAt
+                          ? relativeTime(account.lastActivityAt)
+                          : "No activity yet"}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1.5">
+                      <StageTag stage={account.stage} />
+                      {trend && <TrendCell values={trend} />}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </DetailSection>
+    </div>
   );
 }

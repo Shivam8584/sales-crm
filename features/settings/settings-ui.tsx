@@ -1,85 +1,63 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import {
+  useState,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+} from "react";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
-import Tag, { type TagTone } from "@/components/_ui/tag";
+import Skeleton from "@/components/_ui/skeleton";
+import { DetailSection } from "@/components/record/detail";
+import { PageStatus } from "@/components/shell/page";
 import { useViewer } from "@/hooks/use-viewer";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import SettingsIcon from "@/public/assets/icons/settings.svg";
 
-/** Title block at the top of a settings page. */
-export function SettingsTitle({
-  title,
-  description,
-  meta,
-  actions,
-}: {
-  title: string;
-  description?: ReactNode;
-  meta?: ReactNode;
-  actions?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-wrap items-start gap-x-4 gap-y-3 pb-6">
-      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-        <h2 className="flex items-center gap-2">
-          {title}
-          {meta && (
-            <span className="caption-style text-fg-tertiary font-normal tabular-nums">
-              {meta}
-            </span>
-          )}
-        </h2>
-        {description && (
-          <p className="text-fg-secondary max-w-prose">{description}</p>
-        )}
-      </div>
-      {actions && (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
-      )}
-    </div>
-  );
+/** One-paragraph context under the page header of a settings page. */
+export function SettingsIntro({ children }: { children: ReactNode }) {
+  return <p className="text-fg-secondary max-w-prose">{children}</p>;
 }
 
-/** A titled group of rows on a card. */
+const CARD =
+  "bg-card border-border shadow-card flex min-w-0 flex-col overflow-hidden rounded-xl border";
+
+/** A settings card: eyebrow title and optional control, a short note, then its rows. */
 export function SettingsSection({
   title,
   description,
-  actions,
+  action,
   children,
   className,
 }: {
   title: string;
   description?: ReactNode;
-  actions?: ReactNode;
+  action?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <section className={cn("flex flex-col gap-3 pb-8", className)}>
-      <div className="flex items-end gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <h3>{title}</h3>
-          {description && (
-            <p className="caption-style text-fg-tertiary leading-snug">
-              {description}
-            </p>
-          )}
-        </div>
-        {actions && (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+    <div className={cn(CARD, className)}>
+      <DetailSection
+        title={title}
+        action={action}
+        divider={false}
+        className="gap-1 pt-3.5 pb-3.5"
+      >
+        {description && (
+          <p className="caption-style text-fg-tertiary max-w-prose pb-1 leading-snug">
+            {description}
+          </p>
         )}
-      </div>
-      <div className="bg-card border-border shadow-card divide-border flex flex-col divide-y rounded-xl border">
-        {children}
-      </div>
-    </section>
+      </DetailSection>
+      {children}
+    </div>
   );
 }
 
-/** Label and description on the left, the control on the right; stacks on phones. */
+/** Label and note on the left, the control on the right; stacks on phones. */
 export function SettingsRow({
   label,
   htmlFor,
@@ -97,7 +75,7 @@ export function SettingsRow({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6",
+        "border-border flex flex-col gap-3 border-t px-6 py-4 sm:flex-row sm:items-center sm:gap-6",
         className,
       )}
     >
@@ -120,22 +98,76 @@ export function SettingsRow({
   );
 }
 
+/** A plain block inside a settings card, for content that isn't a label/control pair. */
+export function SettingsBlock({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "border-border flex flex-col gap-3 border-t px-6 py-4",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function SettingsSkeleton({ rows = 2 }: { rows?: number }) {
+  return (
+    <div aria-hidden className={cn(CARD, "gap-0")}>
+      <div className="px-6 pt-5 pb-4">
+        <Skeleton className="h-2.5 w-24" />
+      </div>
+      {Array.from({ length: rows }, (_, index) => (
+        <div
+          key={index}
+          className="border-border flex h-16 items-center gap-3 border-t px-6"
+        >
+          <span className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-2.5 w-56 max-w-full" />
+          </span>
+          <Skeleton className="h-8 w-24 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export type Health = "connected" | "sandbox" | "partial" | "off";
 
-const HEALTH: Record<Health, { tone: TagTone; label: string }> = {
-  connected: { tone: "green", label: "Connected" },
-  sandbox: { tone: "amber", label: "Sandbox" },
-  partial: { tone: "amber", label: "Incomplete" },
+const HEALTH = {
+  connected: { tone: "success", label: "Connected" },
+  sandbox: { tone: "warning", label: "Sandbox" },
+  partial: { tone: "warning", label: "Incomplete" },
   off: { tone: "neutral", label: "Not configured" },
-};
+} as const;
 
 export function HealthTag({ health }: { health: Health }) {
   const { tone, label } = HEALTH[health];
+  return <PageStatus tone={tone}>{label}</PageStatus>;
+}
+
+/** Whether a secret or setting is present, as a status pill. */
+export function ConfiguredTag({ on, label }: { on: boolean; label?: string }) {
   return (
-    <Tag tone={tone} size="sm" className="gap-1.5">
-      <span aria-hidden className="size-1.5 rounded-full bg-current" />
-      {label}
-    </Tag>
+    <PageStatus tone={on ? "success" : "neutral"}>
+      {label ?? (on ? "Set" : "Not set")}
+    </PageStatus>
+  );
+}
+
+export function Code({ children }: { children: ReactNode }) {
+  return (
+    <code className="text-fg-secondary font-mono text-[0.95em]">
+      {children}
+    </code>
   );
 }
 
@@ -185,7 +217,7 @@ export function CopyField({
       currentTarget: HTMLInputElement | HTMLTextAreaElement;
     }) => event.currentTarget.select(),
     className:
-      "border-input bg-secondary text-fg-secondary focus-visible:border-selected focus-visible:ring-selected/20 w-full min-w-0 rounded-lg border px-3 font-mono text-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-3",
+      "border-input bg-secondary text-fg-secondary focus-visible:border-selected focus-visible:ring-selected/20 duration-fast w-full min-w-0 rounded-lg border px-3 font-mono text-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-3",
   };
 
   return (
@@ -203,7 +235,7 @@ export function CopyField({
         <input {...shared} className={cn(shared.className, "h-9")} />
       )}
       <Button
-        variant="subtle"
+        variant="secondary"
         size="control"
         className={cn("w-18 px-3", multiline && "self-end")}
         onClick={() => void copy()}
@@ -220,28 +252,52 @@ export function AdminOnly({ children }: { children: ReactNode }) {
   const viewer = useViewer();
   if (viewer.role === "admin") return <>{children}</>;
   return (
-    <EmptyState
-      icon={SettingsIcon}
-      title="Only admins can change this"
-      description="Ask an admin on your team if something here needs to change."
-      action={
-        <Button variant="secondary" size="sm" href="/settings/profile">
-          Back to your profile
-        </Button>
-      }
-      className="py-20"
-    />
+    <div className={cn(CARD, "py-6")}>
+      <EmptyState
+        icon={SettingsIcon}
+        title="Only admins can change this"
+        description="Ask an admin on your team if something here needs to change."
+        action={
+          <Button variant="secondary" size="sm" href="/settings/profile">
+            Back to your profile
+          </Button>
+        }
+      />
+    </div>
   );
 }
 
-/** A card per integration: name, what it does and its health or main action, then its details. */
+/** Square icon tile, the visual for integrations and the profile hero. */
+export function IconTile({
+  icon: Icon,
+  className,
+}: {
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "bg-muted shadow-tile flex size-10 shrink-0 items-center justify-center rounded-xl",
+        className,
+      )}
+    >
+      <Icon aria-hidden className="text-icon size-4.5" />
+    </span>
+  );
+}
+
+/** A card per integration: icon tile, name, what it does and its health or main action, then its details. */
 export function IntegrationCard({
+  visual,
   title,
   description,
   health,
   action,
   children,
 }: {
+  /** Usually an `IconTile`. */
+  visual: ReactNode;
   title: string;
   description: ReactNode;
   health?: Health;
@@ -249,16 +305,19 @@ export function IntegrationCard({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-card border-border shadow-card divide-border flex flex-col divide-y rounded-xl border">
-      <header className="flex items-start gap-4 px-4 py-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <h3>{title}</h3>
-          <p className="caption-style text-fg-tertiary leading-snug">
+    <section className={CARD}>
+      <header className="flex items-start gap-3 px-6 py-5">
+        {visual}
+        <div className="flex min-w-0 flex-1 flex-col gap-2 pt-0.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+            <h3 className="lead-style font-medium">{title}</h3>
+            {health && <HealthTag health={health} />}
+          </div>
+          <p className="caption-style text-fg-tertiary max-w-prose leading-snug">
             {description}
           </p>
         </div>
-        {health && <HealthTag health={health} />}
-        {action}
+        {action && <div className="flex shrink-0 items-center">{action}</div>}
       </header>
       {children}
     </section>

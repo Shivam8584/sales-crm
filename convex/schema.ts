@@ -4,6 +4,7 @@ import { authTables } from "@convex-dev/auth/server";
 import {
   vCallOutcome,
   vChannel,
+  vCurrency,
   vDay,
   vDealStage,
   vDisqualifyReason,
@@ -20,6 +21,8 @@ import {
   vTimelineKind,
   vUtm,
 } from "./lib/validators";
+import { vApproval, vProposalLine, vProposalStatus } from "./lib/pricing";
+import { vConsentEvent, vConsentPurpose, vLawfulBasis } from "./lib/consent";
 
 /**
  * Times are epoch milliseconds; calendar days are `YYYY-MM-DD` strings.
@@ -90,6 +93,7 @@ export default defineSchema({
     tags: v.array(v.string()),
     platformUserId: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
+    erasedAt: v.optional(v.number()),
     lastActivityAt: v.optional(v.number()),
     updatedAt: v.number(),
     searchText: v.string(),
@@ -128,6 +132,7 @@ export default defineSchema({
     accountId: v.optional(v.id("accounts")),
     personId: v.optional(v.id("people")),
     convertedAt: v.optional(v.number()),
+    erasedAt: v.optional(v.number()),
   })
     .index("by_status", ["status"])
     .index("by_owner_status", ["ownerId", "status"])
@@ -143,6 +148,13 @@ export default defineSchema({
     source: v.string(),
     ip: v.optional(v.string()),
     recordedAt: v.number(),
+    /** Absent on rows from before the ledger: `granted` then means grant or withdraw. */
+    event: v.optional(vConsentEvent),
+    basis: v.optional(vLawfulBasis),
+    /** Absent on a withdrawal or DND means every purpose. */
+    purpose: v.optional(vConsentPurpose),
+    actorId: v.optional(v.id("members")),
+    redactedAt: v.optional(v.number()),
   })
     .index("by_person", ["personId"])
     .index("by_lead", ["leadId"]),
@@ -282,4 +294,30 @@ export default defineSchema({
     windowStart: v.number(),
     count: v.number(),
   }).index("by_key", ["key"]),
+
+  /** An admin chose to keep a stale prospect; hides it from retention review for one window. */
+  retentionReviews: defineTable({
+    personId: v.optional(v.id("people")),
+    leadId: v.optional(v.id("leads")),
+    keptById: v.id("members"),
+    keptAt: v.number(),
+  })
+    .index("by_person", ["personId"])
+    .index("by_lead", ["leadId"]),
+
+  /** Deal-desk pricing for a deal; each version is frozen once it is sent. */
+  proposals: defineTable({
+    dealId: v.id("deals"),
+    version: v.number(),
+    status: vProposalStatus,
+    currency: vCurrency,
+    lines: v.array(vProposalLine),
+    validUntil: vDay,
+    terms: v.string(),
+    approval: v.optional(vApproval),
+    createdById: v.id("members"),
+    sentAt: v.optional(v.number()),
+    decidedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index("by_deal", ["dealId", "version"]),
 });

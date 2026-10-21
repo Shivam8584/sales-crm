@@ -1,8 +1,13 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
+import { DetailSection } from "@/components/record/detail";
 import { cn } from "@/lib/utils";
 import type { Trend } from "./format";
 
-/** A titled report block with an always-visible footnote that defines its metrics. */
+/** Flat bordered surface shared by report blocks; tables inside it keep the page background. */
+export const REPORT_CARD =
+  "border-border bg-background flex min-w-0 flex-col overflow-hidden rounded-xl border";
+
+/** A report block: eyebrow title with an export action, a one-line description, the content and a footnote defining its metrics. */
 export function ReportSection({
   id,
   title,
@@ -21,26 +26,22 @@ export function ReportSection({
   className?: string;
 }) {
   return (
-    <section
-      aria-labelledby={`${id}-title`}
-      className={cn("flex min-w-0 flex-col gap-3", className)}
-    >
-      <div className="flex items-start justify-between gap-x-4">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h2 id={`${id}-title`} className="lead-style font-medium">
-            {title}
-          </h2>
-          {description && (
-            <p className="caption-style text-fg-tertiary leading-snug text-pretty">
-              {description}
-            </p>
-          )}
-        </div>
-        {aside && <div className="-mr-2 flex shrink-0">{aside}</div>}
-      </div>
+    <section id={id} aria-label={title} className={cn(REPORT_CARD, className)}>
+      <DetailSection
+        title={title}
+        action={aside}
+        divider={false}
+        className="gap-1 px-4 pt-3 pb-3.5 sm:px-5"
+      >
+        {description && (
+          <p className="caption-style text-fg-tertiary leading-snug text-pretty">
+            {description}
+          </p>
+        )}
+      </DetailSection>
       {children}
       {footnote && (
-        <p className="caption-style text-fg-tertiary max-w-prose leading-snug text-pretty">
+        <p className="caption-style text-fg-tertiary border-border mt-auto border-t px-4 py-3 leading-snug text-pretty sm:px-5">
           {footnote}
         </p>
       )}
@@ -48,7 +49,7 @@ export function ReportSection({
   );
 }
 
-/** Bordered surface for a chart or table inside a section. */
+/** The body of a report block, ruled off from its heading. */
 export function Panel({
   children,
   className,
@@ -57,8 +58,50 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <div className={cn("shadow-hairline rounded-xl", className)}>
-      {children}
+    <div className={cn("border-border border-t", className)}>{children}</div>
+  );
+}
+
+/** Stat tile in the record-detail style, with an optional comparison line. */
+export function MetricTile({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  delta,
+  tone,
+}: {
+  icon?: ComponentType<SVGProps<SVGSVGElement>>;
+  label: string;
+  value: ReactNode;
+  detail?: ReactNode;
+  delta?: ReactNode;
+  tone?: "danger";
+}) {
+  return (
+    <div className="border-line-strong flex min-w-0 flex-col gap-3 rounded-lg border p-2.75">
+      <span className="caption-style text-fg-secondary flex min-w-0 items-center gap-1">
+        {Icon && <Icon aria-hidden className="size-3 shrink-0" />}
+        <span className="truncate">{label}</span>
+      </span>
+      <span
+        className={cn(
+          "truncate text-2xl leading-none font-semibold tabular-nums",
+          tone === "danger" && "text-danger",
+        )}
+      >
+        {value}
+      </span>
+      {(detail || delta) && (
+        <span className="flex min-h-4 flex-col gap-1.5">
+          {detail && (
+            <span className="caption-style text-fg-tertiary truncate tabular-nums">
+              {detail}
+            </span>
+          )}
+          {delta}
+        </span>
+      )}
     </div>
   );
 }
@@ -84,7 +127,7 @@ export function Delta({
       >
         {value}
       </span>
-      <span className="text-fg-tertiary">{label}</span>
+      <span className="text-fg-tertiary truncate">{label}</span>
     </span>
   );
 }

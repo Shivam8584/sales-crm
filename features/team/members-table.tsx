@@ -2,30 +2,35 @@
 
 import { useMemo, type ReactNode } from "react";
 import Avatar from "@/components/_ui/avatar";
-import Button from "@/components/_ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/_ui/dropdown-menu";
 import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import DataTable from "@/components/data-table/data-table";
-import type { Column, SortState } from "@/components/data-table/types";
+import type {
+  Column,
+  FooterStat,
+  RowMenuItem,
+  SortState,
+} from "@/components/data-table/types";
 import OptionPicker from "@/components/fields/option-picker";
+import { PageStatus } from "@/components/shell/page";
 import { ROLES, type Role } from "@/lib/domain/enums";
 import { ROLE_LABEL } from "@/lib/domain/labels";
-import { shortDate } from "@/lib/time";
+import { dateTime, shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
 import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
-import { ROLE_OPTIONS } from "./roles";
+import UserIcon from "@/public/assets/icons/kanban/user-03.svg";
+import TrashIcon from "@/public/assets/icons/trash.svg";
+import CheckIcon from "@/public/assets/icons/check-circle.svg";
+import { ROLE_OPTIONS, ROLE_TONE } from "./roles";
 import {
   lockReason,
   useMemberActions,
   type TeamMember,
 } from "./use-member-actions";
+
+// Optimistic updates re-render synchronously inside a menu click, which detaches
+// the menu before the row's click handler checks it and opens the row.
+const later = (action: () => void) => () => queueMicrotask(action);
 
 type MembersTableProps = {
   members: TeamMember[] | undefined;
@@ -35,6 +40,7 @@ type MembersTableProps = {
   sort: SortState;
   onSortChange: (sort: SortState) => void;
   memberHref: (member: TeamMember) => string;
+  footer: FooterStat[];
   empty: ReactNode;
 };
 
@@ -46,25 +52,27 @@ export default function MembersTable({
   sort,
   onSortChange,
   memberHref,
+  footer,
   empty,
 }: MembersTableProps) {
   const { setRole, setStatus } = useMemberActions();
 
-  const columns = useMemo<Column<TeamMember>[]>(() => {
-    const list: Column<TeamMember>[] = [
+  const columns = useMemo<Column<TeamMember>[]>(
+    () => [
       {
         id: "name",
-        header: "Name",
+        header: "Member",
         width: "minmax(13rem,2fr)",
         sortValue: (row) => row.name,
         cell: (row) => (
           <>
             <Avatar
               name={row.name}
-              size="md"
+              size="sm"
               className={cn(row.status !== "active" && "opacity-50")}
             />
             <span
+              title={row.name}
               className={cn(
                 "truncate",
                 row.status !== "active" && "text-fg-tertiary",
@@ -87,7 +95,9 @@ export default function MembersTable({
         minViewport: 900,
         sortValue: (row) => row.email,
         cell: (row) => (
-          <span className="text-fg-secondary truncate">{row.email}</span>
+          <span className="text-fg-secondary truncate" title={row.email}>
+            {row.email}
+          </span>
         ),
       },
       {
@@ -95,39 +105,14 @@ export default function MembersTable({
         header: "Role",
         width: "8.5rem",
         sortValue: (row) => ROLES.indexOf(row.role),
-        cell: (row) => {
-          const locked = lockReason(row, viewerId, team);
-          if (!isAdmin || locked) {
-            const label = <span>{ROLE_LABEL[row.role]}</span>;
-            return isAdmin && locked ? (
-              <Tooltip content={locked}>
-                <span
-                  tabIndex={0}
-                  className="focus-visible:ring-ring pointer-events-auto rounded-sm outline-none focus-visible:ring-2"
-                >
-                  {label}
-                </span>
-              </Tooltip>
-            ) : (
-              label
-            );
-          }
-          return (
-            <OptionPicker
-              value={row.role}
-              label={`Role for ${row.name}`}
-              options={ROLE_OPTIONS}
-              onChange={(role) => role && void setRole(row, role as Role)}
-              className="group/role"
-            >
-              {ROLE_LABEL[row.role]}
-              <ChevronDownIcon
-                aria-hidden
-                className="text-fg-tertiary size-2.5 opacity-0 transition-opacity group-hover/role:opacity-100 group-data-[state=open]/role:opacity-100"
-              />
-            </OptionPicker>
-          );
-        },
+        cell: (row) => (
+          <RoleCell
+            member={row}
+            editable={isAdmin}
+            locked={lockReason(row, viewerId, team)}
+            onChange={(role) => void setRole(row, role)}
+          />
+        ),
       },
       {
         id: "joined",
@@ -137,35 +122,50 @@ export default function MembersTable({
         defaultDir: "desc",
         sortValue: (row) => row.joinedAt,
         cell: (row) => (
-          <span className="text-fg-secondary">{shortDate(row.joinedAt)}</span>
+          <Tooltip content={dateTime(row.joinedAt)}>
+            <span className="text-fg-secondary pointer-events-auto truncate tabular-nums">
+              {shortDate(row.joinedAt)}
+            </span>
+          </Tooltip>
         ),
       },
       {
         id: "status",
         header: "Status",
-        width: "8rem",
+        width: "8.5rem",
         sortValue: (row) => row.status,
         cell: (row) => <StatusTag status={row.status} />,
       },
+    ],
+    [isAdmin, viewerId, team, setRole],
+  );
+
+  function rowMenu(row: TeamMember): (RowMenuItem | false)[] {
+    if (!isAdmin || row._id === viewerId) return [];
+    const locked = Boolean(lockReason(row, viewerId, team));
+    const active = row.status === "active";
+    return [
+      ...ROLES.filter((role) => role !== row.role).map((role) => ({
+        label: `Make ${ROLE_LABEL[role].toLowerCase()}`,
+        icon: UserIcon,
+        disabled: locked,
+        onSelect: later(() => void setRole(row, role)),
+      })),
+      active
+        ? {
+            label: "Deactivate",
+            icon: TrashIcon,
+            tone: "danger" as const,
+            disabled: locked,
+            onSelect: later(() => void setStatus(row, "deactivated")),
+          }
+        : {
+            label: "Reactivate",
+            icon: CheckIcon,
+            onSelect: later(() => void setStatus(row, "active")),
+          },
     ];
-    if (isAdmin) {
-      list.push({
-        id: "actions",
-        header: "",
-        width: "3.5rem",
-        align: "end",
-        cell: (row) =>
-          row._id === viewerId ? null : (
-            <MemberMenu
-              member={row}
-              locked={lockReason(row, viewerId, team)}
-              onStatus={(status) => void setStatus(row, status)}
-            />
-          ),
-      });
-    }
-    return list;
-  }, [isAdmin, viewerId, team, setRole, setStatus]);
+  }
 
   return (
     <DataTable
@@ -177,6 +177,8 @@ export default function MembersTable({
       getLabel={(row) => row.name}
       sort={sort}
       onSortChange={onSortChange}
+      rowMenu={rowMenu}
+      footer={footer}
       renderCard={(row) => (
         <span className="flex items-center gap-3">
           <Avatar
@@ -194,10 +196,15 @@ export default function MembersTable({
               )}
             </span>
             <span className="caption-style text-fg-tertiary truncate">
-              {ROLE_LABEL[row.role]} · {row.email}
+              {row.email}
             </span>
           </span>
-          {row.status !== "active" && <StatusTag status={row.status} />}
+          <span className="flex shrink-0 flex-col items-end gap-1.5">
+            <Tag tone={ROLE_TONE[row.role]} size="xs">
+              {ROLE_LABEL[row.role]}
+            </Tag>
+            {row.status !== "active" && <StatusTag status={row.status} />}
+          </span>
         </span>
       )}
       empty={empty}
@@ -205,57 +212,60 @@ export default function MembersTable({
   );
 }
 
-export function StatusTag({ status }: { status: TeamMember["status"] }) {
-  return status === "active" ? (
-    <Tag tone="green" size="sm">
-      Active
+function RoleCell({
+  member,
+  editable,
+  locked,
+  onChange,
+}: {
+  member: TeamMember;
+  editable: boolean;
+  locked: string | null;
+  onChange: (role: Role) => void;
+}) {
+  const tag = (
+    <Tag tone={ROLE_TONE[member.role]} size="sm">
+      {ROLE_LABEL[member.role]}
     </Tag>
-  ) : (
-    <Tag size="sm">Deactivated</Tag>
+  );
+  if (!editable) return tag;
+  if (locked) {
+    return (
+      <Tooltip content={locked}>
+        <span
+          tabIndex={0}
+          className="focus-visible:ring-ring pointer-events-auto rounded-full outline-none focus-visible:ring-2"
+        >
+          {tag}
+        </span>
+      </Tooltip>
+    );
+  }
+  return (
+    // The picker's popup is portalled but still bubbles through the row in React;
+    // a pick would otherwise also open the member.
+    <span className="flex min-w-0" onClick={(event) => event.stopPropagation()}>
+      <OptionPicker
+        value={member.role}
+        label={`Role for ${member.name}`}
+        options={ROLE_OPTIONS}
+        onChange={(role) => role && onChange(role as Role)}
+        className="group/role gap-1"
+      >
+        {tag}
+        <ChevronDownIcon
+          aria-hidden
+          className="text-fg-tertiary size-2.5 opacity-0 transition-opacity group-hover/role:opacity-100 group-data-[state=open]/role:opacity-100"
+        />
+      </OptionPicker>
+    </span>
   );
 }
 
-function MemberMenu({
-  member,
-  locked,
-  onStatus,
-}: {
-  member: TeamMember;
-  locked: string | null;
-  onStatus: (status: TeamMember["status"]) => void;
-}) {
-  const active = member.status === "active";
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={`Actions for ${member.name}`}
-        >
-          <DotsIcon aria-hidden className="size-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-w-64">
-        {active ? (
-          <DropdownMenuItem
-            disabled={!!locked}
-            onSelect={() => onStatus("deactivated")}
-            className="text-danger"
-          >
-            Deactivate
-          </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem onSelect={() => onStatus("active")}>
-            Reactivate
-          </DropdownMenuItem>
-        )}
-        {active && locked && (
-          <p className="caption-style text-fg-tertiary px-2 pt-1 pb-1.5 leading-snug">
-            {locked}.
-          </p>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+export function StatusTag({ status }: { status: TeamMember["status"] }) {
+  return status === "active" ? (
+    <PageStatus>Active</PageStatus>
+  ) : (
+    <PageStatus tone="neutral">Deactivated</PageStatus>
   );
 }
