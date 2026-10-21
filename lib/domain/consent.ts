@@ -123,7 +123,7 @@ export function basisOf(row: LedgerRow): LawfulBasis | null {
 }
 
 /** Oldest first; ties keep insertion order. */
-export function chronological<T extends LedgerRow>(rows: T[]) {
+function chronological<T extends LedgerRow>(rows: T[]) {
   return [...rows].sort(
     (a, b) =>
       a.recordedAt - b.recordedAt ||

@@ -85,6 +85,39 @@ export function bucketCounts(
   return buckets;
 }
 
+/** The newest logged interaction on an account or person: one indexed read per kind. */
+export async function latestInteraction(
+  ctx: QueryCtx,
+  target: { accountId: Id<"accounts"> } | { personId: Id<"people"> },
+) {
+  const latest = await Promise.all(
+    LOGGABLE.map((kind) =>
+      "accountId" in target
+        ? ctx.db
+            .query("timeline")
+            .withIndex("by_account_kind", (q) =>
+              q.eq("accountId", target.accountId).eq("kind", kind),
+            )
+            .order("desc")
+            .first()
+        : ctx.db
+            .query("timeline")
+            .withIndex("by_person_kind", (q) =>
+              q.eq("personId", target.personId).eq("kind", kind),
+            )
+            .order("desc")
+            .first(),
+    ),
+  );
+  let last: Doc<"timeline"> | null = null;
+  for (const entry of latest) {
+    if (entry && (!last || entry.occurredAt > last.occurredAt)) last = entry;
+  }
+  return last
+    ? { at: last.occurredAt, kind: last.kind, subject: last.subject ?? null }
+    : null;
+}
+
 const WINDOW_BUCKET = { 7: 1, 30: 1, 90: 3 } as const;
 
 /** Interactions logged on a record in the last 7, 30 or 90 days, by kind and over time. */
@@ -206,6 +239,12 @@ export const log = memberMutation({
     } else if ("personId" in args.target) {
       const person = await ctx.db.get(args.target.personId);
       if (!person) notFound("Person");
+      if (person.erasedAt) {
+        fail(
+          "forbidden",
+          "This person's data was erased, so nothing new can be logged",
+        );
+      }
       refs = { personId: person._id, accountId: person.accountId };
     } else {
       if (!(await ctx.db.get(args.target.accountId))) notFound("Account");
@@ -252,6 +291,10 @@ async function editableEntry(
   }
   if (entry.actorId !== ctx.viewer._id && ctx.viewer.role !== "admin") {
     fail("forbidden", "Only the author or an admin can change this");
+  }
+  const person = entry.personId ? await ctx.db.get(entry.personId) : null;
+  if (person?.erasedAt) {
+    fail("forbidden", "This person's data was erased and can't be changed");
   }
   return entry;
 }

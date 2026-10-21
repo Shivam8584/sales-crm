@@ -1,8 +1,7 @@
 import Avatar from "@/components/_ui/avatar";
 import Tag, { type TagTone } from "@/components/_ui/tag";
-import ToneDot from "@/components/board/tone-dot";
 import type { Option } from "@/components/fields/option-picker";
-import { LEAD_STATUSES, type LeadStatus } from "@/lib/domain/enums";
+import type { LeadStatus } from "@/lib/domain/enums";
 import { LEAD_STATUS_LABEL } from "@/lib/domain/labels";
 import { cellDate, tagTone } from "@/features/accounts/record-cells";
 import { cn } from "@/lib/utils";
@@ -18,13 +17,6 @@ export const STATUS_TONE: Record<LeadStatus, TagTone> = {
 };
 
 /** Statuses a rep picks directly; disqualify needs a reason and convert has its own action. */
-export const WORKING_STATUS_OPTIONS: Option[] = LEAD_STATUSES.filter(
-  (status) => status !== "disqualified" && status !== "converted",
-).map((status) => ({
-  value: status,
-  label: LEAD_STATUS_LABEL[status],
-  icon: <ToneDot tone={STATUS_TONE[status]} />,
-}));
 
 export function StatusTag({ status }: { status: LeadStatus }) {
   return (

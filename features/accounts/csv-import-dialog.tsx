@@ -48,7 +48,7 @@ const MAX_ROWS = 1000;
 const CHUNK = 200;
 
 /** RFC 4180 parsing: quoted fields, escaped quotes, CRLF and newlines inside quotes. */
-export function parseCsv(text: string) {
+function parseCsv(text: string) {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";

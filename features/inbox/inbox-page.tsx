@@ -70,6 +70,11 @@ const GROUP_STYLE: Record<
     tile: "bg-(--tag-red-bg) border-(--tag-red-border) text-(--tag-red-text)",
     short: "SLA",
   },
+  approvals: {
+    tag: "amber",
+    tile: "bg-(--tag-amber-bg) border-(--tag-amber-border) text-(--tag-amber-text)",
+    short: "Approvals",
+  },
   platform: {
     tag: "teal",
     tile: "bg-(--tag-teal-bg) border-(--tag-teal-border) text-(--tag-teal-text)",

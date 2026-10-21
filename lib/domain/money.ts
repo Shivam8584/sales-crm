@@ -28,11 +28,7 @@ const LOCALE: Record<Currency, string> = {
   SGD: "en-SG",
 };
 
-export function isCurrency(value: string): value is Currency {
-  return (CURRENCIES as readonly string[]).includes(value);
-}
-
-export function toMinor(major: number, currency: Currency): number {
+function toMinor(major: number, currency: Currency): number {
   return Math.round(major * 10 ** MINOR_DIGITS[currency]);
 }
 

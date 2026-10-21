@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import type { ComponentProps, KeyboardEvent } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/_ui/scroll-area";
@@ -18,6 +18,20 @@ function keepOpenForToasts(event: {
   ) {
     event.preventDefault();
   }
+}
+
+/** ⌘/Ctrl+Enter submits the dialog's form from any field, textareas included. */
+function submitOnModEnter(event: KeyboardEvent<HTMLDivElement>) {
+  if (event.defaultPrevented || event.key !== "Enter") return;
+  if (!(event.metaKey || event.ctrlKey) || event.nativeEvent.isComposing) {
+    return;
+  }
+  const target = event.target instanceof Element ? event.target : null;
+  const form =
+    target?.closest("form") ?? event.currentTarget.querySelector("form");
+  if (!form) return;
+  event.preventDefault();
+  form.requestSubmit();
 }
 
 function Dialog(props: ComponentProps<typeof DialogPrimitive.Root>) {
@@ -66,6 +80,10 @@ function DialogContent({
         onInteractOutside={(event) => {
           keepOpenForToasts(event);
           props.onInteractOutside?.(event);
+        }}
+        onKeyDown={(event) => {
+          props.onKeyDown?.(event);
+          submitOnModEnter(event);
         }}
         className={cn(
           "border-line-strong bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-slow data-[state=closed]:duration-base fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-120 -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border outline-none",

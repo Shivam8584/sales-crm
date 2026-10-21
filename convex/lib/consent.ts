@@ -167,7 +167,11 @@ const PHONE_PATTERN = /\+?\d[\d\s-]{7,}\d/g;
  * Replaces the subject's names with "Erased person" and any email or phone
  * number with a marker. Over-redacting free text is the safe failure here.
  */
-export function makeScrubber(names: string[], identifiers: string[]) {
+export function makeScrubber(
+  names: string[],
+  identifiers: string[],
+  generic = true,
+) {
   const patterns = [
     ...identifiers
       .filter((value) => value.length >= 3)
@@ -183,8 +187,12 @@ export function makeScrubber(names: string[], identifiers: string[]) {
         ),
         to: ERASED_NAME,
       })),
-    { re: EMAIL_PATTERN, to: REDACTED },
-    { re: PHONE_PATTERN, to: REDACTED },
+    ...(generic
+      ? [
+          { re: EMAIL_PATTERN, to: REDACTED },
+          { re: PHONE_PATTERN, to: REDACTED },
+        ]
+      : []),
   ];
   return (text: string | undefined) => {
     if (!text) return text;
@@ -243,7 +251,7 @@ async function linkedLeads(ctx: MutationCtx, person: Doc<"people">) {
   };
   for (const lead of await ctx.db
     .query("leads")
-    .filter((q) => q.eq(q.field("personId"), person._id))
+    .withIndex("by_person", (q) => q.eq("personId", person._id))
     .collect()) {
     add(lead);
   }
@@ -273,7 +281,8 @@ async function linkedLeads(ctx: MutationCtx, person: Doc<"people">) {
 
 type Subject = { person?: Doc<"people">; leads: Doc<"leads">[] };
 
-function scrubberFor({ person, leads }: Subject) {
+/** `generic` also redacts any email or phone; off for rows that aren't only about the subject. */
+function scrubberFor({ person, leads }: Subject, generic = true) {
   const names: string[] = [];
   const identifiers: string[] = [];
   if (person) {
@@ -301,6 +310,7 @@ function scrubberFor({ person, leads }: Subject) {
   return makeScrubber(
     [...new Set(names.filter(Boolean))],
     [...new Set(identifiers)],
+    generic,
   );
 }
 
@@ -392,6 +402,115 @@ async function redactAround(
   }
 }
 
+function scrubJson(raw: string, scrub: Scrub) {
+  const walk = (value: unknown): unknown => {
+    if (typeof value === "string") return scrub(value);
+    if (Array.isArray(value)) return value.map(walk);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [key, walk(item)]),
+      );
+    }
+    return value;
+  };
+  try {
+    return JSON.stringify(walk(JSON.parse(raw)));
+  } catch {
+    return REDACTED;
+  }
+}
+
+/**
+ * PII that lives outside the person's own rows: deal titles and contact
+ * changes at their account, raw platform events and enrichment errors.
+ */
+async function redactBeyond(ctx: MutationCtx, subject: Subject) {
+  const { person, leads } = subject;
+  const scrub = scrubberFor(subject);
+  const narrow = scrubberFor(subject, false);
+  const runs: Doc<"enrichmentRuns">[] = [];
+  if (person) {
+    const personId = person._id;
+    runs.push(
+      ...(await ctx.db
+        .query("enrichmentRuns")
+        .withIndex("by_person", (q) => q.eq("personId", personId))
+        .collect()),
+    );
+  }
+  for (const lead of leads) {
+    runs.push(
+      ...(await ctx.db
+        .query("enrichmentRuns")
+        .withIndex("by_lead", (q) => q.eq("leadId", lead._id))
+        .collect()),
+    );
+  }
+  for (const run of runs) {
+    if (run.error) await ctx.db.patch(run._id, { error: scrub(run.error) });
+  }
+
+  const events: Doc<"platformEvents">[] = [];
+  if (person?.platformUserId) {
+    const userId = person.platformUserId;
+    events.push(
+      ...(await ctx.db
+        .query("platformEvents")
+        .withIndex("by_user_type", (q) => q.eq("userId", userId))
+        .collect()),
+    );
+  }
+  const account = person?.accountId ? await ctx.db.get(person.accountId) : null;
+  if (account?.platformOrgId) {
+    const orgId = account.platformOrgId;
+    events.push(
+      ...(await ctx.db
+        .query("platformEvents")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .collect()),
+    );
+  }
+  for (const event of new Map(
+    events.map((item) => [item._id, item]),
+  ).values()) {
+    const payload = scrubJson(event.payload, narrow);
+    const error = narrow(event.error);
+    if (payload !== event.payload || error !== event.error) {
+      await ctx.db.patch(event._id, { payload, error });
+    }
+  }
+
+  if (!person?.accountId) return;
+  const accountId = person.accountId;
+  const deals = await ctx.db
+    .query("deals")
+    .withIndex("by_account", (q) => q.eq("accountId", accountId))
+    .collect();
+  for (const deal of deals) {
+    const onDeal = deal.personIds.includes(person._id);
+    const title = narrow(deal.title) ?? deal.title;
+    if (!onDeal && title === deal.title) continue;
+    await ctx.db.patch(deal._id, {
+      title,
+      personIds: deal.personIds.filter((id) => id !== person._id),
+    });
+    for (const entry of await ctx.db
+      .query("timeline")
+      .withIndex("by_deal", (q) => q.eq("dealId", deal._id))
+      .collect()) {
+      await ctx.db.patch(entry._id, {
+        subject: narrow(entry.subject),
+        body: narrow(entry.body),
+        changes: entry.changes?.map((change) => ({
+          field: change.field,
+          from: narrow(change.from),
+          to: narrow(change.to),
+        })),
+      });
+    }
+  }
+}
+
 async function anonymiseLeads(
   ctx: MutationCtx,
   leads: Doc<"leads">[],
@@ -426,6 +545,7 @@ export async function erasePerson(
   );
   const scrub = scrubberFor({ person, leads });
   await redactAround(ctx, { person, leads }, scrub, now);
+  await redactBeyond(ctx, { person, leads });
   await anonymiseLeads(ctx, leads, now);
   await ctx.db.patch(person._id, {
     firstName: ERASED_NAME,
@@ -475,6 +595,7 @@ export async function eraseLead(
   const now = Date.now();
   const scrub = scrubberFor({ leads: [lead] });
   await redactAround(ctx, { leads: [lead] }, scrub, now);
+  await redactBeyond(ctx, { leads: [lead] });
   await anonymiseLeads(ctx, [lead], now);
   await appendLedger(ctx, {
     leadId: lead._id,

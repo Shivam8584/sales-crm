@@ -26,8 +26,8 @@ export const MARGIN_DEFAULT_BPS = 3_000;
 export const MARGIN_APPROVAL_BPS = 1_500;
 export const MARGIN_TARGET_BPS = { min: 2_000, max: 3_000 } as const;
 
-export const DEFAULT_ORDER_FEE_BPS = 1_000;
-export const DEFAULT_BONUS_FEE_BPS = 3_000;
+const DEFAULT_ORDER_FEE_BPS = 1_000;
+const DEFAULT_BONUS_FEE_BPS = 3_000;
 export const DEFAULT_VALIDITY_DAYS = 14;
 export const MAX_LINES = 25;
 export const MAX_SLOTS = 100_000;
@@ -179,7 +179,7 @@ export function priceForMargin(cost: number, marginBps: number) {
 }
 
 /** What has to be covered per sale before any margin: the order, bonus and coupon. */
-export function costPerSale(input: PricingInput) {
+function costPerSale(input: PricingInput) {
   return input.orderValue + input.bonus + input.coupon;
 }
 
@@ -188,7 +188,7 @@ export function defaultPrice(input: PricingInput) {
 }
 
 /** True when `margin / charge` is under `bps`, compared without floats. */
-export function isBelow(margin: number, charge: number, bps: number) {
+function isBelow(margin: number, charge: number, bps: number) {
   return margin * BPS < bps * charge;
 }
 

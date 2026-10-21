@@ -7,7 +7,9 @@ import { DEFAULT_CURRENCY, formatMoney } from "../lib/domain/money";
 import { cleanText, isValidDay } from "../lib/domain/normalize";
 import { invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
+import schema from "./schema";
 import { assertMoney } from "./lib/money";
+import { checkLineCount } from "./lib/pricing";
 import {
   memberIndex,
   memberRef,
@@ -462,12 +464,37 @@ export const move = memberMutation({
   },
 });
 
-/** Deletes immediately; the client keeps the returned copy to offer undo. */
+const vStoredProposal = schema.tables.proposals.validator.omit("dealId");
+
+/**
+ * Deletes immediately with the deal's proposals, and unlinks its tasks; the
+ * client keeps the returned copy to offer undo. Timeline entries keep the old
+ * deal id so the account's history still reads right, and `restore` re-points them.
+ */
 export const remove = memberMutation({
   args: { id: v.id("deals") },
   handler: async (ctx, { id }) => {
     const deal = await ctx.db.get(id);
     if (!deal) notFound("Deal");
+    const proposals = [];
+    for (const proposal of await ctx.db
+      .query("proposals")
+      .withIndex("by_deal", (q) => q.eq("dealId", id))
+      .collect()) {
+      const { _id, _creationTime, dealId, ...stored } = proposal;
+      void _creationTime;
+      void dealId;
+      await ctx.db.delete(_id);
+      proposals.push(stored);
+    }
+    const taskIds: Id<"tasks">[] = [];
+    for (const task of await ctx.db
+      .query("tasks")
+      .withIndex("by_deal", (q) => q.eq("dealId", id))
+      .collect()) {
+      await ctx.db.patch(task._id, { dealId: undefined });
+      taskIds.push(task._id);
+    }
     await ctx.db.delete(id);
     await logSystem(
       ctx,
@@ -478,7 +505,7 @@ export const remove = memberMutation({
     );
     const { _id, _creationTime, ...fields } = deal;
     void _creationTime;
-    return { previousId: _id, deal: fields };
+    return { previousId: _id, deal: fields, proposals, taskIds };
   },
 });
 
@@ -498,8 +525,10 @@ export const restore = memberMutation({
       closedAt: v.optional(v.number()),
       updatedAt: v.number(),
     }),
+    proposals: v.optional(v.array(vStoredProposal)),
+    taskIds: v.optional(v.array(v.id("tasks"))),
   },
-  handler: async (ctx, { previousId, deal }) => {
+  handler: async (ctx, { previousId, deal, proposals = [], taskIds = [] }) => {
     const account = await requireAccount(ctx, deal.accountId);
     const owner = await ctx.db.get(deal.ownerId);
     const id = await ctx.db.insert("deals", {
@@ -511,7 +540,7 @@ export const restore = memberMutation({
       personIds: await keepPeopleAt(ctx, deal.personIds, account._id),
       updatedAt: Date.now(),
     });
-    // Ids are never reused, so re-point history and tasks at the new document.
+    // Ids are never reused, so re-point history, tasks and proposals at the new document.
     const entries = await ctx.db
       .query("timeline")
       .withIndex("by_deal", (q) => q.eq("dealId", previousId))
@@ -522,6 +551,17 @@ export const restore = memberMutation({
       .withIndex("by_deal", (q) => q.eq("dealId", previousId))
       .collect();
     for (const task of tasks) await ctx.db.patch(task._id, { dealId: id });
+    for (const taskId of taskIds) {
+      const task = await ctx.db.get(taskId);
+      if (task && !task.dealId) await ctx.db.patch(taskId, { dealId: id });
+    }
+    const versions = new Set<number>();
+    for (const proposal of proposals) {
+      if (versions.has(proposal.version)) continue;
+      versions.add(proposal.version);
+      checkLineCount(proposal.lines.length);
+      await ctx.db.insert("proposals", { ...proposal, dealId: id });
+    }
     await logSystem(
       ctx,
       { accountId: account._id, dealId: id },

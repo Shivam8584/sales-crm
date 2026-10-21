@@ -12,7 +12,7 @@ import XCloseIcon from "@/public/assets/icons/kanban/x-close.svg";
 import MonitorIcon from "@/public/assets/icons/monitor.svg";
 import NoteIcon from "@/public/assets/icons/note.svg";
 
-export const DEAL_STAGE_TONE: Record<DealStage, TagTone> = {
+const DEAL_STAGE_TONE: Record<DealStage, TagTone> = {
   discovery: "blue",
   demo: "purple",
   proposal: "amber",
@@ -36,10 +36,6 @@ export const DEAL_STAGE_BADGE: Record<DealStage, StageBadge> = {
   won: { icon: ClipboardCheckIcon, tone: "success", text: "text-success" },
   lost: { icon: XCloseIcon, tone: "neutral", text: "text-fg-tertiary" },
 };
-
-export const OPEN_STAGES = DEAL_STAGES.filter(
-  (stage) => stage !== "won" && stage !== "lost",
-);
 
 export const isOpenStage = (stage: DealStage) =>
   stage !== "won" && stage !== "lost";

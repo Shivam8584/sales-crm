@@ -235,6 +235,8 @@ export default function DataTable<T>({
   }, [activeCursor]);
 
   function openRow(row: T, event: MouseEvent<HTMLDivElement>) {
+    // React bubbles clicks from portaled menus and pickers through the row.
+    if (!event.currentTarget.contains(event.target as Node)) return;
     if (
       event.target instanceof Element &&
       event.target.closest("a, button, input, [role=checkbox], [role=menu]")

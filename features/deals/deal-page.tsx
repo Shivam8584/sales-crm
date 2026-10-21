@@ -37,6 +37,7 @@ import { formatMoney } from "@/lib/domain/money";
 import { dateTime, relativeTime } from "@/lib/time";
 import { useUiStore } from "@/stores/ui-store";
 import BuildingIcon from "@/public/assets/icons/building.svg";
+import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
@@ -141,6 +142,13 @@ function DealView({ deal }: { deal: DealRow }) {
         actions={
           <PageActions
             label="Deal actions"
+            primaryItem={
+              open && {
+                label: "Mark won",
+                icon: CheckCircleIcon,
+                onSelect: () => void save({ stage: "won" }, "Stage"),
+              }
+            }
             primary={
               open && (
                 <Button

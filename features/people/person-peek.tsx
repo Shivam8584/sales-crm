@@ -21,8 +21,10 @@ import AccountLogo from "@/features/accounts/account-logo";
 import { ActivityTrend } from "@/features/accounts/account-insights";
 import AccountPicker from "@/features/accounts/account-picker";
 import { PeekSkeleton } from "@/features/accounts/account-peek";
+import { ErasedTag } from "@/features/consent/erased";
 import { StageAndTags } from "@/features/accounts/record-cells";
 import MemberPicker from "@/features/members/member-picker";
+import GuardedContactActions from "@/features/consent/contact-guard";
 import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
@@ -31,7 +33,6 @@ import { cn } from "@/lib/utils";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import XIcon from "@/public/assets/icons/x.svg";
-import ContactActions from "./contact-actions";
 
 type Person = NonNullable<FunctionReturnType<typeof api.people.get>>;
 
@@ -80,6 +81,8 @@ export default function PersonPeek({
         <p className="text-fg-secondary px-6 py-6">
           This person no longer exists.
         </p>
+      ) : person.erasedAt ? (
+        <ErasedBody person={person} />
       ) : (
         <PeekBody key={person._id} person={person} onClose={onClose} />
       )}
@@ -132,7 +135,7 @@ function PeekBody({
       </DetailHero>
 
       <DetailSection title="Contact" className="gap-2">
-        <ContactActions person={person} className="mb-1" />
+        <GuardedContactActions person={person} className="mb-1" />
         <Properties>
           <Property label="Email">
             <InlineText
@@ -194,6 +197,22 @@ function PeekBody({
 
       <DetailSection title="Recent activity" divider={false}>
         <Timeline target={{ personId: person._id }} compact />
+      </DetailSection>
+    </div>
+  );
+}
+
+function ErasedBody({ person }: { person: Person }) {
+  return (
+    <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
+      <DetailHero
+        visual={<Avatar name={personName(person)} size="xl" />}
+        title={personName(person)}
+      >
+        <ErasedTag erasedAt={person.erasedAt!} />
+      </DetailHero>
+      <DetailSection title="Recent activity" divider={false}>
+        <Timeline target={{ personId: person._id }} compact readOnly />
       </DetailSection>
     </div>
   );

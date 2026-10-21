@@ -5,7 +5,15 @@ import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
 import OptionPicker from "@/components/fields/option-picker";
 import { useMembers } from "@/hooks/use-viewer";
-import type { Channel } from "@/lib/domain/enums";
+import {
+  CONSENT_CHANNEL_LABEL,
+  CONSENT_EVENT_LABEL,
+  CONSENT_PURPOSE_LABEL,
+  consentSourceLabel,
+  eventOf,
+  purposeOf,
+  type ConsentEvent,
+} from "@/lib/domain/consent";
 import {
   DISQUALIFY_REASON_LABEL,
   LEAD_STATUS_LABEL,
@@ -20,10 +28,14 @@ import { useLeadActions } from "./use-lead-actions";
 
 export type Lead = NonNullable<FunctionReturnType<typeof api.leads.get>>;
 
-const CHANNEL_LABEL: Record<Channel, string> = {
-  email: "Email",
-  phone: "Phone",
-  whatsapp: "WhatsApp",
+const EVENT_DOT: Record<ConsentEvent, string> = {
+  grant: "bg-success",
+  withdraw: "bg-danger",
+  dnd_on: "bg-danger",
+  dnd_off: "bg-success",
+  erasure_requested: "bg-warning",
+  erasure_cancelled: "bg-fg-tertiary",
+  erased: "bg-fg-tertiary",
 };
 
 export function Value({ children }: { children: ReactNode }) {
@@ -146,16 +158,18 @@ export function LeadConsents({ consents }: { consents: Lead["consents"] }) {
               aria-hidden
               className={cn(
                 "size-1.5 shrink-0 rounded-full",
-                consent.granted ? "bg-success" : "bg-danger",
+                EVENT_DOT[eventOf(consent)],
               )}
             />
             <span className="text-foreground">
-              {CHANNEL_LABEL[consent.channel]}{" "}
-              {consent.granted ? "granted" : "refused"}
+              {CONSENT_CHANNEL_LABEL[consent.channel]} ·{" "}
+              {CONSENT_EVENT_LABEL[eventOf(consent)].toLowerCase()}
+              {purposeOf(consent) &&
+                ` for ${CONSENT_PURPOSE_LABEL[purposeOf(consent)!].toLowerCase()}`}
             </span>
             <span className="text-fg-tertiary">
               {dateTime(consent.recordedAt)} ·{" "}
-              {LEAD_SOURCE_LABEL[consent.source] ?? consent.source}
+              {consentSourceLabel(consent.source)}
             </span>
           </li>
         ))}

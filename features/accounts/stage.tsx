@@ -4,7 +4,7 @@ import { LIFECYCLE_STAGES, type LifecycleStage } from "@/lib/domain/enums";
 import { STAGE_LABEL } from "@/lib/domain/labels";
 import type { Option } from "@/components/fields/option-picker";
 
-export const STAGE_TONE: Record<LifecycleStage, TagTone> = {
+const STAGE_TONE: Record<LifecycleStage, TagTone> = {
   prospect: "neutral",
   lead: "blue",
   qualified: "blue",

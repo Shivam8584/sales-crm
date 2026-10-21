@@ -53,6 +53,7 @@ import EditIcon from "@/public/assets/icons/edit.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
+import { ErasedNotice, ErasedTag } from "@/features/consent/erased";
 import ConsentRecords from "./consent-records";
 import GuardedContactActions from "@/features/consent/contact-guard";
 import PersonDeals from "./person-deals";
@@ -110,7 +111,55 @@ export default function PersonPage({ id }: { id: Id<"people"> }) {
       </Page>
     );
   }
+  if (person.erasedAt) return <ErasedPersonView person={person} />;
   return <PersonView person={person} />;
+}
+
+function ErasedPersonView({ person }: { person: Person }) {
+  const name = personName(person);
+  return (
+    <Page>
+      <PageHeader
+        crumbs={CRUMBS}
+        title={name}
+        meta={<PageStatus tone="neutral">Erased</PageStatus>}
+      />
+      <RecordLayout
+        header={
+          <div className="flex flex-col gap-5">
+            <RecordHeader
+              visual={<Avatar name={name} size="xl" />}
+              title={<span data-record-title>{name}</span>}
+              subtitle={<ErasedTag erasedAt={person.erasedAt!} />}
+            />
+            <ErasedNotice />
+          </div>
+        }
+        aside={
+          <>
+            <ConsentRecords personId={person._id} className={ASIDE_SECTION} />
+            <DetailSection
+              title="Record"
+              className={cn(ASIDE_SECTION, "gap-2")}
+              divider={false}
+            >
+              <Properties>
+                <Property label="Added">
+                  <Tooltip content={dateTime(person._creationTime)}>
+                    <span className="text-sm">
+                      {shortDate(person._creationTime)}
+                    </span>
+                  </Tooltip>
+                </Property>
+              </Properties>
+            </DetailSection>
+          </>
+        }
+      >
+        <Timeline target={{ personId: person._id }} readOnly />
+      </RecordLayout>
+    </Page>
+  );
 }
 
 function PersonView({ person }: { person: Person }) {

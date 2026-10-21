@@ -69,9 +69,7 @@ export const SETTINGS_ITEM: NavItem = {
   shortcut: "S",
 };
 
-export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap(
-  (section) => section.items,
-);
+const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((section) => section.items);
 
 /** Every item reachable with `G` then a key, including settings. */
 export const ALL_NAV_ITEMS: NavItem[] = [...NAV_ITEMS, SETTINGS_ITEM];

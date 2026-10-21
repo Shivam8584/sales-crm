@@ -140,14 +140,16 @@ export default function AccountStallBanner({
             </Button>
           </>
         )}
-        <Button
-          variant="secondary"
-          size="sm"
-          loading={creating}
-          onClick={() => void openTask()}
-        >
-          {task ? "Open task" : "Create task"}
-        </Button>
+        {(task || stall.canOpenTask) && (
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={creating}
+            onClick={() => void openTask()}
+          >
+            {task ? "Open task" : "Create task"}
+          </Button>
+        )}
       </div>
     </aside>
   );

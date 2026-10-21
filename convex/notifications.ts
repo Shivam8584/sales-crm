@@ -4,8 +4,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
-import type { FilterBuilder, NamedTableInfo } from "convex/server";
-import type { DataModel, Doc, Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { memberMutation, memberQuery } from "./lib/functions";
 
 const LIMIT = 50;
@@ -81,27 +80,18 @@ function toClient(item: Doc<"notifications">) {
   };
 }
 
-function read(ctx: QueryCtx, recipientId: Id<"members">) {
+function newest(ctx: QueryCtx, recipientId: Id<"members">) {
   return ctx.db
     .query("notifications")
-    .withIndex("by_recipient", (q) =>
-      q.eq("recipientId", recipientId).gt("readAt", 0),
-    );
+    .withIndex("by_recipient_time", (q) => q.eq("recipientId", recipientId))
+    .order("desc");
 }
 
-/** The newest notifications for the signed-in member, unread first by recency. */
+/** The newest notifications for the signed-in member. */
 export const listMine = memberQuery({
   args: {},
-  handler: async (ctx) => {
-    const [fresh, seen] = await Promise.all([
-      unread(ctx, ctx.viewer._id).order("desc").take(LIMIT),
-      read(ctx, ctx.viewer._id).order("desc").take(LIMIT),
-    ]);
-    return [...fresh, ...seen]
-      .sort((a, b) => b._creationTime - a._creationTime)
-      .slice(0, LIMIT)
-      .map(toClient);
-  },
+  handler: async (ctx) =>
+    (await newest(ctx, ctx.viewer._id).take(LIMIT)).map(toClient),
 });
 
 /**
@@ -119,27 +109,19 @@ export const list = memberQuery({
       MAX_PAGE,
       Math.max(1, Math.floor(requested ?? LIMIT)),
     );
-    const byKind =
-      kinds && kinds.length > 0
-        ? (q: FilterBuilder<NamedTableInfo<DataModel, "notifications">>) =>
-            q.or(...kinds.map((kind) => q.eq(q.field("kind"), kind)))
-        : null;
-    let freshQuery = unread(ctx, ctx.viewer._id).order("desc");
-    let seenQuery = read(ctx, ctx.viewer._id).order("desc");
-    if (byKind) {
-      freshQuery = freshQuery.filter(byKind);
-      seenQuery = seenQuery.filter(byKind);
+    let query =
+      filter === "unread"
+        ? unread(ctx, ctx.viewer._id).order("desc")
+        : newest(ctx, ctx.viewer._id);
+    if (kinds && kinds.length > 0) {
+      query = query.filter((q) =>
+        q.or(...kinds.map((kind) => q.eq(q.field("kind"), kind))),
+      );
     }
-    const [fresh, seen] = await Promise.all([
-      freshQuery.take(limit + 1),
-      filter === "all" ? seenQuery.take(limit + 1) : Promise.resolve([]),
-    ]);
-    const merged = [...fresh, ...seen].sort(
-      (a, b) => b._creationTime - a._creationTime,
-    );
+    const rows = await query.take(limit + 1);
     return {
-      items: merged.slice(0, limit).map(toClient),
-      hasMore: merged.length > limit,
+      items: rows.slice(0, limit).map(toClient),
+      hasMore: rows.length > limit,
     };
   },
 });

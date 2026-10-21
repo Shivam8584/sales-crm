@@ -56,17 +56,21 @@ npx convex env set JWKS '<jwks json>'
 
 Run `npm run convex:dev` (pushes functions and watches) next to `npm run dev`, then open [http://localhost:3000](http://localhost:3000). The first person to sign up becomes the admin; everyone after needs an invite or an email on `ALLOWED_EMAIL_DOMAINS`.
 
-To fill an empty workspace with demo accounts and people, sign in once and run:
+To fill an empty workspace with demo data (accounts at every stage, brands on the platform, deals with a proposal, tasks, leads and notifications), sign in once and run:
 
 ```bash
-npx convex run seed:demo
+npm run seed:demo
 ```
+
+`npm run seed:reset` wipes the app data (not members, invites or settings) and seeds again; it refuses unless `SITE_URL` is localhost.
 
 | Script                  | What it does                            |
 | ----------------------- | --------------------------------------- |
 | `npm run dev`           | Next.js dev server                      |
 | `npm run build`         | Production build                        |
 | `npm run lint`          | ESLint                                  |
+| `npm run test`          | Unit tests for the pure domain logic    |
+| `npm run check`         | Type-check, lint and test               |
 | `npm run convex:up`     | Start the self-hosted Convex containers |
 | `npm run convex:down`   | Stop them                               |
 | `npm run convex:dev`    | Push Convex functions and watch         |

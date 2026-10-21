@@ -104,7 +104,7 @@ function moneyLocale(currency: Money["currency"]) {
 }
 
 /** Splits money into its symbol and digits so the symbol can be muted. */
-export function moneyParts(value: Money, compact = false) {
+function moneyParts(value: Money, compact = false) {
   const parts = new Intl.NumberFormat(moneyLocale(value.currency), {
     style: "currency",
     currency: value.currency,

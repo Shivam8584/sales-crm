@@ -36,10 +36,6 @@ export function checkGstin(input: string): GstinCheck {
   return { ok: true, gstin };
 }
 
-export function isValidGstin(input: string) {
-  return checkGstin(input).ok;
-}
-
 /** The PAN embedded in a GSTIN; every GSTIN of one legal entity shares it. */
 export function panRoot(gstin: string) {
   const normalized = normalizeGstin(gstin);

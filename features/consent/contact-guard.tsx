@@ -15,7 +15,6 @@ import {
   DialogTitle,
 } from "@/components/_ui/dialog";
 import Tooltip from "@/components/_ui/tooltip";
-import { whatsappHref } from "@/features/people/contact-actions";
 import type { ContactDecision } from "@/lib/domain/consent";
 import type { Channel } from "@/lib/domain/enums";
 import { readError } from "@/lib/errors";
@@ -25,6 +24,10 @@ import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
 import MailIcon from "@/public/assets/icons/mail-04.svg";
 import MessageIcon from "@/public/assets/icons/message.svg";
 import PhoneIcon from "@/public/assets/icons/phone.svg";
+
+function whatsappHref(phone: string) {
+  return `https://wa.me/${phone.replace(/\D/g, "")}`;
+}
 
 type Action = {
   channel: Channel;

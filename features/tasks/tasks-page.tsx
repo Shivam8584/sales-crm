@@ -12,7 +12,13 @@ import { useBoardPrefs } from "@/components/board/board-prefs";
 import { HiddenColumnsToggle } from "@/components/board/hidden-columns";
 import SearchInput from "@/components/data-table/search-input";
 import type { SortState } from "@/components/data-table/types";
-import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
+import {
+  CreateButton,
+  Page,
+  PageHeader,
+  PageStatus,
+  PageToolbar,
+} from "@/components/shell/page";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { PRIORITIES } from "@/lib/domain/enums";
@@ -186,14 +192,21 @@ export default function TasksPage() {
         title="Tasks"
         meta={
           rows && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {rows.filter((task) => task.status !== "done").length} open
-            </span>
+            <PageStatus>
+              <span className="tabular-nums">
+                {rows.filter((task) => task.status !== "done").length} open
+              </span>
+            </PageStatus>
           )
         }
-        actions={newTask}
       />
-      <PageToolbar>
+      <PageToolbar
+        actions={
+          <CreateButton onClick={() => setCreate({ type: "task" })}>
+            New task
+          </CreateButton>
+        }
+      >
         <Segmented
           label="Whose tasks"
           value={mine ? "mine" : "all"}

@@ -20,14 +20,22 @@ import DataTable from "@/components/data-table/data-table";
 import RowAction from "@/components/data-table/row-action";
 import SearchInput from "@/components/data-table/search-input";
 import type { Column, SortState } from "@/components/data-table/types";
-import { Page, PageHeader, PageToolbar } from "@/components/shell/page";
+import {
+  CreateButton,
+  ExportButton,
+  Page,
+  PageHeader,
+  PageStatus,
+  PageToolbar,
+} from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
 import Segmented from "@/features/tasks/segmented";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { DEAL_STAGES, type DealStage } from "@/lib/domain/enums";
 import { DEAL_STAGE_LABEL } from "@/lib/domain/labels";
-import { DEFAULT_CURRENCY, formatMoney } from "@/lib/domain/money";
+import { downloadCsv } from "@/lib/csv";
+import { DEFAULT_CURRENCY, formatMoney, toMajor } from "@/lib/domain/money";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -272,6 +280,34 @@ export default function DealsPage() {
     setClose(ALL);
   }
 
+  function exportView() {
+    downloadCsv(`deals-${today}.csv`, [
+      [
+        "Title",
+        "Account",
+        "Stage",
+        "Amount",
+        "Currency",
+        "Owner",
+        "Close date",
+        "Lost reason",
+      ],
+      ...visible.map((deal) => [
+        deal.title,
+        deal.account?.name ?? "",
+        DEAL_STAGE_LABEL[deal.stage],
+        toMajor(deal.amount),
+        deal.amount.currency,
+        deal.owner?.name ?? "",
+        deal.closeDate ?? "",
+        deal.lostReason ?? "",
+      ]),
+    ]);
+    toast(
+      `Exported ${visible.length} ${visible.length === 1 ? "deal" : "deals"}`,
+    );
+  }
+
   const newDeal = (
     <Button
       variant="primary"
@@ -310,18 +346,48 @@ export default function DealsPage() {
         title="Deals"
         meta={
           deals && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {deals.length}
-            </span>
+            <PageStatus>
+              <span className="tabular-nums">
+                {deals.filter((deal) => isOpenStage(deal.stage)).length} open
+              </span>
+            </PageStatus>
           )
         }
-        actions={newDeal}
       />
-      <PageToolbar>
+      <PageToolbar
+        actions={
+          <>
+            <Segmented
+              label="View"
+              value={listView ? LIST : BOARD}
+              onChange={(next) => setView(next)}
+              compact
+              options={[
+                {
+                  value: BOARD,
+                  label: "Board",
+                  icon: <ClipboardIcon aria-hidden className="size-3.5" />,
+                },
+                {
+                  value: LIST,
+                  label: "List",
+                  icon: <ListIcon aria-hidden className="size-3.5" />,
+                },
+              ]}
+            />
+            {!listView && <HiddenColumnsToggle prefs={boardPrefs} />}
+            <ExportButton disabled={!visible.length} onClick={exportView} />
+            <CreateButton onClick={() => setCreate({ type: "deal" })}>
+              New deal
+            </CreateButton>
+          </>
+        }
+      >
         <SearchInput
           value={search}
           onChange={setSearch}
           placeholder="Search deals"
+          className="sm:w-48"
         />
         <FilterMenu
           label="Owner"
@@ -366,26 +432,6 @@ export default function DealsPage() {
             Clear
           </Button>
         )}
-        <Segmented
-          label="View"
-          value={listView ? LIST : BOARD}
-          onChange={(next) => setView(next)}
-          compact
-          options={[
-            {
-              value: BOARD,
-              label: "Board",
-              icon: <ClipboardIcon aria-hidden className="size-3.5" />,
-            },
-            {
-              value: LIST,
-              label: "List",
-              icon: <ListIcon aria-hidden className="size-3.5" />,
-            },
-          ]}
-          className="ml-auto"
-        />
-        {!listView && <HiddenColumnsToggle prefs={boardPrefs} />}
       </PageToolbar>
       <PipelineSummary deals={matching} />
       <div className="border-border relative flex min-h-0 flex-1 flex-col border-t">
@@ -494,12 +540,12 @@ function DealsList({
       sortValue: (row) => row.account?.name ?? null,
       cell: (row) =>
         row.account ? (
-          <>
+          <span className="flex min-w-0 items-center gap-2">
             <AccountLogo account={row.account} size="xs" />
             <span className="text-fg-secondary truncate">
               {row.account.name}
             </span>
-          </>
+          </span>
         ) : (
           <span className="text-fg-tertiary">—</span>
         ),

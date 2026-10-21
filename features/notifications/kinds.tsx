@@ -6,6 +6,7 @@ import CalendarIcon from "@/public/assets/icons/calendar.svg";
 import MessageIcon from "@/public/assets/icons/message.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
+import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -19,6 +20,7 @@ const KIND_ICON: Record<string, Icon> = {
   demo_rescheduled: CalendarIcon,
   demo_cancelled: CalendarIcon,
   platform_org: BuildingIcon,
+  proposal_approval: ClipboardIcon,
 };
 
 export function KindIcon({
@@ -47,5 +49,6 @@ export const KIND_GROUPS = [
     label: "Demos",
     kinds: ["demo_booked", "demo_rescheduled", "demo_cancelled"],
   },
+  { value: "approvals", label: "Approvals", kinds: ["proposal_approval"] },
   { value: "platform", label: "Platform", kinds: ["platform_org"] },
 ] as const;

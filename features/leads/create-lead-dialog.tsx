@@ -88,7 +88,7 @@ export default function CreateLeadDialog() {
     const next: Errors = {};
     if (!values.name.trim()) next.name = "Enter the lead's name";
     if (!values.companyName.trim()) {
-      next.companyName = "Enter the brand or company";
+      next.companyName = "Enter the account name";
     }
     if (values.email.trim() && !normalizeEmail(values.email)) {
       next.email = "Enter a valid email address";
@@ -187,7 +187,7 @@ export default function CreateLeadDialog() {
                 })}
               </Field>
               <Field
-                label="Brand"
+                label="Account"
                 htmlFor="lead-companyName"
                 required
                 error={errors.companyName}

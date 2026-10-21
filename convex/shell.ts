@@ -16,13 +16,13 @@ export const navCounts = memberQuery({
         .take(CAP),
       ctx.db
         .query("tasks")
-        .withIndex("by_assignee_status", (q) =>
+        .withIndex("by_assignee_status_completed", (q) =>
           q.eq("assigneeId", me).eq("status", "todo"),
         )
         .collect(),
       ctx.db
         .query("tasks")
-        .withIndex("by_assignee_status", (q) =>
+        .withIndex("by_assignee_status_completed", (q) =>
           q.eq("assigneeId", me).eq("status", "in_progress"),
         )
         .collect(),

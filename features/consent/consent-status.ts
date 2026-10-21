@@ -49,12 +49,21 @@ export function channelSummary(
   if (row.channel === "phone" && row.state.dnd.on) {
     return { label: "DND", tone: "red", detail };
   }
-  if (granted.length) {
-    if (row.channel === "whatsapp" && !bases.includes("consent")) {
+  // Sales outreach is what reps act on, so it decides the tag.
+  const sales = row.state.purposes.sales_outreach;
+  if (sales.status === "granted") {
+    if (
+      row.channel === "whatsapp" &&
+      (sales.basis ?? "consent") !== "consent"
+    ) {
       return { label: "Opt-in needed", tone: "amber", detail };
     }
     return { label: "Granted", tone: "green", detail };
   }
+  if (sales.status === "withdrawn") {
+    return { label: "Withdrawn", tone: "red", detail };
+  }
+  if (granted.length) return { label: "Updates only", tone: "amber", detail };
   if (withdrawn) return { label: "Withdrawn", tone: "red", detail };
   return { label: "No record", tone: "neutral", detail };
 }

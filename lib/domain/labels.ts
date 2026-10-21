@@ -8,7 +8,6 @@ import type {
   Priority,
   Role,
   TaskStatus,
-  TimelineKind,
 } from "./enums";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -80,16 +79,6 @@ export const PRIORITY_LABEL: Record<Priority, string> = {
   high: "High",
   normal: "Normal",
   low: "Low",
-};
-
-export const TIMELINE_KIND_LABEL: Record<TimelineKind, string> = {
-  note: "Note",
-  call: "Call",
-  email: "Email",
-  meeting: "Meeting",
-  whatsapp: "WhatsApp",
-  change: "Change",
-  system: "Event",
 };
 
 export const CALL_OUTCOME_LABEL: Record<CallOutcome, string> = {

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { Trend } from "./format";
 
 /** Flat bordered surface shared by report blocks; tables inside it keep the page background. */
-export const REPORT_CARD =
+const REPORT_CARD =
   "border-border bg-background flex min-w-0 flex-col overflow-hidden rounded-xl border";
 
 /** A report block: eyebrow title with an export action, a one-line description, the content and a footnote defining its metrics. */

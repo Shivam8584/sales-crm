@@ -22,7 +22,7 @@ export function useSidebarCollapsed() {
   return useSyncExternalStore(subscribe, readCollapsed, () => false);
 }
 
-export function setSidebarCollapsed(collapsed: boolean) {
+function setSidebarCollapsed(collapsed: boolean) {
   document.documentElement.toggleAttribute(SIDEBAR_COLLAPSED_ATTR, collapsed);
   try {
     localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");

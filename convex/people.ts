@@ -9,6 +9,7 @@ import {
   normalizeLinkedin,
   normalizePhone,
 } from "../lib/domain/normalize";
+import { personName } from "../lib/domain/labels";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import {
@@ -23,8 +24,9 @@ import {
   requirePerson,
   type ImportResult,
 } from "./lib/records";
+import { dealsWithPerson, leaveDeals } from "./lib/deals";
 import { diff, logChanges, logSystem } from "./lib/timeline";
-import { bucketCounts, isInteraction, windowStart } from "./timeline";
+import { bucketCounts, latestInteraction, windowStart } from "./timeline";
 
 const MAX_TEXT = 120;
 
@@ -181,6 +183,7 @@ function toClient(
     owner: memberRef(members, person.ownerId),
     lastActivityAt: person.lastActivityAt ?? null,
     archivedAt: person.archivedAt ?? null,
+    erasedAt: person.erasedAt ?? null,
   };
 }
 
@@ -233,16 +236,9 @@ export const listStats = memberQuery({
               q.eq("personId", person._id).gte("occurredAt", since),
             )
             .collect();
-          let last: Doc<"timeline"> | null = null;
-          for await (const entry of ctx.db
-            .query("timeline")
-            .withIndex("by_person", (q) => q.eq("personId", person._id))
-            .order("desc")) {
-            if (isInteraction(entry.kind)) {
-              last = entry;
-              break;
-            }
-          }
+          const lastInteraction = await latestInteraction(ctx, {
+            personId: person._id,
+          });
           return {
             personId: person._id,
             trend: bucketCounts(
@@ -250,23 +246,19 @@ export const listStats = memberQuery({
               TREND_DAYS,
               now,
             ),
-            lastInteraction: last
-              ? {
-                  at: last.occurredAt,
-                  kind: last.kind,
-                  subject: last.subject ?? null,
-                }
-              : null,
+            lastInteraction,
           };
         }),
     );
   },
 });
 
+/** Takes a raw string because the id comes from the URL and may be stale or mistyped. */
 export const get = memberQuery({
-  args: { id: v.id("people") },
-  handler: async (ctx, { id }) => {
-    const person = await ctx.db.get(id);
+  args: { id: v.string() },
+  handler: async (ctx, args) => {
+    const id = ctx.db.normalizeId("people", args.id);
+    const person = id ? await ctx.db.get(id) : null;
     if (!person) return null;
     const account = person.accountId
       ? await ctx.db.get(person.accountId)
@@ -442,11 +434,10 @@ export const deals = memberQuery({
   handler: async (ctx, { personId }) => {
     const person = await ctx.db.get(personId);
     if (!person) return [];
-    const [all, members] = await Promise.all([
-      ctx.db.query("deals").collect(),
+    const [mine, members] = await Promise.all([
+      dealsWithPerson(ctx, person),
       memberIndex(ctx),
     ]);
-    const mine = all.filter((deal) => deal.personIds.includes(personId));
     const accounts = new Map<Id<"accounts">, Doc<"accounts">>();
     for (const deal of mine) {
       if (accounts.has(deal.accountId)) continue;
@@ -479,32 +470,14 @@ export const deals = memberQuery({
   },
 });
 
-/** Consent the person gave or withdrew, newest first. */
-export const consents = memberQuery({
-  args: { personId: v.id("people") },
-  handler: async (ctx, { personId }) => {
-    const records = await ctx.db
-      .query("consents")
-      .withIndex("by_person", (q) => q.eq("personId", personId))
-      .collect();
-    return records
-      .sort((a, b) => b.recordedAt - a.recordedAt)
-      .map((record) => ({
-        _id: record._id,
-        channel: record.channel,
-        granted: record.granted,
-        text: record.text,
-        source: record.source,
-        recordedAt: record.recordedAt,
-      }));
-  },
-});
-
 /** Returns the previous values so the client can offer undo. */
 export const update = memberMutation({
   args: { id: v.id("people"), patch: v.object(editable) },
   handler: async (ctx, { id, patch }) => {
     const person = await requirePerson(ctx, id);
+    if (person.erasedAt) {
+      fail("forbidden", "This person's data was erased and can't be edited");
+    }
     const fields = await clean(ctx, patch, id);
     const before = snapshot(person);
     const changes = diff(person, fields, LABELS);
@@ -529,6 +502,9 @@ export const update = memberMutation({
       searchText: await withSearchText(ctx, next),
       updatedAt: Date.now(),
     });
+    if (person.accountId && next.accountId !== person.accountId) {
+      await leaveDeals(ctx, person, person.accountId, ctx.viewer._id);
+    }
     await logChanges(
       ctx,
       { personId: id, accountId: next.accountId },
@@ -546,10 +522,20 @@ export const setArchived = memberMutation({
     for (const id of ids) {
       const person = await requirePerson(ctx, id);
       if (Boolean(person.archivedAt) === archived) continue;
+      if (!archived && person.erasedAt) {
+        fail("forbidden", "Erased people stay archived");
+      }
       await ctx.db.patch(id, {
         archivedAt: archived ? now : undefined,
         updatedAt: now,
       });
+      await logSystem(
+        ctx,
+        { personId: id, accountId: person.accountId },
+        `${archived ? "archived" : "restored"} ${personName(person)}`,
+        undefined,
+        ctx.viewer._id,
+      );
     }
   },
 });

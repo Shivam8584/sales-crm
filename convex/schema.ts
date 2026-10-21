@@ -137,7 +137,8 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_owner_status", ["ownerId", "status"])
     .index("by_email", ["email"])
-    .index("by_phone", ["phone"]),
+    .index("by_phone", ["phone"])
+    .index("by_person", ["personId"]),
 
   consents: defineTable({
     personId: v.optional(v.id("people")),
@@ -192,8 +193,13 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
-    .index("by_assignee_status", ["assigneeId", "status"])
+    .index("by_assignee_status_completed", [
+      "assigneeId",
+      "status",
+      "completedAt",
+    ])
     .index("by_status_position", ["status", "position"])
+    .index("by_status_completed", ["status", "completedAt"])
     .index("by_account", ["accountId"])
     .index("by_person", ["personId"])
     .index("by_deal", ["dealId"])
@@ -227,7 +233,9 @@ export default defineSchema({
     .index("by_account", ["accountId", "occurredAt"])
     .index("by_person", ["personId", "occurredAt"])
     .index("by_deal", ["dealId", "occurredAt"])
-    .index("by_lead", ["leadId", "occurredAt"]),
+    .index("by_lead", ["leadId", "occurredAt"])
+    .index("by_account_kind", ["accountId", "kind", "occurredAt"])
+    .index("by_person_kind", ["personId", "kind", "occurredAt"]),
 
   notifications: defineTable({
     recipientId: v.id("members"),
@@ -236,7 +244,9 @@ export default defineSchema({
     body: v.optional(v.string()),
     href: v.optional(v.string()),
     readAt: v.optional(v.number()),
-  }).index("by_recipient", ["recipientId", "readAt"]),
+  })
+    .index("by_recipient", ["recipientId", "readAt"])
+    .index("by_recipient_time", ["recipientId"]),
 
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({

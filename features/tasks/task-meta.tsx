@@ -1,6 +1,5 @@
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
-import type { TagTone } from "@/components/_ui/tag";
 import type { BadgeTone } from "@/components/_common/status-badge";
 import type { Priority, TaskStatus } from "@/lib/domain/enums";
 import { cn } from "@/lib/utils";
@@ -10,12 +9,6 @@ import ContrastIcon from "@/public/assets/icons/kanban/contrast-02.svg";
 import ListIcon from "@/public/assets/icons/kanban/list.svg";
 
 export type TaskRow = FunctionReturnType<typeof api.tasks.list>[number];
-
-export const STATUS_TONE: Record<TaskStatus, TagTone> = {
-  todo: "neutral",
-  in_progress: "blue",
-  done: "green",
-};
 
 export const STATUS_BADGE: Record<
   TaskStatus,
@@ -39,7 +32,7 @@ export function StatusIcon({
   );
 }
 
-export const PRIORITY_TEXT: Record<Priority, string> = {
+const PRIORITY_TEXT: Record<Priority, string> = {
   urgent: "text-warning",
   high: "text-warning",
   normal: "text-info",

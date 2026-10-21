@@ -23,7 +23,7 @@ import {
 } from "./lib/records";
 import { diff, logChanges, logSystem } from "./lib/timeline";
 import { vLifecycleStage } from "./lib/validators";
-import { bucketCounts, isInteraction, windowStart } from "./timeline";
+import { bucketCounts, latestInteraction, windowStart } from "./timeline";
 
 const editable = {
   name: v.optional(v.string()),
@@ -176,16 +176,9 @@ export const listStats = memberQuery({
             q.eq("accountId", account._id).gte("occurredAt", since),
           )
           .collect();
-        let last: Doc<"timeline"> | null = null;
-        for await (const entry of ctx.db
-          .query("timeline")
-          .withIndex("by_account", (q) => q.eq("accountId", account._id))
-          .order("desc")) {
-          if (isInteraction(entry.kind)) {
-            last = entry;
-            break;
-          }
-        }
+        const lastInteraction = await latestInteraction(ctx, {
+          accountId: account._id,
+        });
         const gstin = account.gstin;
         let gstVerified = false;
         if (gstin && !account.archivedAt) {
@@ -213,23 +206,19 @@ export const listStats = memberQuery({
             TREND_DAYS,
             now,
           ),
-          lastInteraction: last
-            ? {
-                at: last.occurredAt,
-                kind: last.kind,
-                subject: last.subject ?? null,
-              }
-            : null,
+          lastInteraction,
         };
       }),
     );
   },
 });
 
+/** Takes a raw string because the id comes from the URL and may be stale or mistyped. */
 export const get = memberQuery({
-  args: { id: v.id("accounts") },
-  handler: async (ctx, { id }) => {
-    const account = await ctx.db.get(id);
+  args: { id: v.string() },
+  handler: async (ctx, args) => {
+    const id = ctx.db.normalizeId("accounts", args.id);
+    const account = id ? await ctx.db.get(id) : null;
     if (!account) return null;
     const members = await memberIndex(ctx);
     const owner = members.get(account.ownerId);

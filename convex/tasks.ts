@@ -196,6 +196,7 @@ export const list = memberQuery({
   },
   handler: async (ctx, args) => {
     const done = args.done ?? "recent";
+    const since = Date.now() - RECENT_DONE_MS;
     const statuses = (args.status ? [args.status] : TASK_STATUSES).filter(
       (status) => status !== "done" || done !== "none",
     );
@@ -225,24 +226,36 @@ export const list = memberQuery({
         .withIndex("by_lead", (q) => q.eq("leadId", id))
         .collect();
     } else {
+      const assigneeId = args.assigneeId;
       for (const status of statuses) {
-        const assigneeId = args.assigneeId;
+        const recentOnly = status === "done" && done === "recent";
         tasks.push(
           ...(assigneeId
             ? await ctx.db
                 .query("tasks")
-                .withIndex("by_assignee_status", (q) =>
-                  q.eq("assigneeId", assigneeId).eq("status", status),
-                )
+                .withIndex("by_assignee_status_completed", (q) => {
+                  const scoped = q
+                    .eq("assigneeId", assigneeId)
+                    .eq("status", status);
+                  return recentOnly ? scoped.gte("completedAt", since) : scoped;
+                })
                 .collect()
-            : await ctx.db
-                .query("tasks")
-                .withIndex("by_status_position", (q) => q.eq("status", status))
-                .collect()),
+            : recentOnly
+              ? await ctx.db
+                  .query("tasks")
+                  .withIndex("by_status_completed", (q) =>
+                    q.eq("status", "done").gte("completedAt", since),
+                  )
+                  .collect()
+              : await ctx.db
+                  .query("tasks")
+                  .withIndex("by_status_position", (q) =>
+                    q.eq("status", status),
+                  )
+                  .collect()),
         );
       }
     }
-    const since = Date.now() - RECENT_DONE_MS;
     const visible = tasks
       .filter(
         (task) =>
@@ -446,6 +459,16 @@ export const remove = memberMutation({
     const task = await ctx.db.get(id);
     if (!task) notFound("Task");
     await ctx.db.delete(id);
+    const refs = taskRefs(task);
+    if (hasRefs(refs)) {
+      await logSystem(
+        ctx,
+        refs,
+        `deleted the task “${task.title}”`,
+        undefined,
+        ctx.viewer._id,
+      );
+    }
     const { _id, _creationTime, ...stored } = task;
     void _id;
     void _creationTime;
@@ -459,7 +482,7 @@ export const restore = memberMutation({
     const exists = async (id: Id<"accounts" | "people" | "deals" | "leads">) =>
       (await ctx.db.get(id)) !== null;
     const assignee = await ctx.db.get(task.assigneeId);
-    return await ctx.db.insert("tasks", {
+    const id = await ctx.db.insert("tasks", {
       ...task,
       assigneeId:
         assignee?.status === "active" ? task.assigneeId : ctx.viewer._id,
@@ -477,5 +500,17 @@ export const restore = memberMutation({
         task.leadId && (await exists(task.leadId)) ? task.leadId : undefined,
       updatedAt: Date.now(),
     });
+    const restored = (await ctx.db.get(id))!;
+    const refs = taskRefs(restored);
+    if (hasRefs(refs)) {
+      await logSystem(
+        ctx,
+        refs,
+        `restored the task “${restored.title}”`,
+        undefined,
+        ctx.viewer._id,
+      );
+    }
+    return id;
   },
 });

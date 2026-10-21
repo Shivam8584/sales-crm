@@ -1,8 +1,15 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { ACTIVATION_STAGES } from "../lib/domain/platform";
-import { PRIORITIES } from "../lib/domain/enums";
-import { managerMutation, memberMutation, memberQuery } from "./lib/functions";
+import { PRIORITIES, ROLE_RANK } from "../lib/domain/enums";
+import { fail } from "./lib/errors";
+import type { Doc } from "./_generated/dataModel";
+import {
+  managerMutation,
+  memberMutation,
+  memberQuery,
+  type Viewer,
+} from "./lib/functions";
 import { memberIndex, memberRef, requireAccount } from "./lib/records";
 import {
   accountEvents,
@@ -17,6 +24,13 @@ import {
   STALL_THRESHOLDS,
   syncAccountActivation,
 } from "./lib/activation";
+
+function canManageAccount(viewer: Viewer, account: Doc<"accounts">) {
+  return (
+    account.ownerId === viewer._id ||
+    ROLE_RANK[viewer.role] >= ROLE_RANK.manager
+  );
+}
 
 /** The activation funnel across linked brands, and every brand stuck on a step. */
 export const desk = memberQuery({
@@ -67,6 +81,7 @@ export const desk = memberQuery({
             }
           : null,
         lastEventAt: current.lastEventAt,
+        canOpenTask: canManageAccount(ctx.viewer, account),
       });
     }
 
@@ -124,6 +139,7 @@ export const forAccount = memberQuery({
     return {
       stage: stall.stage,
       since: stall.since,
+      canOpenTask: canManageAccount(ctx.viewer, account),
       rule: {
         id: stall.rule.id,
         label: stall.rule.label,
@@ -149,7 +165,10 @@ export const forAccount = memberQuery({
 export const ensureTask = memberMutation({
   args: { accountId: v.id("accounts") },
   handler: async (ctx, { accountId }) => {
-    await requireAccount(ctx, accountId);
+    const account = await requireAccount(ctx, accountId);
+    if (!canManageAccount(ctx.viewer, account)) {
+      fail("forbidden", "Only the account owner or a manager can do that");
+    }
     const { key } = await syncAccountActivation(ctx, accountId, Date.now());
     if (!key) return null;
     const task = await ctx.db

@@ -242,23 +242,19 @@ function RoleCell({
     );
   }
   return (
-    // The picker's popup is portalled but still bubbles through the row in React;
-    // a pick would otherwise also open the member.
-    <span className="flex min-w-0" onClick={(event) => event.stopPropagation()}>
-      <OptionPicker
-        value={member.role}
-        label={`Role for ${member.name}`}
-        options={ROLE_OPTIONS}
-        onChange={(role) => role && onChange(role as Role)}
-        className="group/role gap-1"
-      >
-        {tag}
-        <ChevronDownIcon
-          aria-hidden
-          className="text-fg-tertiary size-2.5 opacity-0 transition-opacity group-hover/role:opacity-100 group-data-[state=open]/role:opacity-100"
-        />
-      </OptionPicker>
-    </span>
+    <OptionPicker
+      value={member.role}
+      label={`Role for ${member.name}`}
+      options={ROLE_OPTIONS}
+      onChange={(role) => role && onChange(role as Role)}
+      className="group/role gap-1"
+    >
+      {tag}
+      <ChevronDownIcon
+        aria-hidden
+        className="text-fg-tertiary size-2.5 opacity-0 transition-opacity group-hover/role:opacity-100 group-data-[state=open]/role:opacity-100"
+      />
+    </OptionPicker>
   );
 }
 

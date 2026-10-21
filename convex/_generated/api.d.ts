@@ -23,6 +23,7 @@ import type * as lib_activation from "../lib/activation.js";
 import type * as lib_assignment from "../lib/assignment.js";
 import type * as lib_consent from "../lib/consent.js";
 import type * as lib_crypto from "../lib/crypto.js";
+import type * as lib_deals from "../lib/deals.js";
 import type * as lib_enrichment from "../lib/enrichment.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_functions from "../lib/functions.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   "lib/assignment": typeof lib_assignment;
   "lib/consent": typeof lib_consent;
   "lib/crypto": typeof lib_crypto;
+  "lib/deals": typeof lib_deals;
   "lib/enrichment": typeof lib_enrichment;
   "lib/errors": typeof lib_errors;
   "lib/functions": typeof lib_functions;

@@ -76,6 +76,9 @@ function TaskAction({ row }: { row: Row }) {
     }
   }
 
+  if (!task && !row.canOpenTask) {
+    return <span className="caption-style text-fg-tertiary">No task yet</span>;
+  }
   if (!task) {
     return (
       <button
@@ -404,13 +407,17 @@ export default function ActivationPage() {
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
           onPeek={(row) => setPeek({ type: "account", id: row._id })}
-          rowMenu={(row) => [
-            {
-              label: row.task ? "Open task" : "Create task",
-              icon: row.task ? ListIcon : PlusIcon,
-              onSelect: () => void openTask(row),
-            },
-          ]}
+          rowMenu={(row) =>
+            row.task || row.canOpenTask
+              ? [
+                  {
+                    label: row.task ? "Open task" : "Create task",
+                    icon: row.task ? ListIcon : PlusIcon,
+                    onSelect: () => void openTask(row),
+                  },
+                ]
+              : []
+          }
           footer={[
             { label: "Stuck in view", value: rows?.length ?? 0 },
             {

@@ -101,7 +101,7 @@ function exportRows(rows: LeadRow[]) {
   downloadCsv(`leads-${day}.csv`, [
     [
       "Name",
-      "Company",
+      "Account",
       "Email",
       "Phone",
       "Kind",

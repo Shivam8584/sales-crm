@@ -1,6 +1,6 @@
 import { sourceFamily } from "@/convex/lib/enrichment";
 
-export const FACT_LABEL: Record<string, string> = {
+const FACT_LABEL: Record<string, string> = {
   gstin: "GSTIN",
   panRoot: "PAN",
   name: "Account name",

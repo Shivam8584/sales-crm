@@ -168,6 +168,19 @@ function LeadView({ lead }: { lead: Lead }) {
         actions={
           <PageActions
             primary={primary}
+            primaryItem={
+              converted
+                ? lead.account && {
+                    label: `Open ${lead.account.name}`,
+                    icon: BuildingIcon,
+                    href: `/accounts/${lead.account._id}`,
+                  }
+                : {
+                    label: "Convert",
+                    icon: BuildingIcon,
+                    onSelect: () => void runConvert(),
+                  }
+            }
             label="Lead actions"
             actions={[
               lead.owner?._id !== viewer._id && {
@@ -256,11 +269,13 @@ function LeadView({ lead }: { lead: Lead }) {
                       onSave={(name) => save({ name }, "Name")}
                     />
                   </Property>
-                  <Property label="Company">
+                  <Property label="Account">
                     <InlineText
                       value={lead.companyName}
-                      label="Company"
-                      onSave={(companyName) => save({ companyName }, "Company")}
+                      label="Account name"
+                      onSave={(companyName) =>
+                        save({ companyName }, "Account name")
+                      }
                     />
                   </Property>
                   <Property label="Email">

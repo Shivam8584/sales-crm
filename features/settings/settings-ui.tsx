@@ -149,7 +149,7 @@ const HEALTH = {
   off: { tone: "neutral", label: "Not configured" },
 } as const;
 
-export function HealthTag({ health }: { health: Health }) {
+function HealthTag({ health }: { health: Health }) {
   const { tone, label } = HEALTH[health];
   return <PageStatus tone={tone}>{label}</PageStatus>;
 }

@@ -125,7 +125,7 @@ export function PageHeader({
         ))}
         <h1
           title={typeof title === "string" ? title : undefined}
-          className="min-w-0 shrink-[0.5] truncate py-1 text-base leading-none font-medium tracking-[-0.01em]"
+          className="min-w-0 shrink-[0.5] truncate py-1 text-base leading-none font-medium tracking-[-0.01em] max-sm:shrink"
         >
           {title}
         </h1>
@@ -285,21 +285,29 @@ export type PageAction = {
 /**
  * Header actions: an optional primary button followed by a "…" menu holding
  * every secondary action. Pass `false`/`null` entries to skip items conditionally.
+ * With `primaryItem`, phones move the primary into the menu so the title keeps its room.
  */
 export function PageActions({
   primary,
+  primaryItem,
   actions = [],
   label = "More actions",
 }: {
   primary?: ReactNode;
+  primaryItem?: PageAction | false | null;
   actions?: (PageAction | false | null | undefined)[];
   label?: string;
 }) {
   const router = useRouter();
   const items = actions.filter((item): item is PageAction => Boolean(item));
+  const mobileItem = primary && primaryItem ? primaryItem : null;
+  const select = (item: PageAction) => {
+    if (item.href) router.push(item.href);
+    item.onSelect?.();
+  };
   return (
     <>
-      {items.length > 0 && (
+      {(items.length > 0 || mobileItem) && (
         <DropdownMenu>
           <Tooltip content={label}>
             <DropdownMenuTrigger asChild>
@@ -307,47 +315,74 @@ export function PageActions({
                 variant="secondary"
                 size="icon"
                 aria-label={label}
-                className="data-[state=open]:bg-muted"
+                className={cn(
+                  "data-[state=open]:bg-muted",
+                  items.length === 0 && "sm:hidden",
+                )}
               >
                 <DotsIcon aria-hidden className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
           </Tooltip>
           <DropdownMenuContent align="end" className="min-w-48">
+            {mobileItem && (
+              <>
+                <MenuAction
+                  item={mobileItem}
+                  onSelect={() => select(mobileItem)}
+                  className="sm:hidden"
+                />
+                {items.length > 0 && (
+                  <DropdownMenuSeparator className="sm:hidden" />
+                )}
+              </>
+            )}
             {items.map((item) => (
               <Fragment key={item.label}>
                 {item.separated && <DropdownMenuSeparator />}
-                <DropdownMenuItem
-                  disabled={item.disabled}
-                  onSelect={() => {
-                    if (item.href) router.push(item.href);
-                    item.onSelect?.();
-                  }}
-                  className={cn(item.tone === "danger" && "text-danger")}
-                >
-                  {item.icon && (
-                    <item.icon
-                      aria-hidden
-                      className={cn(
-                        "size-3.5 shrink-0",
-                        item.tone === "danger"
-                          ? "text-danger"
-                          : "text-fg-tertiary",
-                      )}
-                    />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                  {item.shortcut && (
-                    <Kbd className="h-4 min-w-4 px-1">{item.shortcut}</Kbd>
-                  )}
-                </DropdownMenuItem>
+                <MenuAction item={item} onSelect={() => select(item)} />
               </Fragment>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {primary}
+      {primary &&
+        (mobileItem ? (
+          <span className="flex max-sm:hidden">{primary}</span>
+        ) : (
+          primary
+        ))}
     </>
+  );
+}
+
+function MenuAction({
+  item,
+  onSelect,
+  className,
+}: {
+  item: PageAction;
+  onSelect: () => void;
+  className?: string;
+}) {
+  return (
+    <DropdownMenuItem
+      disabled={item.disabled}
+      onSelect={onSelect}
+      className={cn(item.tone === "danger" && "text-danger", className)}
+    >
+      {item.icon && (
+        <item.icon
+          aria-hidden
+          className={cn(
+            "size-3.5 shrink-0",
+            item.tone === "danger" ? "text-danger" : "text-fg-tertiary",
+          )}
+        />
+      )}
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {item.shortcut && <Kbd className="h-4 min-w-4 px-1">{item.shortcut}</Kbd>}
+    </DropdownMenuItem>
   );
 }
 

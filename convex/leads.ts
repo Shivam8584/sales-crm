@@ -198,14 +198,29 @@ export const get = memberQuery({
       },
       consents: consents
         .sort((a, b) => b.recordedAt - a.recordedAt)
-        .map(({ _id, channel, granted, text, source, recordedAt }) => ({
-          _id,
-          channel,
-          granted,
-          text,
-          source,
-          recordedAt,
-        })),
+        .map(
+          ({
+            _id,
+            channel,
+            granted,
+            text,
+            source,
+            recordedAt,
+            event,
+            purpose,
+            basis,
+          }) => ({
+            _id,
+            channel,
+            granted,
+            text,
+            source,
+            recordedAt,
+            event,
+            purpose,
+            basis,
+          }),
+        ),
     };
   },
 });
@@ -227,9 +242,9 @@ function cleanManual(args: {
   if (!name) invalid("name", "Enter the lead's name");
   if (name.length > LEAD_LIMITS.name) invalid("name", "Name is too long");
   const companyName = cleanText(args.companyName);
-  if (!companyName) invalid("companyName", "Enter the brand or company");
+  if (!companyName) invalid("companyName", "Enter the account name");
   if (companyName.length > LEAD_LIMITS.companyName) {
-    invalid("companyName", "Company name is too long");
+    invalid("companyName", "Account name is too long");
   }
   const out: ContactFields = { name, companyName };
   if (args.email?.trim()) {
@@ -578,7 +593,7 @@ const CONTACT_LABELS = {
   name: "Name",
   email: "Email",
   phone: "Phone",
-  companyName: "Company",
+  companyName: "Account name",
   website: "Website",
   gstin: "GSTIN",
   message: "Message",

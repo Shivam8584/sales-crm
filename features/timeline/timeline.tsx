@@ -71,10 +71,13 @@ function groupByDay(entries: Entry[]) {
 export default function Timeline({
   target,
   compact = false,
+  readOnly = false,
 }: {
   target: TimelineTarget;
   /** Peek layout: no filter chips. */
   compact?: boolean;
+  /** History only: no composer and no edits, e.g. for an erased person. */
+  readOnly?: boolean;
 }) {
   const entries = useQuery(api.timeline.forRecord, { target });
   const [filter, setFilter] = useState<TimelineFilter>("all");
@@ -100,7 +103,7 @@ export default function Timeline({
 
   return (
     <div className="flex flex-col gap-5">
-      <TimelineComposer target={target} />
+      {!readOnly && <TimelineComposer target={target} />}
       {!compact && entries !== undefined && entries.length > 0 && (
         <div
           role="group"
@@ -174,6 +177,7 @@ export default function Timeline({
                     entry={entry}
                     last={index === group.entries.length - 1}
                     showContext={onAccount}
+                    readOnly={readOnly}
                   />
                 ))}
               </ol>
@@ -216,15 +220,24 @@ function TimelineItem({
   entry,
   last,
   showContext,
+  readOnly,
 }: {
   entry: Entry;
   last: boolean;
   showContext: boolean;
+  readOnly: boolean;
 }) {
   if (entry.kind === "change" || entry.kind === "system") {
     return <AutomaticItem entry={entry} last={last} />;
   }
-  return <LoggedItem entry={entry} last={last} showContext={showContext} />;
+  return (
+    <LoggedItem
+      entry={entry}
+      last={last}
+      showContext={showContext}
+      readOnly={readOnly}
+    />
+  );
 }
 
 function AutomaticItem({ entry, last }: { entry: Entry; last: boolean }) {
@@ -340,10 +353,12 @@ function LoggedItem({
   entry,
   last,
   showContext,
+  readOnly,
 }: {
   entry: Entry;
   last: boolean;
   showContext: boolean;
+  readOnly: boolean;
 }) {
   const viewer = useViewer();
   const remove = useMutation(api.timeline.remove);
@@ -352,7 +367,8 @@ function LoggedItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.body ?? "");
   const meta = KIND_META[entry.kind];
-  const canManage = entry.actorId === viewer._id || viewer.role === "admin";
+  const canManage =
+    !readOnly && (entry.actorId === viewer._id || viewer.role === "admin");
   const actorName = entry.actor?.name ?? "Hypedrive";
   const details = [
     entry.outcome && CALL_OUTCOME_LABEL[entry.outcome],

@@ -91,7 +91,7 @@ function Row({
 }
 
 /** Margin on a 0–40% scale with the floor, approval line, target band and default marked. */
-export function MarginGauge({
+function MarginGauge({
   margin,
   charge,
   rate,

@@ -15,7 +15,7 @@ import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import { cn } from "@/lib/utils";
 
-export const LOST_REASONS = [
+const LOST_REASONS = [
   "Budget",
   "Timing",
   "Chose an agency",

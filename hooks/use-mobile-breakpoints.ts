@@ -63,12 +63,3 @@ export function useMobileBreakpoints(): MobileBreakpointState {
  * e.g. "below-lg below-md below-sm" when viewport is below sm.
  * Use with your Tailwind config / CSS that defines these classes.
  */
-export function getBelowBreakpointClasses(
-  state: MobileBreakpointState,
-): string {
-  const classes: string[] = [];
-  if (state.belowLg) classes.push("below-lg");
-  if (state.belowMd) classes.push("below-md");
-  if (state.belowSm) classes.push("below-sm");
-  return classes.join(" ");
-}

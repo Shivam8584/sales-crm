@@ -275,8 +275,8 @@ type Draft = {
   [T in PlatformEventType]: { type: T; data: PlatformEventData[T] };
 }[PlatformEventType];
 
-/** Envelopes walking one account along the path up to `until`, skipping steps it already has. */
-async function simulateAccount(
+/** Feeds the events that walk one account up to `until` through the webhook path, skipping steps it already has. */
+export async function simulateAccount(
   ctx: Parameters<typeof receive>[0],
   account: Doc<"accounts">,
   until: LifecycleStage,

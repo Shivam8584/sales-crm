@@ -71,7 +71,7 @@ function ContactLine({
 }
 
 /** The person on the account the team talks to most recently. */
-export function primaryContact(people: Person[] | undefined) {
+function primaryContact(people: Person[] | undefined) {
   return [...(people ?? [])].sort(
     (a, b) =>
       (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0) ||
