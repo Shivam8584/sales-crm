@@ -13,6 +13,7 @@ import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
 import SavedViewsMenu from "@/features/views/saved-views-menu";
 import SelectionBar from "@/components/data-table/selection-bar";
+import { BulkTag, TagsPopover } from "@/components/fields/tags-popover";
 import AddToAutomation from "@/features/automations/add-to-automation";
 import OptionPicker from "@/components/fields/option-picker";
 import type { Column, SortState } from "@/components/data-table/types";
@@ -29,6 +30,7 @@ import {
 import { HealthBadge } from "@/features/platform/health-badge";
 import LogCallDialog from "@/features/timeline/log-call-dialog";
 import type { TimelineTarget } from "@/features/timeline/kinds";
+import { useBulkUpdate } from "@/hooks/use-bulk-update";
 import { useCsvExport } from "@/hooks/use-csv-export";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
@@ -48,8 +50,10 @@ import BuildingIcon from "@/public/assets/icons/building.svg";
 import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
+import { ownerOptions } from "@/features/leads/lead-meta";
 import AccountLogo from "./account-logo";
 import CsvImportDialog, { type ImportConfig } from "./csv-import-dialog";
+import { StageTag } from "./stage";
 import {
   ActivationCell,
   LastInteractionCell,
@@ -176,6 +180,8 @@ export default function AccountsPage() {
   const viewer = useViewer();
   const members = useMembers();
   const setOwner = useMutation(api.accounts.setOwner);
+  const update = useMutation(api.accounts.update);
+  const bulk = useBulkUpdate(update);
   const setArchived = useMutation(api.accounts.setArchived);
   const importRows = useMutation(api.accounts.importRows);
   const setCreate = useUiStore((state) => state.setCreate);
@@ -259,6 +265,73 @@ export default function AccountsPage() {
         ) / onPlatform.length,
       )
     : null;
+
+  const columns = COLUMNS.map((column): Column<AccountRow> => {
+    if (column.id === "stage")
+      return {
+        ...column,
+        cell: (row) => (
+          <span className="flex min-w-0 items-center gap-1">
+            <OptionPicker
+              label="Stage"
+              value={row.stage}
+              align="start"
+              options={LIFECYCLE_STAGES.map((value) => ({
+                value,
+                label: STAGE_LABEL[value as LifecycleStage],
+              }))}
+              onChange={(next) =>
+                next &&
+                void bulk(
+                  [row._id],
+                  () => ({ stage: next as LifecycleStage }),
+                  "Stage",
+                )
+              }
+              className="mx-0 px-0.5"
+            >
+              <StageTag stage={row.stage} />
+            </OptionPicker>
+            <TagsPopover
+              label="Tags"
+              value={row.tags}
+              onChange={(tags) =>
+                void bulk([row._id], () => ({ tags }), "Tags")
+              }
+            >
+              {row.tags.length ? (
+                <StageAndTags tags={row.tags} max={2} />
+              ) : (
+                <span className="text-fg-tertiary text-xs">Add tag</span>
+              )}
+            </TagsPopover>
+          </span>
+        ),
+      };
+    if (column.id === "owner")
+      return {
+        ...column,
+        cell: (row) => (
+          <OptionPicker
+            label="Owner"
+            value={row.owner?._id ?? null}
+            align="start"
+            options={ownerOptions(members, row.owner)}
+            onChange={(next) =>
+              next &&
+              void bulk(
+                [row._id],
+                () => ({ ownerId: next as Id<"members"> }),
+                "Owner",
+              )
+            }
+          >
+            <OwnerCell owner={row.owner} />
+          </OptionPicker>
+        ),
+      };
+    return column;
+  });
 
   const filtered =
     stage !== ALL || owner !== ALL || activity !== ALL || search.trim() !== "";
@@ -470,7 +543,7 @@ export default function AccountsPage() {
       <div className="relative flex min-h-0 flex-1 flex-col">
         <DataTable
           label="Accounts"
-          columns={COLUMNS}
+          columns={columns}
           rows={rows}
           getId={(row) => row._id}
           getHref={(row) => `/accounts/${row._id}`}
@@ -606,6 +679,38 @@ export default function AccountsPage() {
           >
             Assign
           </OptionPicker>
+          <OptionPicker
+            value={null}
+            label="Set stage"
+            align="start"
+            onChange={(next) =>
+              next &&
+              void bulk(
+                selectedIds,
+                () => ({ stage: next as LifecycleStage }),
+                "Stage",
+              )
+            }
+            options={LIFECYCLE_STAGES.map((value) => ({
+              value,
+              label: STAGE_LABEL[value as LifecycleStage],
+            }))}
+            className="h-control-sm mx-0 px-2.5 text-xs"
+          >
+            Stage
+          </OptionPicker>
+          <BulkTag
+            onAdd={(tag) => {
+              const byId = new Map(rows?.map((row) => [row._id, row.tags]));
+              void bulk(
+                selectedIds,
+                (id) => ({
+                  tags: [...new Set([...(byId.get(id) ?? []), tag])],
+                }),
+                "Tags",
+              );
+            }}
+          />
           <AddToAutomation
             kind="account"
             ids={selectedIds}

@@ -174,7 +174,18 @@ export default function LeadsPage() {
       header: "Owner",
       width: "minmax(8.75rem,1fr)",
       minViewport: 1000,
-      cell: (row) => <OwnerCell owner={row.owner} />,
+      cell: (row) => (
+        <OptionPicker
+          label="Owner"
+          value={row.owner?._id ?? null}
+          align="start"
+          clearLabel="Unassign"
+          options={ownerOptions(members, row.owner)}
+          onChange={(next) => void assign(row, next)}
+        >
+          <OwnerCell owner={row.owner} />
+        </OptionPicker>
+      ),
     },
     {
       id: "sla",

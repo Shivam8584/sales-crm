@@ -14,6 +14,8 @@ import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
 import SavedViewsMenu from "@/features/views/saved-views-menu";
 import SelectionBar from "@/components/data-table/selection-bar";
+import OptionPicker from "@/components/fields/option-picker";
+import { BulkTag, TagsPopover } from "@/components/fields/tags-popover";
 import AddToAutomation from "@/features/automations/add-to-automation";
 import type { Column, SortState } from "@/components/data-table/types";
 import {
@@ -39,6 +41,8 @@ import CsvImportDialog, {
 } from "@/features/accounts/csv-import-dialog";
 import type { TimelineTarget } from "@/features/timeline/kinds";
 import LogCallDialog from "@/features/timeline/log-call-dialog";
+import { ownerOptions } from "@/features/leads/lead-meta";
+import { useBulkUpdate } from "@/hooks/use-bulk-update";
 import { useCsvExport } from "@/hooks/use-csv-export";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
@@ -170,6 +174,8 @@ export default function PeoplePage() {
   const viewer = useViewer();
   const members = useMembers();
   const setArchived = useMutation(api.people.setArchived);
+  const update = useMutation(api.people.update);
+  const bulk = useBulkUpdate(update);
   const importRows = useMutation(api.people.importRows);
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
@@ -218,6 +224,49 @@ export default function PeoplePage() {
   const { rows, paging } = usePagedList(api.people.page, args);
   const loaded = allRows(rows, paging);
   const counts = useQuery(api.people.counts, args);
+
+  const columns = COLUMNS.map((column): Column<PersonRow> => {
+    if (column.id === "tags")
+      return {
+        ...column,
+        cell: (row) => (
+          <TagsPopover
+            label="Tags"
+            value={row.tags}
+            onChange={(tags) => void bulk([row._id], () => ({ tags }), "Tags")}
+          >
+            {row.tags.length ? (
+              <StageAndTags tags={row.tags} />
+            ) : (
+              <span className="text-fg-tertiary text-xs">Add tag</span>
+            )}
+          </TagsPopover>
+        ),
+      };
+    if (column.id === "owner")
+      return {
+        ...column,
+        cell: (row) => (
+          <OptionPicker
+            label="Owner"
+            value={row.owner?._id ?? null}
+            align="start"
+            options={ownerOptions(members, row.owner)}
+            onChange={(next) =>
+              next &&
+              void bulk(
+                [row._id],
+                () => ({ ownerId: next as Id<"members"> }),
+                "Owner",
+              )
+            }
+          >
+            <OwnerCell owner={row.owner} />
+          </OptionPicker>
+        ),
+      };
+    return column;
+  });
 
   const filtered = owner !== ALL || activity !== ALL || search.trim() !== "";
   const selectedIds = [...selected].filter((id) =>
@@ -425,7 +474,7 @@ export default function PeoplePage() {
       <div className="relative flex min-h-0 flex-1 flex-col">
         <DataTable
           label="People"
-          columns={COLUMNS}
+          columns={columns}
           rows={rows}
           getId={(row) => row._id}
           getHref={(row) => `/people/${row._id}`}
@@ -571,6 +620,35 @@ export default function PeoplePage() {
           noun={["person", "people"]}
           onClear={() => setSelected(new Set())}
         >
+          <OptionPicker
+            value={null}
+            label="Assign owner"
+            align="start"
+            onChange={(next) =>
+              next &&
+              void bulk(
+                selectedIds,
+                () => ({ ownerId: next as Id<"members"> }),
+                "Owner",
+              )
+            }
+            options={ownerOptions(members, null)}
+            className="h-control-sm mx-0 px-2.5 text-xs"
+          >
+            Assign
+          </OptionPicker>
+          <BulkTag
+            onAdd={(tag) => {
+              const byId = new Map(rows?.map((row) => [row._id, row.tags]));
+              void bulk(
+                selectedIds,
+                (id) => ({
+                  tags: [...new Set([...(byId.get(id) ?? []), tag])],
+                }),
+                "Tags",
+              );
+            }}
+          />
           <AddToAutomation
             kind="person"
             ids={selectedIds}

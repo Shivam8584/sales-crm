@@ -3,7 +3,7 @@
 import { dayStart, istToday } from "@/lib/domain/day";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionArgs } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -21,6 +21,7 @@ import { useBoardPrefs } from "@/components/board/board-prefs";
 import { HiddenColumnsToggle } from "@/components/board/hidden-columns";
 import DataTable from "@/components/data-table/data-table";
 import RowAction from "@/components/data-table/row-action";
+import OptionPicker from "@/components/fields/option-picker";
 import SearchInput from "@/components/data-table/search-input";
 import type { Column, SortState } from "@/components/data-table/types";
 import {
@@ -37,6 +38,8 @@ import SavedViewsMenu from "@/features/views/saved-views-menu";
 import { useCsvExport } from "@/hooks/use-csv-export";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePagedList, viewCount } from "@/hooks/use-paged-list";
+import { ownerOptions } from "@/features/leads/lead-meta";
+import { useBulkUpdate } from "@/hooks/use-bulk-update";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { DEAL_STAGES, type DealStage } from "@/lib/domain/enums";
@@ -54,7 +57,12 @@ import DealCard from "./deal-card";
 import DealQuickAdd from "./deal-quick-add";
 import { formatDay, formatTotals, today as todayDay } from "./format";
 import LostReasonDialog from "./lost-reason-dialog";
-import { DEAL_STAGE_BADGE, DealStageTag, isOpenStage } from "./stage";
+import {
+  DEAL_STAGE_BADGE,
+  DEAL_STAGE_OPTIONS,
+  DealStageTag,
+  isOpenStage,
+} from "./stage";
 import { positionBefore, useMoveDeal, type DealRow } from "./use-deal-actions";
 
 const ZERO = formatMoney({ amount: 0, currency: DEFAULT_CURRENCY });
@@ -462,6 +470,7 @@ export default function DealsPage() {
             today={today}
             onSortChange={setSortParam}
             onPeek={peek}
+            onStageChange={(id, stage) => onMove(id, stage, null)}
             empty={
               filtered ? (
                 <EmptyState
@@ -553,15 +562,19 @@ function DealsList({
   today,
   onSortChange,
   onPeek,
+  onStageChange,
   empty,
 }: {
   args: ListArgs;
   today: string;
   onSortChange: (value: string) => void;
   onPeek: (id: string) => void;
+  onStageChange: (id: string, stage: string) => void;
   empty: ReactNode;
 }) {
   const { rows, paging } = usePagedList(api.deals.page, args);
+  const members = useMembers();
+  const bulk = useBulkUpdate(useMutation(api.deals.update));
   const columns: Column<DealRow>[] = [
     {
       id: "title",
@@ -594,7 +607,18 @@ function DealsList({
       id: "stage",
       header: "Stage",
       width: "8rem",
-      cell: (row) => <DealStageTag stage={row.stage} />,
+      cell: (row) => (
+        <OptionPicker
+          label="Stage"
+          value={row.stage}
+          align="start"
+          options={DEAL_STAGE_OPTIONS}
+          onChange={(next) => next && onStageChange(row._id, next)}
+          className="mx-0 px-0.5"
+        >
+          <DealStageTag stage={row.stage} />
+        </OptionPicker>
+      ),
     },
     {
       id: "amount",
@@ -619,15 +643,31 @@ function DealsList({
       header: "Owner",
       width: "minmax(8rem,1fr)",
       minViewport: 900,
-      cell: (row) =>
-        row.owner ? (
-          <>
-            <Avatar name={row.owner.name} size="xs" />
-            <span className="truncate">{row.owner.name}</span>
-          </>
-        ) : (
-          <span className="text-fg-tertiary">—</span>
-        ),
+      cell: (row) => (
+        <OptionPicker
+          label="Owner"
+          value={row.owner?._id ?? null}
+          align="start"
+          options={ownerOptions(members, row.owner)}
+          onChange={(next) =>
+            next &&
+            void bulk(
+              [row._id],
+              () => ({ ownerId: next as Id<"members"> }),
+              "Owner",
+            )
+          }
+        >
+          {row.owner ? (
+            <>
+              <Avatar name={row.owner.name} size="xs" />
+              <span className="truncate">{row.owner.name}</span>
+            </>
+          ) : (
+            <span className="text-fg-tertiary">—</span>
+          )}
+        </OptionPicker>
+      ),
     },
     {
       id: "close",
