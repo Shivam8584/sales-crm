@@ -1,6 +1,5 @@
 "use client";
 
-import { startOfIstDay } from "@/lib/domain/day";
 import {
   useEffect,
   useMemo,
@@ -15,12 +14,10 @@ import { usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
-import { Card, CardCount, CardHeader } from "@/components/_ui/card";
 import EmptyState from "@/components/_ui/empty-state";
 import Kbd from "@/components/_ui/kbd";
 import Skeleton from "@/components/_ui/skeleton";
-import StatCard from "@/components/_ui/stat-card";
-import Sparkline from "@/components/_common/sparkline";
+import { BigNumber, DetailSection } from "@/components/record/detail";
 import {
   CreateButton,
   Page,
@@ -43,7 +40,6 @@ import { relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
-import BuildingIcon from "@/public/assets/icons/building-sm.svg";
 import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import ClockIcon from "@/public/assets/icons/clock.svg";
@@ -62,6 +58,8 @@ import {
 } from "./today-rows";
 
 const RECENT_ACCOUNTS = 6;
+const CARD_SECTION =
+  "gap-2 px-0 pt-3 pb-0 [&>div:first-child]:px-4 sm:[&>div:first-child]:px-5";
 const TREND_DAYS = 14;
 const DAY_MS = 24 * 60 * 60_000;
 const OVERLAY = "[role=dialog], [role=menu], [role=listbox]";
@@ -98,15 +96,19 @@ function greeting(hour: number) {
   return "Good evening";
 }
 
-/** Tasks completed per India day, oldest first, ending today. */
+/** Tasks completed per local day, oldest first, ending today. */
 function completedPerDay(tasks: TaskRow[] | undefined, now: Date) {
-  const first = startOfIstDay(now.getTime()) - (TREND_DAYS - 1) * DAY_MS;
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const first = start.getTime() - (TREND_DAYS - 1) * DAY_MS;
   const buckets = Array.from({ length: TREND_DAYS }, () => 0);
   for (const task of tasks ?? []) {
     if (task.status !== "done") continue;
     const at = task.completedAt ?? task.updatedAt;
     if (at < first) continue;
-    const index = Math.floor((at - first) / DAY_MS);
+    const day = new Date(at);
+    day.setHours(0, 0, 0, 0);
+    const index = Math.round((day.getTime() - first) / DAY_MS);
     if (index >= 0 && index < TREND_DAYS) buckets[index]++;
   }
   return buckets;
@@ -368,18 +370,18 @@ export default function TodayPage() {
         {section.items === undefined ? (
           <RowsSkeleton />
         ) : section.items.length > 0 ? (
-          <ul className="divide-border flex flex-col divide-y">
+          <ul className="divide-border border-border flex flex-col divide-y border-t">
             {section.items.map(renderItem)}
           </ul>
         ) : (
           !composer && (
-            <p className="caption-style text-fg-tertiary px-4 py-4 leading-snug sm:px-5">
+            <p className="caption-style text-fg-tertiary px-4 pb-4 leading-snug sm:px-5">
               {section.empty}
             </p>
           )
         )}
         {composer && (
-          <div className="p-3 sm:px-4">
+          <div className="px-3 pb-3 sm:px-4">
             <TaskComposer
               assigneeId={viewer._id}
               defaultDueDate={today}
@@ -409,7 +411,7 @@ export default function TodayPage() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 sm:px-6 lg:py-7">
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-            <h2 className="font-display text-2xl font-medium">
+            <h2 className="text-xl leading-tight font-semibold tracking-[-0.01em]">
               {greeting(now.getHours())}, {firstName}
             </h2>
             <p className="caption-style text-fg-tertiary hidden items-center gap-1.5 lg:flex">
@@ -421,43 +423,47 @@ export default function TodayPage() {
 
           <section
             aria-label="Your day at a glance"
-            className="grid gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]"
+            className="border-border bg-background grid overflow-hidden rounded-xl border lg:grid-cols-[17rem_minmax(0,1fr)]"
           >
-            <StatCard
-              label="Completed"
-              icon={CheckCircleIcon}
-              iconTone={completed > 0 ? "success" : "neutral"}
-              value={tasks === undefined ? undefined : completed}
-              context={`last ${TREND_DAYS} days`}
-              change={
-                tasks === undefined
-                  ? undefined
-                  : {
-                      label: `${doneToday} today`,
-                      tone: doneToday > 0 ? "positive" : "neutral",
-                    }
+            <DetailSection
+              title="Completed"
+              divider={false}
+              className="border-border gap-3 px-4 py-4 max-lg:border-b sm:px-5 lg:border-r"
+              action={
+                <span className="caption-style text-fg-tertiary">
+                  Last {TREND_DAYS} days
+                </span>
               }
             >
-              <span
-                role="img"
-                aria-label={`${completed} tasks completed in the last ${TREND_DAYS} days, ${doneToday} today, active on ${activeDays} days`}
-                className="flex min-w-0 flex-col gap-2"
-              >
-                <Sparkline
-                  values={trend}
-                  className="w-full gap-1 [&>span]:flex-1"
-                />
-                <span className="caption-style text-fg-tertiary leading-snug">
-                  {completed === 0
-                    ? "No tasks closed yet. Tick one off to start the streak."
-                    : `Active on ${activeDays} of ${TREND_DAYS} days`}
-                </span>
-              </span>
-            </StatCard>
-            <div className="flex min-w-0 flex-col gap-2">
-              <div className="flex h-5 items-center justify-between gap-2">
-                <h2 className="eyebrow-style text-fg-tertiary">Focus</h2>
-                {focus && (
+              {tasks === undefined ? (
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-7 w-28" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+              ) : (
+                <div
+                  role="img"
+                  aria-label={`${completed} tasks completed in the last ${TREND_DAYS} days, ${doneToday} today`}
+                >
+                  <BigNumber
+                    size="md"
+                    value={completed}
+                    trend={trend}
+                    caption={
+                      completed === 0
+                        ? "No tasks closed yet. Tick one off to start the streak."
+                        : `${doneToday} today · active on ${activeDays} of ${TREND_DAYS} days`
+                    }
+                  />
+                </div>
+              )}
+            </DetailSection>
+            <DetailSection
+              title="Focus"
+              divider={false}
+              className="gap-3 px-4 py-4 sm:px-5"
+              action={
+                focus && (
                   <Button
                     variant="ghost"
                     size="xs"
@@ -465,12 +471,13 @@ export default function TodayPage() {
                   >
                     Show everything
                   </Button>
-                )}
-              </div>
+                )
+              }
+            >
               <div
                 role="group"
                 aria-label="Focus on one section"
-                className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3"
+                className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
               >
                 {sections.map((section) => (
                   <FocusTile
@@ -483,11 +490,11 @@ export default function TodayPage() {
                   />
                 ))}
               </div>
-            </div>
+            </DetailSection>
           </section>
 
           {loaded && total === 0 && !focus ? (
-            <Card>
+            <div className="border-border bg-background rounded-xl border">
               <EmptyState
                 icon={CheckCircleIcon}
                 title="All clear"
@@ -503,7 +510,7 @@ export default function TodayPage() {
                   </Button>
                 }
               />
-            </Card>
+            </div>
           ) : (
             <div
               className={cn(
@@ -538,26 +545,44 @@ function FocusTile({
   onClick: () => void;
 }) {
   const count = section.items?.length;
-  const alert = count ? section.tone : undefined;
+  const alert = Boolean(count) && section.tone;
+  const Icon = section.icon;
   return (
-    <StatCard
-      size="sm"
-      label={section.stat}
-      icon={section.icon}
-      iconTone={alert ?? "neutral"}
-      value={count}
-      pressed={active}
+    <button
+      type="button"
+      aria-pressed={active}
       onClick={onClick}
-      valueClassName={cn(
-        alert === "danger" && "text-danger",
-        alert === "warning" && "text-warning",
-        count === 0 && "text-fg-tertiary",
+      className={cn(
+        "border-line-strong hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex min-w-0 cursor-pointer flex-col gap-3 rounded-lg border p-2.75 text-left transition-colors outline-none focus-visible:ring-2 max-sm:flex-row max-sm:items-center max-sm:justify-between max-sm:gap-2",
+        active && "bg-overlay-2 hover:bg-overlay-2 border-fg-tertiary",
       )}
-    />
+    >
+      <span className="caption-style text-fg-secondary flex min-w-0 items-center gap-1">
+        <Icon
+          aria-hidden
+          className={cn(
+            "size-3 shrink-0",
+            alert && section.tone === "danger" && "text-danger",
+            alert && section.tone === "warning" && "text-warning",
+          )}
+        />
+        <span className="truncate">{section.stat}</span>
+      </span>
+      <span
+        className={cn(
+          "lead-style block truncate font-medium tabular-nums",
+          alert && section.tone === "danger" && "text-danger",
+          alert && section.tone === "warning" && "text-warning",
+          count === 0 && "text-fg-tertiary",
+        )}
+      >
+        {count === undefined ? <Skeleton className="h-3.5 w-5" /> : count}
+      </span>
+    </button>
   );
 }
 
-/** A cockpit block: icon, title and count in the header band, then rows edge to edge. */
+/** A cockpit block in the record-detail style: eyebrow title, count, link, then rows edge to edge. */
 function CockpitCard({
   section,
   action,
@@ -568,53 +593,38 @@ function CockpitCard({
   children: ReactNode;
 }) {
   const count = section.items?.length;
-  const id = `today-${section.id}`;
-  const alert = count ? section.tone : undefined;
   return (
-    <Card aria-labelledby={id}>
-      <CardHeader
-        id={id}
-        size="sm"
-        icon={section.icon}
-        iconTone={alert ?? "neutral"}
+    <div className="border-border bg-background min-w-0 overflow-hidden rounded-xl border">
+      <DetailSection
         title={section.title}
-        meta={
-          count === undefined ? (
-            <span className="sr-only">Loading</span>
-          ) : (
-            count > 0 && <CardCount>{count}</CardCount>
-          )
-        }
+        divider={false}
+        className={CARD_SECTION}
         action={
-          (action || section.href) && (
-            <>
-              {action}
-              {section.href && (
-                <CardLink href={section.href.to}>{section.href.label}</CardLink>
-              )}
-            </>
-          )
+          <span className="flex items-center gap-2">
+            {action}
+            {section.href && (
+              <Link
+                href={section.href.to}
+                className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
+              >
+                {section.href.label}
+              </Link>
+            )}
+          </span>
         }
-      />
-      {children}
-    </Card>
-  );
-}
-
-function CardLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2"
-    >
-      {children}
-    </Link>
+      >
+        <span className="sr-only">
+          {count === undefined ? "Loading" : `${count} items`}
+        </span>
+        {children}
+      </DetailSection>
+    </div>
   );
 }
 
 function RowsSkeleton() {
   return (
-    <div aria-hidden className="divide-border flex flex-col divide-y">
+    <div className="divide-border border-border flex flex-col divide-y border-t">
       {[0, 1].map((index) => (
         <div key={index} className="flex h-13 items-center gap-3 px-4 sm:px-5">
           <Skeleton className="size-4 rounded-sm" />
@@ -632,54 +642,64 @@ function RecentAccounts({
   accounts: FunctionReturnType<typeof api.accounts.page>["page"] | undefined;
 }) {
   return (
-    <Card aria-labelledby="today-recent">
-      <CardHeader
-        id="today-recent"
-        size="sm"
-        icon={BuildingIcon}
+    <div className="border-border bg-background min-w-0 overflow-hidden rounded-xl border">
+      <DetailSection
         title="Recently touched"
-        action={<CardLink href="/accounts?view=mine">My accounts</CardLink>}
-      />
-      {recent === undefined ? (
-        <RowsSkeleton />
-      ) : recent.length === 0 ? (
-        <p className="caption-style text-fg-tertiary px-4 py-4 leading-snug sm:px-5">
-          Accounts you own show up here.{" "}
+        divider={false}
+        className={CARD_SECTION}
+        action={
           <Link
-            href="/accounts"
-            className="text-fg-secondary hover:text-foreground underline underline-offset-2"
+            href="/accounts?view=mine"
+            className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
           >
-            Browse accounts
+            My accounts
           </Link>
-        </p>
-      ) : (
-        <ul className="divide-border flex flex-col divide-y">
-          {recent.map((account) => (
-            <li key={account._id}>
-              <Link
-                href={`/accounts/${account._id}`}
-                className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
-              >
-                <AccountLogo account={account} size="sm" />
-                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="lead-style truncate leading-5 font-medium">
-                    {account.name}
-                  </span>
-                  <span className="caption-style text-fg-tertiary truncate">
-                    {account.lastActivityAt
-                      ? relativeTime(account.lastActivityAt)
-                      : "No activity yet"}
-                  </span>
-                </span>
-                <span className="flex shrink-0 flex-col items-end gap-1.5">
-                  <StageTag stage={account.stage} />
-                  <TrendCell values={account.trend} />
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
+        }
+      >
+        {recent === undefined ? (
+          <RowsSkeleton />
+        ) : recent.length === 0 ? (
+          <p className="caption-style text-fg-tertiary px-4 pb-4 leading-snug sm:px-5">
+            Accounts you own show up here.{" "}
+            <Link
+              href="/accounts"
+              className="text-fg-secondary hover:text-foreground underline underline-offset-2"
+            >
+              Browse accounts
+            </Link>
+          </p>
+        ) : (
+          <ul className="divide-border border-border flex flex-col divide-y border-t">
+            {recent.map((account) => {
+              const trend = account.trend;
+              return (
+                <li key={account._id}>
+                  <Link
+                    href={`/accounts/${account._id}`}
+                    className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
+                  >
+                    <AccountLogo account={account} size="sm" />
+                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="lead-style truncate leading-5 font-medium">
+                        {account.name}
+                      </span>
+                      <span className="caption-style text-fg-tertiary truncate">
+                        {account.lastActivityAt
+                          ? relativeTime(account.lastActivityAt)
+                          : "No activity yet"}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1.5">
+                      <StageTag stage={account.stage} />
+                      {trend && <TrendCell values={trend} />}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </DetailSection>
+    </div>
   );
 }

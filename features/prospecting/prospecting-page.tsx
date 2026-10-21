@@ -725,6 +725,15 @@ export default function ProspectingPage() {
         views={VIEWS.map((item) => ({ ...item, count: counts[item.id] }))}
       />
       <PageToolbar
+        search={
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={
+              view === "prospects" ? "Search brands" : "Search products"
+            }
+          />
+        }
         actions={
           <>
             <ExportButton
@@ -737,13 +746,6 @@ export default function ProspectingPage() {
           </>
         }
       >
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder={
-            view === "prospects" ? "Search brands" : "Search products"
-          }
-        />
         {view === "prospects" && (
           <FilterMenu
             label="Sort by"

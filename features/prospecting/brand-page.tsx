@@ -413,23 +413,23 @@ function BrandSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-12 gap-y-8 px-4 pt-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_19rem] lg:pt-8"
+        className="mx-auto grid w-full max-w-6xl gap-x-12 gap-y-8 px-4 pt-6 sm:px-6 @4xl/page:grid-cols-[minmax(0,1fr)_19rem] lg:pt-8"
       >
-        <div className="flex items-center gap-4 lg:col-span-2">
+        <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-12 rounded-xl" />
           <span className="flex flex-col gap-2">
             <Skeleton className="h-6 w-48" />
             <Skeleton className="h-4 w-64" />
           </span>
         </div>
-        <div className="flex flex-col gap-4 lg:order-1">
+        <div className="flex flex-col gap-4 @4xl/page:order-1">
           <Skeleton className="h-5 w-32" />
           <Skeleton className="h-32 w-full rounded-xl" />
           <Skeleton className="h-5 w-24" />
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
-        <div className="flex flex-col gap-3 lg:order-2">
+        <div className="flex flex-col gap-3 @4xl/page:order-2">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-full" />

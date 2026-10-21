@@ -172,6 +172,14 @@ export default function TasksPage() {
         }
       />
       <PageToolbar
+        search={
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search tasks"
+            className="sm:w-56"
+          />
+        }
         actions={
           <CreateButton onClick={() => setCreate({ type: "task" })}>
             New task
@@ -186,12 +194,6 @@ export default function TasksPage() {
             { value: "mine", label: "My tasks" },
             { value: "all", label: "All tasks" },
           ]}
-        />
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search tasks"
-          className="sm:w-56"
         />
         {!mine && (
           <FilterMenu

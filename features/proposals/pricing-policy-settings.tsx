@@ -29,8 +29,6 @@ import {
 } from "@/lib/domain/pricing";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
-import InfoIcon from "@/public/assets/icons/info-circle.svg";
-import WalletIcon from "@/public/assets/icons/wallet.svg";
 import { formatAmount } from "./amount";
 
 type Policy = FunctionReturnType<typeof api.proposals.policy>;
@@ -75,7 +73,6 @@ export default function PricingPolicySettings() {
   return (
     <>
       <SettingsSection
-        icon={WalletIcon}
         title="Pricing policy"
         description="Company rules the deal desk prices and approves against. Sent proposals keep the policy they were sent under."
       >
@@ -88,7 +85,6 @@ export default function PricingPolicySettings() {
         ))}
       </SettingsSection>
       <SettingsSection
-        icon={InfoIcon}
         title="Platform rules"
         description="Set by the Hypedrive platform, not by this workspace. Proposals that break them can't be sent."
       >

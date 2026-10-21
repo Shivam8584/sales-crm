@@ -376,9 +376,9 @@ function LeadPageSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:py-8"
+        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 @4xl/page:grid-cols-[minmax(0,1fr)_20rem] lg:py-8"
       >
-        <div className="flex items-center gap-4 lg:col-span-2">
+        <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-10 rounded-full" />
           <span className="flex flex-col gap-2">
             <Skeleton className="h-5 w-48" />
@@ -390,7 +390,7 @@ function LeadPageSkeleton() {
           <Skeleton className="h-24 w-full rounded-xl" />
           <Skeleton className="h-16 w-full rounded-xl" />
         </div>
-        <div className="flex flex-col gap-3 max-lg:order-first">
+        <div className="flex flex-col gap-3 @max-4xl/page:order-first">
           {[0, 1, 2, 3].map((index) => (
             <Skeleton key={index} className="h-6 w-full" />
           ))}

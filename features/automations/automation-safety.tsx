@@ -14,7 +14,6 @@ import { FREQUENCY_WINDOW_DAYS } from "@/lib/domain/automations";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
-import AutomationIcon from "@/public/assets/icons/automation.svg";
 
 type Safety = FunctionReturnType<typeof api.automations.safety>;
 
@@ -26,7 +25,6 @@ export default function AutomationSafety() {
   const safety = useQuery(api.automations.safety, {});
   return (
     <SettingsSection
-      icon={AutomationIcon}
       tone={safety?.killSwitch ? "danger" : "default"}
       title="Automation safety"
       description="Limits that apply to every automation, whoever built it."

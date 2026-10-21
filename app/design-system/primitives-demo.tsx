@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
-import { Card, CardCount, CardHeader } from "@/components/_ui/card";
+import { Card, CardHeader } from "@/components/_ui/card";
 import { Checkbox } from "@/components/_ui/checkbox";
 import { CollapsibleSection } from "@/components/_ui/collapsible";
 import CountBadge from "@/components/_ui/count-badge";
@@ -45,7 +45,6 @@ import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
 import FilterIcon from "@/public/assets/icons/filter.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
-import TrashIcon from "@/public/assets/icons/trash.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import WalletIcon from "@/public/assets/icons/wallet.svg";
@@ -324,9 +323,7 @@ export default function PrimitivesDemo() {
       <Row label="Card · CardHeader · Collapsible">
         <Card className="w-full">
           <CardHeader
-            icon={UsersIcon}
             title="Round-robin"
-            meta={<CardCount>3</CardCount>}
             description="New leads rotate through every active member."
             action={
               <Button variant="secondary" size="xs">
@@ -345,9 +342,7 @@ export default function PrimitivesDemo() {
         </Card>
         <Card className="w-full">
           <CardHeader
-            icon={TrashIcon}
             tone="danger"
-            size="sm"
             title="Danger zone"
             description="Destructive actions run at once with an Undo toast."
           />

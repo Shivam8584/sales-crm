@@ -13,7 +13,6 @@ import {
   LEAD_KIND_LABEL,
   LEAD_STATUS_LABEL,
   STAGE_LABEL,
-  personName,
 } from "../lib/domain/labels";
 import { formatMoney, toMajor } from "../lib/domain/money";
 import { ACTIVATION_STAGES } from "../lib/domain/platform";

@@ -30,7 +30,12 @@ import LogCallDialog from "@/features/timeline/log-call-dialog";
 import type { TimelineTarget } from "@/features/timeline/kinds";
 import { useCsvExport } from "@/hooks/use-csv-export";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { isPartial, usePagedList, viewCount } from "@/hooks/use-paged-list";
+import {
+  allRows,
+  isPartial,
+  usePagedList,
+  viewCount,
+} from "@/hooks/use-paged-list";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { LIFECYCLE_STAGES, type LifecycleStage } from "@/lib/domain/enums";
@@ -51,6 +56,7 @@ import {
   OwnerCell,
   StageAndTags,
   TrendCell,
+  activationPercent,
   activationSteps,
   dash,
   rankTotals,
@@ -242,6 +248,17 @@ export default function AccountsPage() {
     }),
   );
 
+  const loaded = allRows(rows, paging);
+  const onPlatform = loaded?.filter((row) => row.activation !== null);
+  const avgActivation = onPlatform?.length
+    ? Math.round(
+        onPlatform.reduce(
+          (sum, row) => sum + activationPercent(row.activation!),
+          0,
+        ) / onPlatform.length,
+      )
+    : null;
+
   const filtered =
     stage !== ALL || owner !== ALL || activity !== ALL || search.trim() !== "";
   const selectedIds = [...selected].filter((id) =>
@@ -382,6 +399,13 @@ export default function AccountsPage() {
         }))}
       />
       <PageToolbar
+        search={
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search accounts"
+          />
+        }
         actions={
           <>
             <ExportButton
@@ -394,11 +418,6 @@ export default function AccountsPage() {
           </>
         }
       >
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search accounts"
-        />
         {view !== "archived" && (
           <FilterMenu
             label="Sort by"
@@ -478,6 +497,35 @@ export default function AccountsPage() {
             {
               label: "Accounts in view",
               value: viewCount(counts?.inView, rows?.length, paging),
+            },
+            {
+              label: "Pipeline",
+              value: loaded ? (
+                <MoneyValue
+                  totals={rankTotals(loaded.flatMap((row) => row.pipeline))}
+                  compact
+                />
+              ) : (
+                dash
+              ),
+            },
+            {
+              label: "Avg activation",
+              value:
+                avgActivation === null ? (
+                  dash
+                ) : (
+                  <>
+                    {avgActivation}
+                    <span className="text-fg-tertiary">%</span>
+                  </>
+                ),
+            },
+            {
+              label: "Open deals",
+              value: loaded
+                ? loaded.reduce((sum, row) => sum + row.openDeals, 0)
+                : dash,
             },
           ]}
           renderCard={(row) => <AccountCard row={row} />}

@@ -40,6 +40,11 @@ export function isPartial(paging: Paging) {
   return paging.status === "CanLoadMore" || paging.status === "LoadingMore";
 }
 
+/** Rows to total in a footer: only once every page is loaded, so sums are never partial. */
+export function allRows<T>(rows: T[] | undefined, paging: Paging) {
+  return paging.status === "Exhausted" ? rows : undefined;
+}
+
 /** "1,234" when the server could count the view, else the loaded rows, with "+" while more remain. */
 export function viewCount(
   total: number | null | undefined,

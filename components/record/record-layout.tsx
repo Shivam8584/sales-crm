@@ -17,12 +17,12 @@ export default function RecordLayout({
 }: RecordLayoutProps) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto grid w-full max-w-6xl gap-x-12 gap-y-8 px-4 pt-6 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_19rem] lg:pt-8">
-        <div className="min-w-0 lg:col-span-2">{header}</div>
-        <aside className="flex min-w-0 flex-col gap-7 lg:order-2">
+      <div className="mx-auto grid w-full max-w-6xl gap-x-12 gap-y-8 px-4 pt-6 pb-16 sm:px-6 @4xl/page:grid-cols-[minmax(0,1fr)_19rem] lg:pt-8">
+        <div className="min-w-0 @4xl/page:col-span-2">{header}</div>
+        <aside className="flex min-w-0 flex-col gap-7 @4xl/page:order-2">
           {aside}
         </aside>
-        <div className="flex min-w-0 flex-col gap-8 lg:order-1">{children}</div>
+        <div className="flex min-w-0 flex-col gap-8 @4xl/page:order-1">{children}</div>
       </div>
     </div>
   );

@@ -364,6 +364,14 @@ export default function DealsPage() {
         }
       />
       <PageToolbar
+        search={
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search deals"
+            className="sm:w-48"
+          />
+        }
         actions={
           <>
             <Segmented
@@ -400,12 +408,6 @@ export default function DealsPage() {
           </>
         }
       >
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search deals"
-          className="sm:w-48"
-        />
         <FilterMenu
           label="Owner"
           value={owner}
@@ -739,12 +741,7 @@ function PipelineSummary({ deals }: { deals: DealRow[] | undefined }) {
         <div key={item.label} className="flex min-w-0 flex-col gap-1">
           <dt className="caption-style text-fg-tertiary truncate">
             {item.label}
-            {item.hint && (
-              <span className="text-fg-disabled max-sm:hidden">
-                {" "}
-                · {item.hint}
-              </span>
-            )}
+            {item.hint && <span className="max-sm:hidden"> · {item.hint}</span>}
           </dt>
           <dd className="lead-style font-medium tabular-nums">
             {item.value ?? <Skeleton className="my-1 h-3 w-14" />}

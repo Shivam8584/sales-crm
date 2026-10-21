@@ -28,8 +28,6 @@ import { useUiStore } from "@/stores/ui-store";
 import MonitorIcon from "@/public/assets/icons/monitor.svg";
 import MoonIcon from "@/public/assets/icons/moon.svg";
 import SunIcon from "@/public/assets/icons/sun.svg";
-import KeyboardIcon from "@/public/assets/icons/message-question.svg";
-import SessionIcon from "@/public/assets/icons/arrow-right.svg";
 import { SettingsRow, SettingsSection } from "./settings-ui";
 
 const MAX_NAME = 80;
@@ -101,7 +99,6 @@ export default function ProfileSettings() {
       </Card>
 
       <SettingsSection
-        icon={MonitorIcon}
         title="Appearance"
         description="How the CRM looks on this device."
       >
@@ -114,7 +111,6 @@ export default function ProfileSettings() {
       </SettingsSection>
 
       <SettingsSection
-        icon={KeyboardIcon}
         title="Keyboard shortcuts"
         description="The few worth learning first."
         action={
@@ -147,7 +143,7 @@ export default function ProfileSettings() {
         </ul>
       </SettingsSection>
 
-      <SettingsSection icon={SessionIcon} title="Session">
+      <SettingsSection title="Session">
         <SettingsRow
           label="Sign out"
           description="Ends your session in this browser."

@@ -401,6 +401,13 @@ export default function AutomationsPage() {
       ) : (
         <>
           <PageToolbar
+            search={
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search automations"
+              />
+            }
             actions={
               <>
                 <SegmentedControl
@@ -421,11 +428,6 @@ export default function AutomationsPage() {
               </>
             }
           >
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Search automations"
-            />
             <FilterMenu
               label="Sort by"
               value={

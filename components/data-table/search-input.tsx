@@ -22,7 +22,7 @@ export default function SearchInput({
   return (
     <label
       className={cn(
-        "bg-secondary shadow-raised focus-within:border-selected focus-within:ring-selected/20 duration-fast h-control-md flex w-full min-w-40 items-center gap-2 rounded-full border border-transparent px-2.75 transition-[border-color,box-shadow] focus-within:ring-3 sm:w-64",
+        "bg-secondary shadow-raised focus-within:border-selected focus-within:ring-selected/20 duration-fast h-control-md flex w-full min-w-0 items-center gap-2 rounded-full border border-transparent px-2.75 transition-[border-color,box-shadow] focus-within:ring-3 sm:w-64",
         className,
       )}
     >

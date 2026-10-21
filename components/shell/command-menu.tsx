@@ -212,6 +212,7 @@ export default function CommandMenu() {
           value={search}
           onValueChange={setSearch}
           placeholder="Search accounts, people, leads, deals or commands…"
+          aria-label="Search records and commands"
           autoFocus
         />
         <CommandList>

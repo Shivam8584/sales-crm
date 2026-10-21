@@ -407,6 +407,12 @@
   *::-webkit-scrollbar {
     display: none;
   }
+  /* The shell scrolls inside its panes; without this, a moment of overflow while
+     a page hydrates makes mobile browsers zoom the whole app out for good. */
+  html,
+  body {
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-foreground font-normal;
     font-optical-sizing: auto;

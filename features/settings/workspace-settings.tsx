@@ -20,9 +20,6 @@ import { ROLE_TONE } from "@/features/team/roles";
 import PrivacySettings from "@/features/consent/privacy-settings";
 import PricingPolicySettings from "@/features/proposals/pricing-policy-settings";
 import AutomationSafety from "@/features/automations/automation-safety";
-import ClockIcon from "@/public/assets/icons/clock.svg";
-import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
-import UsersIcon from "@/public/assets/icons/users.svg";
 import {
   AdminOnly,
   SettingsIntro,
@@ -81,7 +78,6 @@ function WorkspaceForm() {
   return (
     <>
       <SettingsSection
-        icon={ClockIcon}
         title="Lead routing"
         description="Changes apply to leads that arrive from now on; existing leads keep their owner."
       >
@@ -95,7 +91,6 @@ function WorkspaceForm() {
       <RotationSection settings={settings} />
 
       <SettingsSection
-        icon={UserPlusIcon}
         title="Joining the workspace"
         description="Who can sign up without an invite."
       >
@@ -316,7 +311,6 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
 
   return (
     <SettingsSection
-      icon={UsersIcon}
       title="Round-robin"
       description={
         everyone

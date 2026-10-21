@@ -145,12 +145,16 @@ export default function TeamPage() {
 
       {view === "members" ? (
         <>
-          <PageToolbar actions={inviteButton}>
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Search members"
-            />
+          <PageToolbar
+            search={
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search members"
+              />
+            }
+            actions={inviteButton}
+          >
             <FilterMenu
               label="Role"
               value={role}

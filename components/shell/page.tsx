@@ -42,7 +42,12 @@ export function Page({
   className?: string;
 }) {
   return (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", className)}>
+    <div
+      className={cn(
+        "@container/page flex min-h-0 min-w-0 flex-1 flex-col",
+        className,
+      )}
+    >
       {children}
     </div>
   );
@@ -387,14 +392,17 @@ function MenuAction({
 }
 
 /**
- * Filters on the left, view actions on the right (`ExportButton`, `CreateButton`).
- * On phones the filters scroll sideways instead of wrapping.
+ * Search and filters on the left, view actions on the right (`ExportButton`,
+ * `CreateButton`). Filters stay on one row and scroll sideways when they don't
+ * fit; on phones they move to a row of their own under search and the actions.
  */
 export function PageToolbar({
+  search,
   children,
   actions,
   className,
 }: {
+  search?: ReactNode;
   children?: ReactNode;
   actions?: ReactNode;
   className?: string;
@@ -403,15 +411,27 @@ export function PageToolbar({
     <div
       data-slot="page-toolbar"
       className={cn(
-        "border-border short:py-2 flex min-h-12 shrink-0 items-center gap-2 border-b px-4 py-3 sm:py-4",
+        "border-border short:py-2 flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b px-4 py-3 sm:flex-nowrap sm:py-4",
         className,
       )}
     >
-      <div className="scrollbar-none relative -my-1 flex min-w-0 flex-1 items-center gap-2 py-1 max-sm:overflow-x-auto max-sm:mask-r-from-[calc(100%-1.5rem)] max-sm:pr-4 sm:flex-wrap">
-        {children}
-      </div>
+      {search && (
+        <div className="flex min-w-28 flex-1 sm:flex-none">{search}</div>
+      )}
+      {children && (
+        <div
+          className={cn(
+            "scrollbar-none -my-1 flex min-w-0 flex-1 items-center gap-2 overflow-x-auto mask-r-from-[calc(100%-1.5rem)] py-1 pr-4",
+            search && "max-sm:order-last max-sm:basis-full",
+          )}
+        >
+          {children}
+        </div>
+      )}
       {actions && (
-        <div className="flex shrink-0 items-center gap-1.5">{actions}</div>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {actions}
+        </div>
       )}
     </div>
   );
@@ -455,10 +475,11 @@ export function CreateButton({
         variant="primary"
         size="sm"
         onClick={onClick}
-        className="h-control-md py-0"
+        aria-label={typeof children === "string" ? children : undefined}
+        className="h-control-md max-sm:w-control-md py-0 max-sm:px-0"
       >
         <PlusIcon aria-hidden className="size-3" />
-        {children}
+        <span className="max-sm:hidden">{children}</span>
       </Button>
     </Tooltip>
   );

@@ -8,7 +8,6 @@ import {
   type SVGProps,
 } from "react";
 import Button from "@/components/_ui/button";
-import Divider from "@/components/_ui/divider";
 import { Card, CardHeader } from "@/components/_ui/card";
 import EmptyState from "@/components/_ui/empty-state";
 import IconBadge from "@/components/_ui/icon-badge";
@@ -25,19 +24,16 @@ export function SettingsIntro({ children }: { children: ReactNode }) {
 }
 
 const CARD =
-  "bg-card shadow-card flex min-w-0 flex-col overflow-hidden rounded-2xl";
+  "bg-card border-border shadow-card flex min-w-0 flex-col overflow-hidden rounded-xl border";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
-/** Drops the top rule of the first row, which the header's divider replaces. */
-const BODY =
-  "flex min-w-0 flex-col [&>:first-child]:border-t-0 [&>:first-child>:first-child]:border-t-0";
+const BODY = "flex min-w-0 flex-col";
 
-/** A settings card: icon badge, title and short note in a header band, then its rows. */
+/** A settings card: eyebrow title and a short note, then its rows. */
 export function SettingsSection({
   title,
   description,
-  icon,
   tone = "default",
   action,
   children,
@@ -45,7 +41,6 @@ export function SettingsSection({
 }: {
   title: string;
   description?: ReactNode;
-  icon?: Icon;
   tone?: "default" | "danger";
   action?: ReactNode;
   children: ReactNode;
@@ -56,7 +51,6 @@ export function SettingsSection({
     <Card aria-labelledby={id} className={className}>
       <CardHeader
         id={id}
-        icon={icon}
         title={title}
         description={description}
         action={action}
@@ -131,14 +125,10 @@ export function SettingsBlock({
 export function SettingsSkeleton({ rows = 2 }: { rows?: number }) {
   return (
     <div aria-hidden className={cn(CARD, "gap-0")}>
-      <div className="bg-overlay-1 flex items-center gap-3 px-4 py-4 sm:px-5">
-        <Skeleton className="size-8 rounded-[10px]" />
-        <span className="flex flex-col gap-2">
-          <Skeleton className="h-3 w-28" />
-          <Skeleton className="h-2.5 w-48 max-w-full" />
-        </span>
+      <div className="flex flex-col gap-2 px-4 py-4 sm:px-6">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-2.5 w-48 max-w-full" />
       </div>
-      <Divider />
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}

@@ -40,7 +40,12 @@ import type { TimelineTarget } from "@/features/timeline/kinds";
 import LogCallDialog from "@/features/timeline/log-call-dialog";
 import { useCsvExport } from "@/hooks/use-csv-export";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { isPartial, usePagedList, viewCount } from "@/hooks/use-paged-list";
+import {
+  allRows,
+  isPartial,
+  usePagedList,
+  viewCount,
+} from "@/hooks/use-paged-list";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { personName } from "@/lib/domain/labels";
@@ -53,6 +58,9 @@ import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 
 type PersonRow = FunctionReturnType<typeof api.people.page>["page"][number];
+
+const trendTotal = (row: PersonRow) =>
+  row.trend.reduce((sum, value) => sum + value, 0);
 type ListArgs = Omit<FunctionArgs<typeof api.people.page>, "paginationOpts">;
 
 const ALL = "all";
@@ -207,6 +215,7 @@ export default function PeoplePage() {
     dir: sort.dir,
   };
   const { rows, paging } = usePagedList(api.people.page, args);
+  const loaded = allRows(rows, paging);
   const counts = useQuery(api.people.counts, args);
 
   const filtered = owner !== ALL || activity !== ALL || search.trim() !== "";
@@ -359,6 +368,13 @@ export default function PeoplePage() {
         }))}
       />
       <PageToolbar
+        search={
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search people"
+          />
+        }
         actions={
           <>
             <ExportButton
@@ -371,11 +387,6 @@ export default function PeoplePage() {
           </>
         }
       >
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search people"
-        />
         <FilterMenu
           label="Sort by"
           value={sort.id}
@@ -444,6 +455,20 @@ export default function PeoplePage() {
             {
               label: "People in view",
               value: viewCount(counts?.inView, rows?.length, paging),
+            },
+            {
+              label: "With an account",
+              value: loaded?.filter((row) => row.account).length ?? dash,
+            },
+            {
+              label: "Active in 14 days",
+              value:
+                loaded?.filter((row) => trendTotal(row) > 0).length ?? dash,
+            },
+            {
+              label: "Timeline entries, 14 days",
+              value:
+                loaded?.reduce((sum, row) => sum + trendTotal(row), 0) ?? dash,
             },
           ]}
           renderCard={(row) => (

@@ -16,9 +16,6 @@ import { RETENTION_DAYS } from "@/lib/domain/consent";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime, shortDate } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
-import EyeIcon from "@/public/assets/icons/eye.svg";
-import TrashIcon from "@/public/assets/icons/trash.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
 import ConsentEventDialog from "./consent-event-dialog";
 import EraseDialog, { type EraseTarget } from "./erase-dialog";
 
@@ -41,7 +38,6 @@ export default function PrivacySettings() {
   return (
     <>
       <SettingsSection
-        icon={EyeIcon}
         title="Privacy"
         description="How long prospect data is kept before it's reviewed. Nothing is deleted automatically."
       >
@@ -53,7 +49,6 @@ export default function PrivacySettings() {
       </SettingsSection>
 
       <SettingsSection
-        icon={TrashIcon}
         tone={privacy && privacy.requests.length > 0 ? "danger" : "default"}
         title="Erasure requests"
         description="People who asked to be forgotten. Contact with them is paused until you erase their data or dismiss the request."
@@ -300,7 +295,6 @@ function ReviewSection({
   const total = privacy?.staleTotal ?? 0;
   return (
     <SettingsSection
-      icon={ClockIcon}
       title="Retention review"
       description={
         privacy

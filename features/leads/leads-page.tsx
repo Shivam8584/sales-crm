@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
@@ -25,8 +25,14 @@ import {
   PageViews,
 } from "@/components/shell/page";
 import { useCsvExport } from "@/hooks/use-csv-export";
+import { dash } from "@/features/accounts/record-cells";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { isPartial, usePagedList, viewCount } from "@/hooks/use-paged-list";
+import {
+  allRows,
+  isPartial,
+  usePagedList,
+  viewCount,
+} from "@/hooks/use-paged-list";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import {
@@ -52,7 +58,7 @@ import {
   ownerOptions,
 } from "./lead-meta";
 import LeadStatusMenu from "./lead-status-menu";
-import { SlaCell, useNow } from "./sla";
+import { SlaCell, slaState, useNow } from "./sla";
 import { useBulkLeadActions, useLeadActions } from "./use-lead-actions";
 
 type LeadRow = FunctionReturnType<typeof api.leads.page>["page"][number];
@@ -77,6 +83,15 @@ const SORT_DIR: Record<string, "asc" | "desc"> = { demo: "desc" };
 
 function isClosed(row: LeadRow) {
   return row.status === "disqualified" || row.status === "converted";
+}
+
+function median(values: number[]) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 /** The inbound lead inbox: triage by status, watch the SLA, peek or open a lead. */
@@ -209,6 +224,29 @@ export default function LeadsPage() {
     dir: sort.dir,
   };
   const { rows, paging } = usePagedList(api.leads.page, args);
+  const loaded = allRows(rows, paging);
+  const stats = useMemo(() => {
+    if (!loaded) return null;
+    let within = 0;
+    let judged = 0;
+    const speeds: number[] = [];
+    for (const row of loaded) {
+      const state = slaState(row, slaMs, now);
+      if (state.kind === "replied") {
+        speeds.push(state.tookMs);
+        judged++;
+        if (!state.late) within++;
+      } else if (state.kind === "breached") {
+        judged++;
+      }
+    }
+    return {
+      untouched: loaded.filter((row) => !row.firstTouchedAt && !isClosed(row))
+        .length,
+      median: median(speeds),
+      within: judged ? Math.round((within / judged) * 100) : null,
+    };
+  }, [loaded, slaMs, now]);
   const statusCounts = counts?.statuses;
 
   const selectedIds = (rows ?? [])
@@ -286,6 +324,13 @@ export default function LeadsPage() {
         )}
       />
       <PageToolbar
+        search={
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search leads"
+          />
+        }
         actions={
           <>
             <ExportButton
@@ -298,11 +343,6 @@ export default function LeadsPage() {
           </>
         }
       >
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search leads"
-        />
         <FilterMenu
           label="Sort by"
           value={sort.id}
@@ -378,6 +418,23 @@ export default function LeadsPage() {
             {
               label: "Leads in view",
               value: viewCount(statusCounts?.[status], rows?.length, paging),
+            },
+            { label: "Untouched", value: stats ? stats.untouched : dash },
+            {
+              label: "Median speed to lead",
+              value: stats?.median == null ? dash : compactSpan(stats.median),
+            },
+            {
+              label: "Within SLA",
+              value:
+                stats?.within == null ? (
+                  dash
+                ) : (
+                  <>
+                    {stats.within}
+                    <span className="text-fg-tertiary">%</span>
+                  </>
+                ),
             },
           ]}
           renderCard={(row) => <LeadCard row={row} slaMs={slaMs} now={now} />}
