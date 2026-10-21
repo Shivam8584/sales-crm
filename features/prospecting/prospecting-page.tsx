@@ -12,6 +12,7 @@ import Tooltip from "@/components/_ui/tooltip";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
+import SavedViewsMenu from "@/features/views/saved-views-menu";
 import SelectionBar from "@/components/data-table/selection-bar";
 import {
   compareBy,
@@ -736,6 +737,7 @@ export default function ProspectingPage() {
         }
         actions={
           <>
+            <SavedViewsMenu />
             <ExportButton
               disabled={!(view === "prospects" ? prospects : products)?.length}
               onClick={exportView}

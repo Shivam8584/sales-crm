@@ -352,6 +352,22 @@ export default defineSchema({
     .index("by_record", ["record"])
     .index("by_member_record", ["memberId", "record"]),
 
+  /** A member's own named filter set for a list page. */
+  savedViews: defineTable({
+    memberId: v.id("members"),
+    path: v.string(),
+    name: v.string(),
+    query: v.string(),
+  }).index("by_member_path", ["memberId", "path"]),
+
+  /** A record a member keeps in the sidebar. */
+  pins: defineTable({
+    memberId: v.id("members"),
+    record: v.string(),
+  })
+    .index("by_member", ["memberId"])
+    .index("by_member_record", ["memberId", "record"]),
+
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({
     accountId: v.optional(v.id("accounts")),

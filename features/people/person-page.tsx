@@ -41,6 +41,7 @@ import { RecordAutomations } from "@/features/automations/record-automations";
 import MemberPicker from "@/features/members/member-picker";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
+import { usePinAction } from "@/features/pins/use-pins";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
@@ -72,7 +73,7 @@ export default function PersonPage({ id }: { id: Id<"people"> }) {
         <PageHeader crumbs={CRUMBS} title="" />
         <div
           aria-busy
-          className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 @4xl/page:grid-cols-[minmax(0,1fr)_20rem] lg:py-8"
+          className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:py-8 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
         >
           <div className="flex items-center gap-4 @4xl/page:col-span-2">
             <Skeleton className="size-12 rounded-full" />
@@ -169,6 +170,7 @@ function PersonView({ person }: { person: Person }) {
   const update = useMutation(api.people.update);
   const setArchived = useMutation(api.people.setArchived);
   const save = useRecordUpdate(update, person._id);
+  const pin = usePinAction({ personId: person._id });
   const setCreate = useUiStore((state) => state.setCreate);
   const deals = useQuery(api.people.deals, { personId: person._id });
   const tasks = useQuery(api.tasks.list, {
@@ -248,6 +250,7 @@ function PersonView({ person }: { person: Person }) {
           <PageActions
             label="Person actions"
             actions={[
+              pin,
               { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
               newDeal && {
                 label: "New deal",

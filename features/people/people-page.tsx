@@ -12,6 +12,7 @@ import EmptyState from "@/components/_ui/empty-state";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
 import SearchInput from "@/components/data-table/search-input";
+import SavedViewsMenu from "@/features/views/saved-views-menu";
 import SelectionBar from "@/components/data-table/selection-bar";
 import AddToAutomation from "@/features/automations/add-to-automation";
 import type { Column, SortState } from "@/components/data-table/types";
@@ -377,6 +378,7 @@ export default function PeoplePage() {
         }
         actions={
           <>
+            <SavedViewsMenu />
             <ExportButton
               disabled={!rows?.length || exporting}
               onClick={() => void exportCsv({ name: "people", args })}

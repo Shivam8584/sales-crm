@@ -66,6 +66,7 @@ import type * as migrations from "../migrations.js";
 import type * as notifications from "../notifications.js";
 import type * as people from "../people.js";
 import type * as perf from "../perf.js";
+import type * as pins from "../pins.js";
 import type * as platform from "../platform.js";
 import type * as platformSync from "../platformSync.js";
 import type * as proposals from "../proposals.js";
@@ -77,6 +78,7 @@ import type * as shell from "../shell.js";
 import type * as smtp from "../smtp.js";
 import type * as tasks from "../tasks.js";
 import type * as timeline from "../timeline.js";
+import type * as views from "../views.js";
 
 import type {
   ApiFromModules,
@@ -143,6 +145,7 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   people: typeof people;
   perf: typeof perf;
+  pins: typeof pins;
   platform: typeof platform;
   platformSync: typeof platformSync;
   proposals: typeof proposals;
@@ -154,6 +157,7 @@ declare const fullApi: ApiFromModules<{
   smtp: typeof smtp;
   tasks: typeof tasks;
   timeline: typeof timeline;
+  views: typeof views;
 }>;
 
 /**

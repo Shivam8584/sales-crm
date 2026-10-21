@@ -21,6 +21,7 @@ import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import HelpIcon from "@/public/assets/icons/message-question.svg";
 import { SETTINGS_ITEM, isActive, navSections } from "../navigation";
 import SidebarNavItem from "./sidebar-nav-item";
+import SidebarPins from "./sidebar-pins";
 import SidebarSection from "./sidebar-section";
 
 type CountKey = "accounts" | "leads" | "tasks" | "inbox";
@@ -138,6 +139,7 @@ export default function SidebarContent({
               })}
             </SidebarSection>
           ))}
+          <SidebarPins collapsed={collapsed} onNavigate={close} />
         </nav>
       </ScrollArea>
 

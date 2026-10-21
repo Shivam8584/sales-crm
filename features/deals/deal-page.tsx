@@ -28,6 +28,7 @@ import {
 import AccountLogo from "@/features/accounts/account-logo";
 import AccountPicker from "@/features/accounts/account-picker";
 import MemberPicker from "@/features/members/member-picker";
+import { usePinAction } from "@/features/pins/use-pins";
 import RecordTasks from "@/features/tasks/record-tasks";
 import { TaskChecklistSkeleton } from "@/features/tasks/task-checklist";
 import ProposalTab from "@/features/proposals/proposal-tab";
@@ -97,6 +98,7 @@ function DealView({ deal }: { deal: DealRow }) {
   const remove = useDeleteDeal();
   const setCreate = useUiStore((state) => state.setCreate);
   const tasks = useQuery(api.tasks.list, { dealId: deal._id, done: "none" });
+  const pin = usePinAction({ dealId: deal._id });
   const open = isOpenStage(deal.stage);
 
   const addTask = () =>
@@ -164,6 +166,7 @@ function DealView({ deal }: { deal: DealRow }) {
                 )
               }
               actions={[
+                pin,
                 { label: "Add task", icon: PlusIcon, onSelect: addTask },
                 deal.account && {
                   label: "Open account",
@@ -411,7 +414,7 @@ function DealPageSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 @4xl/page:grid-cols-[minmax(0,1fr)_20rem] lg:py-8"
+        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:py-8 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
       >
         <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-12 rounded-xl" />

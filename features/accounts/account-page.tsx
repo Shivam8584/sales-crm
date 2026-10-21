@@ -37,6 +37,7 @@ import MarketplaceListings from "@/features/prospecting/marketplace-listings";
 import PlatformTab from "@/features/platform/platform-tab";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
+import { usePinAction } from "@/features/pins/use-pins";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import type { LifecycleStage } from "@/lib/domain/enums";
 import { readError } from "@/lib/errors";
@@ -98,6 +99,7 @@ function AccountView({ account }: { account: Account }) {
   const update = useMutation(api.accounts.update);
   const setArchived = useMutation(api.accounts.setArchived);
   const save = useRecordUpdate(update, account._id);
+  const pin = usePinAction({ accountId: account._id });
   const setCreate = useUiStore((state) => state.setCreate);
   const people = useQuery(api.people.list, { accountId: account._id });
   const deals = useQuery(api.deals.list, { accountId: account._id });
@@ -175,6 +177,7 @@ function AccountView({ account }: { account: Account }) {
             <PageActions
               label="Account actions"
               actions={[
+                pin,
                 {
                   label: "Add person",
                   icon: UserPlusIcon,
@@ -416,7 +419,7 @@ function AccountPageSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 @4xl/page:grid-cols-[minmax(0,1fr)_20rem] lg:py-8"
+        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:py-8 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
       >
         <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-12 rounded-xl" />

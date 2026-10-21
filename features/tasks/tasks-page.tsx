@@ -19,6 +19,7 @@ import {
   PageStatus,
   PageToolbar,
 } from "@/components/shell/page";
+import SavedViewsMenu from "@/features/views/saved-views-menu";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
@@ -181,9 +182,12 @@ export default function TasksPage() {
           />
         }
         actions={
-          <CreateButton onClick={() => setCreate({ type: "task" })}>
-            New task
-          </CreateButton>
+          <>
+            <SavedViewsMenu />
+            <CreateButton onClick={() => setCreate({ type: "task" })}>
+              New task
+            </CreateButton>
+          </>
         }
       >
         <Segmented

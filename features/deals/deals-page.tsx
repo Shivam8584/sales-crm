@@ -33,6 +33,7 @@ import {
 } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
 import Segmented from "@/features/tasks/segmented";
+import SavedViewsMenu from "@/features/views/saved-views-menu";
 import { useCsvExport } from "@/hooks/use-csv-export";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePagedList, viewCount } from "@/hooks/use-paged-list";
@@ -393,6 +394,7 @@ export default function DealsPage() {
               ]}
             />
             {!listView && <HiddenColumnsToggle prefs={boardPrefs} />}
+            <SavedViewsMenu />
             <ExportButton
               disabled={!visible.length || exporting}
               onClick={() =>

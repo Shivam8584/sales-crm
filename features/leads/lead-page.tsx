@@ -23,6 +23,7 @@ import {
 } from "@/features/accounts/use-title-shortcut";
 import Timeline from "@/features/timeline/timeline";
 import { RecordAutomations } from "@/features/automations/record-automations";
+import { usePinAction } from "@/features/pins/use-pins";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { useViewer } from "@/hooks/use-viewer";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
@@ -91,6 +92,7 @@ function LeadView({ lead }: { lead: Lead }) {
   const viewer = useViewer();
   const update = useMutation(api.leads.update);
   const save = useRecordUpdate(update, lead._id);
+  const pin = usePinAction({ leadId: lead._id });
   const { convert, assign } = useLeadActions();
   const [converting, setConverting] = useState(false);
   const converted = lead.status === "converted";
@@ -187,6 +189,7 @@ function LeadView({ lead }: { lead: Lead }) {
               }
               label="Lead actions"
               actions={[
+                pin,
                 lead.owner?._id !== viewer._id && {
                   label: "Assign to me",
                   icon: UserPlusIcon,
@@ -376,7 +379,7 @@ function LeadPageSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 @4xl/page:grid-cols-[minmax(0,1fr)_20rem] lg:py-8"
+        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:py-8 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
       >
         <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-10 rounded-full" />
