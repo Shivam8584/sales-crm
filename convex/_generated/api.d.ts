@@ -71,6 +71,7 @@ import type * as platform from "../platform.js";
 import type * as platformSync from "../platformSync.js";
 import type * as proposals from "../proposals.js";
 import type * as prospecting from "../prospecting.js";
+import type * as push from "../push.js";
 import type * as reports from "../reports.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
@@ -150,6 +151,7 @@ declare const fullApi: ApiFromModules<{
   platformSync: typeof platformSync;
   proposals: typeof proposals;
   prospecting: typeof prospecting;
+  push: typeof push;
   reports: typeof reports;
   seed: typeof seed;
   settings: typeof settings;

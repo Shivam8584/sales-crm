@@ -60,6 +60,8 @@ export default defineSchema({
     role: vRole,
     status: vMemberStatus,
     joinedAt: v.number(),
+    /** Set when the member finishes or skips the first-run tour. */
+    tourCompletedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_email", ["email"])
@@ -351,6 +353,16 @@ export default defineSchema({
   })
     .index("by_record", ["record"])
     .index("by_member_record", ["memberId", "record"]),
+
+  /** A browser or phone a member allowed push notifications on. */
+  pushSubscriptions: defineTable({
+    memberId: v.id("members"),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+  })
+    .index("by_member", ["memberId"])
+    .index("by_endpoint", ["endpoint"]),
 
   /** A member's own named filter set for a list page. */
   savedViews: defineTable({

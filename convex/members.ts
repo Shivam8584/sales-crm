@@ -147,6 +147,15 @@ export const updateProfile = memberMutation({
   },
 });
 
+/** Marks the first-run tour as done (or skipped) for the signed-in member. */
+export const completeTour = memberMutation({
+  args: {},
+  handler: async (ctx) => {
+    if (ctx.viewer.tourCompletedAt === undefined)
+      await ctx.db.patch(ctx.viewer._id, { tourCompletedAt: Date.now() });
+  },
+});
+
 async function requireOtherMember(
   ctx: MutationCtx & { viewer: Doc<"members"> },
   id: Doc<"members">["_id"],
