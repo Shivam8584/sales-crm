@@ -97,9 +97,15 @@ export default defineSchema({
     .index("by_pan_root", ["panRoot"])
     .index("by_platform_org", ["platformOrgId"])
     .index("by_updated", ["updatedAt"])
+    .index("list_activity", ["archivedAt", "lastActivityAt"])
+    .index("list_name", ["archivedAt", "name"])
+    .index("list_owner_activity", ["ownerId", "archivedAt", "lastActivityAt"])
+    .index("list_owner_name", ["ownerId", "archivedAt", "name"])
+    .index("list_stage_activity", ["stage", "archivedAt", "lastActivityAt"])
+    .index("list_stage_name", ["stage", "archivedAt", "name"])
     .searchIndex("search_name", {
       searchField: "name",
-      filterFields: ["ownerId", "stage"],
+      filterFields: ["ownerId", "stage", "archivedAt"],
     }),
 
   people: defineTable({
@@ -125,9 +131,29 @@ export default defineSchema({
     .index("by_owner", ["ownerId"])
     .index("by_platform_user", ["platformUserId"])
     .index("by_updated", ["updatedAt"])
+    .index("list_activity", ["archivedAt", "lastActivityAt"])
+    .index("list_name", ["archivedAt", "firstName", "lastName"])
+    .index("list_owner_activity", ["ownerId", "archivedAt", "lastActivityAt"])
+    .index("list_owner_name", [
+      "ownerId",
+      "archivedAt",
+      "firstName",
+      "lastName",
+    ])
+    .index("list_account_activity", [
+      "accountId",
+      "archivedAt",
+      "lastActivityAt",
+    ])
+    .index("list_account_name", [
+      "accountId",
+      "archivedAt",
+      "firstName",
+      "lastName",
+    ])
     .searchIndex("search_text", {
       searchField: "searchText",
-      filterFields: ["accountId", "ownerId"],
+      filterFields: ["accountId", "ownerId", "archivedAt"],
     }),
 
   leads: defineTable({
@@ -159,7 +185,21 @@ export default defineSchema({
     .index("by_owner_status", ["ownerId", "status"])
     .index("by_email", ["email"])
     .index("by_phone", ["phone"])
-    .index("by_person", ["personId"]),
+    .index("by_person", ["personId"])
+    .index("list_touched", ["status", "firstTouchedAt"])
+    .index("list_demo", ["status", "demoAt"])
+    .index("list_name", ["status", "name"])
+    .index("list_owner_touched", ["ownerId", "status", "firstTouchedAt"])
+    .index("list_owner_demo", ["ownerId", "status", "demoAt"])
+    .index("list_owner_name", ["ownerId", "status", "name"])
+    .searchIndex("search_name", {
+      searchField: "name",
+      filterFields: ["status", "ownerId"],
+    })
+    .searchIndex("search_company", {
+      searchField: "companyName",
+      filterFields: ["status", "ownerId"],
+    }),
 
   consents: defineTable({
     personId: v.optional(v.id("people")),
@@ -197,7 +237,17 @@ export default defineSchema({
     .index("by_account", ["accountId"])
     .index("by_stage_position", ["stage", "position"])
     .index("by_stage_closed", ["stage", "closedAt"])
-    .index("by_owner", ["ownerId"]),
+    .index("by_owner", ["ownerId"])
+    .index("list_close", ["closeDate"])
+    .index("list_amount", ["amount.amount"])
+    .index("list_title", ["title"])
+    .index("list_owner_close", ["ownerId", "closeDate"])
+    .index("list_owner_amount", ["ownerId", "amount.amount"])
+    .index("list_owner_title", ["ownerId", "title"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["ownerId", "accountId"],
+    }),
 
   tasks: defineTable({
     title: v.string(),
@@ -229,7 +279,11 @@ export default defineSchema({
     .index("by_person", ["personId"])
     .index("by_deal", ["dealId"])
     .index("by_lead", ["leadId"])
-    .index("by_automation_key", ["automationKey"]),
+    .index("by_automation_key", ["automationKey"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["assigneeId", "status"],
+    }),
 
   /** Every interaction and change on a record, shown as one timeline. */
   timeline: defineTable({
@@ -256,7 +310,7 @@ export default defineSchema({
     editedAt: v.optional(v.number()),
     /** Members @mentioned in the body, which holds them as `<@id>` tokens. */
     mentions: v.optional(v.array(v.id("members"))),
-    /** Members who acknowledged the entry. */
+    /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
     acks: v.optional(v.array(v.id("members"))),
     /** Written by an automation, not a teammate: never counts as an interaction. */
     automated: v.optional(v.boolean()),
@@ -283,14 +337,15 @@ export default defineSchema({
     entryId: v.optional(v.id("timeline")),
     /** Follow updates merged into this one. */
     count: v.optional(v.number()),
-    /** Cleared from the inbox; done implies read. */
+    /** Cleared from the inbox; archived implies read. */
+    archivedAt: v.optional(v.number()),
+    /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
     doneAt: v.optional(v.number()),
-    /** Hidden and read until then, when it comes back unread. */
     snoozedUntil: v.optional(v.number()),
   })
     .index("by_recipient", ["recipientId", "readAt"])
     .index("by_recipient_time", ["recipientId"])
-    .index("by_recipient_state", ["recipientId", "doneAt", "snoozedUntil"])
+    .index("by_recipient_archived", ["recipientId", "archivedAt"])
     .index("by_recipient_record", ["recipientId", "record"]),
 
   /** A member following a record hears about its stage changes, deals and notes. */
@@ -301,27 +356,13 @@ export default defineSchema({
     .index("by_record", ["record"])
     .index("by_member_record", ["memberId", "record"]),
 
+  /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
   notificationPrefs: defineTable({
     memberId: v.id("members"),
-    /** Preference groups turned off in-app. */
     muted: v.array(v.string()),
     emailDigest: v.boolean(),
-    lastDigest: v.optional(
-      v.object({
-        at: v.number(),
-        count: v.number(),
-        status: v.union(
-          v.literal("sent"),
-          v.literal("queued"),
-          v.literal("failed"),
-        ),
-        provider: v.string(),
-        error: v.optional(v.string()),
-        subject: v.string(),
-        body: v.string(),
-      }),
-    ),
-  }).index("by_member", ["memberId"]),
+    lastDigest: v.optional(v.any()),
+  }),
 
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({
@@ -432,12 +473,6 @@ export default defineSchema({
     ["key"],
   ),
 
-  rateLimits: defineTable({
-    key: v.string(),
-    windowStart: v.number(),
-    count: v.number(),
-  }).index("by_key", ["key"]),
-
   /** An admin chose to keep a stale prospect; hides it from retention review for one window. */
   retentionReviews: defineTable({
     personId: v.optional(v.id("people")),
@@ -448,24 +483,25 @@ export default defineSchema({
     .index("by_person", ["personId"])
     .index("by_lead", ["leadId"]),
 
-  /** Deal-desk pricing for a deal; each version is frozen once it is sent. */
+  /** The deal-desk proposal for a deal, one per deal. */
   proposals: defineTable({
     dealId: v.id("deals"),
-    version: v.number(),
+    /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
+    version: v.optional(v.number()),
     status: vProposalStatus,
     currency: vCurrency,
     lines: v.array(vProposalLine),
     validUntil: vDay,
     terms: v.string(),
     payment: v.optional(vPayment),
-    /** The pricing policy a sent version was priced under. */
+    /** The pricing policy a sent proposal was priced under. */
     policy: v.optional(vPolicy),
     approval: v.optional(vApproval),
     createdById: v.id("members"),
     sentAt: v.optional(v.number()),
     decidedAt: v.optional(v.number()),
     updatedAt: v.number(),
-  }).index("by_deal", ["dealId", "version"]),
+  }).index("by_deal", ["dealId"]),
 
   /** Marketplace listings watched for their review gap against category leaders. */
   watchlists: defineTable({

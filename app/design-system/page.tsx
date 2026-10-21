@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import ContrastTable from "./contrast-table";
 import KitDemo from "./kit-demo";
@@ -174,7 +175,7 @@ const NAV = [
   ["kit", "Kit"],
 ] as const;
 
-export default function DesignSystemPage() {
+function DesignSystemPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 sm:px-8">
       <header className="shadow-divider flex flex-col gap-4 py-8">
@@ -404,3 +405,12 @@ export default function DesignSystemPage() {
     </main>
   );
 }
+
+function NotInProduction(): never {
+  notFound();
+}
+
+/** A local reference for the kit; production builds serve a 404 and leave it out of the bundle. */
+export default process.env.NODE_ENV === "development"
+  ? DesignSystemPage
+  : NotInProduction;

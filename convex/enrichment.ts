@@ -1,17 +1,17 @@
 import { v } from "convex/values";
-import {
-  action,
-  internalMutation,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import { action, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { checkGstin, gstinError, panRoot } from "../lib/domain/gstin";
 import { normalizePhone } from "../lib/domain/normalize";
 import type { FactStatus } from "../lib/domain/enums";
 import { fail, invalid, notFound } from "./lib/errors";
-import { getViewer, memberMutation, memberQuery } from "./lib/functions";
+import {
+  getViewer,
+  internalMutation,
+  memberMutation,
+  memberQuery,
+} from "./lib/functions";
 import { accountName, personSearchText } from "./lib/records";
 import { logChanges, logSystem } from "./lib/timeline";
 import { vFactStatus } from "./lib/validators";
@@ -34,9 +34,8 @@ import {
   type DinResult,
   type GstResult,
 } from "./lib/enrichment";
+import { rateLimiter } from "./lib/rateLimiter";
 
-const RATE_LIMIT = 20;
-const RATE_WINDOW_MS = 60_000;
 const STALE_RUN_MS = 2 * 60_000;
 
 const vTarget = v.object({
@@ -201,26 +200,17 @@ export const startRun = internalMutation({
       notFound("Person");
     }
 
-    const now = Date.now();
-    const key = `enrichment:${viewer._id}`;
-    const limit = await ctx.db
-      .query("rateLimits")
-      .withIndex("by_key", (q) => q.eq("key", key))
-      .unique();
-    if (!limit) {
-      await ctx.db.insert("rateLimits", { key, windowStart: now, count: 1 });
-    } else if (now - limit.windowStart >= RATE_WINDOW_MS) {
-      await ctx.db.patch(limit._id, { windowStart: now, count: 1 });
-    } else if (limit.count >= RATE_LIMIT) {
-      const wait = Math.ceil((limit.windowStart + RATE_WINDOW_MS - now) / 1000);
+    const { ok, retryAfter } = await rateLimiter.limit(ctx, "enrichment", {
+      key: viewer._id,
+    });
+    if (!ok) {
       fail(
         "rate_limited",
-        `You've run ${RATE_LIMIT} lookups in a minute. Try again in ${wait} s.`,
+        `You've run too many lookups in a minute. Try again in ${Math.ceil(retryAfter / 1000)} s.`,
       );
-    } else {
-      await ctx.db.patch(limit._id, { count: limit.count + 1 });
     }
 
+    const now = Date.now();
     const family = sourceFamily(provider);
     for (const run of await runsFor(ctx, target)) {
       if (run.status !== "running" || sourceFamily(run.provider) !== family) {

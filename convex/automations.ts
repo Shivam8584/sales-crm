@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import {
   internalAction,
-  internalMutation,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
@@ -71,6 +70,7 @@ import {
 import { fail, invalid, notFound } from "./lib/errors";
 import {
   adminMutation,
+  internalMutation,
   managerMutation,
   memberMutation,
   memberQuery,

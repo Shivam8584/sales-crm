@@ -2,12 +2,13 @@
 
 The sales CRM for the Hypedrive team, built for selling to D2C brands and marketplace sellers in India. It covers inbound leads with a speed-to-lead SLA, accounts and people with GSTIN verification, deals, tasks, a per-record timeline, platform sync and activation, reports and team management. Everything is live: every screen updates in real time across the team.
 
-Only `/demo` (the embeddable demo-request form) is public. Everything else is behind sign-in.
+Only `/demo` (the embeddable demo-request form) and `/api/health` are public. Everything else is behind sign-in.
 
 ## Stack
 
 - Next.js 16 App Router (Turbopack), React 19, Tailwind CSS 4
-- Self-hosted [Convex](https://github.com/get-convex/convex-backend/tree/main/self-hosted) for data, live queries, HTTP webhooks and scheduled jobs, with Convex Auth (email and password)
+- Self-hosted [Convex](https://github.com/get-convex/convex-backend/tree/main/self-hosted) for data, live queries, HTTP webhooks and scheduled jobs, with Convex Auth: Hypedrive SSO (Logto, OIDC) for staff, email and password as a fallback.
+- Convex components: `@convex-dev/rate-limiter` (demo form, lookups, product checks, automation send caps, inbound dedupe) and `@convex-dev/migrations` (data migrations)
 - Radix primitives, cmdk, dnd-kit, motion; zustand for UI state only
 
 ## Architecture
@@ -62,7 +63,9 @@ To fill an empty workspace with demo data (accounts at every stage, brands on th
 npm run seed:demo
 ```
 
-`npm run seed:reset` wipes the app data (not members, invites or settings) and seeds again; it refuses unless `SITE_URL` is localhost.
+`npm run seed:reset` wipes the app data (not members, invites or settings) and seeds again; it refuses unless `SITE_URL` is localhost. Demo contacts use reserved addresses (`name@brand.example`) and unallocated `+91 00000…` numbers, so automations never reach a real person; account domains stay real for logos.
+
+Data migrations live in `convex/migrations.ts` (`migrations.define`). Deploy, then run one with `npx convex run migrations:run '{"fn": "migrations:<name>"}'` (add `"dryRun": true` to preview); it runs in batches and resumes where it stopped. `npx convex run --component migrations lib:getStatus --watch` shows progress.
 
 | Script                  | What it does                            |
 | ----------------------- | --------------------------------------- |
@@ -80,30 +83,35 @@ npm run seed:demo
 
 Convex deployment variables are set with `npx convex env set NAME value`. All are optional unless marked.
 
-| Variable                      | Where  | What it does                                                                                 |
-| ----------------------------- | ------ | -------------------------------------------------------------------------------------------- |
-| `SITE_URL`                    | Convex | Required. The CRM's public URL; used by auth, CORS and links in alerts                       |
-| `JWT_PRIVATE_KEY`, `JWKS`     | Convex | Required. Convex Auth signing keys                                                           |
-| `ALLOWED_EMAIL_DOMAINS`       | Convex | Comma-separated domains (e.g. `hypedrive.in`) that can join without an invite                |
-| `LEAD_FORM_ORIGINS`           | Convex | Comma-separated origins allowed to post the demo form; defaults to `SITE_URL` and localhost  |
-| `LEAD_SLA_SECONDS`            | Convex | Speed-to-lead target before a lead is flagged as breached; default 300                       |
-| `CALCOM_WEBHOOK_SECRET`       | Convex | Secret for the Cal.com booking webhook at `/webhooks/calcom` (`X-Cal-Signature-256`)         |
-| `ALERT_SLACK_WEBHOOK_URL`     | Convex | Slack incoming webhook for new leads, demo bookings and SLA breaches                         |
-| `ALERT_WEBHOOK_URL`           | Convex | Generic JSON webhook for the same events                                                     |
-| `KYC_BASE_URL`                | Convex | KYC provider base URL for GSTIN and DIN lookups                                              |
-| `KYC_API_TOKEN`               | Convex | KYC provider API token                                                                       |
-| `KYC_HMAC_SECRET`             | Convex | Verifies signed KYC responses                                                                |
-| `ENRICHMENT_SANDBOX`          | Convex | Set to `1` to return test data instead of calling the KYC provider (local only)              |
-| `PLATFORM_WEBHOOK_SECRET`     | Convex | Secret for platform events at `/webhooks/platform` (`X-Hypedrive-Signature`)                 |
-| `EMAIL_PROVIDER`              | Convex | `smtp`, `resend` or `novu` for the notification digest and automation emails; unset = outbox |
-| `SMTP_HOST`, `SMTP_PORT`      | Convex | SMTP server for `EMAIL_PROVIDER=smtp`; port 587 (STARTTLS) by default, 465 for TLS           |
-| `SMTP_USER`, `SMTP_PASSWORD`  | Convex | SMTP credentials                                                                             |
-| `EMAIL_FROM`                  | Convex | Sender, e.g. `Hypedrive <no-reply@hypedrive.app>`                                            |
-| `WHATSAPP_PHONE_NUMBER_ID`    | Convex | Meta WhatsApp Cloud API number; with `WHATSAPP_ACCESS_TOKEN` automations send for real       |
-| `NEXT_PUBLIC_CONVEX_URL`      | Next   | Required. Convex API URL (`CONVEX_CLOUD_ORIGIN`)                                             |
-| `NEXT_PUBLIC_CONVEX_SITE_URL` | Next   | Convex HTTP-actions URL (`CONVEX_SITE_ORIGIN`); the demo form posts leads here               |
-| `NEXT_PUBLIC_CALCOM_LINK`     | Next   | Cal.com booking link shown after the demo form                                               |
-| `NEXT_PUBLIC_SITE_URL`        | Next   | Canonical URL for robots and the sitemap                                                     |
+| Variable                             | Where  | What it does                                                                                               |
+| ------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------- |
+| `SITE_URL`                           | Convex | Required. The CRM's public URL; used by auth, CORS and links in alerts                                     |
+| `AUTH_LOGTO_ID`, `AUTH_LOGTO_SECRET` | Convex | Logto (Hypedrive SSO) app for staff sign-in; unset hides the SSO button                                    |
+| `AUTH_LOGTO_ISSUER`                  | Convex | Logto OIDC issuer, `https://auth.hypedrive.app/oidc`                                                       |
+| `AUTH_PASSWORD_ENABLED`              | Convex | `0` turns off email and password sign-in and sign-up (on by default)                                       |
+| `DEMO_DEPLOYMENT`                    | Convex | `1` lets `seed:reset` run on this non-local deployment when `confirmSiteUrl` matches                       |
+| `JWT_PRIVATE_KEY`, `JWKS`            | Convex | Required. Convex Auth signing keys                                                                         |
+| `ALLOWED_EMAIL_DOMAINS`              | Convex | Comma-separated domains (e.g. `hypedrive.in`) that can join without an invite                              |
+| `LEAD_FORM_ORIGINS`                  | Convex | Comma-separated origins allowed to post the demo form; defaults to `SITE_URL` and localhost                |
+| `LEAD_SLA_SECONDS`                   | Convex | Speed-to-lead target before a lead is flagged as breached; default 300                                     |
+| `CALCOM_WEBHOOK_SECRET`              | Convex | Secret for the Cal.com booking webhook at `/webhooks/calcom` (`X-Cal-Signature-256`)                       |
+| `ALERT_SLACK_WEBHOOK_URL`            | Convex | Slack incoming webhook for new leads, demo bookings and SLA breaches                                       |
+| `ALERT_WEBHOOK_URL`                  | Convex | Generic JSON webhook for the same events                                                                   |
+| `KYC_BASE_URL`                       | Convex | KYC provider base URL for GSTIN and DIN lookups                                                            |
+| `KYC_API_TOKEN`                      | Convex | KYC provider API token                                                                                     |
+| `KYC_HMAC_SECRET`                    | Convex | Verifies signed KYC responses                                                                              |
+| `ENRICHMENT_SANDBOX`                 | Convex | Set to `1` to return test data instead of calling the KYC provider (local only)                            |
+| `PLATFORM_WEBHOOK_SECRET`            | Convex | Secret for platform events at `/webhooks/platform` (`X-Hypedrive-Signature`)                               |
+| `EMAIL_PROVIDER`                     | Convex | `smtp`, `resend` or `novu` for the notification digest and automation emails; unset = outbox               |
+| `SMTP_HOST`, `SMTP_PORT`             | Convex | SMTP server for `EMAIL_PROVIDER=smtp`; port 587 (STARTTLS) by default, 465 for TLS                         |
+| `SMTP_USER`, `SMTP_PASSWORD`         | Convex | SMTP credentials                                                                                           |
+| `EMAIL_FROM`                         | Convex | Sender, e.g. `Hypedrive <no-reply@hypedrive.app>`                                                          |
+| `WHATSAPP_PHONE_NUMBER_ID`           | Convex | Meta WhatsApp Cloud API number; with `WHATSAPP_ACCESS_TOKEN` automations send for real                     |
+| `NEXT_PUBLIC_CONVEX_URL`             | Next   | Required. Convex API URL (`CONVEX_CLOUD_ORIGIN`)                                                           |
+| `NEXT_PUBLIC_CONVEX_SITE_URL`        | Next   | Convex HTTP-actions URL (`CONVEX_SITE_ORIGIN`); the demo form posts leads here                             |
+| `NEXT_PUBLIC_CALCOM_LINK`            | Next   | Cal.com booking link shown after the demo form                                                             |
+| `NEXT_PUBLIC_SITE_URL`               | Next   | Canonical URL for robots and the sitemap                                                                   |
+| `SENTRY_DSN`                         | Next   | GlitchTip/Sentry DSN for server errors; `NEXT_PUBLIC_SENTRY_DSN` (build time) for the browser. Unset = off |
 
 ## Production
 
@@ -123,11 +131,25 @@ On the server:
 ```
 /opt/hypedrive-crm/
   compose.yml        # copy of deploy/compose.prod.yml
-  .env               # INSTANCE_SECRET, POSTGRES_PASSWORD, CONVEX_ADMIN_KEY, dashboard login, hostnames
+  .env               # INSTANCE_SECRET, POSTGRES_PASSWORD, CONVEX_ADMIN_KEY, dashboard login, hostnames,
+                     # R2_* (off-server backups), optional SENTRY_DSN
   whatsapp.env       # Meta WhatsApp Cloud API credentials, not yet set on Convex
   src/               # the app source the web image is built from
   backup.sh          # copy of deploy/backup.sh
   backups/           # nightly dumps, 14 days
+```
+
+### Sign-in
+
+Staff sign in with Hypedrive SSO: the Logto app "Hypedrive Sales CRM" (Traditional web, redirect URIs `https://convex-sales-site.hypedrive.app/api/auth/callback/logto` and `http://127.0.0.1:3211/api/auth/callback/logto`, scopes `openid profile email`). Like the other internal tools it only admits users with a platform staff role (Logto app-level access control). Workspace membership is unchanged: the first member is admin, then invites or `ALLOWED_EMAIL_DOMAINS`. An SSO sign-in with a verified email joins the existing account with that email, so someone who started on a password keeps their membership. Set `AUTH_PASSWORD_ENABLED=0` once everyone signs in with SSO.
+
+### Monitoring
+
+`GET https://sales.hypedrive.app/api/health` returns 200 `{"ok":true,"convex":true}` when the app is up and Convex answers a query, else 503; point UptimeRobot at it. The web container's own Docker healthcheck stays on `/demo` so a Convex outage doesn't make Traefik drop the app. With `SENTRY_DSN` in `.env` (a GlitchTip project on errors.hypedrive.app), Next server errors and screens that crash in the browser are reported; rebuild the web image after setting it. For Convex function errors, add the same DSN as a log stream:
+
+```bash
+curl -X POST "$CONVEX_SELF_HOSTED_URL/api/v1/create_log_stream" -H "Authorization: Convex $CONVEX_SELF_HOSTED_ADMIN_KEY" \
+  -H "Content-Type: application/json" -d '{"logStreamType":"sentry","dsn":"<dsn>"}'
 ```
 
 Convex stores its data in a dedicated `postgres:17` container (database `hypedrive_crm`, volume `hypedrive-crm_pgdata`) that is only on the project's private network.
@@ -144,11 +166,26 @@ rsync -a --delete --files-from=/tmp/files.txt --rsync-path="sudo rsync" ./ amper
 ssh ampere2 'cd /opt/hypedrive-crm && sudo docker compose build web && sudo docker compose up -d web'
 ```
 
+The production workspace is a demo for now (`DEMO_DEPLOYMENT=1`), so it can be reset to fresh demo data:
+
+```bash
+npx convex run seed:reset '{"confirmSiteUrl": "https://sales.hypedrive.app"}'
+```
+
 The web image bakes in `NEXT_PUBLIC_*` at build time from the hostnames in `.env`. To set Convex variables, use `npx convex env set` with the same two variables exported.
 
 ### Backups
 
-`/etc/cron.d/hypedrive-crm-backup` runs `backup.sh` every night at 21:00 UTC (02:30 IST). It writes `backups/hypedrive_crm-YYYY-MM-DD.dump` (`pg_dump -Fc`) and `backups/convex-data-YYYY-MM-DD.tgz` (the backend's local storage) and deletes files older than 14 days. Output goes to `/var/log/hypedrive-crm-backup.log`. Backups stay on the same disk, so copy them off the server if you need protection against losing the server.
+`/etc/cron.d/hypedrive-crm-backup` runs `backup.sh` every night at 21:00 UTC (02:30 IST). It writes `backups/hypedrive_crm-YYYY-MM-DD.dump` (`pg_dump -Fc`) and `backups/convex-data-YYYY-MM-DD.tgz` (the backend's local storage), deletes local files older than 14 days, then copies the day's files with `rclone` to the Cloudflare R2 bucket `hypedrive-crm-backups` under `YYYY-MM-DD/` and deletes objects older than 30 days there. The R2 credentials are `R2_ENDPOINT`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in `.env`; without `R2_BUCKET` the upload is skipped. Output goes to `/var/log/hypedrive-crm-backup.log`.
+
+To fetch a dump from R2 (on any machine with rclone):
+
+```bash
+export RCLONE_CONFIG_R2_TYPE=s3 RCLONE_CONFIG_R2_PROVIDER=Cloudflare RCLONE_CONFIG_R2_ENDPOINT=… \
+  RCLONE_CONFIG_R2_ACCESS_KEY_ID=… RCLONE_CONFIG_R2_SECRET_ACCESS_KEY=…
+rclone lsf r2:hypedrive-crm-backups
+rclone copy r2:hypedrive-crm-backups/YYYY-MM-DD ./backups
+```
 
 To restore, stop the backend so nothing writes, replace the database and start again:
 

@@ -69,7 +69,6 @@ const ALL = "all";
 const VIEWS = [
   { id: "prospects", label: "Prospects" },
   { id: "products", label: "Products" },
-  { id: "watchlists", label: "Watchlists" },
 ] as const;
 type View = (typeof VIEWS)[number]["id"];
 
@@ -174,7 +173,9 @@ const PROSPECT_COLUMNS: Column<Prospect>[] = [
     width: "minmax(8.5rem,0.9fr)",
     minViewport: 760,
     sortValue: (row) => row.account?.name ?? (row.lead ? "~lead" : null),
-    cell: (row) => <MatchCell account={row.account} lead={row.lead} />,
+    cell: (row) => (
+      <MatchCell account={row.account} lead={row.lead} inbound={row.inbound} />
+    ),
   },
 ];
 
@@ -317,96 +318,6 @@ function CheckCell({ row }: { row: ProductRow }) {
   );
 }
 
-const WATCHLIST_COLUMNS: Column<WatchlistRow>[] = [
-  {
-    id: "name",
-    header: "Watchlist",
-    width: "minmax(12rem,2fr)",
-    sortValue: (row) => row.name,
-    cell: (row) => (
-      <span className="truncate" title={row.name}>
-        {row.name}
-      </span>
-    ),
-  },
-  {
-    id: "products",
-    header: "Products",
-    width: "6rem",
-    align: "end",
-    defaultDir: "desc",
-    sortValue: (row) => row.products,
-    cell: (row) => <span className="tabular-nums">{row.products}</span>,
-  },
-  {
-    id: "brands",
-    header: "Brands",
-    width: "5.5rem",
-    align: "end",
-    defaultDir: "desc",
-    minViewport: 700,
-    sortValue: (row) => row.brands,
-    cell: (row) => <span className="tabular-nums">{row.brands}</span>,
-  },
-  {
-    id: "benchmark",
-    header: "Benchmark",
-    width: "7.5rem",
-    align: "end",
-    minViewport: 800,
-    sortValue: (row) => row.benchmark,
-    cell: (row) =>
-      row.benchmark === null ? (
-        <Tooltip content="The median of each category's leaders">
-          <span className="text-fg-tertiary">Auto</span>
-        </Tooltip>
-      ) : (
-        <span className="tabular-nums">
-          {row.benchmark.toLocaleString("en-IN")}
-        </span>
-      ),
-  },
-  {
-    id: "health",
-    header: "Checks",
-    width: "minmax(8rem,1fr)",
-    minViewport: 900,
-    sortValue: (row) => row.failed,
-    cell: (row) =>
-      row.checking ? (
-        <span className="text-fg-secondary">{row.checking} checking…</span>
-      ) : row.failed ? (
-        <span className="text-danger">{row.failed} failed</span>
-      ) : (
-        <span className="text-fg-tertiary">All read</span>
-      ),
-  },
-  {
-    id: "refreshed",
-    header: "Refreshed",
-    width: "minmax(7rem,0.8fr)",
-    minViewport: 1000,
-    defaultDir: "desc",
-    sortValue: (row) => row.refreshedAt,
-    cell: (row) =>
-      row.refreshedAt ? (
-        <Tooltip content={dateTime(row.refreshedAt)}>
-          <span className="truncate">{relativeTime(row.refreshedAt)}</span>
-        </Tooltip>
-      ) : (
-        dash
-      ),
-  },
-  {
-    id: "creator",
-    header: "Created by",
-    width: "minmax(7rem,0.8fr)",
-    minViewport: 1200,
-    sortValue: (row) => row.createdBy,
-    cell: (row) => <span className="truncate">{row.createdBy ?? "—"}</span>,
-  },
-];
-
 const PROSPECT_SORTS = [
   { value: "score", label: "Score" },
   { value: "gap", label: "Biggest gap" },
@@ -417,12 +328,10 @@ const PROSPECT_SORTS = [
 const DEFAULT_SORT: Record<View, SortState> = {
   prospects: { id: "score", dir: "desc" },
   products: { id: "score", dir: "desc" },
-  watchlists: { id: "name", dir: "asc" },
 };
 const COLUMNS_BY_VIEW = {
   prospects: PROSPECT_COLUMNS,
   products: PRODUCT_COLUMNS,
-  watchlists: WATCHLIST_COLUMNS,
 } as const;
 
 const CRM_OPTIONS = [
@@ -470,7 +379,7 @@ function exportProducts(rows: ProductRow[]) {
   const day = new Date().toISOString().slice(0, 10);
   downloadCsv(`watched-products-${day}.csv`, [
     [
-      "Watchlist",
+      "Source",
       "Marketplace",
       "Product id",
       "Title",
@@ -514,7 +423,7 @@ export default function ProspectingPage() {
 
   const [viewParam, setView] = useUrlState("view", "prospects");
   const [search, setSearch] = useUrlState("q", "");
-  const [watchlist, setWatchlist] = useUrlState("watchlist", ALL);
+  const [watchlist, setWatchlist] = useUrlState("source", ALL);
   const [marketplace, setMarketplace] = useUrlState("marketplace", ALL);
   const [crm, setCrm] = useUrlState("crm", ALL);
   const [status, setStatus] = useUrlState("status", ALL);
@@ -590,18 +499,9 @@ export default function ProspectingPage() {
     });
   }, [overview, search, watchlist, marketplace, status]);
 
-  const lists = useMemo(() => {
-    if (!watchlists) return undefined;
-    const query = words(search);
-    return watchlists.filter((row) =>
-      query.every((word) => row.name.toLowerCase().includes(word)),
-    );
-  }, [watchlists, search]);
-
   const counts: Record<View, number | undefined> = {
     prospects: overview?.brands.length,
     products: overview?.products.length,
-    watchlists: watchlists?.length,
   };
 
   const marketplaceOptions = useMemo(
@@ -614,9 +514,10 @@ export default function ProspectingPage() {
     [overview],
   );
   const watchlistOptions = [
-    { value: ALL, label: "All" },
+    { value: ALL, label: "Any" },
     ...(watchlists ?? []).map((row) => ({ value: row._id, label: row.name })),
   ];
+  const source = watchlists?.find((row) => row._id === watchlist);
 
   const filtered =
     search.trim() !== "" ||
@@ -666,7 +567,7 @@ export default function ProspectingPage() {
     }
   }
 
-  async function deleteWatchlist(row: WatchlistRow) {
+  async function deleteSource(row: WatchlistRow) {
     try {
       await setDeleted({ id: row._id, deleted: true });
       if (watchlist === row._id) setWatchlist(ALL);
@@ -765,16 +666,51 @@ export default function ProspectingPage() {
             label="Prospecting actions"
             actions={[
               {
-                label: "New watchlist",
+                label: "New source",
                 icon: PlusIcon,
                 onSelect: () => setEditing({ name: "", benchmark: null }),
               },
-              {
-                label: "Refresh all now",
-                icon: ClockIcon,
-                disabled: !overview?.products.length,
-                onSelect: () => void runRefresh({}, "now"),
-              },
+              ...(source && !source.inbound
+                ? [
+                    {
+                      label: `Edit ${source.name}`,
+                      icon: EditIcon,
+                      onSelect: () =>
+                        setEditing({
+                          _id: source._id,
+                          name: source.name,
+                          benchmark: source.benchmark,
+                        }),
+                    },
+                  ]
+                : []),
+              source
+                ? {
+                    label: `Re-check ${source.name}`,
+                    icon: ClockIcon,
+                    disabled: source.products === 0,
+                    onSelect: () =>
+                      void runRefresh(
+                        { watchlistId: source._id },
+                        `in ${source.name}`,
+                      ),
+                  }
+                : {
+                    label: "Re-check everything now",
+                    icon: ClockIcon,
+                    disabled: !overview?.products.length,
+                    onSelect: () => void runRefresh({}, "now"),
+                  },
+              ...(source && !source.inbound
+                ? [
+                    {
+                      label: `Delete ${source.name}`,
+                      icon: TrashIcon,
+                      tone: "danger" as const,
+                      onSelect: () => void deleteSource(source),
+                    },
+                  ]
+                : []),
             ]}
           />
         }
@@ -791,14 +727,10 @@ export default function ProspectingPage() {
       <PageToolbar
         actions={
           <>
-            {view !== "watchlists" && (
-              <ExportButton
-                disabled={
-                  !(view === "prospects" ? prospects : products)?.length
-                }
-                onClick={exportView}
-              />
-            )}
+            <ExportButton
+              disabled={!(view === "prospects" ? prospects : products)?.length}
+              onClick={exportView}
+            />
             <CreateButton onClick={() => setAdding(true)}>
               Watch products
             </CreateButton>
@@ -809,11 +741,7 @@ export default function ProspectingPage() {
           value={search}
           onChange={setSearch}
           placeholder={
-            view === "prospects"
-              ? "Search brands"
-              : view === "products"
-                ? "Search products"
-                : "Search watchlists"
+            view === "prospects" ? "Search brands" : "Search products"
           }
         />
         {view === "prospects" && (
@@ -832,22 +760,18 @@ export default function ProspectingPage() {
             }
           />
         )}
-        {view !== "watchlists" && (
-          <>
-            <FilterMenu
-              label="Watchlist"
-              value={watchlist}
-              options={watchlistOptions}
-              onChange={setWatchlist}
-            />
-            <FilterMenu
-              label="Marketplace"
-              value={marketplace}
-              options={marketplaceOptions}
-              onChange={setMarketplace}
-            />
-          </>
-        )}
+        <FilterMenu
+          label="Source"
+          value={watchlist}
+          options={watchlistOptions}
+          onChange={setWatchlist}
+        />
+        <FilterMenu
+          label="Marketplace"
+          value={marketplace}
+          options={marketplaceOptions}
+          onChange={setMarketplace}
+        />
         {view === "prospects" && (
           <FilterMenu
             label="CRM"
@@ -1027,65 +951,6 @@ export default function ProspectingPage() {
             </SelectionBar>
           </>
         )}
-        {view === "watchlists" && (
-          <DataTable
-            label="Watchlists"
-            columns={WATCHLIST_COLUMNS}
-            rows={lists}
-            getId={(row) => row._id}
-            getHref={(row) => `/prospecting?watchlist=${row._id}`}
-            getLabel={(row) => row.name}
-            sort={sort}
-            onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
-            rowMenu={(row) => [
-              {
-                label: "Edit",
-                icon: EditIcon,
-                onSelect: () =>
-                  setEditing({
-                    _id: row._id,
-                    name: row.name,
-                    benchmark: row.benchmark,
-                  }),
-              },
-              {
-                label: "Refresh now",
-                icon: ClockIcon,
-                disabled: row.products === 0,
-                onSelect: () =>
-                  void runRefresh({ watchlistId: row._id }, `in ${row.name}`),
-              },
-              {
-                label: "Delete",
-                icon: TrashIcon,
-                tone: "danger",
-                onSelect: () => void deleteWatchlist(row),
-              },
-            ]}
-            renderCard={(row) => <WatchlistCard row={row} />}
-            empty={
-              watchlists?.length ? (
-                noMatch
-              ) : (
-                <EmptyState
-                  icon={EyeIcon}
-                  title="No watchlists yet"
-                  description="A watchlist groups products that compete, so the leaders set a fair benchmark for the rest."
-                  action={
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => setEditing({ name: "", benchmark: null })}
-                    >
-                      <PlusIcon aria-hidden className="size-3" />
-                      New watchlist
-                    </Button>
-                  }
-                />
-              )
-            }
-          />
-        )}
       </div>
       <AddProductsDialog
         open={adding}
@@ -1122,7 +987,11 @@ function ProspectCard({ row }: { row: Prospect }) {
           dash
         )}
         <span className="text-fg-secondary flex min-w-0 justify-end">
-          <MatchCell account={row.account} lead={row.lead} />
+          <MatchCell
+            account={row.account}
+            lead={row.lead}
+            inbound={row.inbound}
+          />
         </span>
       </span>
     </span>
@@ -1153,25 +1022,6 @@ function ProductCard({ row }: { row: ProductRow }) {
         <span className="text-fg-secondary flex min-w-0 justify-end">
           <CheckCell row={row} />
         </span>
-      </span>
-    </span>
-  );
-}
-
-function WatchlistCard({ row }: { row: WatchlistRow }) {
-  return (
-    <span className="flex items-center gap-3">
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="lead-style truncate font-medium">{row.name}</span>
-        <span className="caption-style text-fg-tertiary truncate">
-          {row.products} products · {row.brands} brands
-          {row.failed ? ` · ${row.failed} failed` : ""}
-        </span>
-      </span>
-      <span className="caption-style text-fg-secondary shrink-0 tabular-nums">
-        {row.benchmark === null
-          ? "Auto"
-          : row.benchmark.toLocaleString("en-IN")}
       </span>
     </span>
   );

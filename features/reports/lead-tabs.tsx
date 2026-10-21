@@ -6,6 +6,8 @@ import type { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import type { FunnelStepKey, Period } from "@/convex/lib/reports";
+import { STAGE_PROBABILITY_BPS } from "@/lib/domain/forecast";
+import { DEAL_STAGE_LABEL } from "@/lib/domain/labels";
 import ActivityIcon from "@/public/assets/icons/activity.svg";
 import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
@@ -31,6 +33,13 @@ type LeadTabProps = {
   clearFilters: () => void;
   setPeriod: (period: Period) => void;
 };
+
+const STAGE_ODDS = Object.entries(STAGE_PROBABILITY_BPS)
+  .map(
+    ([stage, bps]) =>
+      `${DEAL_STAGE_LABEL[stage as keyof typeof STAGE_PROBABILITY_BPS]} ${bps / 100}%`,
+  )
+  .join(", ");
 
 const STEP_LIST: Record<FunnelStepKey, string> = {
   lead: "/leads",
@@ -100,7 +109,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
           id="pipeline"
           title="Pipeline"
           description="Open deals now, and deals closed in the period."
-          footnote="Totals are kept per currency and never converted. Deals don't carry a source, so the source filter doesn't apply here."
+          footnote={`Weighted counts each open deal at its stage's chance of closing: ${STAGE_ODDS}. Totals are kept per currency and never converted. Deals don't carry a source, so the source filter doesn't apply here.`}
           aside={
             <ExportButton
               label="pipeline"
@@ -179,9 +188,15 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
   );
 }
 
-/** Where leads created in the period stopped. */
+/** Where leads created in the period stopped, and which sources they came from. */
 export function FunnelTab(props: LeadTabProps) {
-  const { report, loading, period, ownerParam } = props;
+  const { report, loading, period, ownerParam, filtered } = props;
+  const params = useSearchParams();
+  const sourceHref = (key: string) => {
+    const query = new URLSearchParams(params.toString());
+    query.set("source", key);
+    return `/reports?${query}`;
+  };
   const hrefFor = (key: FunnelStepKey) => {
     const href = STEP_LIST[key];
     if (ownerParam === "all") return href;
@@ -238,30 +253,11 @@ export function FunnelTab(props: LeadTabProps) {
           </p>
         )}
       </ReportSection>
-    </Reloading>
-  );
-}
 
-/** Conversion by acquisition source. */
-export function SourcesTab({
-  report,
-  loading,
-  period,
-  filtered,
-}: LeadTabProps) {
-  const params = useSearchParams();
-  const hrefFor = (key: string) => {
-    const query = new URLSearchParams(params.toString());
-    query.set("source", key);
-    query.set("tab", "funnel");
-    return `/reports?${query}`;
-  };
-  return (
-    <Reloading loading={loading && Boolean(report)}>
       <ReportSection
         id="sources"
         title="By source"
-        description="Which channels bring brands that go on to activate. Select a source to see its funnel."
+        description="Which channels bring brands that go on to activate. Select a source to filter the funnel."
         aside={
           <ExportButton
             label="sources"
@@ -285,7 +281,7 @@ export function SourcesTab({
             <SourceTable
               filtered={filtered}
               rows={report.bySource}
-              hrefFor={hrefFor}
+              hrefFor={sourceHref}
             />
           ) : (
             <ChartSkeleton rows={4} />

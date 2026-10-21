@@ -16,7 +16,6 @@ import {
 import EmptyState from "@/components/_ui/empty-state";
 import { Input } from "@/components/_ui/input";
 import { Label } from "@/components/_ui/label";
-import SegmentedControl from "@/components/_ui/segmented-control";
 import {
   Select,
   SelectContent,
@@ -68,17 +67,15 @@ const localDay = (offsetDays = 0) => istToday(offsetDays);
 
 const BAND_TONE = {
   below_floor: "text-danger",
-  low: "text-warning",
   target: undefined,
   default: "text-success",
 } as const;
 
-/** The deal desk: priced line items, the team's numbers, the brand's view and versions. */
+/** The deal desk: the deal's one proposal, its priced lines, the team's numbers and the brand's view. */
 export default function ProposalTab({ deal }: { deal: { _id: Id<"deals"> } }) {
-  const rows = useQuery(api.proposals.forDeal, { dealId: deal._id });
+  const proposal = useQuery(api.proposals.forDeal, { dealId: deal._id });
   const live = useQuery(api.proposals.policy, {});
   const actions = useProposalActions(deal._id);
-  const [selectedId, setSelectedId] = useState<Id<"proposals"> | null>(null);
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
@@ -88,15 +85,12 @@ export default function ProposalTab({ deal }: { deal: { _id: Id<"deals"> } }) {
     setStarting(true);
     const id = await actions.create(line, localDay(DEFAULT_VALIDITY_DAYS));
     setStarting(false);
-    if (id) {
-      setSelectedId(id);
-      setFocusKey(line.key);
-    }
+    if (id) setFocusKey(line.key);
   }
 
-  if (rows === undefined) return <ProposalSkeleton />;
+  if (proposal === undefined) return <ProposalSkeleton />;
 
-  if (rows.length === 0) {
+  if (proposal === null) {
     return (
       <EmptyState
         icon={WalletIcon}
@@ -119,35 +113,32 @@ export default function ProposalTab({ deal }: { deal: { _id: Id<"deals"> } }) {
     );
   }
 
-  const proposal = rows.find((row) => row._id === selectedId) ?? rows[0];
-
   return (
     <ProposalEditor
       key={proposal._id}
       proposal={proposal}
-      rows={rows}
       actions={actions}
       focusKey={focusKey}
       onFocusKey={setFocusKey}
-      onSelect={setSelectedId}
+      onRestart={() =>
+        void actions.create(undefined, localDay(DEFAULT_VALIDITY_DAYS))
+      }
     />
   );
 }
 
 function ProposalEditor({
   proposal,
-  rows,
   actions,
   focusKey,
   onFocusKey,
-  onSelect,
+  onRestart,
 }: {
   proposal: ProposalRow;
-  rows: ProposalRow[];
   actions: ProposalActions;
   focusKey: string | null;
   onFocusKey: (key: string | null) => void;
-  onSelect: (id: Id<"proposals">) => void;
+  onRestart: () => void;
 }) {
   const viewer = useViewer();
   const canApprove = viewer.role !== "rep";
@@ -160,8 +151,6 @@ function ProposalEditor({
   const needsApproval = pricing.needsApproval && !approved;
   const issueCount = pricing.issues.length;
   const blocked = needsApproval || issueCount > 0;
-  const latest = rows[0];
-  const canStartVersion = latest.status !== "draft";
   const band = marginBand(total.margin, total.brandCharge, policy);
   const [settingsKey, setSettingsKey] = useState<string | null>(null);
   const settingsLine =
@@ -173,11 +162,6 @@ function ProposalEditor({
       : blankLine(newKey(), policy, proposal.lines.at(-1));
     onFocusKey(after ? null : line.key);
     void actions.addLine(proposal._id, line, index);
-  }
-
-  async function newVersion() {
-    const id = await actions.create();
-    if (id) onSelect(id);
   }
 
   const preview = (
@@ -196,25 +180,10 @@ function ProposalEditor({
     <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          {rows.length > 1 ? (
-            <div className="scrollbar-none -m-1 max-w-full overflow-x-auto p-1">
-              <SegmentedControl
-                label="Proposal version"
-                value={proposal._id}
-                onChange={(value) => onSelect(value as Id<"proposals">)}
-                segments={rows.map((row) => ({
-                  value: row._id,
-                  label: `v${row.version}`,
-                  count: PROPOSAL_STATUS_LABEL[row.status],
-                }))}
-              />
-            </div>
-          ) : (
-            <span className="flex items-center gap-2">
-              <span className="text-sm font-medium">v{proposal.version}</span>
-              <ProposalStatusTag status={proposal.status} />
-            </span>
-          )}
+          <span className="flex items-center gap-2">
+            <span className="text-sm font-medium">Proposal</span>
+            <ProposalStatusTag status={proposal.status} />
+          </span>
           <span className="caption-style text-fg-tertiary">
             {proposal.status === "draft"
               ? `Started by ${proposal.createdBy?.name ?? "a teammate"} ${relativeTime(proposal._creationTime)}`
@@ -232,7 +201,7 @@ function ProposalEditor({
                   ? `Fix ${issueCount === 1 ? "the issue" : `the ${issueCount} issues`} under Internal first`
                   : needsApproval
                     ? "Needs a manager's approval first"
-                    : "Share the preview with the brand, then mark it sent. Sent versions are frozen."
+                    : "Share the preview with the brand, then mark it sent. You can still edit it afterwards."
               }
             >
               <span tabIndex={blocked ? 0 : undefined} className="rounded-full">
@@ -248,59 +217,65 @@ function ProposalEditor({
             </Tooltip>
           )}
           {proposal.status === "sent" && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => void actions.accept(proposal)}
-            >
-              Mark accepted
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void actions.edit(proposal)}
+              >
+                Edit proposal
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void actions.accept(proposal)}
+              >
+                Mark accepted
+              </Button>
+            </>
+          )}
+          {proposal.status === "rejected" && (
+            <Button variant="primary" size="sm" onClick={onRestart}>
+              New proposal
             </Button>
           )}
-          {!draft && proposal.status !== "sent" && canStartVersion && (
-            <Button variant="secondary" size="sm" onClick={newVersion}>
-              New version
-            </Button>
-          )}
-          {(draft || proposal.status === "sent") && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Proposal actions"
-                  className="data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Proposal actions"
+                className="data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground"
+              >
+                <DotsIcon aria-hidden className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              {proposal.status === "sent" && (
+                <DropdownMenuItem
+                  onSelect={() => void actions.reject(proposal)}
                 >
-                  <DotsIcon aria-hidden className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-44">
-                {proposal.status === "sent" && (
-                  <>
-                    <DropdownMenuItem
-                      onSelect={() => void actions.reject(proposal)}
-                    >
-                      Mark rejected
-                    </DropdownMenuItem>
-                    {canStartVersion && (
-                      <DropdownMenuItem onSelect={() => void newVersion()}>
-                        New version
-                      </DropdownMenuItem>
-                    )}
-                  </>
-                )}
-                {draft && (
-                  <DropdownMenuItem
-                    className="text-danger"
-                    onSelect={() =>
-                      void actions.remove(proposal, (id) => onSelect(id))
-                    }
-                  >
-                    Delete draft
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                  Mark rejected
+                </DropdownMenuItem>
+              )}
+              {(proposal.status === "accepted" ||
+                proposal.status === "rejected") && (
+                <DropdownMenuItem
+                  onSelect={() => void actions.reopen(proposal)}
+                >
+                  Reopen as sent
+                </DropdownMenuItem>
+              )}
+              {draft && (
+                <DropdownMenuItem
+                  className="text-danger"
+                  onSelect={() => void actions.remove(proposal)}
+                >
+                  Delete draft
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -330,7 +305,7 @@ function ProposalEditor({
       >
         {proposal.lines.length === 0 ? (
           <EmptyState
-            title="No lines on this version"
+            title="No lines yet"
             description="Each line is one campaign: a product, how creators earn, the pricing and how many slots."
             action={
               draft && (

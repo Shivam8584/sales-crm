@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import type { OptimisticLocalStore } from "convex/browser";
 import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
@@ -54,36 +55,43 @@ type MoveArgs = {
   lostReason?: string;
 };
 
+/** Applies an optimistic change to the board and to every record page's deal list. */
+function patchDeals(
+  store: OptimisticLocalStore,
+  update: (deals: DealRow[]) => DealRow[],
+) {
+  for (const { args, value } of store.getAllQueries(api.deals.list)) {
+    if (value) store.setQuery(api.deals.list, args, update(value));
+  }
+  for (const { args, value } of store.getAllQueries(api.deals.board)) {
+    if (value) store.setQuery(api.deals.board, args, update(value));
+  }
+}
+
 export function useMoveDeal() {
   const move = useMutation(api.deals.move).withOptimisticUpdate(
-    (store, { id, stage, position, lostReason }) => {
-      for (const { args, value } of store.getAllQueries(api.deals.list)) {
-        if (!value) continue;
-        store.setQuery(
-          api.deals.list,
-          args,
-          value
-            .map((deal) =>
-              deal._id === id
-                ? {
-                    ...deal,
-                    stage,
-                    position,
-                    lostReason:
-                      stage === "lost" ? (lostReason ?? deal.lostReason) : null,
-                    closedAt:
-                      stage === "won" || stage === "lost"
-                        ? deal.stage === stage
-                          ? deal.closedAt
-                          : Date.now()
-                        : null,
-                  }
-                : deal,
-            )
-            .sort((a, b) => a.position - b.position),
-        );
-      }
-    },
+    (store, { id, stage, position, lostReason }) =>
+      patchDeals(store, (deals) =>
+        deals
+          .map((deal) =>
+            deal._id === id
+              ? {
+                  ...deal,
+                  stage,
+                  position,
+                  lostReason:
+                    stage === "lost" ? (lostReason ?? deal.lostReason) : null,
+                  closedAt:
+                    stage === "won" || stage === "lost"
+                      ? deal.stage === stage
+                        ? deal.closedAt
+                        : Date.now()
+                      : null,
+                }
+              : deal,
+          )
+          .sort((a, b) => a.position - b.position),
+      ),
   );
 
   return useCallback(
@@ -119,16 +127,8 @@ export function useMoveDeal() {
 
 export function useRemoveDeal() {
   const remove = useMutation(api.deals.remove).withOptimisticUpdate(
-    (store, { id }) => {
-      for (const { args, value } of store.getAllQueries(api.deals.list)) {
-        if (!value) continue;
-        store.setQuery(
-          api.deals.list,
-          args,
-          value.filter((deal) => deal._id !== id),
-        );
-      }
-    },
+    (store, { id }) =>
+      patchDeals(store, (deals) => deals.filter((deal) => deal._id !== id)),
   );
   const restore = useMutation(api.deals.restore);
 

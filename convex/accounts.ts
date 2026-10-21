@@ -1,20 +1,35 @@
-import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
+import { v, type ObjectType } from "convex/values";
+import {
+  paginationOptsValidator,
+  type FilterBuilder,
+  type NamedTableInfo,
+} from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { LIFECYCLE_STAGES } from "../lib/domain/enums";
 import { STAGE_LABEL } from "../lib/domain/labels";
 import { checkGstin, panRoot } from "../lib/domain/gstin";
 import { cleanTags, normalizeDomain } from "../lib/domain/normalize";
-import { sumMoney, type Money } from "../lib/domain/money";
+import { accountHealth } from "../lib/domain/health";
+import { sumMoney } from "../lib/domain/money";
 import { accountStall, isOnPlatform } from "./lib/activation";
 import { sourceFamily } from "./lib/enrichment";
 import { emitAutomationTrigger } from "./lib/automations/engine";
+import { countAccounts } from "./lib/counts";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import { findAccount } from "./lib/identity";
+import {
+  activityBounds,
+  mapPage,
+  searchText,
+  vActivity,
+  vDir,
+  vSearch,
+} from "./lib/lists";
 import { assertCanReassign } from "./lib/ownership";
 import { assertCan } from "./lib/permissions";
+import { healthInput, latestSnapshot, stateEvents } from "./lib/platform";
 import {
   accountName,
   checkImportSize,
@@ -27,7 +42,7 @@ import {
   type ImportResult,
 } from "./lib/records";
 import { diff, logChanges, logSystem } from "./lib/timeline";
-import { vLifecycleStage } from "./lib/validators";
+import { literals, vLifecycleStage } from "./lib/validators";
 import { bucketCounts, latestInteraction, windowStart } from "./timeline";
 
 const editable = {
@@ -154,7 +169,7 @@ async function countPeople(ctx: QueryCtx, accountId: Id<"accounts">) {
   return people.filter((person) => !person.archivedAt).length;
 }
 
-/** Every account, recently updated first; the list page sorts and filters it in the browser. */
+/** Every account, recently updated first. Reads the whole table: lists use `page`. */
 export const list = memberQuery({
   args: { includeArchived: v.optional(v.boolean()) },
   handler: async (ctx, { includeArchived }) => {
@@ -173,114 +188,318 @@ export const list = memberQuery({
   },
 });
 
-/** Cursor-paginated accounts, recently updated first, optionally one owner's or one stage's. */
-export const page = memberQuery({
-  args: {
-    paginationOpts: paginationOptsValidator,
-    ownerId: v.optional(v.id("members")),
-    stage: v.optional(vLifecycleStage),
-    includeArchived: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    const { ownerId, stage } = args;
-    const base = ownerId
-      ? ctx.db
-          .query("accounts")
-          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
-      : stage
-        ? ctx.db
-            .query("accounts")
-            .withIndex("by_stage", (q) => q.eq("stage", stage))
-        : ctx.db.query("accounts").withIndex("by_updated");
-    const result = await base
-      .filter((q) =>
-        q.and(
-          args.includeArchived ? true : q.eq(q.field("archivedAt"), undefined),
-          ownerId && stage ? q.eq(q.field("stage"), stage) : true,
-        ),
-      )
-      .order("desc")
-      .paginate(args.paginationOpts);
-    const members = await memberIndex(ctx);
-    return {
-      ...result,
-      page: await Promise.all(
-        result.page.map(async (account) =>
-          toRow(account, members, await countPeople(ctx, account._id)),
-        ),
-      ),
-    };
-  },
-});
-
 const TREND_DAYS = 14;
 
+async function accountStats(
+  ctx: QueryCtx,
+  account: Doc<"accounts">,
+  now: number,
+) {
+  const [deals, recent, lastInteraction, stall] = await Promise.all([
+    ctx.db
+      .query("deals")
+      .withIndex("by_account", (q) => q.eq("accountId", account._id))
+      .collect(),
+    ctx.db
+      .query("timeline")
+      .withIndex("by_account", (q) =>
+        q
+          .eq("accountId", account._id)
+          .gte("occurredAt", windowStart(TREND_DAYS, now)),
+      )
+      .collect(),
+    latestInteraction(ctx, { accountId: account._id }),
+    accountStall(ctx, account, now),
+  ]);
+  const open = deals
+    .filter((deal) => deal.stage !== "won" && deal.stage !== "lost")
+    .map((deal) => deal.amount);
+  const gstin = account.gstin;
+  let gstVerified = false;
+  if (gstin && !account.archivedAt) {
+    const facts = await ctx.db
+      .query("facts")
+      .withIndex("by_account", (q) => q.eq("accountId", account._id))
+      .collect();
+    gstVerified = facts.some(
+      (fact) =>
+        fact.field === "gstin" &&
+        fact.value === gstin &&
+        (fact.status === "applied" || fact.status === "accepted") &&
+        sourceFamily(fact.source) === "gst",
+    );
+  }
+  return {
+    openDeals: open.length,
+    pipeline: sumMoney(open),
+    gstVerified,
+    onPlatform: isOnPlatform(account),
+    stuck: Boolean(stall),
+    trend: bucketCounts(
+      recent.map((entry) => entry.occurredAt),
+      TREND_DAYS,
+      now,
+    ),
+    lastInteraction,
+  };
+}
+
 /**
- * Per-account rollups for the list: open deals and pipeline per currency,
- * GSTIN verification, timeline entries per day for the last two weeks, the
- * latest logged interaction and whether onboarding is stuck. Kept apart from
- * `list` so deal, fact and timeline churn doesn't re-run the main list query.
+ * Per-account rollups for every account: open deals, pipeline, GSTIN
+ * verification, activity trend, last interaction and whether onboarding is
+ * stuck. Reads the whole table: lists get the same fields from `page`.
  */
 export const listStats = memberQuery({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    const since = windowStart(TREND_DAYS, now);
-    const [accounts, deals] = await Promise.all([
-      ctx.db.query("accounts").collect(),
-      ctx.db.query("deals").collect(),
-    ]);
-    const open = new Map<Id<"accounts">, Money[]>();
-    for (const deal of deals) {
-      if (deal.stage === "won" || deal.stage === "lost") continue;
-      open.set(deal.accountId, [
-        ...(open.get(deal.accountId) ?? []),
-        deal.amount,
-      ]);
-    }
+    const accounts = await ctx.db.query("accounts").collect();
     return await Promise.all(
-      accounts.map(async (account) => {
-        const amounts = open.get(account._id) ?? [];
-        const recent = await ctx.db
-          .query("timeline")
-          .withIndex("by_account", (q) =>
-            q.eq("accountId", account._id).gte("occurredAt", since),
-          )
-          .collect();
-        const lastInteraction = await latestInteraction(ctx, {
-          accountId: account._id,
-        });
-        const gstin = account.gstin;
-        let gstVerified = false;
-        if (gstin && !account.archivedAt) {
-          const facts = await ctx.db
-            .query("facts")
-            .withIndex("by_account", (q) => q.eq("accountId", account._id))
-            .collect();
-          gstVerified = facts.some(
-            (fact) =>
-              fact.field === "gstin" &&
-              fact.value === gstin &&
-              (fact.status === "applied" || fact.status === "accepted") &&
-              sourceFamily(fact.source) === "gst",
-          );
-        }
-        return {
-          accountId: account._id,
-          openDeals: amounts.length,
-          pipeline: sumMoney(amounts),
-          gstVerified,
-          onPlatform: isOnPlatform(account),
-          stuck: Boolean(await accountStall(ctx, account, now)),
-          trend: bucketCounts(
-            recent.map((entry) => entry.occurredAt),
-            TREND_DAYS,
-            now,
-          ),
-          lastInteraction,
-        };
-      }),
+      accounts.map(async (account) => ({
+        accountId: account._id,
+        ...(await accountStats(ctx, account, now)),
+      })),
     );
+  },
+});
+
+const ORG_EVENT_LIMIT = 5000;
+
+async function healthOf(ctx: QueryCtx, account: Doc<"accounts">, now: number) {
+  const orgId = account.platformOrgId;
+  if (!orgId || account.archivedAt) return null;
+  const events = await ctx.db
+    .query("platformEvents")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .take(ORG_EVENT_LIMIT);
+  const health = accountHealth(
+    healthInput(
+      account,
+      stateEvents(events),
+      await latestSnapshot(ctx, account._id),
+      now,
+    ),
+  );
+  return {
+    score: health.score,
+    band: health.band,
+    signals: health.signals.map((signal) => signal.id),
+  };
+}
+
+type AccountsTable = NamedTableInfo<DataModel, "accounts">;
+
+/** Filters and sort of the list; `page`, `counts` and CSV export share them. */
+export const vListArgs = {
+  archived: v.optional(v.boolean()),
+  ownerId: v.optional(v.id("members")),
+  stage: v.optional(vLifecycleStage),
+  activity: v.optional(vActivity),
+  search: vSearch,
+  sort: v.optional(literals(["activity", "name"])),
+  dir: v.optional(vDir),
+};
+type ListArgs = ObjectType<typeof vListArgs>;
+
+/**
+ * The query behind the accounts list. Each owner or stage filter has an index
+ * per sort; the other filters narrow the scan. Search ranks by relevance, and
+ * archived accounts list the most recently archived first.
+ */
+function listQuery(ctx: QueryCtx, args: ListArgs, now: number) {
+  const accounts = ctx.db.query("accounts");
+  const { ownerId, stage, archived = false } = args;
+  const window = activityBounds(args.activity, now);
+  const text = searchText(args.search);
+  const narrow = (
+    q: FilterBuilder<AccountsTable>,
+    indexed: "owner" | "stage" | "both" | "none",
+    ranged: boolean,
+  ) =>
+    q.and(
+      indexed === "owner" && stage ? q.eq(q.field("stage"), stage) : true,
+      !ranged && window?.since !== undefined
+        ? q.gte(q.field("lastActivityAt"), window.since)
+        : true,
+      !ranged && window?.before !== undefined
+        ? q.or(
+            q.eq(q.field("lastActivityAt"), undefined),
+            q.lt(q.field("lastActivityAt"), window.before),
+          )
+        : true,
+    );
+
+  if (text) {
+    return accounts
+      .withSearchIndex("search_name", (q) => {
+        let search = q.search("name", text);
+        if (!archived) search = search.eq("archivedAt", undefined);
+        if (ownerId) search = search.eq("ownerId", ownerId);
+        if (stage) search = search.eq("stage", stage);
+        return search;
+      })
+      .filter((q) =>
+        q.and(
+          archived ? q.neq(q.field("archivedAt"), undefined) : true,
+          narrow(q, "both", false),
+        ),
+      );
+  }
+
+  if (archived) {
+    const query = ownerId
+      ? accounts.withIndex("list_owner_activity", (q) =>
+          q.eq("ownerId", ownerId).gt("archivedAt", 0),
+        )
+      : stage
+        ? accounts.withIndex("list_stage_activity", (q) =>
+            q.eq("stage", stage).gt("archivedAt", 0),
+          )
+        : accounts.withIndex("list_activity", (q) => q.gt("archivedAt", 0));
+    return query
+      .filter((q) => narrow(q, ownerId ? "owner" : "stage", false))
+      .order("desc");
+  }
+
+  if (args.sort === "name") {
+    const query = ownerId
+      ? accounts.withIndex("list_owner_name", (q) =>
+          q.eq("ownerId", ownerId).eq("archivedAt", undefined),
+        )
+      : stage
+        ? accounts.withIndex("list_stage_name", (q) =>
+            q.eq("stage", stage).eq("archivedAt", undefined),
+          )
+        : accounts.withIndex("list_name", (q) => q.eq("archivedAt", undefined));
+    return query
+      .filter((q) => narrow(q, ownerId ? "owner" : "stage", false))
+      .order(args.dir ?? "asc");
+  }
+
+  const query = ownerId
+    ? accounts.withIndex("list_owner_activity", (q) => {
+        const base = q.eq("ownerId", ownerId).eq("archivedAt", undefined);
+        return window?.since !== undefined
+          ? base.gte("lastActivityAt", window.since)
+          : window?.before !== undefined
+            ? base.lt("lastActivityAt", window.before)
+            : base;
+      })
+    : stage
+      ? accounts.withIndex("list_stage_activity", (q) => {
+          const base = q.eq("stage", stage).eq("archivedAt", undefined);
+          return window?.since !== undefined
+            ? base.gte("lastActivityAt", window.since)
+            : window?.before !== undefined
+              ? base.lt("lastActivityAt", window.before)
+              : base;
+        })
+      : accounts.withIndex("list_activity", (q) => {
+          const base = q.eq("archivedAt", undefined);
+          return window?.since !== undefined
+            ? base.gte("lastActivityAt", window.since)
+            : window?.before !== undefined
+              ? base.lt("lastActivityAt", window.before)
+              : base;
+        });
+  return query
+    .filter((q) => narrow(q, ownerId ? "owner" : "stage", true))
+    .order(args.dir ?? "desc");
+}
+
+/** One page of the accounts list, with each row's rollups and health. */
+export const page = memberQuery({
+  args: { paginationOpts: paginationOptsValidator, ...vListArgs },
+  handler: async (ctx, { paginationOpts, ...args }) => {
+    const now = Date.now();
+    const [result, members] = await Promise.all([
+      listQuery(ctx, args, now).paginate(paginationOpts),
+      memberIndex(ctx),
+    ]);
+    return await mapPage(result, (accounts) =>
+      Promise.all(
+        accounts.map(async (account) => {
+          const [peopleCount, stats, health] = await Promise.all([
+            countPeople(ctx, account._id),
+            accountStats(ctx, account, now),
+            healthOf(ctx, account, now),
+          ]);
+          return { ...toRow(account, members, peopleCount), ...stats, health };
+        }),
+      ),
+    );
+  },
+});
+
+/**
+ * Exact counts for the list's views, and for the current filters when they
+ * can be counted without a scan (`inView` is null with a search or an
+ * activity filter).
+ */
+export const counts = memberQuery({
+  args: vListArgs,
+  handler: async (ctx, args) => {
+    const [all, mine, archived, inView] = await Promise.all([
+      countAccounts(ctx, { archived: false }),
+      countAccounts(ctx, { archived: false, ownerId: ctx.viewer._id }),
+      countAccounts(ctx, { archived: true }),
+      searchText(args.search) || args.activity
+        ? null
+        : countAccounts(ctx, {
+            archived: Boolean(args.archived),
+            ownerId: args.ownerId,
+            stage: args.stage,
+          }),
+    ]);
+    return { views: { all, mine, archived }, inView };
+  },
+});
+
+/** Active accounts matching `search` by name, or the recently active ones when it's empty. */
+export async function findAccounts(
+  ctx: QueryCtx,
+  search: string,
+  limit: number,
+) {
+  const text = searchText(search);
+  const accounts = text
+    ? await ctx.db
+        .query("accounts")
+        .withSearchIndex("search_name", (q) =>
+          q.search("name", text).eq("archivedAt", undefined),
+        )
+        .take(limit)
+    : await ctx.db
+        .query("accounts")
+        .withIndex("list_activity", (q) => q.eq("archivedAt", undefined))
+        .order("desc")
+        .take(limit);
+  return accounts.map((account) => ({
+    _id: account._id,
+    name: account.name,
+    domain: account.domain ?? null,
+    logoUrl: account.logoUrl ?? null,
+  }));
+}
+
+/** For account pickers; `selected` is always included so the picker can name it. */
+export const search = memberQuery({
+  args: { search: v.string(), selected: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const found = await findAccounts(ctx, args.search, 20);
+    const id = args.selected && ctx.db.normalizeId("accounts", args.selected);
+    if (!id || found.some((account) => account._id === id)) return found;
+    const account = await ctx.db.get(id);
+    if (!account) return found;
+    return [
+      {
+        _id: account._id,
+        name: account.name,
+        domain: account.domain ?? null,
+        logoUrl: account.logoUrl ?? null,
+      },
+      ...found,
+    ];
   },
 });
 

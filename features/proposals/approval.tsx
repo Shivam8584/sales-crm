@@ -153,7 +153,6 @@ export default function ApprovalPanel({
       </div>
       <DecideDialog
         mode={deciding}
-        proposal={proposal}
         pricing={pricing}
         policy={policy}
         onClose={() => setDeciding(null)}
@@ -167,14 +166,12 @@ export default function ApprovalPanel({
 
 function DecideDialog({
   mode,
-  proposal,
   pricing,
   policy,
   onClose,
   onSubmit,
 }: {
   mode: "approve" | "decline" | null;
-  proposal: ProposalRow;
   pricing: ProposalPricing;
   policy: CompanyPolicy;
   onClose: () => void;
@@ -215,8 +212,8 @@ function DecideDialog({
               {approve ? "Approve pricing" : "Decline pricing"}
             </DialogTitle>
             <DialogDescription className="pr-8">
-              Proposal v{proposal.version} at {rateLabel(pricing.marginRate)}{" "}
-              blended margin. {approvalReasons(pricing, policy).join(". ")}.
+              The proposal is at {rateLabel(pricing.marginRate)} blended margin.{" "}
+              {approvalReasons(pricing, policy).join(". ")}.
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 py-5">
@@ -240,7 +237,7 @@ function DecideDialog({
                 placeholder={
                   approve
                     ? "Strategic logo; volume ramps to 1,000 slots in month 2"
-                    : `Bring the bonus down or the price up to clear ${bpsLabel(policy.approvalBps)}`
+                    : `Bring the bonus down or the price up to clear the ${bpsLabel(policy.marginFloorBps)} floor`
                 }
                 aria-invalid={error ? true : undefined}
                 aria-describedby={

@@ -15,9 +15,9 @@ import { formatMoney } from "@/lib/domain/money";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
 
-export type ProposalRow = FunctionReturnType<
-  typeof api.proposals.forDeal
->[number];
+export type ProposalRow = NonNullable<
+  FunctionReturnType<typeof api.proposals.forDeal>
+>;
 
 export type { LinePatch };
 
@@ -31,14 +31,12 @@ export function useProposalActions(dealId: Id<"deals">) {
     id: Id<"proposals">,
     edit: (lines: ProposalLine[], row: ProposalRow) => ProposalLine[],
   ) {
-    const rows = store.getQuery(api.proposals.forDeal, { dealId });
-    if (!rows) return;
+    const row = store.getQuery(api.proposals.forDeal, { dealId });
+    if (!row || row._id !== id) return;
     store.setQuery(
       api.proposals.forDeal,
       { dealId },
-      rows.map((row) =>
-        row._id === id ? { ...row, lines: edit(row.lines, row) } : row,
-      ),
+      { ...row, lines: edit(row.lines, row) },
     );
   }
 
@@ -71,6 +69,7 @@ export function useProposalActions(dealId: Id<"deals">) {
   const requestApproval = useMutation(api.proposals.requestApproval);
   const decide = useMutation(api.proposals.decide);
   const send = useMutation(api.proposals.send);
+  const editMutation = useMutation(api.proposals.edit);
   const accept = useMutation(api.proposals.accept);
   const reject = useMutation(api.proposals.reject);
   const reopen = useMutation(api.proposals.reopen);
@@ -160,7 +159,26 @@ export function useProposalActions(dealId: Id<"deals">) {
     send: async (proposal: ProposalRow) => {
       try {
         await send({ id: proposal._id });
-        toast(`Marked v${proposal.version} as sent`);
+        toast("Marked as sent");
+      } catch (error) {
+        fail(error);
+      }
+    },
+    edit: async (proposal: ProposalRow) => {
+      try {
+        await editMutation({ id: proposal._id });
+        toast(
+          "Proposal reopened for editing",
+          () => void send({ id: proposal._id }).catch((error) => fail(error)),
+        );
+      } catch (error) {
+        fail(error);
+      }
+    },
+    reopen: async (proposal: ProposalRow) => {
+      try {
+        await reopen({ id: proposal._id });
+        toast("Proposal reopened as sent");
       } catch (error) {
         fail(error);
       }
@@ -169,7 +187,7 @@ export function useProposalActions(dealId: Id<"deals">) {
       try {
         const result = await accept({ id: proposal._id });
         toast(
-          `Accepted v${proposal.version}; deal amount is now ${formatMoney(result.amount)}`,
+          `Accepted; deal amount is now ${formatMoney(result.amount)}`,
           () =>
             void reopen({ id: proposal._id, restore: result }).catch((error) =>
               fail(error),
@@ -183,25 +201,19 @@ export function useProposalActions(dealId: Id<"deals">) {
       try {
         await reject({ id: proposal._id });
         toast(
-          `Marked v${proposal.version} as rejected`,
+          "Marked as rejected",
           () => void reopen({ id: proposal._id }).catch((error) => fail(error)),
         );
       } catch (error) {
         fail(error);
       }
     },
-    remove: async (
-      proposal: ProposalRow,
-      onRestored: (id: Id<"proposals">) => void,
-    ) => {
+    remove: async (proposal: ProposalRow) => {
       try {
         const copy = await remove({ id: proposal._id });
         toast(
-          `Deleted draft v${proposal.version}`,
-          () =>
-            void restore({ proposal: copy })
-              .then(onRestored)
-              .catch((error) => fail(error)),
+          "Deleted the draft proposal",
+          () => void restore({ proposal: copy }).catch((error) => fail(error)),
         );
       } catch (error) {
         fail(error);

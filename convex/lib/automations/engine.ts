@@ -48,6 +48,7 @@ import {
   type Trigger,
   type TriggerEvent,
 } from "../../../lib/domain/automations";
+import { dailySendCap, rateLimiter } from "../rateLimiter";
 import { killSwitchOn, readSafety } from "./safety";
 import { nextOwner } from "../assignment";
 import { upsertAutomatedTask } from "../tasks";
@@ -902,12 +903,11 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
       message: `Quiet hours: holding the ${CHANNEL_NOUN[channel]} until ${formatIst(at)}`,
     };
   }
-  const capKey = `automation-send:${automation._id}:${istDay(now)}`;
-  const counter = await ctx.db
-    .query("rateLimits")
-    .withIndex("by_key", (q) => q.eq("key", capKey))
-    .unique();
-  if ((counter?.count ?? 0) >= published.settings.dailyCap) {
+  const cap = {
+    key: automation._id,
+    config: dailySendCap(published.settings.dailyCap),
+  };
+  if (!(await rateLimiter.check(ctx, "automationSend", cap)).ok) {
     const next = nextDayWindow(now);
     return {
       type: "defer",
@@ -1019,13 +1019,7 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
     attempts: 0,
     timelineId,
   });
-  if (counter) await ctx.db.patch(counter._id, { count: counter.count + 1 });
-  else
-    await ctx.db.insert("rateLimits", {
-      key: capKey,
-      windowStart: now,
-      count: 1,
-    });
+  await rateLimiter.limit(ctx, "automationSend", cap);
   if (!outbox) {
     await ctx.scheduler.runAfter(0, internal.automations.deliver, {
       messageId,

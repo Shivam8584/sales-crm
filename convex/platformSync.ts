@@ -2,7 +2,6 @@ import { v } from "convex/values";
 import {
   action,
   internalAction,
-  internalMutation,
   internalQuery,
   type ActionCtx,
 } from "./_generated/server";
@@ -10,7 +9,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { personName } from "../lib/domain/labels";
 import { fail, notFound } from "./lib/errors";
-import { getViewer, memberQuery } from "./lib/functions";
+import { getViewer, internalMutation, memberQuery } from "./lib/functions";
 import { stateEvents, upsertMember } from "./lib/platform";
 import {
   PLATFORM_ENV_HINT,

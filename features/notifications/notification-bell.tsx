@@ -65,12 +65,12 @@ export default function NotificationBell() {
   const router = useRouter();
   const items = useQuery(api.notifications.listMine);
   const unread = useQuery(api.notifications.unreadCount) ?? 0;
-  const { markRead, markAllRead } = useNotificationActions();
+  const { setRead, markAllRead } = useNotificationActions();
   const [open, setOpen] = useState(false);
   useArrivalToasts(items);
 
   function select(item: Item) {
-    if (!item.read) void markRead({ id: item._id });
+    if (!item.read) void setRead({ ids: [item._id], read: true });
     setOpen(false);
     if (item.href) router.push(item.href);
   }

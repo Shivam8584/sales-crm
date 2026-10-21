@@ -2,10 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useViewer } from "@/hooks/use-viewer";
 import { isEditableTarget } from "@/lib/keyboard";
 import { toggleSidebarCollapsed } from "@/lib/sidebar-collapse";
 import { useUiStore } from "@/stores/ui-store";
-import { ALL_NAV_ITEMS } from "./navigation";
+import { navItems } from "./navigation";
 
 const SEQUENCE_TIMEOUT = 900;
 const DESKTOP_WIDTH = 1024;
@@ -18,8 +19,10 @@ export default function GlobalShortcuts({
   onCreate: () => void;
 }) {
   const router = useRouter();
+  const { role } = useViewer();
 
   useEffect(() => {
+    const items = navItems(role);
     let pendingG = 0;
 
     function onKeyDown(event: KeyboardEvent) {
@@ -36,9 +39,7 @@ export default function GlobalShortcuts({
       const key = event.key.toLowerCase();
       if (pendingG && Date.now() - pendingG < SEQUENCE_TIMEOUT) {
         pendingG = 0;
-        const item = ALL_NAV_ITEMS.find(
-          (nav) => nav.shortcut.toLowerCase() === key,
-        );
+        const item = items.find((nav) => nav.shortcut.toLowerCase() === key);
         if (item) {
           event.preventDefault();
           router.push(item.href);
@@ -61,7 +62,7 @@ export default function GlobalShortcuts({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [router, onCreate]);
+  }, [router, onCreate, role]);
 
   return null;
 }

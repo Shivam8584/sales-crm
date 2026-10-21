@@ -4,7 +4,9 @@ import { dayStart, istToday } from "@/lib/domain/day";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
+import type { FunctionArgs } from "convex/server";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
@@ -31,12 +33,14 @@ import {
 } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
 import Segmented from "@/features/tasks/segmented";
+import { useCsvExport } from "@/hooks/use-csv-export";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { usePagedList, viewCount } from "@/hooks/use-paged-list";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { DEAL_STAGES, type DealStage } from "@/lib/domain/enums";
 import { DEAL_STAGE_LABEL } from "@/lib/domain/labels";
-import { downloadCsv } from "@/lib/csv";
-import { DEFAULT_CURRENCY, formatMoney, toMajor } from "@/lib/domain/money";
+import { DEFAULT_CURRENCY, formatMoney } from "@/lib/domain/money";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -63,6 +67,9 @@ const CLOSE_MONTH = "month";
 const CLOSE_OVERDUE = "overdue";
 const CLOSE_NONE = "none";
 const DEFAULT_SORT: SortState = { id: "close", dir: "asc" };
+const CLOSED_WINDOW_MS = 30 * 24 * 60 * 60_000;
+
+type ListArgs = Omit<FunctionArgs<typeof api.deals.page>, "paginationOpts">;
 
 type BoardDeal = DealRow & { id: string };
 type PendingLost = { deal: DealRow; position: number };
@@ -111,12 +118,19 @@ function closeMatches(deal: DealRow, filter: string, today: string) {
   return isOpenStage(deal.stage) && deal.closeDate < today;
 }
 
-/** The pipeline: deals by stage on a board or in a list, with per-currency totals. */
+/**
+ * The pipeline: deals by stage on a board or in a list, with per-currency
+ * totals. The board holds every open deal and those closed this month or in
+ * the last 30 days; the list pages through all deals on the server.
+ */
 export default function DealsPage() {
   const router = useRouter();
   const viewer = useViewer();
   const members = useMembers();
-  const deals = useQuery(api.deals.list, {});
+  const [closedSince] = useState(() =>
+    Math.min(startOfMonth(), Date.now() - CLOSED_WINDOW_MS),
+  );
+  const deals = useQuery(api.deals.board, { closedSince });
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
   const moveDeal = useMoveDeal();
@@ -133,6 +147,8 @@ export default function DealsPage() {
     `${DEFAULT_SORT.id}:${DEFAULT_SORT.dir}`,
   );
   const [pending, setPending] = useState<PendingLost | null>(null);
+  const { exportCsv, pending: exporting } = useCsvExport(["deal", "deals"]);
+  const query = useDebouncedValue(search);
   const [drafting, setDrafting] = useState<DealStage | null>(null);
   const [draftAccount, setDraftAccount] = useState<string | null>(null);
   const today = todayDay();
@@ -280,33 +296,26 @@ export default function DealsPage() {
     setClose(ALL);
   }
 
-  function exportView() {
-    downloadCsv(`deals-${today}.csv`, [
-      [
-        "Title",
-        "Account",
-        "Stage",
-        "Amount",
-        "Currency",
-        "Owner",
-        "Close date",
-        "Lost reason",
-      ],
-      ...visible.map((deal) => [
-        deal.title,
-        deal.account?.name ?? "",
-        DEAL_STAGE_LABEL[deal.stage],
-        toMajor(deal.amount),
-        deal.amount.currency,
-        deal.owner?.name ?? "",
-        deal.closeDate ?? "",
-        deal.lostReason ?? "",
-      ]),
-    ]);
-    toast(
-      `Exported ${visible.length} ${visible.length === 1 ? "deal" : "deals"}`,
-    );
-  }
+  const [sortId, sortDir] = sortParam.split(":");
+  const listArgs: ListArgs = {
+    ownerId: (owner === ALL
+      ? undefined
+      : owner === MINE
+        ? viewer._id
+        : owner) as Id<"members"> | undefined,
+    accountId: account === ALL ? undefined : (account as Id<"accounts">),
+    close:
+      close === CLOSE_MONTH || close === CLOSE_OVERDUE || close === CLOSE_NONE
+        ? close
+        : undefined,
+    today,
+    hideClosed: closed === HIDE || undefined,
+    search: query.trim() || undefined,
+    sort: (["close", "amount", "title"].includes(sortId)
+      ? sortId
+      : DEFAULT_SORT.id) as ListArgs["sort"],
+    dir: sortDir === "desc" ? "desc" : "asc",
+  };
 
   const newDeal = (
     <Button
@@ -376,7 +385,15 @@ export default function DealsPage() {
               ]}
             />
             {!listView && <HiddenColumnsToggle prefs={boardPrefs} />}
-            <ExportButton disabled={!visible.length} onClick={exportView} />
+            <ExportButton
+              disabled={!visible.length || exporting}
+              onClick={() =>
+                void exportCsv({
+                  name: "deals",
+                  args: { ...listArgs, search: search.trim() || undefined },
+                })
+              }
+            />
             <CreateButton onClick={() => setCreate({ type: "deal" })}>
               New deal
             </CreateButton>
@@ -437,13 +454,27 @@ export default function DealsPage() {
       <div className="border-border relative flex min-h-0 flex-1 flex-col border-t">
         {listView ? (
           <DealsList
-            rows={deals ? visible : undefined}
+            args={listArgs}
             today={today}
-            sortParam={sortParam}
             onSortChange={setSortParam}
             onPeek={peek}
             empty={
-              emptyState ?? (
+              filtered ? (
+                <EmptyState
+                  icon={FilterIcon}
+                  title="No deals match"
+                  description="Try another search or clear the filters."
+                  action={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={clearFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  }
+                />
+              ) : closed === HIDE ? (
                 <EmptyState
                   icon={ClipboardIcon}
                   title="No open deals"
@@ -457,6 +488,13 @@ export default function DealsPage() {
                       Show won & lost
                     </Button>
                   }
+                />
+              ) : (
+                <EmptyState
+                  icon={ClipboardIcon}
+                  title="No deals yet"
+                  description="Track each opportunity from first call to a live campaign."
+                  action={newDeal}
                 />
               )
             }
@@ -507,26 +545,25 @@ function ColumnTotals({ deals }: { deals: DealRow[] }) {
 }
 
 function DealsList({
-  rows,
+  args,
   today,
-  sortParam,
   onSortChange,
   onPeek,
   empty,
 }: {
-  rows: DealRow[] | undefined;
+  args: ListArgs;
   today: string;
-  sortParam: string;
   onSortChange: (value: string) => void;
   onPeek: (id: string) => void;
   empty: ReactNode;
 }) {
+  const { rows, paging } = usePagedList(api.deals.page, args);
   const columns: Column<DealRow>[] = [
     {
       id: "title",
       header: "Deal",
       width: "minmax(14rem,2fr)",
-      sortValue: (row) => row.title,
+      sortable: true,
       cell: (row) => (
         <span className="truncate font-medium" title={row.title}>
           {row.title}
@@ -537,7 +574,6 @@ function DealsList({
       id: "account",
       header: "Account",
       width: "minmax(10rem,1.2fr)",
-      sortValue: (row) => row.account?.name ?? null,
       cell: (row) =>
         row.account ? (
           <span className="flex min-w-0 items-center gap-2">
@@ -554,7 +590,6 @@ function DealsList({
       id: "stage",
       header: "Stage",
       width: "8rem",
-      sortValue: (row) => DEAL_STAGES.indexOf(row.stage),
       cell: (row) => <DealStageTag stage={row.stage} />,
     },
     {
@@ -563,7 +598,7 @@ function DealsList({
       width: "8.5rem",
       align: "end",
       defaultDir: "desc",
-      sortValue: (row) => row.amount.amount,
+      sortable: true,
       cell: (row) => (
         <span
           className={cn(
@@ -580,7 +615,6 @@ function DealsList({
       header: "Owner",
       width: "minmax(8rem,1fr)",
       minViewport: 900,
-      sortValue: (row) => row.owner?.name ?? null,
       cell: (row) =>
         row.owner ? (
           <>
@@ -595,7 +629,7 @@ function DealsList({
       id: "close",
       header: "Close date",
       width: "7.5rem",
-      sortValue: (row) => row.closeDate,
+      sortable: true,
       cell: (row) => {
         if (!row.closeDate) return <span className="text-fg-tertiary">—</span>;
         const overdue = isOpenStage(row.stage) && row.closeDate < today;
@@ -613,12 +647,9 @@ function DealsList({
     },
   ];
 
-  const [sortId, sortDir] = sortParam.split(":");
   const sort: SortState = {
-    id: columns.some((column) => column.id === sortId)
-      ? sortId
-      : DEFAULT_SORT.id,
-    dir: sortDir === "desc" ? "desc" : "asc",
+    id: args.sort ?? DEFAULT_SORT.id,
+    dir: args.dir ?? DEFAULT_SORT.dir,
   };
 
   return (
@@ -634,6 +665,13 @@ function DealsList({
       sort={sort}
       onSortChange={(next) => onSortChange(`${next.id}:${next.dir}`)}
       onPeek={(row) => onPeek(row._id)}
+      paging={paging}
+      footer={[
+        {
+          label: "Deals in view",
+          value: viewCount(null, rows?.length, paging),
+        },
+      ]}
       rowActions={(row) => (
         <RowAction
           label="Peek"

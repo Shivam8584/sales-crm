@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -19,9 +19,10 @@ import {
   PageStatus,
   PageToolbar,
 } from "@/components/shell/page";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
-import { PRIORITIES } from "@/lib/domain/enums";
+import { PRIORITIES, type Priority } from "@/lib/domain/enums";
 import { PRIORITY_LABEL } from "@/lib/domain/labels";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
@@ -35,33 +36,14 @@ import Segmented from "./segmented";
 import TaskBulkBar from "./task-bulk-bar";
 import TasksBoard, { TasksBoardSkeleton } from "./tasks-board";
 import TasksList, { LIST_COLUMNS } from "./tasks-list";
-import { isOverdue, type TaskRow } from "./task-meta";
+import { dayFromToday, isOverdue } from "./task-meta";
 
 const ANY = "any";
 const DEFAULT_SORT: SortState = { id: "due", dir: "asc" };
 
-function matches(task: TaskRow, query: string) {
-  const text = [
-    task.title,
-    task.notes,
-    task.account?.name,
-    task.person?.name,
-    task.assignee?.name,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((word) => text.includes(word));
-}
-
 export default function TasksPage() {
   const viewer = useViewer();
   const members = useMembers();
-  const tasks = useQuery(api.tasks.list, {});
   const setCreate = useUiStore((state) => state.setCreate);
   const setEdit = useUiStore((state) => state.setEdit);
   const router = useRouter();
@@ -98,27 +80,16 @@ export default function TasksPage() {
 
   const mine = scope !== "all";
   const assigneeFilter = mine ? viewer._id : assignee === ANY ? null : assignee;
-
-  const rows = useMemo(() => {
-    if (!tasks) return undefined;
-    return tasks.filter(
-      (task) =>
-        (!assigneeFilter || task.assigneeId === assigneeFilter) &&
-        (priority === ANY || task.priority === priority) &&
-        (!overdue || isOverdue(task)) &&
-        (!search.trim() || matches(task, search)),
-    );
-  }, [tasks, assigneeFilter, priority, overdue, search]);
-
-  const overdueCount = useMemo(
-    () =>
-      tasks?.filter(
-        (task) =>
-          isOverdue(task) &&
-          (!assigneeFilter || task.assigneeId === assigneeFilter),
-      ).length ?? 0,
-    [tasks, assigneeFilter],
-  );
+  const query = useDebouncedValue(search);
+  const rows = useQuery(api.tasks.list, {
+    assigneeId: (assigneeFilter as Id<"members"> | null) ?? undefined,
+    priority: PRIORITIES.find((value) => value === priority) as
+      | Priority
+      | undefined,
+    overdueBefore: overdue ? dayFromToday() : undefined,
+    search: query.trim() || undefined,
+  });
+  const overdueCount = rows?.filter(isOverdue).length ?? 0;
 
   const filtered =
     priority !== ANY ||
@@ -157,7 +128,7 @@ export default function TasksPage() {
         </Button>
       }
     />
-  ) : mine && tasks && tasks.length > 0 ? (
+  ) : mine ? (
     <EmptyState
       icon={CheckSquareIcon}
       title="Nothing assigned to you"
@@ -178,7 +149,7 @@ export default function TasksPage() {
   );
 
   const boardOverlay =
-    rows && rows.length === 0 && (filtered || (mine && tasks?.length)) ? (
+    rows && rows.length === 0 && (filtered || mine) ? (
       <div className="z-sticky-header pointer-events-none absolute inset-0 flex items-start justify-center px-4 pt-20">
         <div className="bg-popover border-line-strong shadow-overlay pointer-events-auto w-full max-w-sm rounded-xl border">
           {empty}

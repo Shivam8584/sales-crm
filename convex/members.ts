@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import { query, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import type { Role } from "../lib/domain/enums";
 import { cleanText, normalizeEmail } from "../lib/domain/normalize";
@@ -11,6 +11,7 @@ import {
   getViewer,
   memberMutation,
   memberQuery,
+  mutation,
 } from "./lib/functions";
 import { vMemberStatus, vRole } from "./lib/validators";
 
@@ -48,6 +49,16 @@ export const join = mutation({
     const user = await ctx.db.get(userId);
     const email = user?.email ? normalizeEmail(user.email) : null;
     if (!user || !email) fail("invalid", "Your account has no email address");
+    const taken = await ctx.db
+      .query("members")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .first();
+    if (taken) {
+      fail(
+        "conflict",
+        "This email already belongs to a member. Sign in the way you first joined.",
+      );
+    }
 
     const now = Date.now();
     const anyMember = await ctx.db.query("members").first();

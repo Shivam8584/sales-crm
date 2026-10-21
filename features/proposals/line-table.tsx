@@ -84,7 +84,6 @@ const PRESENTATION_OPTIONS = PRESENTATIONS.map((value) => ({
 
 const BAND_TONE = {
   below_floor: "text-danger",
-  low: "text-warning",
   target: "text-foreground",
   default: "text-success",
 } as const;

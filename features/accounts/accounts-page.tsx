@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import type { FunctionReturnType } from "convex/server";
+import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
@@ -14,11 +14,7 @@ import SearchInput from "@/components/data-table/search-input";
 import SelectionBar from "@/components/data-table/selection-bar";
 import AddToAutomation from "@/features/automations/add-to-automation";
 import OptionPicker from "@/components/fields/option-picker";
-import {
-  compareBy,
-  type Column,
-  type SortState,
-} from "@/components/data-table/types";
+import type { Column, SortState } from "@/components/data-table/types";
 import {
   CreateButton,
   ExportButton,
@@ -29,16 +25,16 @@ import {
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
-import { HealthBadge, useHealthIndex } from "@/features/platform/health-badge";
+import { HealthBadge } from "@/features/platform/health-badge";
 import LogCallDialog from "@/features/timeline/log-call-dialog";
 import type { TimelineTarget } from "@/features/timeline/kinds";
+import { useCsvExport } from "@/hooks/use-csv-export";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { isPartial, usePagedList, viewCount } from "@/hooks/use-paged-list";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
-import { downloadCsv } from "@/lib/csv";
 import { LIFECYCLE_STAGES, type LifecycleStage } from "@/lib/domain/enums";
-import { HEALTH_BAND_LABEL } from "@/lib/domain/health";
 import { STAGE_LABEL } from "@/lib/domain/labels";
-import { formatMoney, toMajor, type Money } from "@/lib/domain/money";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -55,67 +51,32 @@ import {
   OwnerCell,
   StageAndTags,
   TrendCell,
-  activationPercent,
   activationSteps,
   dash,
-  interactionLabel,
   rankTotals,
 } from "./record-cells";
 
-type Stats = FunctionReturnType<typeof api.accounts.listStats>[number];
-type AccountHealth = NonNullable<ReturnType<typeof useHealthIndex>>[string];
-
-export type AccountRow = FunctionReturnType<typeof api.accounts.list>[number] &
-  Omit<Stats, "accountId" | "pipeline"> & {
-    pipeline: Money[];
-    activation: number | null;
-    health: AccountHealth | null;
-  };
+type PageRow = FunctionReturnType<typeof api.accounts.page>["page"][number];
+export type AccountRow = PageRow & { activation: number | null };
+type ListArgs = Omit<FunctionArgs<typeof api.accounts.page>, "paginationOpts">;
 
 const ALL = "all";
 const MINE = "mine";
-const DEFAULT_SORT: SortState = { id: "lastInteraction", dir: "desc" };
-const DAY = 24 * 60 * 60_000;
+const DEFAULT_SORT: SortState = { id: "activity", dir: "desc" };
 
 const VIEWS = [
   { id: "all", label: "All" },
   { id: "mine", label: "My accounts" },
-  { id: "stuck", label: "Stuck" },
-  { id: "activated", label: "Activated" },
-  { id: "at_risk", label: "At risk" },
-  { id: "expansion", label: "Expansion" },
   { id: "archived", label: "Archived" },
 ] as const;
 type View = (typeof VIEWS)[number]["id"];
-
-function inView(row: AccountRow, view: View, viewerId: string) {
-  if (view === "archived") return row.archivedAt !== null;
-  if (row.archivedAt !== null) return false;
-  switch (view) {
-    case "mine":
-      return row.owner?._id === viewerId;
-    case "stuck":
-      return row.stuck;
-    case "activated":
-      return row.stage === "activated" || row.stage === "expanding";
-    case "at_risk":
-      return row.health?.band === "at_risk";
-    case "expansion":
-      return (row.health?.signals.length ?? 0) > 0;
-    default:
-      return true;
-  }
-}
-
-const mainAmount = (row: AccountRow) =>
-  row.pipeline[0] ? toMajor(row.pipeline[0]) : null;
 
 const COLUMNS: Column<AccountRow>[] = [
   {
     id: "name",
     header: "Account",
     width: "minmax(10.5rem,1.3fr)",
-    sortValue: (row) => row.name,
+    sortable: true,
     cell: (row) => (
       <>
         <AccountLogo account={row} size="xs" />
@@ -129,15 +90,12 @@ const COLUMNS: Column<AccountRow>[] = [
     id: "stage",
     header: "Stage & tags",
     width: "minmax(12.5rem,1.3fr)",
-    sortValue: (row) => LIFECYCLE_STAGES.indexOf(row.stage),
     cell: (row) => <StageAndTags stage={row.stage} tags={row.tags} />,
   },
   {
     id: "health",
     header: "Health",
     width: "5.5rem",
-    defaultDir: "asc",
-    sortValue: (row) => row.health?.score ?? null,
     cell: (row) =>
       row.health ? (
         <HealthBadge score={row.health.score} band={row.health.band} />
@@ -150,7 +108,6 @@ const COLUMNS: Column<AccountRow>[] = [
     header: "Owner",
     width: "minmax(8.75rem,1fr)",
     minViewport: 900,
-    sortValue: (row) => row.owner?.name ?? null,
     cell: (row) => <OwnerCell owner={row.owner} />,
   },
   {
@@ -158,9 +115,7 @@ const COLUMNS: Column<AccountRow>[] = [
     header: "Open deals",
     width: "6.5rem",
     align: "end",
-    defaultDir: "desc",
     minViewport: 1536,
-    sortValue: (row) => row.openDeals,
     cell: (row) => (row.openDeals ? row.openDeals : dash),
   },
   {
@@ -168,19 +123,15 @@ const COLUMNS: Column<AccountRow>[] = [
     header: "Pipeline value",
     width: "7.5rem",
     align: "end",
-    defaultDir: "desc",
     minViewport: 800,
-    sortValue: mainAmount,
-    cell: (row) => <MoneyValue totals={row.pipeline} />,
+    cell: (row) => <MoneyValue totals={rankTotals(row.pipeline)} />,
   },
   {
     id: "activation",
     header: "Activation",
     width: "7.5rem",
     align: "end",
-    defaultDir: "desc",
     minViewport: 1200,
-    sortValue: (row) => row.activation,
     cell: (row) => <ActivationCell steps={row.activation} />,
   },
   {
@@ -194,22 +145,16 @@ const COLUMNS: Column<AccountRow>[] = [
     id: "lastInteraction",
     header: "Last interaction",
     width: "minmax(9rem,1fr)",
-    defaultDir: "desc",
     minViewport: 1000,
-    sortValue: (row) => row.lastInteraction?.at ?? null,
     cell: (row) => <LastInteractionCell last={row.lastInteraction} />,
   },
 ];
 
 const SORT_OPTIONS = [
-  { value: "lastInteraction", label: "Last interaction" },
-  { value: "pipeline", label: "Pipeline value" },
-  { value: "deals", label: "Open deals" },
-  { value: "activation", label: "Activation" },
-  { value: "health", label: "Health, weakest first" },
+  { value: "activity", label: "Last activity" },
   { value: "name", label: "Name" },
 ];
-const SORT_DIR: Record<string, "asc" | "desc"> = { name: "asc", health: "asc" };
+const SORT_DIR: Record<string, "asc" | "desc"> = { name: "asc" };
 
 const ACTIVITY_OPTIONS = [
   { value: ALL, label: "Any time" },
@@ -218,82 +163,20 @@ const ACTIVITY_OPTIONS = [
   { value: "90", label: "90 days" },
   { value: "stale", label: "Over 30 days ago" },
 ];
-
-function activeWithin(row: AccountRow, window: string, now: number) {
-  if (window === ALL) return true;
-  const at = row.lastActivityAt;
-  if (window === "stale") return !at || now - at > 30 * DAY;
-  return at !== null && now - at <= Number(window) * DAY;
-}
-
-function matches(row: AccountRow, query: string) {
-  const text =
-    `${row.name} ${row.domain ?? ""} ${row.gstin ?? ""} ${row.tags.join(" ")} ${row.owner?.name ?? ""}`.toLowerCase();
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((word) => text.includes(word));
-}
-
-function exportRows(rows: AccountRow[]) {
-  const day = new Date().toISOString().slice(0, 10);
-  downloadCsv(`accounts-${day}.csv`, [
-    [
-      "Name",
-      "Website",
-      "Stage",
-      "Owner",
-      "People",
-      "Open deals",
-      "Pipeline",
-      "On platform",
-      "Activation",
-      "Health",
-      "GSTIN",
-      "GST verified",
-      "Tags",
-      "Last interaction",
-      "Last activity",
-    ],
-    ...rows.map((row) => [
-      row.name,
-      row.domain ?? "",
-      STAGE_LABEL[row.stage],
-      row.owner?.name ?? "",
-      row.peopleCount,
-      row.openDeals,
-      row.pipeline
-        .filter((money) => money.amount > 0)
-        .map((money) => formatMoney(money))
-        .join(" + "),
-      row.onPlatform ? "Yes" : "No",
-      row.activation === null ? "" : `${activationPercent(row.activation)}%`,
-      row.health
-        ? `${row.health.score} ${HEALTH_BAND_LABEL[row.health.band]}`
-        : "",
-      row.gstin ?? "",
-      row.gstVerified ? "Yes" : "No",
-      row.tags.join(", "),
-      row.lastInteraction
-        ? `${new Date(row.lastInteraction.at).toISOString()} ${interactionLabel(row.lastInteraction)}`
-        : "",
-      row.lastActivityAt ? new Date(row.lastActivityAt).toISOString() : "",
-    ]),
-  ]);
-}
+const WINDOWS = ["7", "30", "90", "stale"] as const;
 
 export default function AccountsPage() {
   const viewer = useViewer();
   const members = useMembers();
-  const accounts = useQuery(api.accounts.list, { includeArchived: true });
-  const stats = useQuery(api.accounts.listStats, {});
-  const health = useHealthIndex();
   const setOwner = useMutation(api.accounts.setOwner);
   const setArchived = useMutation(api.accounts.setArchived);
   const importRows = useMutation(api.accounts.importRows);
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
+  const { exportCsv, pending: exporting } = useCsvExport([
+    "account",
+    "accounts",
+  ]);
 
   const [viewParam, setView] = useUrlState("view", "all");
   const [search, setSearch] = useUrlState("q", "");
@@ -310,7 +193,7 @@ export default function AccountsPage() {
     target: TimelineTarget;
     name: string;
   } | null>(null);
-  const [now] = useState(() => Date.now());
+  const query = useDebouncedValue(search);
 
   const view: View = VIEWS.some((item) => item.id === viewParam)
     ? (viewParam as View)
@@ -331,70 +214,33 @@ export default function AccountsPage() {
 
   const [sortId, sortDir] = sortParam.split(":");
   const sort: SortState = {
-    id: COLUMNS.some((column) => column.id === sortId && column.sortValue)
+    id: SORT_OPTIONS.some((option) => option.value === sortId)
       ? sortId
       : DEFAULT_SORT.id,
     dir: sortDir === "asc" ? "asc" : "desc",
   };
 
-  const all = useMemo(() => {
-    if (!accounts) return undefined;
-    const byId = new Map<string, Stats>(
-      (stats ?? []).map((item) => [item.accountId, item]),
-    );
-    return accounts.map((account): AccountRow => {
-      const item = byId.get(account._id);
-      const onPlatform = item?.onPlatform ?? false;
-      return {
-        ...account,
-        openDeals: item?.openDeals ?? 0,
-        pipeline: rankTotals(item?.pipeline ?? []),
-        gstVerified: item?.gstVerified ?? false,
-        onPlatform,
-        stuck: item?.stuck ?? false,
-        trend: item?.trend ?? [],
-        lastInteraction: item?.lastInteraction ?? null,
-        activation: activationSteps(onPlatform, account.stage),
-        health: health?.[account._id] ?? null,
-      };
-    });
-  }, [accounts, stats, health]);
-
-  const counts = useMemo(() => {
-    if (!all || !stats || !health) return undefined;
-    return Object.fromEntries(
-      VIEWS.map((item) => [
-        item.id,
-        all.filter((row) => inView(row, item.id, viewer._id)).length,
-      ]),
-    ) as Record<View, number>;
-  }, [all, stats, health, viewer._id]);
-
-  const rows = useMemo(() => {
-    if (!all || !stats || !health) return undefined;
-    return all.filter(
-      (row) =>
-        inView(row, view, viewer._id) &&
-        (stage === ALL || row.stage === stage) &&
-        (owner === ALL ||
-          (owner === MINE
-            ? row.owner?._id === viewer._id
-            : row.owner?._id === owner)) &&
-        activeWithin(row, activity, now) &&
-        (!search.trim() || matches(row, search)),
-    );
-  }, [
-    all,
-    stats,
-    health,
-    view,
-    stage,
-    owner,
-    activity,
-    search,
-    viewer._id,
-    now,
-  ]);
+  const args: ListArgs = {
+    archived: view === "archived" || undefined,
+    ownerId: (view === "mine" || owner === MINE
+      ? viewer._id
+      : owner === ALL
+        ? undefined
+        : owner) as Id<"members"> | undefined,
+    stage: stage === ALL ? undefined : (stage as LifecycleStage),
+    activity: WINDOWS.find((value) => value === activity),
+    search: query.trim() || undefined,
+    sort: sort.id as ListArgs["sort"],
+    dir: sort.dir,
+  };
+  const { rows: pageRows, paging } = usePagedList(api.accounts.page, args);
+  const counts = useQuery(api.accounts.counts, args);
+  const rows = pageRows?.map(
+    (row): AccountRow => ({
+      ...row,
+      activation: activationSteps(row.onPlatform, row.stage),
+    }),
+  );
 
   const filtered =
     stage !== ALL || owner !== ALL || activity !== ALL || search.trim() !== "";
@@ -402,40 +248,11 @@ export default function AccountsPage() {
     rows?.some((row) => row._id === id),
   ) as Id<"accounts">[];
 
-  const totals = useMemo(() => {
-    if (!rows) return null;
-    const onPlatform = rows.filter((row) => row.activation !== null);
-    return {
-      pipeline: rankTotals(rows.flatMap((row) => row.pipeline)),
-      openDeals: rows.reduce((sum, row) => sum + row.openDeals, 0),
-      activation: onPlatform.length
-        ? Math.round(
-            onPlatform.reduce(
-              (sum, row) => sum + activationPercent(row.activation!),
-              0,
-            ) / onPlatform.length,
-          )
-        : null,
-    };
-  }, [rows]);
-
   function clearFilters() {
     setSearch("");
     setStage(ALL);
     setOwnerFilter(ALL);
     setActivity(ALL);
-  }
-
-  function exportView() {
-    if (!rows) return;
-    const column = COLUMNS.find((item) => item.id === sort.id);
-    const sorted = column?.sortValue
-      ? [...rows].sort(compareBy(column, sort.dir))
-      : rows;
-    exportRows(sorted);
-    toast(
-      `Exported ${sorted.length} ${sorted.length === 1 ? "account" : "accounts"}`,
-    );
   }
 
   const importConfig: ImportConfig = {
@@ -531,10 +348,6 @@ export default function AccountsPage() {
     }
   }
 
-  const sortMenu = SORT_OPTIONS.some((option) => option.value === sort.id)
-    ? sort.id
-    : DEFAULT_SORT.id;
-
   return (
     <Page>
       <PageHeader
@@ -542,7 +355,9 @@ export default function AccountsPage() {
         meta={
           counts && (
             <PageStatus>
-              <span className="tabular-nums">{counts.all} active</span>
+              <span className="tabular-nums">
+                {counts.views.all.toLocaleString("en-IN")} active
+              </span>
             </PageStatus>
           )
         }
@@ -561,12 +376,18 @@ export default function AccountsPage() {
           setView(next);
           setSelected(new Set());
         }}
-        views={VIEWS.map((item) => ({ ...item, count: counts?.[item.id] }))}
+        views={VIEWS.map((item) => ({
+          ...item,
+          count: counts?.views[item.id],
+        }))}
       />
       <PageToolbar
         actions={
           <>
-            <ExportButton disabled={!rows?.length} onClick={exportView} />
+            <ExportButton
+              disabled={!rows?.length || exporting}
+              onClick={() => void exportCsv({ name: "accounts", args })}
+            />
             <CreateButton onClick={() => setCreate({ type: "account" })}>
               New account
             </CreateButton>
@@ -578,24 +399,28 @@ export default function AccountsPage() {
           onChange={setSearch}
           placeholder="Search accounts"
         />
-        <FilterMenu
-          label="Sort by"
-          value={sortMenu}
-          options={SORT_OPTIONS}
-          onChange={(id) => setSortParam(`${id}:${SORT_DIR[id] ?? "desc"}`)}
-        />
-        <FilterMenu
-          label="Owner"
-          value={owner}
-          onChange={setOwnerFilter}
-          options={[
-            { value: ALL, label: "Anyone" },
-            { value: MINE, label: "Me" },
-            ...(members ?? [])
-              .filter((member) => member._id !== viewer._id)
-              .map((member) => ({ value: member._id, label: member.name })),
-          ]}
-        />
+        {view !== "archived" && (
+          <FilterMenu
+            label="Sort by"
+            value={sort.id}
+            options={SORT_OPTIONS}
+            onChange={(id) => setSortParam(`${id}:${SORT_DIR[id] ?? "desc"}`)}
+          />
+        )}
+        {view !== "mine" && (
+          <FilterMenu
+            label="Owner"
+            value={owner}
+            onChange={setOwnerFilter}
+            options={[
+              { value: ALL, label: "Anyone" },
+              { value: MINE, label: "Me" },
+              ...(members ?? [])
+                .filter((member) => member._id !== viewer._id)
+                .map((member) => ({ value: member._id, label: member.name })),
+            ]}
+          />
+        )}
         <FilterMenu
           label="Stage"
           value={stage}
@@ -648,25 +473,12 @@ export default function AccountsPage() {
               onSelect: () => void toggleArchived(row),
             },
           ]}
+          paging={paging}
           footer={[
-            { label: "Accounts in view", value: rows?.length ?? 0 },
             {
-              label: "Pipeline",
-              value: <MoneyValue totals={totals?.pipeline ?? []} compact />,
+              label: "Accounts in view",
+              value: viewCount(counts?.inView, rows?.length, paging),
             },
-            {
-              label: "Avg activation",
-              value:
-                totals?.activation == null ? (
-                  dash
-                ) : (
-                  <>
-                    {totals.activation}
-                    <span className="text-fg-tertiary">%</span>
-                  </>
-                ),
-            },
-            { label: "Open deals", value: totals?.openDeals ?? 0 },
           ]}
           renderCard={(row) => <AccountCard row={row} />}
           empty={
@@ -726,6 +538,7 @@ export default function AccountsPage() {
         />
         <SelectionBar
           count={selectedIds.length}
+          loaded={isPartial(paging) ? rows?.length : undefined}
           noun={["account", "accounts"]}
           onClear={() => setSelected(new Set())}
         >
@@ -776,26 +589,6 @@ const EMPTY_VIEW: Record<
     description:
       "Accounts you own show up here. Assign yourself from the list.",
   },
-  stuck: {
-    title: "Nobody is stuck",
-    description:
-      "Brands that stall on a step of the Hypedrive activation path show up here.",
-  },
-  activated: {
-    title: "No activated brands yet",
-    description:
-      "Brands land here once their first enrollment is approved on Hypedrive.",
-  },
-  at_risk: {
-    title: "No brands at risk",
-    description:
-      "Brands on Hypedrive whose health drops below 45 show up here: unfunded wallets, paused campaigns, review backlogs or going quiet.",
-  },
-  expansion: {
-    title: "No expansion signals yet",
-    description:
-      "Brands that sell out a campaign, top up repeatedly, list on a new marketplace, near a renewal or grow their team show up here.",
-  },
   archived: {
     title: "Nothing archived",
     description: "Archived accounts stay here, ready to restore.",
@@ -816,7 +609,7 @@ function AccountCard({ row }: { row: AccountRow }) {
           </span>
         </span>
         <span className="lead-style shrink-0">
-          <MoneyValue totals={row.pipeline} compact />
+          <MoneyValue totals={rankTotals(row.pipeline)} compact />
         </span>
       </span>
       <span className="caption-style flex items-center justify-between gap-3 pl-11">

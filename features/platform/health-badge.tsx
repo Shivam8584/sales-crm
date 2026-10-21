@@ -1,7 +1,5 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import Tag, { type TagTone } from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { HEALTH_BAND_LABEL, type HealthBand } from "@/lib/domain/health";
@@ -68,7 +66,7 @@ export function HealthRing({
 /**
  * Compact health score: ring, number and (optionally) the band name. Use in
  * list cells, peeks and headers; pass the `score`/`band` from
- * `api.platform.healthIndex` or `api.activation.health`.
+ * `api.accounts.page` or `api.activation.health`.
  */
 export function HealthBadge({
   score,
@@ -99,15 +97,3 @@ export function HealthBadge({
   return showBand ? badge : <Tooltip content={label}>{badge}</Tooltip>;
 }
 
-/**
- * Health for every account linked to the platform, keyed by account id; undefined
- * while loading. For a "Health" column on the accounts list:
- * `const health = useHealthIndex();` then
- * `cell: (row) => health?.[row._id] ? <HealthBadge {...health[row._id]} /> : dash`.
- */
-export function useHealthIndex() {
-  const index = useQuery(api.platform.healthIndex, {});
-  return index as
-    | Record<string, { score: number; band: HealthBand; signals: string[] }>
-    | undefined;
-}

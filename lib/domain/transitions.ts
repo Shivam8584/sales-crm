@@ -106,12 +106,16 @@ export function taskCompletedAt(
 
 const PROPOSAL_MOVES: Record<ProposalStatus, ProposalStatus[]> = {
   draft: ["sent"],
-  sent: ["accepted", "rejected"],
+  sent: ["accepted", "rejected", "draft"],
   accepted: ["sent"],
-  rejected: ["sent"],
+  rejected: ["sent", "draft"],
 };
 
-/** Draft → sent → accepted or rejected; a decision can be undone back to sent. */
+/**
+ * Draft → sent → accepted or rejected. Editing a sent proposal, or starting
+ * over after a rejection, takes it back to draft; a decision can be undone
+ * back to sent.
+ */
 export function proposalMoveProblem(
   from: ProposalStatus,
   to: ProposalStatus,
@@ -121,7 +125,7 @@ export function proposalMoveProblem(
     from === "draft"
       ? "Send the proposal first"
       : to === "draft"
-        ? "Sent proposals are frozen; start a new version to change it"
+        ? "Reopen the accepted proposal before editing it"
         : from === "sent"
           ? "This proposal is already sent"
           : "Reopen the proposal first";

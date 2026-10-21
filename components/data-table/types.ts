@@ -10,8 +10,10 @@ export type Column<T> = {
   /** CSS grid track, e.g. `minmax(14rem,2fr)` or `8rem`. */
   width: string;
   align?: "start" | "end";
-  /** Value to sort by; columns without it are not sortable. */
+  /** Value to sort loaded rows by; columns without it or `sortable` are not sortable. */
   sortValue?: (row: T) => string | number | null;
+  /** The server sorts by this column (paged lists, whose rows arrive sorted). */
+  sortable?: boolean;
   /** First sort direction when the header is clicked. */
   defaultDir?: SortDir;
   /** Hidden when the viewport is narrower than this many pixels. */
@@ -47,3 +49,11 @@ export function compareBy<T>(column: Column<T>, dir: SortDir) {
     return (left < right ? -1 : 1) * factor;
   };
 }
+
+/** Server pagination state from `usePagedList`; the table loads more as it scrolls. */
+export type Paging = {
+  status: "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted";
+  loadMore: () => void;
+  /** Showing the previous results while new filters load. */
+  stale?: boolean;
+};

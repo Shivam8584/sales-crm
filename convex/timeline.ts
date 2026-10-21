@@ -21,7 +21,6 @@ import { addedMentions } from "../lib/domain/mentions";
 export { isInteraction };
 
 const MAX_BODY = 10_000;
-const PAGE = 200;
 
 const vLoggable = literals(INTERACTION_KINDS);
 
@@ -185,9 +184,6 @@ async function withRefs(ctx: QueryCtx, entries: Doc<"timeline">[]) {
       mentioned: (entry.mentions ?? [])
         .map((id) => memberRef(members, id))
         .filter((member) => member !== null),
-      acked: (entry.acks ?? [])
-        .map((id) => memberRef(members, id))
-        .filter((member) => member !== null),
       person: person
         ? {
             _id: person._id,
@@ -200,18 +196,9 @@ async function withRefs(ctx: QueryCtx, entries: Doc<"timeline">[]) {
 }
 
 /**
- * Newest first, the latest 200. An account's timeline includes entries logged
- * on its people and deals. `page` walks the whole history.
+ * A record's history, newest first, a page at a time. An account's timeline
+ * includes entries logged on its people and deals.
  */
-export const forRecord = memberQuery({
-  args: { target: vTarget },
-  handler: async (ctx, { target }) => {
-    const entries = await entriesFor(ctx, target).order("desc").take(PAGE);
-    return await withRefs(ctx, entries);
-  },
-});
-
-/** Cursor-paginated `forRecord`, for `usePaginatedQuery`. */
 export const page = memberQuery({
   args: { target: vTarget, paginationOpts: paginationOptsValidator },
   handler: async (ctx, { target, paginationOpts }) => {
@@ -389,7 +376,6 @@ export const restore = memberMutation({
         v.union(v.literal("inbound"), v.literal("outbound")),
       ),
       mentions: v.optional(v.array(v.id("members"))),
-      acks: v.optional(v.array(v.id("members"))),
     }),
   },
   handler: async (ctx, { entry }) => {

@@ -35,25 +35,13 @@ import { formatAmount } from "./amount";
 
 type Policy = FunctionReturnType<typeof api.proposals.policy>;
 
-const KEY: Record<PolicyField, `pricing.${PolicyField}`> = {
-  marginFloorBps: "pricing.marginFloorBps",
-  approvalBps: "pricing.approvalBps",
-  defaultMarginBps: "pricing.defaultMarginBps",
-  defaultFundBps: "pricing.defaultFundBps",
-  defaultFeeBps: "pricing.defaultFeeBps",
-  defaultBonusFeeBps: "pricing.defaultBonusFeeBps",
-};
+const KEY = (field: PolicyField) => `pricing.${field}` as const;
 
 const COPY: Record<PolicyField, { label: string; description: string }> = {
   marginFloorBps: {
     label: "Margin floor",
     description:
-      "A line with a margin under this needs a manager's approval before it goes to the brand.",
-  },
-  approvalBps: {
-    label: "Approval threshold",
-    description:
-      "A proposal whose blended margin is under this needs a manager's approval.",
+      "The only approval rule: a proposal with any line, or its blended margin, under this needs a manager's approval before it goes to the brand.",
   },
   defaultMarginBps: {
     label: "Default margin",
@@ -81,7 +69,7 @@ const money = (amount: number) => formatAmount(amount, PROPOSAL_CURRENCY);
 /** Settings → Workspace: the company's pricing rules for the deal desk, and the platform's fixed ones. */
 export default function PricingPolicySettings() {
   const data = useQuery(api.proposals.policy, {});
-  if (!data) return <SettingsSkeleton rows={6} />;
+  if (!data) return <SettingsSkeleton rows={5} />;
   const floor = data.policy.platformFloor;
 
   return (
@@ -147,7 +135,7 @@ function PolicyRow({ field, data }: { field: PolicyField; data: Policy }) {
     setError(undefined);
     try {
       const { previous } = await set({
-        setting: { key: KEY[field], value: next },
+        setting: { key: KEY(field), value: next },
       });
       toast(
         next === null
@@ -155,7 +143,7 @@ function PolicyRow({ field, data }: { field: PolicyField; data: Policy }) {
           : `${label} set to ${bpsLabel(next)}`,
         () => {
           set({
-            setting: { key: KEY[field], value: previous as number | null },
+            setting: { key: KEY(field), value: previous as number | null },
           }).catch((reason) =>
             toast(readError(reason).message, { tone: "danger" }),
           );

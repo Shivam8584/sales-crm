@@ -14,10 +14,5 @@ crons.daily(
   { hourUTC: 22, minuteUTC: 0 },
   internal.prospecting.refreshAll,
 );
-crons.daily(
-  "notification digest",
-  { hourUTC: 3, minuteUTC: 30 },
-  internal.notifications.sendDigests,
-);
 
 export default crons;

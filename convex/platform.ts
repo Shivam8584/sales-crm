@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { httpAction, internalMutation } from "./_generated/server";
+import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -17,8 +17,9 @@ import {
 } from "../lib/domain/platform";
 import { platformState } from "../lib/domain/platform-state";
 import { syncAccountActivation } from "./lib/activation";
+import { demoEmail } from "./lib/demo";
 import { fail } from "./lib/errors";
-import { adminQuery, memberQuery } from "./lib/functions";
+import { adminQuery, internalMutation, memberQuery } from "./lib/functions";
 import { json, parseJsonObject, readBody, verifyHmac } from "./lib/http";
 import {
   accountForOrg,
@@ -276,43 +277,6 @@ export const forAccount = memberQuery({
 });
 
 /** Health score and band for every linked account, keyed by account id; for list columns and badges. */
-export const healthIndex = memberQuery({
-  args: {},
-  handler: async (ctx) => {
-    const now = Date.now();
-    const accounts = await ctx.db
-      .query("accounts")
-      .withIndex("by_platform_org", (q) => q.gt("platformOrgId", ""))
-      .collect();
-    const result: Record<
-      string,
-      { score: number; band: string; signals: string[] }
-    > = {};
-    for (const account of accounts) {
-      if (account.archivedAt || !account.platformOrgId) continue;
-      const orgId = account.platformOrgId;
-      const events = await ctx.db
-        .query("platformEvents")
-        .withIndex("by_org", (q) => q.eq("orgId", orgId))
-        .take(ORG_EVENT_LIMIT);
-      const health = accountHealth(
-        healthInput(
-          account,
-          stateEvents(events),
-          await latestSnapshot(ctx, account._id),
-          now,
-        ),
-      );
-      result[account._id] = {
-        score: health.score,
-        band: health.band,
-        signals: health.signals.map((signal) => signal.id),
-      };
-    }
-    return result;
-  },
-});
-
 function eventStatus(event: Doc<"platformEvents">) {
   if (event.ignored) return "ignored" as const;
   if (event.processedAt) return "processed" as const;
@@ -533,7 +497,9 @@ function scenarioDrafts(scenario: Scenario, context: ScenarioContext): Timed[] {
             user_id: platformId("usr"),
             role: "campaign_manager",
             name: "Rhea Kapoor",
-            email: context.domain ? `rhea@${context.domain}` : undefined,
+            email: context.domain
+              ? demoEmail("rhea", context.domain)
+              : undefined,
           },
           ago: 2 * DAY,
         },

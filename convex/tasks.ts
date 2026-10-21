@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -10,6 +9,7 @@ import { taskCompletedAt } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
 import { invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery, type Viewer } from "./lib/functions";
+import { searchText, vSearch } from "./lib/lists";
 import { assertCan, can } from "./lib/permissions";
 import {
   memberIndex,
@@ -27,7 +27,7 @@ import {
   touchRecords,
 } from "./lib/tasks";
 import { logSystem } from "./lib/timeline";
-import { literals, vPriority, vTaskStatus } from "./lib/validators";
+import { literals, vDay, vPriority, vTaskStatus } from "./lib/validators";
 
 const MAX_TITLE = 200;
 const UNDO_WINDOW_MS = 10 * 60_000;
@@ -56,6 +56,7 @@ async function statusEffects(
 }
 const MAX_NOTES = 5_000;
 const RECENT_DONE_MS = 14 * 24 * 60 * 60_000;
+const SEARCH_LIMIT = 200;
 
 const editable = {
   title: v.optional(v.string()),
@@ -210,8 +211,9 @@ async function toClientList(ctx: QueryCtx, tasks: Doc<"tasks">[]) {
 }
 
 /**
- * Tasks ordered by board position. Done tasks are limited to the last two weeks
- * unless `done` says otherwise, so the board doesn't grow without bound.
+ * Tasks ordered by board position: open tasks plus done ones from the last
+ * two weeks unless `done` says otherwise, so the board stays the team's
+ * working set. Priority, overdue and title search narrow it on the server.
  */
 export const list = memberQuery({
   args: {
@@ -222,6 +224,10 @@ export const list = memberQuery({
     dealId: v.optional(v.id("deals")),
     leadId: v.optional(v.id("leads")),
     done: v.optional(literals(["none", "recent", "all"])),
+    priority: v.optional(vPriority),
+    /** Only open tasks due before this day. */
+    overdueBefore: v.optional(vDay),
+    search: vSearch,
   },
   handler: async (ctx, args) => {
     const done = args.done ?? "recent";
@@ -230,7 +236,18 @@ export const list = memberQuery({
       (status) => status !== "done" || done !== "none",
     );
     let tasks: Doc<"tasks">[] = [];
-    if (args.accountId) {
+    const text = searchText(args.search);
+    const assignee = args.assigneeId;
+    if (text) {
+      tasks = await ctx.db
+        .query("tasks")
+        .withSearchIndex("search_title", (q) =>
+          assignee
+            ? q.search("title", text).eq("assigneeId", assignee)
+            : q.search("title", text),
+        )
+        .take(SEARCH_LIMIT);
+    } else if (args.accountId) {
       const id = args.accountId;
       tasks = await ctx.db
         .query("tasks")
@@ -296,40 +313,15 @@ export const list = memberQuery({
           (!args.leadId || task.leadId === args.leadId) &&
           (task.status !== "done" ||
             done === "all" ||
-            (task.completedAt ?? task.updatedAt) >= since),
+            (task.completedAt ?? task.updatedAt) >= since) &&
+          (!args.priority || task.priority === args.priority) &&
+          (!args.overdueBefore ||
+            (task.status !== "done" &&
+              task.dueDate !== undefined &&
+              task.dueDate < args.overdueBefore)),
       )
       .sort((a, b) => a.position - b.position);
     return await toClientList(ctx, visible);
-  },
-});
-
-/** Cursor-paginated tasks in one status, by board position; done tasks newest first. */
-export const page = memberQuery({
-  args: {
-    paginationOpts: paginationOptsValidator,
-    status: vTaskStatus,
-    assigneeId: v.optional(v.id("members")),
-  },
-  handler: async (ctx, { paginationOpts, status, assigneeId }) => {
-    const result = assigneeId
-      ? await ctx.db
-          .query("tasks")
-          .withIndex("by_assignee_status_completed", (q) =>
-            q.eq("assigneeId", assigneeId).eq("status", status),
-          )
-          .order(status === "done" ? "desc" : "asc")
-          .paginate(paginationOpts)
-      : status === "done"
-        ? await ctx.db
-            .query("tasks")
-            .withIndex("by_status_completed", (q) => q.eq("status", "done"))
-            .order("desc")
-            .paginate(paginationOpts)
-        : await ctx.db
-            .query("tasks")
-            .withIndex("by_status_position", (q) => q.eq("status", status))
-            .paginate(paginationOpts);
-    return { ...result, page: await toClientList(ctx, result.page) };
   },
 });
 

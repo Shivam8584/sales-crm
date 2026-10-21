@@ -1,4 +1,5 @@
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import { v } from "convex/values";
+import { type MutationCtx } from "./_generated/server";
 import { istToday } from "../lib/domain/day";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -17,12 +18,14 @@ import type { ActivationStage } from "../lib/domain/platform";
 import type { ProposalLine } from "../lib/domain/pricing";
 import { syncAccountActivation } from "./lib/activation";
 import { appendLedger } from "./lib/consent";
+import { demoEmail } from "./lib/demo";
 import { fail } from "./lib/errors";
 import { createLead, recordConsents } from "./lib/leads";
 import { personSearchText } from "./lib/records";
 import { notify } from "./notifications";
 import { receive } from "./lib/platform";
 import { simulateAccount, type Scenario } from "./platform";
+import { internalMutation } from "./lib/functions";
 
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -65,7 +68,7 @@ const ACCOUNTS: AccountSeed[] = [
         first: "Rohit",
         last: "Agarwal",
         title: "Founder",
-        phone: "+919810011122",
+        phone: "+910000011122",
         consent: "granted",
       },
       { first: "Neha", last: "Kapoor", title: "Marketplace manager" },
@@ -84,7 +87,7 @@ const ACCOUNTS: AccountSeed[] = [
         first: "Arjun",
         last: "Mehta",
         title: "Co-founder",
-        phone: "+919820022233",
+        phone: "+910000022233",
         consent: "granted",
       },
     ],
@@ -102,7 +105,7 @@ const ACCOUNTS: AccountSeed[] = [
         first: "Sana",
         last: "Qureshi",
         title: "Head of growth",
-        phone: "+919830033344",
+        phone: "+910000033344",
         consent: "dnd",
       },
     ],
@@ -119,7 +122,7 @@ const ACCOUNTS: AccountSeed[] = [
         first: "Vikram",
         last: "Singh",
         title: "Founder",
-        phone: "+919840044455",
+        phone: "+910000044455",
         consent: "granted",
       },
     ],
@@ -147,7 +150,7 @@ const ACCOUNTS: AccountSeed[] = [
         first: "Aditi",
         last: "Verma",
         title: "Founder",
-        phone: "+919811122233",
+        phone: "+910000122233",
         consent: "updates_only",
       },
     ],
@@ -163,7 +166,7 @@ const ACCOUNTS: AccountSeed[] = [
         first: "Priya",
         last: "Iyer",
         title: "Founder",
-        phone: "+919850055566",
+        phone: "+910000055566",
         consent: "granted",
       },
       { first: "Karan", last: "Malhotra", title: "Performance marketing lead" },
@@ -206,7 +209,7 @@ const ACCOUNTS: AccountSeed[] = [
         first: "Tanvi",
         last: "Shah",
         title: "Growth lead",
-        phone: "+919860066677",
+        phone: "+910000066677",
         consent: "withdrawn",
       },
     ],
@@ -405,8 +408,8 @@ const LEADS: LeadSeed[] = [
   {
     kind: "demo",
     name: "Kavya Reddy",
-    email: "kavya@petals.in",
-    phone: "+919870077788",
+    email: "kavya@petals.example",
+    phone: "+910000077788",
     companyName: "Petals Skincare",
     website: "petals.in",
     utm: { source: "instagram", medium: "social", campaign: "talk_to_sales" },
@@ -416,7 +419,7 @@ const LEADS: LeadSeed[] = [
   {
     kind: "contact",
     name: "Dev Malhotra",
-    email: "dev@greenroots.in",
+    email: "dev@greenroots.example",
     companyName: "Green Roots",
     utm: { source: "google", medium: "cpc", campaign: "brand-search" },
     status: "new",
@@ -424,8 +427,8 @@ const LEADS: LeadSeed[] = [
   {
     kind: "demo",
     name: "Rahul Jain",
-    email: "rahul@ayurvedaco.in",
-    phone: "+919880088899",
+    email: "rahul@ayurvedaco.example",
+    phone: "+910000088899",
     companyName: "Ayurveda Co",
     website: "ayurvedaco.in",
     utm: { source: "linkedin", medium: "social", campaign: "talk_to_sales" },
@@ -436,8 +439,8 @@ const LEADS: LeadSeed[] = [
   {
     kind: "demo",
     name: "Sneha Pillai",
-    email: "sneha@lumebags.in",
-    phone: "+919820045678",
+    email: "sneha@lumebags.example",
+    phone: "+910000045678",
     companyName: "Lume Bags",
     utm: { source: "website", medium: "cta" },
     status: "qualified",
@@ -447,7 +450,7 @@ const LEADS: LeadSeed[] = [
   {
     kind: "contact",
     name: "Imran Sheikh",
-    email: "imran@brewhaus.in",
+    email: "imran@brewhaus.example",
     companyName: "Brewhaus",
     utm: { source: "google", medium: "cpc" },
     status: "nurture",
@@ -456,7 +459,7 @@ const LEADS: LeadSeed[] = [
   {
     kind: "manual",
     name: "Nikhil Rao",
-    email: "nikhil@cheapdeals.biz",
+    email: "nikhil@cheapdeals.example",
     companyName: "Cheap Deals",
     utm: {},
     status: "disqualified",
@@ -466,7 +469,7 @@ const LEADS: LeadSeed[] = [
   {
     kind: "demo",
     name: "Ishaan Bose",
-    email: "ishaan@threadtheory.in",
+    email: "ishaan@threadtheory.example",
     companyName: "Thread Theory",
     website: "threadtheory.in",
     utm: { source: "google", medium: "cpc", campaign: "talk_to_sales" },
@@ -501,7 +504,6 @@ const APP_TABLES = [
   "platformEvents",
   "platformSnapshots",
   "retentionReviews",
-  "rateLimits",
   "follows",
   "watchlists",
   "watchedProducts",
@@ -574,7 +576,7 @@ async function seedWorkspace(ctx: MutationCtx) {
     });
     const staff: Doc<"people">[] = [];
     for (const person of item.people) {
-      const email = `${person.first.toLowerCase()}@${item.domain}`;
+      const email = demoEmail(person.first, item.domain);
       const fields = {
         firstName: person.first,
         lastName: person.last,
@@ -821,8 +823,8 @@ async function newBrandSignsUp(ctx: MutationCtx, now: number) {
       occurredAt: now - 5 * HOUR,
       data: {
         user_id: userId,
-        email: "kabir@tinytots.in",
-        phone: "+919890099900",
+        email: "kabir@tinytots.example",
+        phone: "+910000099900",
         name: "Kabir Anand",
         utm: { source: "google", medium: "cpc", campaign: "brand-search" },
       },
@@ -909,13 +911,23 @@ export const demo = internalMutation({
   },
 });
 
-/** Local only: wipes app data (not members, invites or settings) and seeds again. */
+/**
+ * Wipes app data (not members, invites or settings) and seeds again. Runs on
+ * localhost, or on a deployment marked `DEMO_DEPLOYMENT=1` when `confirmSiteUrl`
+ * repeats its SITE_URL.
+ */
 export const reset = internalMutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { confirmSiteUrl: v.optional(v.string()) },
+  handler: async (ctx, { confirmSiteUrl }) => {
     const site = process.env.SITE_URL ?? "";
-    if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(site)) {
-      fail("forbidden", "seed:reset only runs when SITE_URL is localhost");
+    const local = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(site);
+    const demo =
+      process.env.DEMO_DEPLOYMENT === "1" && !!site && confirmSiteUrl === site;
+    if (!local && !demo) {
+      fail(
+        "forbidden",
+        "seed:reset runs on localhost, or on a DEMO_DEPLOYMENT=1 deployment with confirmSiteUrl set to its SITE_URL",
+      );
     }
     for (const table of APP_TABLES) {
       for (const doc of await ctx.db.query(table).collect()) {

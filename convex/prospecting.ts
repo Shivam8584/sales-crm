@@ -1,7 +1,7 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import {
+  httpAction,
   internalAction,
-  internalMutation,
   internalQuery,
   type MutationCtx,
   type QueryCtx,
@@ -14,14 +14,19 @@ import {
   cleanText,
 } from "../lib/domain/normalize";
 import {
+  INBOUND_SOURCE,
   MAX_IMPORT_URLS,
   MAX_WATCHLIST_PRODUCTS,
+  REVIEW_GAP_CONSENT,
+  REVIEW_GAP_LEAD_SOURCE,
+  parseReviewGap,
   VELOCITY_WINDOW_DAYS,
   benchmarksFor,
   brandKey,
   dailyGains,
   dayOf,
   domainKey,
+  marketplaceName,
   parseProductUrl,
   sameBrand,
   scoreBand,
@@ -32,8 +37,24 @@ import {
   type Score,
 } from "../lib/domain/prospecting";
 import { fail, invalid, notFound } from "./lib/errors";
-import { memberMutation, memberQuery } from "./lib/functions";
-import { createLead, isOpen, leadHref } from "./lib/leads";
+import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
+import {
+  allowedOrigins,
+  clientIp,
+  corsHeaders,
+  json,
+  originAllowed,
+  preflight,
+  readJson,
+  siteOrigins,
+} from "./lib/http";
+import {
+  createLead,
+  isOpen,
+  leadHref,
+  recordConsents,
+  type NewLead,
+} from "./lib/leads";
 import { requireAccount } from "./lib/records";
 import {
   MAX_BATCH,
@@ -43,6 +64,7 @@ import {
   scraperMode,
   type ScrapeResult,
 } from "./lib/scraper";
+import { rateLimiter } from "./lib/rateLimiter";
 import { logSystem } from "./lib/timeline";
 import { vMoney } from "./lib/validators";
 
@@ -50,8 +72,6 @@ const DAY_MS = 24 * 60 * 60_000;
 const TREND_DAYS = 14;
 const MAX_NAME = 80;
 const MAX_BENCHMARK = 10_000_000;
-const CHECK_BUDGET = 300;
-const CHECK_WINDOW_MS = 60 * 60_000;
 const BATCH_STAGGER_MS = 20_000;
 
 export const config = memberQuery({
@@ -67,7 +87,11 @@ export const config = memberQuery({
 type Scope = {
   watchlists: Map<Id<"watchlists">, Doc<"watchlists">>;
   products: Doc<"watchedProducts">[];
+  /** Every curated listing, the market inbound audits are measured against. */
+  peers: Doc<"watchedProducts">[];
 };
+
+const isInbound = (list: Doc<"watchlists">) => list.name === INBOUND_SOURCE;
 
 async function productsOf(ctx: QueryCtx, watchlistId: Id<"watchlists">) {
   return (
@@ -107,10 +131,16 @@ async function loadScope(ctx: QueryCtx, keys?: string[]): Promise<Scope> {
       ),
     ];
   }
-  const products = (
-    await Promise.all(ids.map((id) => productsOf(ctx, id)))
-  ).flat();
-  return { watchlists, products };
+  const load = async (lists: Id<"watchlists">[]) =>
+    (await Promise.all(lists.map((id) => productsOf(ctx, id)))).flat();
+  const products = await load(ids);
+  const curated = [...watchlists.values()].filter((list) => !isInbound(list));
+  const peers = ids.some((id) => isInbound(watchlists.get(id)!))
+    ? keys
+      ? await load(curated.map((list) => list._id))
+      : products.filter((row) => !isInbound(watchlists.get(row.watchlistId)!))
+    : [];
+  return { watchlists, products, peers };
 }
 
 async function trendOf(ctx: QueryCtx, productId: Id<"watchedProducts">) {
@@ -132,6 +162,7 @@ export type ProductRow = {
   _id: Id<"watchedProducts">;
   watchlistId: Id<"watchlists">;
   watchlist: string;
+  inbound: boolean;
   marketplace: string;
   identifier: string;
   listingKey: string;
@@ -163,24 +194,29 @@ function scoreScope(scope: Scope): ProductRow[] {
       product,
     ]);
   }
+  const peer = (product: Doc<"watchedProducts">) => ({
+    id: product._id,
+    category: product.category ?? null,
+    ratingsCount: product.ratingsCount ?? null,
+    velocity: product.velocity ?? null,
+  });
   const rows: ProductRow[] = [];
   for (const [watchlistId, products] of byList) {
     const watchlist = scope.watchlists.get(watchlistId)!;
-    const benchmarks = benchmarksFor(
-      products.map((product) => ({
-        id: product._id,
-        category: product.category ?? null,
-        ratingsCount: product.ratingsCount ?? null,
-        velocity: product.velocity ?? null,
-      })),
-      watchlist.benchmark ?? null,
-    );
+    const inbound = isInbound(watchlist);
+    const set = watchlist.benchmark ?? null;
+    const shared = inbound ? null : benchmarksFor(products.map(peer), set);
     for (const product of products) {
-      const benchmark = benchmarks.get(product._id) ?? null;
+      // Each public check is measured against the curated market alone, not other checks.
+      const benchmark =
+        (shared ?? benchmarksFor([product, ...scope.peers].map(peer), set)).get(
+          product._id,
+        ) ?? null;
       rows.push({
         _id: product._id,
         watchlistId,
         watchlist: watchlist.name,
+        inbound,
         marketplace: product.marketplace,
         identifier: product.identifier,
         listingKey: product.listingKey,
@@ -315,6 +351,7 @@ async function brandsOf(ctx: QueryCtx, rows: ProductRow[]) {
       products: products.length,
       marketplaces: [...new Set(products.map((row) => row.marketplace))].sort(),
       watchlistIds: [...new Set(products.map((row) => row.watchlistId))],
+      inbound: products.some((row) => row.inbound),
       score: top ? top.score!.score : null,
       band: top ? scoreBand(top.score!.score) : null,
       reasons: top ? top.score!.reasons : [],
@@ -434,26 +471,18 @@ export const forAccount = memberQuery({
 
 // ── Watchlists ──────────────────────────────────────────────────────────────
 
+/** Sources for the filter and the add dialog, by name. */
 export const watchlists = memberQuery({
   args: {},
   handler: async (ctx) => {
-    const lists = [...(await liveWatchlists(ctx)).values()];
     const out = [];
-    for (const list of lists) {
-      const products = await productsOf(ctx, list._id);
-      const creator = await ctx.db.get(list.createdById);
+    for (const list of (await liveWatchlists(ctx)).values()) {
       out.push({
         _id: list._id,
         name: list.name,
         benchmark: list.benchmark ?? null,
-        refreshedAt: list.refreshedAt ?? null,
-        createdBy: creator?.name ?? null,
-        createdAt: list._creationTime,
-        products: products.length,
-        brands: new Set(products.map((row) => row.brandKey).filter(Boolean))
-          .size,
-        failed: products.filter((row) => row.status === "failed").length,
-        checking: products.filter((row) => row.queuedAt !== undefined).length,
+        inbound: isInbound(list),
+        products: (await productsOf(ctx, list._id)).length,
       });
     }
     return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -462,8 +491,11 @@ export const watchlists = memberQuery({
 
 function cleanName(value: string) {
   const name = cleanText(value);
-  if (!name) invalid("name", "Name the watchlist");
+  if (!name) invalid("name", "Name the source");
   if (name.length > MAX_NAME) invalid("name", "Name is too long");
+  if (name.toLowerCase() === INBOUND_SOURCE.toLowerCase()) {
+    invalid("name", `${INBOUND_SOURCE} is kept for public review-gap checks`);
+  }
   return name;
 }
 
@@ -477,7 +509,19 @@ function cleanBenchmark(value: number | null | undefined) {
 
 async function requireWatchlist(ctx: QueryCtx, id: Id<"watchlists">) {
   const list = await ctx.db.get(id);
-  if (!list || list.deletedAt) notFound("Watchlist");
+  if (!list || list.deletedAt) notFound("Source");
+  return list;
+}
+
+/** Curated sources only: inbound audits are filled by the public check. */
+async function requireCurated(ctx: QueryCtx, id: Id<"watchlists">) {
+  const list = await requireWatchlist(ctx, id);
+  if (isInbound(list)) {
+    fail(
+      "forbidden",
+      `${INBOUND_SOURCE} is filled by public review-gap checks`,
+    );
+  }
   return list;
 }
 
@@ -491,7 +535,7 @@ export const createWatchlist = memberMutation({
         (row) => row.name.toLowerCase() === name.toLowerCase(),
       )
     ) {
-      invalid("name", "A watchlist with this name already exists");
+      invalid("name", "A source with this name already exists");
     }
     return await ctx.db.insert("watchlists", {
       name,
@@ -510,7 +554,7 @@ export const updateWatchlist = memberMutation({
     benchmark: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, { id, ...args }) => {
-    const list = await requireWatchlist(ctx, id);
+    const list = await requireCurated(ctx, id);
     const patch: Partial<Doc<"watchlists">> = { updatedAt: Date.now() };
     if (args.name !== undefined) patch.name = cleanName(args.name);
     if (args.benchmark !== undefined) {
@@ -525,7 +569,13 @@ export const setWatchlistDeleted = memberMutation({
   args: { id: v.id("watchlists"), deleted: v.boolean() },
   handler: async (ctx, { id, deleted }) => {
     const list = await ctx.db.get(id);
-    if (!list) notFound("Watchlist");
+    if (!list) notFound("Source");
+    if (isInbound(list)) {
+      fail(
+        "forbidden",
+        `${INBOUND_SOURCE} is filled by public review-gap checks`,
+      );
+    }
     await ctx.db.patch(id, {
       deletedAt: deleted ? Date.now() : undefined,
       updatedAt: Date.now(),
@@ -541,30 +591,16 @@ async function spendBudget(
   memberId: Id<"members">,
   count: number,
 ) {
-  const now = Date.now();
-  const key = `scraper:${memberId}`;
-  const row = await ctx.db
-    .query("rateLimits")
-    .withIndex("by_key", (q) => q.eq("key", key))
-    .unique();
-  const fresh = !row || now - row.windowStart >= CHECK_WINDOW_MS;
-  const used = fresh ? 0 : row.count;
-  if (used + count > CHECK_BUDGET) {
-    const minutes = Math.ceil(
-      (row!.windowStart + CHECK_WINDOW_MS - now) / 60_000,
-    );
+  const { ok, retryAfter } = await rateLimiter.limit(ctx, "productChecks", {
+    key: memberId,
+    count,
+  });
+  if (!ok) {
     fail(
       "rate_limited",
-      used >= CHECK_BUDGET
-        ? `You've used your ${CHECK_BUDGET} product checks for this hour. Try again in ${minutes} min.`
-        : `Only ${CHECK_BUDGET - used} of your ${CHECK_BUDGET} hourly product checks are left. Check fewer products or wait ${minutes} min.`,
+      `That's more than your hourly budget of product checks allows. Check fewer products or wait ${Math.ceil(retryAfter / 60_000)} min.`,
     );
   }
-  if (!row) {
-    await ctx.db.insert("rateLimits", { key, windowStart: now, count });
-  } else if (fresh) {
-    await ctx.db.patch(row._id, { windowStart: now, count });
-  } else await ctx.db.patch(row._id, { count: used + count });
 }
 
 async function queueChecks(
@@ -583,11 +619,11 @@ async function queueChecks(
   }
 }
 
-/** Adds product links to a watchlist and queues a first check of each. */
+/** Adds product links to a source and queues a first check of each. */
 export const addProducts = memberMutation({
   args: { watchlistId: v.id("watchlists"), urls: v.array(v.string()) },
   handler: async (ctx, { watchlistId, urls }) => {
-    await requireWatchlist(ctx, watchlistId);
+    await requireCurated(ctx, watchlistId);
     if (urls.length === 0) invalid("urls", "Paste at least one product link");
     if (urls.length > MAX_IMPORT_URLS) {
       invalid("urls", `Add up to ${MAX_IMPORT_URLS} links at a time`);
@@ -609,7 +645,7 @@ export const addProducts = memberMutation({
     if (existing.length + ready.length > MAX_WATCHLIST_PRODUCTS) {
       invalid(
         "urls",
-        `A watchlist holds up to ${MAX_WATCHLIST_PRODUCTS} products; this one has ${existing.length}`,
+        `A source holds up to ${MAX_WATCHLIST_PRODUCTS} products; this one has ${existing.length}`,
       );
     }
     if (ready.length > 0) await spendBudget(ctx, ctx.viewer._id, ready.length);
@@ -644,7 +680,7 @@ export const setProductsRemoved = memberMutation({
   },
 });
 
-/** Re-checks every product in a watchlist (or all of them) now. */
+/** Re-checks every product in a source (or all of them) now. */
 export const refresh = memberMutation({
   args: {
     watchlistId: v.optional(v.id("watchlists")),
@@ -725,29 +761,35 @@ function toRecord(result: ScrapeResult) {
   };
 }
 
+/** Reads listings through the scraper worker, or the sandbox when SCRAPER_SANDBOX=1. */
+async function readListings(items: { id: string; url: string }[], at: number) {
+  const mode = scraperMode(process.env);
+  let results: ScrapeResult[];
+  if (mode === "live") results = await scrapeBatch(process.env, items);
+  else if (mode === "sandbox") {
+    results = items.map((item) => sandboxScrape(item, at));
+  } else {
+    results = items.map((item) => ({
+      id: item.id,
+      ok: false,
+      error: `The scraper isn't set up. ${SCRAPER_ENV_HINT}`,
+      retryable: true,
+    }));
+  }
+  return { source: mode ?? ("live" as const), results };
+}
+
 export const scrape = internalAction({
   args: { productIds: v.array(v.id("watchedProducts")) },
   handler: async (ctx, { productIds }) => {
     const items: { id: Id<"watchedProducts">; url: string }[] =
       await ctx.runQuery(internal.prospecting.scrapeTargets, { productIds });
     if (items.length === 0) return;
-    const mode = scraperMode(process.env);
     const at = Date.now();
-    let results: ScrapeResult[];
-    if (mode === "live") results = await scrapeBatch(process.env, items);
-    else if (mode === "sandbox") {
-      results = items.map((item) => sandboxScrape(item, at));
-    } else {
-      results = items.map((item) => ({
-        id: item.id,
-        ok: false,
-        error: `The scraper isn't set up. ${SCRAPER_ENV_HINT}`,
-        retryable: true,
-      }));
-    }
+    const { source, results } = await readListings(items, at);
     await ctx.runMutation(internal.prospecting.record, {
       at,
-      source: mode ?? "live",
+      source,
       results: results.map(toRecord),
     });
   },
@@ -798,43 +840,54 @@ async function velocityOf(
   );
 }
 
+type Reading = Infer<typeof vResult>;
+type ReadSource = "live" | "sandbox";
+
+/** Stores one scrape on its product: today's snapshot, the listing and its ratings pace. */
+async function applyReading(
+  ctx: MutationCtx,
+  result: Reading,
+  at: number,
+  source: ReadSource,
+) {
+  if (!result.listing) {
+    await ctx.db.patch(result.id, {
+      status: "failed",
+      error: result.error ?? "The check failed",
+      queuedAt: undefined,
+    });
+    return;
+  }
+  const { listing } = result;
+  await writeSnapshot(ctx, result.id, at, {
+    rating: listing.rating,
+    ratingsCount: listing.ratingsCount,
+    price: listing.price,
+  });
+  const key = listing.brand ? brandKey(listing.brand) : "";
+  await ctx.db.patch(result.id, {
+    ...listing,
+    brandKey: key || undefined,
+    status: "ok",
+    error: undefined,
+    source,
+    velocity: (await velocityOf(ctx, result.id, at)) ?? undefined,
+    queuedAt: undefined,
+    checkedAt: at,
+  });
+}
+
+const vSource = v.union(v.literal("live"), v.literal("sandbox"));
+
 export const record = internalMutation({
-  args: {
-    at: v.number(),
-    source: v.union(v.literal("live"), v.literal("sandbox")),
-    results: v.array(vResult),
-  },
+  args: { at: v.number(), source: vSource, results: v.array(vResult) },
   handler: async (ctx, { at, source, results }) => {
     const touched = new Set<Id<"watchlists">>();
     for (const result of results) {
       const product = await ctx.db.get(result.id);
       if (!product) continue;
       touched.add(product.watchlistId);
-      if (!result.listing) {
-        await ctx.db.patch(product._id, {
-          status: "failed",
-          error: result.error ?? "The check failed",
-          queuedAt: undefined,
-        });
-        continue;
-      }
-      const { listing } = result;
-      await writeSnapshot(ctx, product._id, at, {
-        rating: listing.rating,
-        ratingsCount: listing.ratingsCount,
-        price: listing.price,
-      });
-      const key = listing.brand ? brandKey(listing.brand) : "";
-      await ctx.db.patch(product._id, {
-        ...listing,
-        brandKey: key || undefined,
-        status: "ok",
-        error: undefined,
-        source,
-        velocity: (await velocityOf(ctx, product._id, at)) ?? undefined,
-        queuedAt: undefined,
-        checkedAt: at,
-      });
+      await applyReading(ctx, result, at, source);
     }
     for (const id of touched) await ctx.db.patch(id, { refreshedAt: at });
   },
@@ -901,6 +954,29 @@ export const linkAccount = memberMutation({
   },
 });
 
+async function openLeadFor(ctx: MutationCtx, decision: Doc<"prospectBrands">) {
+  const lead = decision.leadId ? await ctx.db.get(decision.leadId) : null;
+  return lead && isOpen(lead) ? lead : null;
+}
+
+/** Creates the brand's lead, opening with its review-gap talking point, and remembers it on the brand. */
+async function prospectLead(
+  ctx: MutationCtx,
+  decision: Doc<"prospectBrands">,
+  lead: Omit<NewLead, "companyName">,
+  subject: string,
+  actorId?: Id<"members">,
+) {
+  const { id } = await createLead(
+    ctx,
+    { ...lead, companyName: decision.brand },
+    { announce: actorId ? false : "lead_new" },
+  );
+  await logSystem(ctx, { leadId: id }, subject, lead.message, actorId);
+  await ctx.db.patch(decision._id, { leadId: id, updatedAt: Date.now() });
+  return id;
+}
+
 /** A lead for a brand, owned by the viewer, opening with the review-gap talking point. */
 export const createProspectLead = memberMutation({
   args: {
@@ -912,11 +988,8 @@ export const createProspectLead = memberMutation({
   },
   handler: async (ctx, args) => {
     const decision = await brandDecision(ctx, args.key);
-    if (decision.leadId) {
-      const lead = await ctx.db.get(decision.leadId);
-      if (lead && isOpen(lead)) {
-        fail("conflict", `${decision.brand} already has an open lead`);
-      }
+    if (await openLeadFor(ctx, decision)) {
+      fail("conflict", `${decision.brand} already has an open lead`);
     }
     const email = args.email?.trim()
       ? (normalizeEmail(args.email) ?? invalid("email", "Enter a valid email"))
@@ -931,33 +1004,275 @@ export const createProspectLead = memberMutation({
       invalid("message", "Keep it under 2,000 characters");
     const name = cleanText(args.name) ?? decision.brand;
     if (name.length > 120) invalid("name", "Name is too long");
-    const now = Date.now();
-    const { id } = await createLead(
+    const id = await prospectLead(
       ctx,
+      decision,
       {
         kind: "manual",
         name,
         email,
         phone,
-        companyName: decision.brand,
         message,
         source: "prospecting",
         utm: {},
         ownerId: ctx.viewer._id,
         // Owning a lead you created counts as the first touch, as for manual leads.
-        firstTouchedAt: now,
+        firstTouchedAt: Date.now(),
       },
-      { announce: false },
-    );
-    await logSystem(
-      ctx,
-      { leadId: id },
       `created the lead from ${decision.brand}'s marketplace review gap`,
-      message,
       ctx.viewer._id,
     );
-    await ctx.db.patch(decision._id, { leadId: id, updatedAt: now });
     return { id, href: leadHref(id) };
+  },
+});
+
+// ── Public review-gap check ─────────────────────────────────────────────────
+
+const MIN_FILL_MS = 1500;
+
+const auditOrigins = () => allowedOrigins("LEAD_FORM_ORIGINS", siteOrigins());
+
+export const reviewGapPreflight = httpAction(async (_ctx, request) =>
+  preflight(request, auditOrigins()),
+);
+
+/**
+ * Public "How far behind is your listing?" check: reads one listing with the
+ * same scraper and scoring as Prospecting, files it under Inbound audits and
+ * opens a lead with the visitor's consent. CORS-limited, rate-limited per IP
+ * and honeypot-guarded like the demo form; the hourly check budget is shared
+ * by every visitor so the public page can't run the scraper hot.
+ */
+export const reviewGap = httpAction(async (ctx, request) => {
+  const origins = auditOrigins();
+  const cors = corsHeaders(request, origins);
+  if (!originAllowed(request, origins)) {
+    return json({ ok: false, error: "Origin not allowed" }, 403, cors);
+  }
+  const ip = clientIp(request);
+  const limited = await rateLimiter.limit(ctx, "leadForm", {
+    key: `review-gap:${ip}`,
+  });
+  if (!limited.ok) {
+    return json(
+      { ok: false, error: "Too many checks. Try again in a minute." },
+      429,
+      { ...cors, "Retry-After": "60" },
+    );
+  }
+  const body = await readJson(request);
+  if (!body.ok)
+    return json({ ok: false, error: body.error }, body.status, cors);
+  const { value } = body;
+  const elapsed = Number(value.elapsedMs);
+  const trapped = typeof value.fax === "string" && value.fax.trim() !== "";
+  if (trapped || !Number.isFinite(elapsed) || elapsed < MIN_FILL_MS) {
+    return json({ ok: true, report: null }, 200, cors);
+  }
+  const parsed = parseReviewGap(value);
+  if (!parsed.ok) {
+    return json(
+      {
+        ok: false,
+        error: "Check the highlighted fields",
+        errors: parsed.errors,
+      },
+      422,
+      cors,
+    );
+  }
+  const budget = await rateLimiter.limit(ctx, "productChecks", {
+    key: "public",
+  });
+  if (!budget.ok) {
+    return json(
+      {
+        ok: false,
+        error: "We're checking a lot of listings right now. Try again shortly.",
+      },
+      429,
+      { ...cors, "Retry-After": String(Math.ceil(budget.retryAfter / 1000)) },
+    );
+  }
+  const { listing, ...contact } = parsed.value;
+  const at = Date.now();
+  const { source, results } = await readListings(
+    [{ id: listing.key, url: listing.url }],
+    at,
+  );
+  const report = await ctx.runMutation(internal.prospecting.recordAudit, {
+    at,
+    source,
+    url: listing.url,
+    marketplace: listing.marketplace,
+    identifier: listing.identifier,
+    listingKey: listing.key,
+    reading: toReading(results[0]),
+    contact,
+    ip: ip === "unknown" ? undefined : ip,
+  });
+  return json({ ok: true, report }, 200, cors);
+});
+
+const vReading = v.object({
+  error: v.optional(v.string()),
+  listing: vResult.fields.listing,
+});
+
+function toReading(result: ScrapeResult) {
+  const { id, ...reading } = toRecord(result);
+  void id;
+  return reading;
+}
+
+async function inboundSource(ctx: MutationCtx, memberId: Id<"members">) {
+  const lists = await liveWatchlists(ctx);
+  const existing = [...lists.values()].find(isInbound);
+  if (existing) return existing._id;
+  return await ctx.db.insert("watchlists", {
+    name: INBOUND_SOURCE,
+    createdById: memberId,
+    updatedAt: Date.now(),
+  });
+}
+
+export const recordAudit = internalMutation({
+  args: {
+    at: v.number(),
+    source: vSource,
+    url: v.string(),
+    marketplace: v.string(),
+    identifier: v.string(),
+    listingKey: v.string(),
+    reading: vReading,
+    contact: v.object({
+      name: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      utm: v.record(v.string(), v.string()),
+      referrer: v.optional(v.string()),
+      landingPage: v.optional(v.string()),
+    }),
+    ip: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const members = await ctx.db
+      .query("members")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+    const keeper =
+      members.find((member) => member.role === "admin") ?? members[0];
+    if (!keeper) fail("conflict", "The CRM has no active members yet");
+    const watchlistId = await inboundSource(ctx, keeper._id);
+    const existing = await ctx.db
+      .query("watchedProducts")
+      .withIndex("by_watchlist_listing", (q) =>
+        q.eq("watchlistId", watchlistId).eq("listingKey", args.listingKey),
+      )
+      .unique();
+    const productId =
+      existing?._id ??
+      (await ctx.db.insert("watchedProducts", {
+        watchlistId,
+        marketplace: args.marketplace,
+        identifier: args.identifier,
+        listingKey: args.listingKey,
+        url: args.url,
+        status: "pending",
+        addedById: keeper._id,
+      }));
+    if (existing?.removedAt) {
+      await ctx.db.patch(productId, { removedAt: undefined });
+    }
+    await applyReading(
+      ctx,
+      { id: productId, ...args.reading },
+      args.at,
+      args.source,
+    );
+    await ctx.db.patch(watchlistId, { refreshedAt: args.at });
+
+    const product = (await ctx.db.get(productId))!;
+    const row = product.brandKey
+      ? scoreScope(await loadScope(ctx, [product.brandKey])).find(
+          (item) => item._id === productId,
+        )
+      : undefined;
+    const pitch =
+      row?.score && row.benchmark && row.score.gap > 0
+        ? talkingPoint({
+            title: row.title ?? row.identifier,
+            marketplace: row.marketplace,
+            ratingsCount: row.ratingsCount!,
+            benchmark: row.benchmark,
+          })
+        : null;
+
+    const { contact } = args;
+    const message = [
+      pitch ?? `Ran a review-gap check on ${args.url}`,
+      row?.score?.reasons.join(". "),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const consent = {
+      text: REVIEW_GAP_CONSENT,
+      source: REVIEW_GAP_LEAD_SOURCE,
+      ip: args.ip,
+    };
+    const decision = product.brand
+      ? await brandDecision(ctx, product.brandKey!)
+      : null;
+    const open = decision ? await openLeadFor(ctx, decision) : null;
+    let leadId = open?._id;
+    if (open) {
+      await logSystem(
+        ctx,
+        { leadId: open._id },
+        "ran the public review-gap check again",
+        message,
+      );
+    } else {
+      const lead: NewLead = {
+        kind: "contact",
+        name:
+          contact.name ??
+          contact.email ??
+          `${product.brand ?? "Review-gap"} contact`,
+        email: contact.email,
+        phone: contact.phone,
+        companyName: product.brand ?? product.title ?? args.url,
+        message,
+        source: REVIEW_GAP_LEAD_SOURCE,
+        utm: contact.utm,
+        referrer: contact.referrer,
+        landingPage: contact.landingPage,
+      };
+      leadId = decision
+        ? await prospectLead(
+            ctx,
+            decision,
+            lead,
+            `created the lead from a public review-gap check on ${marketplaceName(args.marketplace)}`,
+          )
+        : (await createLead(ctx, lead)).id;
+    }
+    await recordConsents(ctx, leadId!, contact, consent);
+
+    if (!row || product.status !== "ok") return null;
+    return {
+      title: row.title ?? row.identifier,
+      brand: row.brand,
+      marketplace: row.marketplace,
+      rating: row.rating,
+      ratingsCount: row.ratingsCount,
+      velocity: row.velocity,
+      benchmark: row.benchmark,
+      score: row.score,
+      band: row.score ? scoreBand(row.score.score) : null,
+      talkingPoint: pitch,
+      sandbox: args.source === "sandbox",
+    };
   },
 });
 
@@ -1023,21 +1338,7 @@ export const seedDemo = internalMutation({
           price: last.listing.price ?? undefined,
         });
       }
-      const result = toRecord(last!);
-      if (!result.listing) {
-        await ctx.db.patch(id, { status: "failed", error: result.error });
-        continue;
-      }
-      await ctx.db.patch(id, {
-        ...result.listing,
-        brandKey: result.listing.brand
-          ? brandKey(result.listing.brand)
-          : undefined,
-        status: "ok",
-        source: "sandbox",
-        velocity: (await velocityOf(ctx, id, now)) ?? undefined,
-        checkedAt: now,
-      });
+      await applyReading(ctx, toRecord(last!), now, "sandbox");
     }
     return `seeded ${DEMO_URLS.length} products`;
   },

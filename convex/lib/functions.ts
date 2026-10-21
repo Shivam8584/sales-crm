@@ -4,9 +4,16 @@ import {
   customMutation,
   customQuery,
 } from "convex-helpers/server/customFunctions";
-import { mutation, query, type QueryCtx } from "../_generated/server";
+import {
+  internalMutation as rawInternalMutation,
+  mutation as rawMutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { ROLE_RANK, type Role } from "../../lib/domain/enums";
+import { triggers } from "./counts";
 import { fail } from "./errors";
 
 export type Viewer = Doc<"members">;
@@ -37,10 +44,33 @@ const withViewer = (minRole: Role) =>
     viewer: await requireViewer(ctx, minRole),
   }));
 
+/** Writes go through `triggers`, which keep the list counts in `./counts` exact. */
+const withViewerWrites = (minRole: Role) =>
+  customCtx(async (ctx: MutationCtx) => ({
+    db: triggers.wrapDB(ctx).db,
+    viewer: await requireViewer(ctx, minRole),
+  }));
+
 /** Any active member. Use for every app query. */
 export const memberQuery = customQuery(query, withViewer("rep"));
 /** Any active member. Use for every app mutation. */
-export const memberMutation = customMutation(mutation, withViewer("rep"));
-export const managerMutation = customMutation(mutation, withViewer("manager"));
+export const memberMutation = customMutation(
+  rawMutation,
+  withViewerWrites("rep"),
+);
+export const managerQuery = customQuery(query, withViewer("manager"));
+export const managerMutation = customMutation(
+  rawMutation,
+  withViewerWrites("manager"),
+);
 export const adminQuery = customQuery(query, withViewer("admin"));
-export const adminMutation = customMutation(mutation, withViewer("admin"));
+export const adminMutation = customMutation(
+  rawMutation,
+  withViewerWrites("admin"),
+);
+/** Use instead of the raw builders from `_generated/server` for every mutation. */
+export const mutation = customMutation(rawMutation, customCtx(triggers.wrapDB));
+export const internalMutation = customMutation(
+  rawInternalMutation,
+  customCtx(triggers.wrapDB),
+);

@@ -190,8 +190,8 @@ export const DEFAULT_PAYMENT: Payment = { mode: "prepaid" };
 
 /** The company's rules, set by an admin in Settings → Workspace. */
 export type CompanyPolicy = {
+  /** Pricing below this margin, on any line or blended, needs a manager's approval. */
   marginFloorBps: number;
-  approvalBps: number;
   defaultMarginBps: number;
   defaultFundBps: number;
   defaultFeeBps: number;
@@ -205,7 +205,6 @@ export type PricingPolicy = CompanyPolicy & { platformFloor: PlatformFloor };
 
 export const DEFAULT_COMPANY_POLICY: CompanyPolicy = {
   marginFloorBps: 500,
-  approvalBps: 1_500,
   defaultMarginBps: 3_000,
   defaultFundBps: 6_000,
   defaultFeeBps: 1_000,
@@ -221,7 +220,6 @@ export const DEFAULT_POLICY: PricingPolicy = {
 
 export const POLICY_FIELDS = [
   "marginFloorBps",
-  "approvalBps",
   "defaultMarginBps",
   "defaultFundBps",
   "defaultFeeBps",
@@ -231,7 +229,6 @@ export type PolicyField = (typeof POLICY_FIELDS)[number];
 
 const MARGIN_FIELDS: readonly PolicyField[] = [
   "marginFloorBps",
-  "approvalBps",
   "defaultMarginBps",
 ];
 
@@ -264,11 +261,8 @@ export function policyProblem(policy: CompanyPolicy) {
       return `Keep margins at ${bpsLabel(MAX_MARGIN_BPS)} or less`;
     }
   }
-  if (policy.marginFloorBps > policy.approvalBps) {
-    return "The margin floor can't be above the approval threshold";
-  }
-  if (policy.approvalBps > policy.defaultMarginBps) {
-    return "The approval threshold can't be above the default margin";
+  if (policy.marginFloorBps > policy.defaultMarginBps) {
+    return "The margin floor can't be above the default margin";
   }
   return orderPoolProblem(policy.defaultFundBps, policy.defaultFeeBps);
 }
@@ -361,7 +355,7 @@ export type ProposalPricing = {
   marginRate: number;
   takeRate: number;
   belowFloorCount: number;
-  blendedBelowApproval: boolean;
+  blendedBelowFloor: boolean;
   needsApproval: boolean;
   /** Billed before GST if every line fills to its oversubscription limit. */
   maxBilled: number;
@@ -592,17 +586,17 @@ export function priceLines(
   const priced = lines.map((line) => priceLine(line, policy));
   const total = priced.reduce((sum, line) => add(sum, line.total), ZERO);
   const belowFloorCount = priced.filter((line) => line.belowFloor).length;
-  const blendedBelowApproval =
+  const blendedBelowFloor =
     lines.length > 0 &&
-    isBelow(total.margin, total.brandCharge, policy.approvalBps);
+    isBelow(total.margin, total.brandCharge, policy.marginFloorBps);
   return {
     lines: priced,
     total,
     marginRate: rate(total.margin, total.brandCharge),
     takeRate: rate(total.take, total.brandCharge),
     belowFloorCount,
-    blendedBelowApproval,
-    needsApproval: belowFloorCount > 0 || blendedBelowApproval,
+    blendedBelowFloor,
+    needsApproval: belowFloorCount > 0 || blendedBelowFloor,
     maxBilled: priced.reduce(
       (sum, line) => sum + line.perEnrollment.billed * line.maxEnrollments,
       0,
@@ -631,13 +625,13 @@ export function approvalReasons(
         : `${pricing.belowFloorCount} lines are below the ${floor} margin floor`,
     );
   }
-  if (pricing.blendedBelowApproval) {
-    reasons.push(`Blended margin is under ${bpsLabel(policy.approvalBps)}`);
+  if (pricing.blendedBelowFloor) {
+    reasons.push(`Blended margin is below the ${floor} margin floor`);
   }
   return reasons;
 }
 
-export type MarginBand = "below_floor" | "low" | "target" | "default";
+export type MarginBand = "below_floor" | "target" | "default";
 
 export function marginBand(
   margin: number,
@@ -645,7 +639,6 @@ export function marginBand(
   policy: CompanyPolicy,
 ): MarginBand {
   if (isBelow(margin, charge, policy.marginFloorBps)) return "below_floor";
-  if (isBelow(margin, charge, policy.approvalBps)) return "low";
   if (isBelow(margin, charge, policy.defaultMarginBps)) return "target";
   return "default";
 }

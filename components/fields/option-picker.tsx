@@ -32,6 +32,11 @@ type OptionPickerProps = {
   className?: string;
   /** Custom trigger content; defaults to the selected option. */
   children?: ReactNode;
+  /**
+   * Server search: called with the typed text, and `options` are shown as
+   * given (already matched) instead of being filtered here.
+   */
+  onSearch?: (text: string) => void;
 };
 
 function optionValue(option: Option) {
@@ -51,19 +56,25 @@ export default function OptionPicker({
   align = "start",
   className,
   children,
+  onSearch,
 }: OptionPickerProps) {
   const [open, setOpen] = useState(false);
   const commandRef = useRef<HTMLDivElement>(null);
-  const searchable = options.length > 7;
+  const searchable = Boolean(onSearch) || options.length > 7;
   const selected = options.find((option) => option.value === value);
 
+  function toggle(next: boolean) {
+    setOpen(next);
+    if (!next) onSearch?.("");
+  }
+
   function pick(next: string | null) {
-    setOpen(false);
+    toggle(false);
     if (next !== value) onChange(next);
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={toggle}>
       <PopoverTrigger
         disabled={disabled}
         aria-label={`${label}: ${selected?.label ?? placeholder}`}
@@ -100,11 +111,13 @@ export default function OptionPicker({
           tabIndex={-1}
           label={label}
           defaultValue={selected ? optionValue(selected) : undefined}
+          shouldFilter={!onSearch}
           className="flex flex-col outline-none"
         >
           {searchable && (
             <CommandPrimitive.Input
               placeholder={searchPlaceholder}
+              onValueChange={onSearch}
               className="border-line-strong placeholder:text-fg-tertiary h-10 border-b bg-transparent px-3 text-sm outline-none"
             />
           )}

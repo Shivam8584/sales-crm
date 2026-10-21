@@ -34,9 +34,7 @@ import CalendarIcon from "@/public/assets/icons/calendar.svg";
 export type WaitingLead = FunctionReturnType<
   typeof api.leads.waiting
 >["leads"][number];
-export type StuckRow = FunctionReturnType<
-  typeof api.activation.desk
->["rows"][number] & { label: string; playbook: string };
+export type StuckRow = FunctionReturnType<typeof api.activation.mine>[number];
 export type DealRow = FunctionReturnType<typeof api.deals.list>[number];
 
 type RowProps = { active: boolean; onHover: (id: string) => void };

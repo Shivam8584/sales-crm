@@ -24,6 +24,7 @@ import Skeleton from "@/components/_ui/skeleton";
 import OptionPicker, { type Option } from "@/components/fields/option-picker";
 import AccountPicker from "@/features/accounts/account-picker";
 import MemberPicker from "@/features/members/member-picker";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import {
   PRIORITIES,
@@ -213,10 +214,13 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
   const [saving, setSaving] = useState(false);
   const [titleTouched, setTitleTouched] = useState(false);
 
-  const people = useQuery(
-    api.people.list,
-    draft.accountId ? { accountId: draft.accountId } : {},
-  );
+  const [personSearch, setPersonSearch] = useState("");
+  const personQuery = useDebouncedValue(personSearch, 150);
+  const people = useQuery(api.people.search, {
+    search: personQuery,
+    accountId: draft.accountId ?? undefined,
+    selected: draft.personId ?? undefined,
+  });
 
   const changed = (Object.keys(draft) as (keyof Draft)[]).filter((key) =>
     key === "title" || key === "notes"
@@ -549,9 +553,12 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
               options={personOptions}
               label="Person"
               placeholder={
-                people && people.length === 0 ? "No people" : "No person"
+                people && people.length === 0 && !personQuery
+                  ? "No people"
+                  : "No person"
               }
               searchPlaceholder="Search people…"
+              onSearch={setPersonSearch}
               clearLabel="Remove person"
               onChange={(id) => {
                 const personId = id as Id<"people"> | null;

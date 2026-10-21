@@ -126,7 +126,7 @@ export default function TodayPage() {
     done: "recent",
   });
   const waiting = useQuery(api.leads.waiting, {});
-  const desk = useQuery(api.activation.desk, {});
+  const stuck = useQuery(api.activation.mine, {});
   const deals = useQuery(api.deals.list, { open: true });
   const accounts = useQuery(api.accounts.list, {});
   const accountStats = useQuery(api.accounts.listStats, {});
@@ -140,14 +140,17 @@ export default function TodayPage() {
   const weekAhead = dayFromToday(7);
 
   const sections = useMemo((): Section[] => {
+    // A stall's auto task shows on its stuck card, not again in the task lists.
+    const stallTasks = new Set(
+      stuck?.flatMap((row) => (row.task ? [row.task._id] : [])),
+    );
     const open = tasks
-      ?.filter((task) => task.status !== "done")
+      ?.filter((task) => task.status !== "done" && !stallTasks.has(task._id))
       .sort(byUrgency);
     const taskItems = (filter: (task: TaskRow) => boolean) =>
       open
         ?.filter(filter)
         .map((task): Item => ({ kind: "task", id: task._id, task }));
-    const rules = new Map(desk?.rules.map((rule) => [rule.id, rule]) ?? []);
     return [
       {
         id: "leads",
@@ -204,24 +207,13 @@ export default function TodayPage() {
         stat: "Stuck brands",
         icon: TargetIcon,
         aside: true,
-        items: desk?.rows
-          .filter((row) => row.owner?._id === viewer._id)
-          .sort((a, b) => a.since - b.since)
-          .map((row) => {
-            const rule = rules.get(row.ruleId);
-            return {
-              kind: "stuck",
-              id: row._id,
-              row: {
-                ...row,
-                label: rule?.label ?? "Stuck",
-                playbook: rule?.playbook ?? "",
-              },
-            };
-          }),
+        items: stuck?.map((row) => ({ kind: "stuck", id: row._id, row })),
         tone: "warning",
         empty: "Every brand you own is moving through onboarding.",
-        href: { label: "Activation", to: "/activation?owner=mine" },
+        href:
+          viewer.role === "rep"
+            ? undefined
+            : { label: "Activation", to: "/activation?owner=mine" },
       },
       {
         id: "deals",
@@ -243,7 +235,7 @@ export default function TodayPage() {
         href: { label: "Pipeline", to: "/deals?owner=mine" },
       },
     ];
-  }, [tasks, waiting, desk, deals, viewer._id, today, weekAhead]);
+  }, [tasks, waiting, stuck, deals, viewer, today, weekAhead]);
 
   const { main, aside } = useMemo(() => {
     if (focus) {

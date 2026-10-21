@@ -44,9 +44,9 @@ import { MarketplaceChips, ScoreTag } from "./prospect-cells";
 const CRUMBS = [{ label: "Prospecting", href: "/prospecting" }];
 
 const BENCHMARK_SOURCE = {
-  set: "Set on the watchlist",
+  set: "Set on the source",
   category: "Category leaders",
-  watchlist: "Watchlist leaders",
+  watchlist: "Leaders in the source",
 } as const;
 
 type Brand = NonNullable<FunctionReturnType<typeof api.prospecting.brand>>;
@@ -62,7 +62,7 @@ export default function BrandPage({ brandKey }: { brandKey: string }) {
         <EmptyState
           icon={EyeIcon}
           title="No watched products for this brand"
-          description="Its products may have been removed from every watchlist."
+          description="Its products may have been removed from every source."
           action={
             <Button variant="secondary" size="sm" href="/prospecting">
               Back to prospecting
@@ -298,7 +298,7 @@ function BrandView({ brand }: { brand: Brand }) {
               divider={false}
             >
               <Properties>
-                <Property label="Watchlists">
+                <Property label="Sources">
                   <span
                     className="truncate text-sm"
                     title={watchlists.join(", ")}
@@ -343,7 +343,7 @@ function BrandView({ brand }: { brand: Brand }) {
             ) : (
               <p className="text-fg-secondary text-sm">
                 {brand.score === null
-                  ? "Not scored yet: the watchlist needs at least three rated products to set a benchmark."
+                  ? "Not scored yet: the source needs at least three rated products to set a benchmark."
                   : "Every listing is level with its benchmark, so there is no review gap to pitch."}
               </p>
             )}

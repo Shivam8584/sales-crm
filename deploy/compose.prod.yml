@@ -99,7 +99,10 @@ services:
         NEXT_PUBLIC_CONVEX_SITE_URL: https://${CONVEX_SITE_HOST}
         NEXT_PUBLIC_SITE_URL: https://${WEB_HOST:?}
         NEXT_PUBLIC_CALCOM_LINK: ${NEXT_PUBLIC_CALCOM_LINK:-}
+        NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN:-}
     restart: unless-stopped
+    environment:
+      SENTRY_DSN: ${SENTRY_DSN:-}
     networks: [dokploy-network]
     labels:
       traefik.enable: "true"

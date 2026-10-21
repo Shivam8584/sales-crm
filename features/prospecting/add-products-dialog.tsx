@@ -31,7 +31,7 @@ const MAX_FILE_BYTES = 1024 * 1024;
 
 type Errors = Partial<Record<"watchlist" | "name" | "urls" | "form", string>>;
 
-/** Paste or upload product links into a watchlist; shows what will be added before saving. */
+/** Paste or upload product links into a source; shows what will be added before saving. */
 export default function AddProductsDialog({
   open,
   onOpenChange,
@@ -41,7 +41,10 @@ export default function AddProductsDialog({
   onOpenChange: (open: boolean) => void;
   watchlistId?: string | null;
 }) {
-  const watchlists = useQuery(api.prospecting.watchlists, open ? {} : "skip");
+  const watchlists = useQuery(
+    api.prospecting.watchlists,
+    open ? {} : "skip",
+  )?.filter((list) => !list.inbound);
   const createWatchlist = useMutation(api.prospecting.createWatchlist);
   const addProducts = useMutation(api.prospecting.addProducts);
   const [picked, setPicked] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export default function AddProductsDialog({
   async function submit(event: FormEvent) {
     event.preventDefault();
     const next: Errors = {};
-    if (target === NEW && !name.trim()) next.name = "Name the watchlist";
+    if (target === NEW && !name.trim()) next.name = "Name the source";
     if (ready.length === 0) {
       next.urls = entries.length
         ? "None of these links can be watched yet"
@@ -115,7 +118,7 @@ export default function AddProductsDialog({
       toast(
         result.added
           ? `Watching ${result.added} new ${result.added === 1 ? "product" : "products"}${skipped ? ` · ${skipped} already listed or unreadable` : ""}. First checks are running.`
-          : "Those products are already in this watchlist",
+          : "Those products are already in this source",
         { tone: result.added ? "success" : "info" },
       );
     } catch (error) {
@@ -134,7 +137,7 @@ export default function AddProductsDialog({
       value: list._id as string,
       label: `${list.name} · ${list.products}`,
     })),
-    { value: NEW, label: "New watchlist…" },
+    { value: NEW, label: "New source…" },
   ];
 
   return (
@@ -152,7 +155,7 @@ export default function AddProductsDialog({
           <div className="flex flex-col gap-4 px-6 py-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="Watchlist"
+                label="Source"
                 htmlFor="watch-list"
                 error={errors.watchlist}
               >

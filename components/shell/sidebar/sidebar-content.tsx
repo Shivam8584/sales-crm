@@ -19,7 +19,7 @@ import Logo from "@/public/assets/images/_common/logo.svg";
 import SidebarIcon from "@/public/assets/icons/sidebar.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import HelpIcon from "@/public/assets/icons/message-question.svg";
-import { NAV_SECTIONS, SETTINGS_ITEM, isActive } from "../navigation";
+import { SETTINGS_ITEM, isActive, navSections } from "../navigation";
 import SidebarNavItem from "./sidebar-nav-item";
 import SidebarSection from "./sidebar-section";
 
@@ -43,6 +43,7 @@ export default function SidebarContent({
 }) {
   const pathname = usePathname();
   const viewer = useViewer();
+  const sections = navSections(viewer.role);
   const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen);
   const collapsedState = useSidebarCollapsed();
@@ -109,13 +110,12 @@ export default function SidebarContent({
 
       <ScrollArea className="min-h-0 flex-1">
         <nav aria-label="Primary">
-          {NAV_SECTIONS.map((section, index) => (
+          {sections.map((section, index) => (
             <SidebarSection
               key={section.title ?? index}
               title={section.title}
               className={cn(
-                index < NAV_SECTIONS.length - 1 &&
-                  "border-sidebar-border border-b",
+                index < sections.length - 1 && "border-sidebar-border border-b",
               )}
             >
               {section.items.map((item) => {

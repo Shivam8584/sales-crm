@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Kbd from "@/components/_ui/kbd";
-import FilterMenu from "@/components/_common/filter-menu";
+import { Switch } from "@/components/_ui/switch";
 import SelectionBar from "@/components/data-table/selection-bar";
 import {
   Page,
@@ -15,94 +15,62 @@ import {
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
-import { KIND_GROUPS } from "@/features/notifications/kinds";
 import { useNotificationActions } from "@/features/notifications/use-notification-actions";
 import { useUrlState } from "@/hooks/use-url-state";
-import type { SnoozePreset } from "@/lib/domain/notifications";
 import { isEditableTarget } from "@/lib/keyboard";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
+import ArchiveIcon from "@/public/assets/icons/archive.svg";
 import AtSignIcon from "@/public/assets/icons/at-sign.svg";
 import BellIcon from "@/public/assets/icons/bell.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
-import FilterIcon from "@/public/assets/icons/filter.svg";
+import MailIcon from "@/public/assets/icons/mail.svg";
 import {
   GroupHeader,
   InboxRow,
   InboxSkeleton,
   ROW_ATTR,
-  SnoozeMenu,
   groupByRecord,
-  wakeLabel,
   type InboxItem,
   type RowActions,
 } from "./inbox-list";
 
 const PAGE = 50;
-const VIEWS = ["inbox", "mentions", "snoozed", "done"] as const;
+const VIEWS = ["inbox", "mentions", "archived"] as const;
 type View = (typeof VIEWS)[number];
 const OVERLAY = "[role=dialog], [role=menu], [role=listbox]";
-
-const TYPE_OPTIONS = [
-  { value: "all", label: "All" },
-  ...KIND_GROUPS.filter((group) => group.value !== "mentions").map((group) => ({
-    value: group.value,
-    label: group.label,
-  })),
-];
-const SHOW_OPTIONS = [
-  { value: "all", label: "All" },
-  { value: "unread", label: "Unread" },
-];
-const GROUP_OPTIONS = [
-  { value: "record", label: "Record" },
-  { value: "none", label: "None" },
-];
 
 const plural = (count: number, noun: string) =>
   `${count} ${count === 1 ? noun : `${noun}s`}`;
 
-/** Notifications for the signed-in member: grouped by record, with done, snooze and read state. */
+/** The signed-in member's notifications, grouped by record: archive, read state and bulk actions. */
 export default function InboxPage() {
   const [viewParam, setView] = useUrlState("view", "inbox");
-  const [typeParam, setType] = useUrlState("type", "all");
   const [show, setShow] = useUrlState("show", "all");
-  const [grouping, setGrouping] = useUrlState("group", "record");
   const [limit, setLimit] = useState(PAGE);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [cursorId, setCursorId] = useState<string | null>(null);
-  const [snoozeFor, setSnoozeFor] = useState<string | null>(null);
-  const [bulkSnooze, setBulkSnooze] = useState(false);
   const actions = useNotificationActions();
 
-  const view: View = (VIEWS as readonly string[]).includes(viewParam)
-    ? (viewParam as View)
-    : "inbox";
-  const type = TYPE_OPTIONS.some((option) => option.value === typeParam)
-    ? typeParam
-    : "all";
-  const unreadOnly =
-    show === "unread" && (view === "inbox" || view === "mentions");
-  const grouped = grouping !== "none";
+  const view: View =
+    viewParam === "done"
+      ? "archived"
+      : (VIEWS as readonly string[]).includes(viewParam)
+        ? (viewParam as View)
+        : "inbox";
+  const unreadOnly = show === "unread" && view !== "archived";
 
   const result = useQuery(api.notifications.inbox, {
     view,
     unreadOnly: unreadOnly || undefined,
-    group: view !== "mentions" && type !== "all" ? type : undefined,
     limit,
   });
   const counts = useQuery(api.notifications.counts);
   const items = result?.items;
 
   const groups = useMemo(
-    () =>
-      result
-        ? grouped
-          ? groupByRecord(result.items, result.records)
-          : [{ key: "all", record: null, items: result.items }]
-        : [],
-    [result, grouped],
+    () => (result ? groupByRecord(result.items, result.records) : []),
+    [result],
   );
   const ordered = useMemo(
     () => groups.flatMap((group) => group.items),
@@ -157,49 +125,53 @@ export default function InboxPage() {
   const report = (error: unknown) =>
     toast(readError(error).message, { tone: "danger" });
 
+  /** Read changes in the Archived view move items back to the inbox, so they leave the list. */
+  function setRead(targets: InboxItem[], read: boolean) {
+    const changing = targets.filter((item) => item.read !== read);
+    if (changing.length === 0) return;
+    setSelected(new Set());
+    if (!read && view === "archived") moveCursorOff(changing);
+    actions
+      .setRead({ ids: changing.map((item) => item._id), read })
+      .then((previous) =>
+        toast(
+          `${plural(previous.length, "notification")} marked ${read ? "read" : "unread"}`,
+          () => void actions.restoreState({ items: previous }).catch(report),
+        ),
+      )
+      .catch(report);
+  }
+
+  function moveCursorOff(leaving: InboxItem[]) {
+    if (cursorId && leaving.some((item) => item._id === cursorId)) {
+      focusRow(nextAfter(leaving));
+    }
+  }
+
   const rowActions: RowActions = {
     open(item) {
-      if (!item.read) void actions.markRead({ id: item._id }).catch(report);
-    },
-    done(targets, done) {
-      if (targets.length === 0) return;
-      if (cursorId && targets.some((item) => item._id === cursorId)) {
-        focusRow(nextAfter(targets));
+      if (!item.read) {
+        void actions.setRead({ ids: [item._id], read: true }).catch(report);
       }
+    },
+    archive(targets, archived) {
+      if (targets.length === 0) return;
+      moveCursorOff(targets);
       setSelected(new Set());
       actions
-        .setDone({ ids: targets.map((item) => item._id), done })
+        .setArchived({ ids: targets.map((item) => item._id), archived })
         .then((previous) =>
           toast(
-            done
-              ? `${plural(previous.length, "notification")} marked done`
+            archived
+              ? `${plural(previous.length, "notification")} archived`
               : `${plural(previous.length, "notification")} moved to the inbox`,
             () => void actions.restoreState({ items: previous }).catch(report),
           ),
         )
         .catch(report);
     },
-    snooze(targets, preset: SnoozePreset) {
-      if (targets.length === 0) return;
-      if (cursorId && targets.some((item) => item._id === cursorId)) {
-        focusRow(nextAfter(targets));
-      }
-      setSelected(new Set());
-      actions
-        .snooze({ ids: targets.map((item) => item._id), preset })
-        .then(({ until, previous }) =>
-          toast(
-            `Snoozed until ${wakeLabel(until)}`,
-            () => void actions.restoreState({ items: previous }).catch(report),
-          ),
-        )
-        .catch(report);
-    },
     toggleRead(item) {
-      const call = item.read
-        ? actions.markUnread({ id: item._id })
-        : actions.markRead({ id: item._id });
-      void call.catch(report);
+      setRead([item], !item.read);
     },
     select(item, on) {
       setSelected((current) => {
@@ -212,21 +184,15 @@ export default function InboxPage() {
     setCursor: setCursorId,
   };
 
-  function setSelectedRead(read: boolean) {
-    const targets = selectedItems.filter((item) => item.read !== read);
-    setSelected(new Set());
-    for (const item of targets) {
-      const call = read
-        ? actions.markRead({ id: item._id })
-        : actions.markUnread({ id: item._id });
-      void call.catch(report);
-    }
-  }
-
   async function readAll() {
     try {
-      const count = await actions.markAllRead();
-      if (count > 0) toast(`Marked ${plural(count, "notification")} as read`);
+      const previous = await actions.markAllRead();
+      if (previous.length > 0) {
+        toast(
+          `Marked ${plural(previous.length, "notification")} as read`,
+          () => void actions.restoreState({ items: previous }).catch(report),
+        );
+      }
     } catch (error) {
       report(error);
     }
@@ -268,22 +234,15 @@ export default function InboxPage() {
       }
       if (key === "e" && targets.length > 0) {
         event.preventDefault();
-        rowActions.done(targets, view !== "done");
-        return;
-      }
-      if (key === "s" && targets.length > 0 && view !== "done") {
-        event.preventDefault();
-        if (selectedItems.length > 0) setBulkSnooze(true);
-        else if (current) setSnoozeFor(current._id);
+        rowActions.archive(targets, view !== "archived");
         return;
       }
       if (key === "u" && targets.length > 0) {
         event.preventDefault();
-        if (selectedItems.length > 0) {
-          setSelectedRead(selectedItems.some((item) => !item.read));
-        } else if (current) {
-          rowActions.toggleRead(current);
-        }
+        setRead(
+          targets,
+          targets.some((item) => !item.read),
+        );
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -294,8 +253,7 @@ export default function InboxPage() {
   const views = [
     { id: "inbox", label: "Inbox", count: counts?.inbox },
     { id: "mentions", label: "Mentions", count: counts?.mentions },
-    { id: "snoozed", label: "Snoozed", count: counts?.snoozed },
-    { id: "done", label: "Done" },
+    { id: "archived", label: "Archived" },
   ];
 
   return (
@@ -332,42 +290,32 @@ export default function InboxPage() {
           </Button>
         }
       >
-        {view !== "mentions" && (
-          <FilterMenu
-            label="Type"
-            value={type}
-            options={TYPE_OPTIONS}
-            onChange={(value) => {
-              setType(value === "all" ? "" : value);
-              setLimit(PAGE);
-            }}
-          />
+        {view !== "archived" && (
+          <label
+            htmlFor="inbox-unread-only"
+            className="text-fg-secondary hover:text-foreground h-control-md duration-fast flex cursor-pointer items-center gap-2 text-xs font-medium transition-colors select-none"
+          >
+            <Switch
+              id="inbox-unread-only"
+              checked={unreadOnly}
+              onCheckedChange={(on) => {
+                setShow(on ? "unread" : "");
+                setLimit(PAGE);
+              }}
+            />
+            Unread only
+          </label>
         )}
-        {(view === "inbox" || view === "mentions") && (
-          <FilterMenu
-            label="Show"
-            value={unreadOnly ? "unread" : "all"}
-            options={SHOW_OPTIONS}
-            onChange={(value) => setShow(value === "all" ? "" : value)}
-          />
-        )}
-        <FilterMenu
-          label="Group by"
-          value={grouped ? "record" : "none"}
-          options={GROUP_OPTIONS}
-          onChange={(value) => setGrouping(value === "record" ? "" : value)}
-          className="max-sm:hidden"
-        />
         <span className="caption-style text-fg-tertiary hidden items-center gap-1.5 pl-2 xl:flex">
           <Kbd>J</Kbd>
           <Kbd>K</Kbd>
           move
+          <Kbd className="ml-2">↵</Kbd>
+          open
           <Kbd className="ml-2">E</Kbd>
-          done
-          <Kbd className="ml-2">S</Kbd>
-          snooze
+          {view === "archived" ? "unarchive" : "archive"}
           <Kbd className="ml-2">U</Kbd>
-          unread
+          read
           <Kbd className="ml-2">X</Kbd>
           select
         </span>
@@ -380,12 +328,9 @@ export default function InboxPage() {
           ) : items.length === 0 ? (
             <InboxEmpty
               view={view}
-              filtered={type !== "all" || unreadOnly}
-              onReset={() => {
-                setType("");
-                setShow("");
-                changeView("inbox");
-              }}
+              unreadOnly={unreadOnly}
+              onShowAll={() => setShow("")}
+              onReset={() => changeView("inbox")}
             />
           ) : (
             <>
@@ -394,20 +339,15 @@ export default function InboxPage() {
                   key={group.key}
                   aria-label={group.record?.name ?? "Notifications"}
                 >
-                  {grouped && <GroupHeader group={group} />}
+                  <GroupHeader group={group} />
                   <ul className="flex flex-col">
                     {group.items.map((item) => (
                       <InboxRow
                         key={item._id}
                         item={item}
-                        view={view}
                         cursor={item._id === cursorId}
                         selected={selected.has(item._id)}
                         selecting={selected.size > 0}
-                        snoozeOpen={snoozeFor === item._id}
-                        onSnoozeOpenChange={(open) =>
-                          setSnoozeFor(open ? item._id : null)
-                        }
                         actions={rowActions}
                       />
                     ))}
@@ -436,29 +376,28 @@ export default function InboxPage() {
           <Button
             variant="ghost"
             size="xs"
-            onClick={() => rowActions.done(selectedItems, view !== "done")}
+            onClick={() =>
+              rowActions.archive(selectedItems, view !== "archived")
+            }
           >
-            {view === "done" ? "Move to inbox" : "Done"}
+            {view === "archived" ? (
+              <BellIcon aria-hidden className="size-3" />
+            ) : (
+              <ArchiveIcon aria-hidden className="size-3" />
+            )}
+            {view === "archived" ? "Move to inbox" : "Archive"}
           </Button>
-          {view !== "done" && (
-            <SnoozeMenu
-              open={bulkSnooze}
-              onOpenChange={setBulkSnooze}
-              onSnooze={(preset) => rowActions.snooze(selectedItems, preset)}
-              trigger={
-                <Button variant="ghost" size="xs">
-                  Snooze
-                </Button>
-              }
-            />
-          )}
           <Button
             variant="ghost"
             size="xs"
             onClick={() =>
-              setSelectedRead(selectedItems.some((item) => !item.read))
+              setRead(
+                selectedItems,
+                selectedItems.some((item) => !item.read),
+              )
             }
           >
+            <MailIcon aria-hidden className="size-3" />
             {selectedItems.some((item) => !item.read)
               ? "Mark read"
               : "Mark unread"}
@@ -471,25 +410,26 @@ export default function InboxPage() {
 
 function InboxEmpty({
   view,
-  filtered,
+  unreadOnly,
+  onShowAll,
   onReset,
 }: {
   view: View;
-  filtered: boolean;
+  unreadOnly: boolean;
+  onShowAll: () => void;
   onReset: () => void;
 }) {
-  const reset = (
-    <Button variant="secondary" size="sm" onClick={onReset}>
-      Show everything in the inbox
-    </Button>
-  );
-  if (filtered) {
+  if (unreadOnly) {
     return (
       <EmptyState
-        icon={FilterIcon}
-        title="Nothing matches these filters"
-        description="Other notifications are still in your inbox."
-        action={reset}
+        icon={CheckCircleIcon}
+        title="No unread notifications"
+        description="Everything here has been read. Turn off Unread only to see the rest."
+        action={
+          <Button variant="secondary" size="sm" onClick={onShowAll}>
+            Show read notifications
+          </Button>
+        }
       />
     );
   }
@@ -499,27 +439,25 @@ function InboxEmpty({
         icon={AtSignIcon}
         title="No mentions"
         description="When a teammate types @ and your name in a note or call log, it lands here and links straight to the entry."
-        action={reset}
+        action={
+          <Button variant="secondary" size="sm" onClick={onReset}>
+            Back to the inbox
+          </Button>
+        }
       />
     );
   }
-  if (view === "snoozed") {
+  if (view === "archived") {
     return (
       <EmptyState
-        icon={ClockIcon}
-        title="Nothing snoozed"
-        description="Press S on a notification to hide it until tomorrow or next week at 9:00. It comes back unread."
-        action={reset}
-      />
-    );
-  }
-  if (view === "done") {
-    return (
-      <EmptyState
-        icon={CheckCircleIcon}
-        title="Nothing marked done yet"
-        description="Press E on a notification once you've dealt with it to clear it from your inbox."
-        action={reset}
+        icon={ArchiveIcon}
+        title="Nothing archived yet"
+        description="Press E on a notification once you've dealt with it. It moves here, out of your inbox."
+        action={
+          <Button variant="secondary" size="sm" onClick={onReset}>
+            Back to the inbox
+          </Button>
+        }
       />
     );
   }

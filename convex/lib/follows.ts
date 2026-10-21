@@ -1,8 +1,7 @@
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { notify, prefsFor } from "../notifications";
+import { notify } from "../notifications";
 import {
-  deliversInApp,
   entryHref,
   followEvent,
   followTitle,
@@ -86,17 +85,10 @@ export async function notifyFollowers(
     if (
       latest &&
       joinsBatch(
-        {
-          createdAt: latest._creationTime,
-          count: latest.count ?? 1,
-          doneAt: latest.doneAt,
-          snoozedUntil: latest.snoozedUntil,
-        },
+        { createdAt: latest._creationTime, archivedAt: latest.archivedAt },
         now,
       )
     ) {
-      const prefs = await prefsFor(ctx, memberId);
-      if (!deliversInApp("follow", prefs?.muted ?? [])) continue;
       const count = (latest.count ?? 1) + 1;
       await ctx.db.patch(latest._id, {
         title: followTitle(name, count),

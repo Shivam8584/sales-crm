@@ -10,6 +10,8 @@ type SelectionBarProps = {
   noun: [singular: string, plural: string];
   onClear: () => void;
   children: ReactNode;
+  /** How many rows "select all" covered when the list isn't fully loaded, e.g. 50. */
+  loaded?: number;
 };
 
 /** Floating actions for the rows currently selected in a list. */
@@ -18,6 +20,7 @@ export default function SelectionBar({
   noun,
   onClear,
   children,
+  loaded,
 }: SelectionBarProps) {
   return (
     <AnimatePresence>
@@ -33,6 +36,9 @@ export default function SelectionBar({
         >
           <span className="caption-style text-foreground mr-2 whitespace-nowrap tabular-nums">
             {count} {count === 1 ? noun[0] : noun[1]} selected
+            {loaded !== undefined && (
+              <span className="text-fg-tertiary"> of {loaded} loaded</span>
+            )}
           </span>
           {children}
           <Button

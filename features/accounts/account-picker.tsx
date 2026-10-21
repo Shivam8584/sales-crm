@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import OptionPicker, { type Option } from "@/components/fields/option-picker";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import AccountLogo from "./account-logo";
 
 type AccountPickerProps = {
@@ -13,6 +15,7 @@ type AccountPickerProps = {
   placeholder?: string;
 };
 
+/** Searches accounts on the server as you type; recently active ones first. */
 export default function AccountPicker({
   value,
   currentName,
@@ -20,18 +23,19 @@ export default function AccountPicker({
   className,
   placeholder = "No account",
 }: AccountPickerProps) {
-  const accounts = useQuery(api.accounts.list, {});
+  const [search, setSearch] = useState("");
+  const query = useDebouncedValue(search, 150);
+  const accounts = useQuery(api.accounts.search, {
+    search: query,
+    selected: value ?? undefined,
+  });
   const options: Option[] = (accounts ?? []).map((account) => ({
     value: account._id,
     label: account.name,
     hint: account.domain ?? undefined,
     icon: <AccountLogo account={account} size="xs" />,
   }));
-  if (
-    value &&
-    currentName &&
-    !options.some((option) => option.value === value)
-  ) {
+  if (value && currentName && accounts === undefined) {
     options.unshift({
       value,
       label: currentName,
@@ -45,6 +49,7 @@ export default function AccountPicker({
       value={value}
       options={options}
       onChange={onChange}
+      onSearch={setSearch}
       label="Account"
       placeholder={placeholder}
       searchPlaceholder="Search accounts…"

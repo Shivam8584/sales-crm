@@ -1,11 +1,3 @@
-import { v } from "convex/values";
-import {
-  internalMutation,
-  type ActionCtx,
-  type MutationCtx,
-} from "../_generated/server";
-import { internal } from "../_generated/api";
-
 export const DEFAULT_BODY_LIMIT = 32 * 1024;
 
 /** Origins from a comma-separated env var, or `defaults` when it is unset. */
@@ -165,72 +157,4 @@ export function clientIp(request: Request) {
   const forwarded = request.headers.get("X-Forwarded-For");
   const first = forwarded?.split(",")[0]?.trim();
   return first || request.headers.get("X-Real-IP")?.trim() || "unknown";
-}
-
-/** Fixed-window counter; true when this call is within `limit` per `windowMs`. */
-export async function consumeRateLimit(
-  ctx: MutationCtx,
-  key: string,
-  limit: number,
-  windowMs: number,
-) {
-  const now = Date.now();
-  const row = await ctx.db
-    .query("rateLimits")
-    .withIndex("by_key", (q) => q.eq("key", key))
-    .unique();
-  if (!row || now - row.windowStart >= windowMs) {
-    if (row) await ctx.db.patch(row._id, { windowStart: now, count: 1 });
-    else {
-      const id = await ctx.db.insert("rateLimits", {
-        key,
-        windowStart: now,
-        count: 1,
-      });
-      await ctx.scheduler.runAfter(windowMs, internal.lib.http.expire, {
-        id,
-        windowMs,
-      });
-    }
-    return true;
-  }
-  if (row.count >= limit) return false;
-  await ctx.db.patch(row._id, { count: row.count + 1 });
-  return true;
-}
-
-export const hit = internalMutation({
-  args: { key: v.string(), limit: v.number(), windowMs: v.number() },
-  handler: (ctx, { key, limit, windowMs }) =>
-    consumeRateLimit(ctx, key, limit, windowMs),
-});
-
-/** Deletes a counter once its window has passed, so one-off callers don't pile up. */
-export const expire = internalMutation({
-  args: { id: v.id("rateLimits"), windowMs: v.number() },
-  handler: async (ctx, { id, windowMs }) => {
-    const row = await ctx.db.get(id);
-    if (!row) return;
-    const age = Date.now() - row.windowStart;
-    if (age >= windowMs) await ctx.db.delete(id);
-    else {
-      await ctx.scheduler.runAfter(windowMs - age, internal.lib.http.expire, {
-        id,
-        windowMs,
-      });
-    }
-  },
-});
-
-export async function rateLimit(
-  ctx: ActionCtx,
-  key: string,
-  limit: number,
-  windowMs: number,
-): Promise<boolean> {
-  return await ctx.runMutation(internal.lib.http.hit, {
-    key,
-    limit,
-    windowMs,
-  });
 }

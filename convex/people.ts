@@ -1,7 +1,11 @@
-import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
+import { v, type ObjectType } from "convex/values";
+import {
+  paginationOptsValidator,
+  type FilterBuilder,
+  type NamedTableInfo,
+} from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import {
   cleanTags,
   cleanText,
@@ -11,9 +15,18 @@ import {
   normalizePhone,
 } from "../lib/domain/normalize";
 import { personName } from "../lib/domain/labels";
+import { countPeople } from "./lib/counts";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import { findPerson } from "./lib/identity";
+import {
+  activityBounds,
+  mapPage,
+  searchText,
+  vActivity,
+  vDir,
+  vSearch,
+} from "./lib/lists";
 import { assertCanReassign } from "./lib/ownership";
 import { assertCan } from "./lib/permissions";
 import {
@@ -30,6 +43,7 @@ import {
 } from "./lib/records";
 import { dealsWithPerson, leaveDeals } from "./lib/deals";
 import { diff, logChanges, logSystem } from "./lib/timeline";
+import { literals } from "./lib/validators";
 import { bucketCounts, latestInteraction, windowStart } from "./timeline";
 
 const MAX_TEXT = 120;
@@ -206,20 +220,15 @@ async function accountsOf(ctx: QueryCtx, people: Doc<"people">[]) {
   return accounts;
 }
 
+/** One account's people, for record pages. */
 export const list = memberQuery({
-  args: { accountId: v.optional(v.id("accounts")) },
+  args: { accountId: v.id("accounts") },
   handler: async (ctx, { accountId }) => {
     const [people, members] = await Promise.all([
-      accountId
-        ? ctx.db
-            .query("people")
-            .withIndex("by_account", (q) => q.eq("accountId", accountId))
-            .collect()
-        : ctx.db
-            .query("people")
-            .withIndex("by_updated")
-            .order("desc")
-            .collect(),
+      ctx.db
+        .query("people")
+        .withIndex("by_account", (q) => q.eq("accountId", accountId))
+        .collect(),
       memberIndex(ctx),
     ]);
     const visible = people.filter((person) => !person.archivedAt);
@@ -228,70 +237,236 @@ export const list = memberQuery({
   },
 });
 
-/** Cursor-paginated people, recently updated first, optionally one owner's. */
+const TREND_DAYS = 14;
+
+type PeopleTable = NamedTableInfo<DataModel, "people">;
+
+/** Filters and sort of the list; `page`, `counts` and CSV export share them. */
+export const vListArgs = {
+  ownerId: v.optional(v.id("members")),
+  linked: v.optional(v.boolean()),
+  activity: v.optional(vActivity),
+  search: vSearch,
+  sort: v.optional(literals(["activity", "name"])),
+  dir: v.optional(vDir),
+};
+type ListArgs = ObjectType<typeof vListArgs>;
+
+/**
+ * The query behind the people list: an index per sort for the owner and
+ * "no account" filters, the activity window as an index range when sorting
+ * by activity, and relevance order when searching.
+ */
+function listQuery(ctx: QueryCtx, args: ListArgs, now: number) {
+  const people = ctx.db.query("people");
+  const { ownerId, linked } = args;
+  const window = activityBounds(args.activity, now);
+  const text = searchText(args.search);
+  const narrow = (
+    q: FilterBuilder<PeopleTable>,
+    accountIndexed: boolean,
+    ranged: boolean,
+  ) =>
+    q.and(
+      linked === true ? q.neq(q.field("accountId"), undefined) : true,
+      linked === false && !accountIndexed
+        ? q.eq(q.field("accountId"), undefined)
+        : true,
+      !ranged && window?.since !== undefined
+        ? q.gte(q.field("lastActivityAt"), window.since)
+        : true,
+      !ranged && window?.before !== undefined
+        ? q.or(
+            q.eq(q.field("lastActivityAt"), undefined),
+            q.lt(q.field("lastActivityAt"), window.before),
+          )
+        : true,
+    );
+
+  if (text) {
+    return people
+      .withSearchIndex("search_text", (q) => {
+        let search = q.search("searchText", text).eq("archivedAt", undefined);
+        if (ownerId) search = search.eq("ownerId", ownerId);
+        if (linked === false) search = search.eq("accountId", undefined);
+        return search;
+      })
+      .filter((q) => narrow(q, linked === false, false));
+  }
+
+  const unlinked = linked === false && !ownerId;
+  if (args.sort === "name") {
+    const query = ownerId
+      ? people.withIndex("list_owner_name", (q) =>
+          q.eq("ownerId", ownerId).eq("archivedAt", undefined),
+        )
+      : unlinked
+        ? people.withIndex("list_account_name", (q) =>
+            q.eq("accountId", undefined).eq("archivedAt", undefined),
+          )
+        : people.withIndex("list_name", (q) => q.eq("archivedAt", undefined));
+    return query
+      .filter((q) => narrow(q, unlinked, false))
+      .order(args.dir ?? "asc");
+  }
+
+  const query = ownerId
+    ? people.withIndex("list_owner_activity", (q) => {
+        const base = q.eq("ownerId", ownerId).eq("archivedAt", undefined);
+        return window?.since !== undefined
+          ? base.gte("lastActivityAt", window.since)
+          : window?.before !== undefined
+            ? base.lt("lastActivityAt", window.before)
+            : base;
+      })
+    : unlinked
+      ? people.withIndex("list_account_activity", (q) => {
+          const base = q.eq("accountId", undefined).eq("archivedAt", undefined);
+          return window?.since !== undefined
+            ? base.gte("lastActivityAt", window.since)
+            : window?.before !== undefined
+              ? base.lt("lastActivityAt", window.before)
+              : base;
+        })
+      : people.withIndex("list_activity", (q) => {
+          const base = q.eq("archivedAt", undefined);
+          return window?.since !== undefined
+            ? base.gte("lastActivityAt", window.since)
+            : window?.before !== undefined
+              ? base.lt("lastActivityAt", window.before)
+              : base;
+        });
+  return query
+    .filter((q) => narrow(q, unlinked, true))
+    .order(args.dir ?? "desc");
+}
+
+async function personStats(ctx: QueryCtx, person: Doc<"people">, now: number) {
+  const [recent, lastInteraction] = await Promise.all([
+    ctx.db
+      .query("timeline")
+      .withIndex("by_person", (q) =>
+        q
+          .eq("personId", person._id)
+          .gte("occurredAt", windowStart(TREND_DAYS, now)),
+      )
+      .collect(),
+    latestInteraction(ctx, { personId: person._id }),
+  ]);
+  return {
+    trend: bucketCounts(
+      recent.map((entry) => entry.occurredAt),
+      TREND_DAYS,
+      now,
+    ),
+    lastInteraction,
+  };
+}
+
+/** One page of the people list, with each row's activity trend and last interaction. */
 export const page = memberQuery({
-  args: {
-    paginationOpts: paginationOptsValidator,
-    ownerId: v.optional(v.id("members")),
-  },
-  handler: async (ctx, { paginationOpts, ownerId }) => {
-    const base = ownerId
-      ? ctx.db
-          .query("people")
-          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
-      : ctx.db.query("people").withIndex("by_updated");
-    const result = await base
-      .filter((q) => q.eq(q.field("archivedAt"), undefined))
-      .order("desc")
-      .paginate(paginationOpts);
-    const [members, accounts] = await Promise.all([
+  args: { paginationOpts: paginationOptsValidator, ...vListArgs },
+  handler: async (ctx, { paginationOpts, ...args }) => {
+    const now = Date.now();
+    const [result, members] = await Promise.all([
+      listQuery(ctx, args, now).paginate(paginationOpts),
       memberIndex(ctx),
-      accountsOf(ctx, result.page),
     ]);
-    return {
-      ...result,
-      page: result.page.map((person) => toClient(person, members, accounts)),
-    };
+    const accounts = await accountsOf(ctx, result.page);
+    return await mapPage(result, (people) =>
+      Promise.all(
+        people.map(async (person) => ({
+          ...toClient(person, members, accounts),
+          ...(await personStats(ctx, person, now)),
+        })),
+      ),
+    );
   },
 });
 
-const TREND_DAYS = 14;
+/** Exact counts for the views, and for the current filters unless a search or activity window is on. */
+export const counts = memberQuery({
+  args: vListArgs,
+  handler: async (ctx, args) => {
+    const [all, mine, unlinked, inView] = await Promise.all([
+      countPeople(ctx, {}),
+      countPeople(ctx, { ownerId: ctx.viewer._id }),
+      countPeople(ctx, { linked: false }),
+      searchText(args.search) || args.activity
+        ? null
+        : countPeople(ctx, { linked: args.linked, ownerId: args.ownerId }),
+    ]);
+    return { views: { all, mine, unlinked }, inView };
+  },
+});
 
 /**
- * Per-person rollups for the list: timeline entries per day for the last two
- * weeks and the latest logged interaction. Apart from `list` so timeline churn
- * doesn't re-run it.
+ * Active people matching `search` by name, email, phone, title or account,
+ * optionally within one account; the recently active ones when it's empty.
  */
-export const listStats = memberQuery({
-  args: {},
-  handler: async (ctx) => {
-    const now = Date.now();
-    const since = windowStart(TREND_DAYS, now);
-    const people = await ctx.db.query("people").collect();
-    return await Promise.all(
-      people
-        .filter((person) => !person.archivedAt)
-        .map(async (person) => {
-          const recent = await ctx.db
-            .query("timeline")
-            .withIndex("by_person", (q) =>
-              q.eq("personId", person._id).gte("occurredAt", since),
-            )
-            .collect();
-          const lastInteraction = await latestInteraction(ctx, {
-            personId: person._id,
-          });
-          return {
-            personId: person._id,
-            trend: bucketCounts(
-              recent.map((entry) => entry.occurredAt),
-              TREND_DAYS,
-              now,
-            ),
-            lastInteraction,
-          };
-        }),
-    );
+export async function findPeople(
+  ctx: QueryCtx,
+  search: string,
+  limit: number,
+  accountId?: Id<"accounts">,
+) {
+  const text = searchText(search);
+  const people = text
+    ? await ctx.db
+        .query("people")
+        .withSearchIndex("search_text", (q) => {
+          const query = q
+            .search("searchText", text)
+            .eq("archivedAt", undefined);
+          return accountId ? query.eq("accountId", accountId) : query;
+        })
+        .take(limit)
+    : accountId
+      ? await ctx.db
+          .query("people")
+          .withIndex("list_account_activity", (q) =>
+            q.eq("accountId", accountId).eq("archivedAt", undefined),
+          )
+          .order("desc")
+          .take(limit)
+      : await ctx.db
+          .query("people")
+          .withIndex("list_activity", (q) => q.eq("archivedAt", undefined))
+          .order("desc")
+          .take(limit);
+  return await findPeopleRows(ctx, people);
+}
+
+async function findPeopleRows(ctx: QueryCtx, people: Doc<"people">[]) {
+  const accounts = await accountsOf(ctx, people);
+  return people.map((person) => {
+    const account = person.accountId ? accounts.get(person.accountId) : null;
+    return {
+      _id: person._id,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      email: person.email ?? null,
+      title: person.title ?? null,
+      account: account ? { _id: account._id, name: account.name } : null,
+    };
+  });
+}
+
+/** For person pickers; `selected` is always included so the picker can name it. */
+export const search = memberQuery({
+  args: {
+    search: v.string(),
+    accountId: v.optional(v.id("accounts")),
+    selected: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const found = await findPeople(ctx, args.search, 20, args.accountId);
+    const id = args.selected && ctx.db.normalizeId("people", args.selected);
+    if (!id || found.some((person) => person._id === id)) return found;
+    const person = await ctx.db.get(id);
+    if (!person) return found;
+    const [selected] = await findPeopleRows(ctx, [person]);
+    return [selected, ...found];
   },
 });
 

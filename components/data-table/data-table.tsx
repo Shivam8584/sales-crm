@@ -9,6 +9,7 @@ import {
   type CSSProperties,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -34,6 +35,7 @@ import {
   compareBy,
   type Column,
   type FooterStat,
+  type Paging,
   type RowMenuItem,
   type SortState,
 } from "./types";
@@ -70,6 +72,11 @@ type DataTableProps<T> = {
   footer?: FooterStat[];
   /** Keep the first column (and the checkbox) visible while scrolling sideways. */
   stickyFirstColumn?: boolean;
+  /**
+   * Server-paged rows (from `usePagedList`): rows arrive sorted, more load as
+   * the list scrolls, and "select all" selects the loaded rows.
+   */
+  paging?: Paging;
 };
 
 const SKELETON_WIDTHS = ["w-36", "w-28", "w-44", "w-32", "w-24", "w-40"];
@@ -81,7 +88,8 @@ const ROW_TINT =
  * The list view used by every record type: sortable columns, row selection,
  * a "…" menu per row, keyboard navigation (J/K, Enter, Space, X, Esc), an
  * optional calculation footer and a card layout on phones. Rows are links, so
- * middle-click and Cmd-click open records in a new tab.
+ * middle-click and Cmd-click open records in a new tab. With `paging` the
+ * server sorts and the table loads further pages as it scrolls.
  */
 export default function DataTable<T>({
   label,
@@ -103,6 +111,7 @@ export default function DataTable<T>({
   actionColumn = true,
   footer,
   stickyFirstColumn = true,
+  paging,
 }: DataTableProps<T>) {
   const router = useRouter();
   const density = useTableDensity();
@@ -111,6 +120,7 @@ export default function DataTable<T>({
   const [scrolled, setScrolled] = useState(false);
   const [scrollEnd, setScrollEnd] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const selectable = selected !== undefined && onSelectedChange !== undefined;
 
@@ -124,9 +134,13 @@ export default function DataTable<T>({
 
   const sorted = useMemo(() => {
     const column = columns.find((item) => item.id === sort.id);
-    if (!rows || !column?.sortValue) return rows;
+    if (!rows || paging || !column?.sortValue) return rows;
     return [...rows].sort(compareBy(column, sort.dir));
-  }, [rows, columns, sort]);
+  }, [rows, columns, sort, paging]);
+  const canLoadMore = paging?.status === "CanLoadMore";
+  const partial =
+    paging !== undefined &&
+    (paging.status === "CanLoadMore" || paging.status === "LoadingMore");
 
   const loaded = sorted !== undefined;
   const ids = useMemo(() => sorted?.map(getId) ?? [], [sorted, getId]);
@@ -185,6 +199,8 @@ export default function DataTable<T>({
       const move = (delta: number) => {
         if (rowsList.length === 0) return;
         event.preventDefault();
+        if (delta > 0 && activeCursor === rowsList.length - 1 && canLoadMore)
+          paging?.loadMore();
         setCursor((current) =>
           current === null
             ? 0
@@ -291,6 +307,14 @@ export default function DataTable<T>({
   const footerBar = footer && footer.length > 0 && (
     <TableFooter stats={footer} loading={!sorted} />
   );
+  const more = partial && (
+    <LoadMore
+      root={belowSm ? listRef : scrollRef}
+      loading={paging.status === "LoadingMore"}
+      onLoad={paging.loadMore}
+      card={belowSm}
+    />
+  );
 
   if (sorted && sorted.length === 0) {
     return (
@@ -307,7 +331,15 @@ export default function DataTable<T>({
         data-footer={footerBar ? "" : undefined}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <ul aria-label={label} className="min-h-0 flex-1 overflow-y-auto">
+        <ul
+          ref={listRef}
+          aria-label={label}
+          aria-busy={!sorted || paging?.stale || undefined}
+          className={cn(
+            "duration-fast min-h-0 flex-1 overflow-y-auto transition-opacity",
+            paging?.stale && "opacity-60",
+          )}
+        >
           {!sorted &&
             Array.from({ length: SKELETON_ROWS }, (_, index) => (
               <li
@@ -338,6 +370,7 @@ export default function DataTable<T>({
               </Link>
             </li>
           ))}
+          {more && <li>{more}</li>}
         </ul>
         {footerBar}
       </div>
@@ -354,8 +387,8 @@ export default function DataTable<T>({
         ref={scrollRef}
         role="table"
         aria-label={label}
-        aria-rowcount={sorted ? sorted.length + 1 : undefined}
-        aria-busy={!sorted || undefined}
+        aria-rowcount={partial ? -1 : sorted ? sorted.length + 1 : undefined}
+        aria-busy={!sorted || paging?.stale || undefined}
         data-scrolled={scrolled}
         data-scroll-end={scrollEnd}
         data-density={density}
@@ -386,7 +419,12 @@ export default function DataTable<T>({
                         : false
                   }
                   onCheckedChange={toggleAll}
-                  aria-label="Select all rows"
+                  aria-label={
+                    partial ? "Select all loaded rows" : "Select all rows"
+                  }
+                  title={
+                    partial ? `Select the ${ids.length} loaded rows` : undefined
+                  }
                   disabled={!sorted}
                 />
               </div>
@@ -424,7 +462,14 @@ export default function DataTable<T>({
             )}
           </div>
 
-          <div role="rowgroup" ref={bodyRef}>
+          <div
+            role="rowgroup"
+            ref={bodyRef}
+            className={cn(
+              "duration-fast transition-opacity",
+              paging?.stale && "opacity-60",
+            )}
+          >
             {!sorted &&
               Array.from({ length: SKELETON_ROWS }, (_, row) => (
                 <div
@@ -566,10 +611,74 @@ export default function DataTable<T>({
                 </div>
               );
             })}
+            {more}
           </div>
         </div>
       </div>
       {footerBar}
+    </div>
+  );
+}
+
+/**
+ * Loads the next page when it scrolls within reach of the viewport; also a
+ * button, for keyboards and for when the observer can't fire.
+ */
+function LoadMore({
+  root,
+  loading,
+  onLoad,
+  card,
+}: {
+  root: RefObject<HTMLElement | null>;
+  loading: boolean;
+  onLoad: () => void;
+  card: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const load = useRef(onLoad);
+  useEffect(() => {
+    load.current = onLoad;
+  });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || loading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) load.current();
+      },
+      { root: root.current, rootMargin: "0px 0px 600px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [root, loading]);
+
+  const button = (
+    <Button
+      variant="ghost"
+      size="xs"
+      disabled={loading}
+      onClick={onLoad}
+      className="text-fg-secondary"
+    >
+      {loading ? "Loading more…" : "Load more"}
+    </Button>
+  );
+  if (card) {
+    return (
+      <div ref={ref} className="flex justify-center py-4">
+        {button}
+      </div>
+    );
+  }
+  return (
+    <div
+      ref={ref}
+      role="row"
+      className="h-row border-border sticky left-0 flex items-center justify-center border-b"
+    >
+      <div role="cell">{button}</div>
     </div>
   );
 }
@@ -697,7 +806,7 @@ function HeaderCell<T>({
         className,
       )}
     >
-      {column.sortValue ? (
+      {column.sortValue || column.sortable ? (
         <button
           type="button"
           onClick={onSort}

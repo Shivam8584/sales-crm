@@ -8,16 +8,18 @@ import {
   DialogTitle,
 } from "@/components/_ui/dialog";
 import Kbd from "@/components/_ui/kbd";
+import { useViewer } from "@/hooks/use-viewer";
+import type { Role } from "@/lib/domain/enums";
 import { MOD_KEY } from "@/lib/keyboard";
 import { useUiStore } from "@/stores/ui-store";
-import { ALL_NAV_ITEMS } from "./navigation";
+import { navItems } from "./navigation";
 
-const GROUPS = [
+const groups = (role: Role) => [
   {
     title: "General",
     items: [
       { keys: [MOD_KEY, "K"], label: "Search and commands" },
-      ...ALL_NAV_ITEMS.map((item) => ({
+      ...navItems(role).map((item) => ({
         keys: ["G", item.shortcut],
         label: `Go to ${item.label.toLowerCase()}`,
       })),
@@ -35,7 +37,13 @@ const GROUPS = [
       { keys: ["X"], label: "Select row" },
       { keys: ["/"], label: "Search the list" },
       { keys: ["Esc"], label: "Clear selection" },
-      { keys: ["U"], label: "Mark notification read or unread" },
+    ],
+  },
+  {
+    title: "Inbox",
+    items: [
+      { keys: ["E"], label: "Archive, or move back to the inbox" },
+      { keys: ["U"], label: "Mark read or unread" },
     ],
   },
   {
@@ -52,6 +60,7 @@ const GROUPS = [
 export default function ShortcutsDialog() {
   const open = useUiStore((state) => state.shortcutsOpen);
   const setOpen = useUiStore((state) => state.setShortcutsOpen);
+  const { role } = useViewer();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -63,7 +72,7 @@ export default function ShortcutsDialog() {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-x-10 gap-y-5 px-6 py-5 sm:grid-cols-2 sm:[&>section:first-child]:row-span-3">
-          {GROUPS.map((group) => (
+          {groups(role).map((group) => (
             <section key={group.title} className="flex flex-col gap-2">
               <h3 className="eyebrow-style text-fg-tertiary">{group.title}</h3>
               <ul className="flex flex-col">

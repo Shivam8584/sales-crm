@@ -1,13 +1,16 @@
 import { v } from "convex/values";
 import { can } from "./lib/permissions";
-import { internalMutation } from "./_generated/server";
+
 import { accountHealth, weakestFactors } from "../lib/domain/health";
 import { ACTIVATION_STAGES } from "../lib/domain/platform";
 import { PRIORITIES } from "../lib/domain/enums";
 import { fail } from "./lib/errors";
 import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import {
+  internalMutation,
   managerMutation,
+  managerQuery,
   memberMutation,
   memberQuery,
   type Viewer,
@@ -32,59 +35,68 @@ function canManageAccount(viewer: Viewer, account: Doc<"accounts">) {
   return can(viewer, "activation.task", [account.ownerId]);
 }
 
+/** Every stuck brand among `accounts`, with its rule and rep task; also counts how far each got. */
+async function stuckRows(
+  ctx: QueryCtx & { viewer: Viewer },
+  accounts: Doc<"accounts">[],
+) {
+  const now = Date.now();
+  const members = await memberIndex(ctx);
+  const reached = ACTIVATION_STAGES.map(() => 0);
+  const rows = [];
+
+  for (const account of accounts) {
+    const events = await accountEvents(ctx, account);
+    const input = stallAccount(account);
+    const current = journey(input, events);
+    const index = current.stage ? ACTIVATION_STAGES.indexOf(current.stage) : -1;
+    for (let step = 0; step <= index; step++) reached[step]++;
+
+    const stall = detectStall(input, events, now);
+    if (!stall || !current.stage) continue;
+    const task = await ctx.db
+      .query("tasks")
+      .withIndex("by_automation_key", (q) =>
+        q.eq("automationKey", automationKey(stall.rule.id, account._id)),
+      )
+      .first();
+    rows.push({
+      _id: account._id,
+      account: {
+        _id: account._id,
+        name: account.name,
+        domain: account.domain ?? null,
+        logoUrl: account.logoUrl ?? null,
+      },
+      stage: current.stage,
+      ruleId: stall.rule.id,
+      label: stall.rule.label,
+      playbook: stall.rule.playbook,
+      title: stall.title,
+      since: stall.since,
+      severity: PRIORITIES.indexOf(stall.rule.priority),
+      owner: memberRef(members, account.ownerId),
+      task: task
+        ? {
+            _id: task._id,
+            status: task.status,
+            assignee: memberRef(members, task.assigneeId),
+            completedAt: task.completedAt ?? null,
+          }
+        : null,
+      lastEventAt: current.lastEventAt,
+      canOpenTask: canManageAccount(ctx.viewer, account),
+    });
+  }
+  return { rows, reached };
+}
+
 /** The activation funnel across linked brands, and every brand stuck on a step. */
-export const desk = memberQuery({
+export const desk = managerQuery({
   args: {},
   handler: async (ctx) => {
-    const now = Date.now();
-    const members = await memberIndex(ctx);
     const accounts = await platformAccounts(ctx);
-    const reached = ACTIVATION_STAGES.map(() => 0);
-    const rows = [];
-
-    for (const account of accounts) {
-      const events = await accountEvents(ctx, account);
-      const input = stallAccount(account);
-      const current = journey(input, events);
-      const index = current.stage
-        ? ACTIVATION_STAGES.indexOf(current.stage)
-        : -1;
-      for (let step = 0; step <= index; step++) reached[step]++;
-
-      const stall = detectStall(input, events, now);
-      if (!stall || !current.stage) continue;
-      const task = await ctx.db
-        .query("tasks")
-        .withIndex("by_automation_key", (q) =>
-          q.eq("automationKey", automationKey(stall.rule.id, account._id)),
-        )
-        .first();
-      rows.push({
-        _id: account._id,
-        account: {
-          _id: account._id,
-          name: account.name,
-          domain: account.domain ?? null,
-          logoUrl: account.logoUrl ?? null,
-        },
-        stage: current.stage,
-        ruleId: stall.rule.id,
-        title: stall.title,
-        since: stall.since,
-        severity: PRIORITIES.indexOf(stall.rule.priority),
-        owner: memberRef(members, account.ownerId),
-        task: task
-          ? {
-              _id: task._id,
-              status: task.status,
-              assignee: memberRef(members, task.assigneeId),
-              completedAt: task.completedAt ?? null,
-            }
-          : null,
-        lastEventAt: current.lastEventAt,
-        canOpenTask: canManageAccount(ctx.viewer, account),
-      });
-    }
+    const { rows, reached } = await stuckRows(ctx, accounts);
 
     const funnel = ACTIVATION_STAGES.map((stage, step) => ({
       stage,
@@ -119,6 +131,18 @@ export const desk = memberQuery({
       linked: accounts.length,
       rows,
     };
+  },
+});
+
+/** Stuck brands the signed-in member owns, longest stuck first, for Today. */
+export const mine = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const accounts = (await platformAccounts(ctx)).filter(
+      (account) => account.ownerId === ctx.viewer._id,
+    );
+    const { rows } = await stuckRows(ctx, accounts);
+    return rows.sort((a, b) => a.since - b.since);
   },
 });
 
@@ -182,7 +206,7 @@ export const ensureTask = memberMutation({
 });
 
 /** Health for every brand linked to an organisation, riskiest first, with their expansion signals. */
-export const health = memberQuery({
+export const health = managerQuery({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();

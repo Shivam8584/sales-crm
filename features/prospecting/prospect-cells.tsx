@@ -77,7 +77,7 @@ export function ScoreTag({
 }) {
   if (score === null) {
     return (
-      <Tooltip content="Needs at least three rated products in the watchlist to compare">
+      <Tooltip content="Needs at least three rated products in the source to compare">
         <span className="text-fg-tertiary">Not scored</span>
       </Tooltip>
     );
@@ -204,13 +204,15 @@ type Match = {
   logoUrl: string | null;
 } | null;
 
-/** The CRM account a brand maps to, or a "New" chip. */
+/** The CRM account a brand maps to, its lead, or a "New" chip; `inbound` marks public review-gap checks. */
 export function MatchCell({
   account,
   lead,
+  inbound = false,
 }: {
   account: Match;
   lead?: { name: string; open: boolean } | null;
+  inbound?: boolean;
 }) {
   if (account) {
     return (
@@ -231,6 +233,7 @@ export function MatchCell({
   if (lead) {
     return (
       <Tag tone="blue" size="sm">
+        {inbound ? "Public check · " : ""}
         {lead.open ? "Lead" : "Lead closed"}
       </Tag>
     );

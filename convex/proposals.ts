@@ -46,7 +46,6 @@ import {
   vPayment,
   vPolicy,
   vProposalStatus,
-  versionLabel,
 } from "./lib/pricing";
 import { memberIndex, memberRef } from "./lib/records";
 import { pricingPolicy, storedPricingPolicy } from "./lib/settings";
@@ -63,24 +62,20 @@ function requireMove(proposal: Doc<"proposals">, to: ProposalStatus) {
   if (problem) fail("conflict", problem.message);
 }
 
-async function versions(ctx: QueryCtx, dealId: Id<"deals">) {
+async function proposalFor(ctx: QueryCtx, dealId: Id<"deals">) {
   return await ctx.db
     .query("proposals")
     .withIndex("by_deal", (q) => q.eq("dealId", dealId))
-    .order("desc")
-    .collect();
+    .first();
 }
 
 function requireDraft(proposal: Doc<"proposals">) {
   if (proposal.status !== "draft") {
-    fail(
-      "conflict",
-      "Sent proposals are frozen; start a new version to change it",
-    );
+    fail("conflict", "Edit the proposal first; sent proposals are read-only");
   }
 }
 
-/** Sent versions keep the policy they were priced under; drafts follow the live one. */
+/** A sent proposal keeps the policy it was priced under; a draft follows the live one. */
 function policyFor(proposal: Priced, live: PricingPolicy): PricingPolicy {
   return proposal.policy ?? live;
 }
@@ -94,6 +89,15 @@ function takeOf(pricing: ProposalPricing): Money {
 
 function summaryLine(pricing: ProposalPricing) {
   return `${formatMoney(takeOf(pricing))} take · ${rateLabel(pricing.marginRate)} blended margin`;
+}
+
+/** What went to the brand, kept on the timeline because a sent proposal can be edited later. */
+function sentCopy(lines: ProposalLine[], pricing: ProposalPricing) {
+  const rows = lines.map((line, index) => {
+    const price = pricing.lines[index].perEnrollment.brandCharge;
+    return `${line.product || "Untitled"} · ${line.slots.toLocaleString("en-IN")} slots at ${formatMoney({ amount: price, currency: PROPOSAL_CURRENCY })}`;
+  });
+  return [summaryLine(pricing), ...rows].join("\n");
 }
 
 /** A proposal has to be complete and platform-valid before it is sent or approved. */
@@ -158,7 +162,6 @@ export const policy = memberQuery({
       policy: await pricingPolicy(ctx),
       isDefault: {
         marginFloorBps: stored.marginFloorBps === undefined,
-        approvalBps: stored.approvalBps === undefined,
         defaultMarginBps: stored.defaultMarginBps === undefined,
         defaultFundBps: stored.defaultFundBps === undefined,
         defaultFeeBps: stored.defaultFeeBps === undefined,
@@ -172,16 +175,17 @@ export const policy = memberQuery({
   },
 });
 
-/** Every version for a deal, newest first, with names resolved and the policy each is priced under. */
+/** The deal's proposal with names resolved and the policy it is priced under. */
 export const forDeal = memberQuery({
   args: { dealId: v.id("deals") },
   handler: async (ctx, { dealId }) => {
-    const [rows, members, live] = await Promise.all([
-      versions(ctx, dealId),
+    const proposal = await proposalFor(ctx, dealId);
+    if (!proposal) return null;
+    const [members, live] = await Promise.all([
       memberIndex(ctx),
       pricingPolicy(ctx),
     ]);
-    return rows.map((proposal) => ({
+    return {
       ...proposal,
       policy: policyFor(proposal, live),
       payment: proposal.payment ?? DEFAULT_PAYMENT,
@@ -193,17 +197,15 @@ export const forDeal = memberQuery({
             decidedBy: memberRef(members, proposal.approval.decidedById),
           }
         : null,
-    }));
+    };
   },
 });
 
-/** The proposal that speaks for the deal: the accepted one, else the newest. */
+/** Status, take and margin of the deal's proposal, for the peek. */
 export const current = memberQuery({
   args: { dealId: v.id("deals") },
   handler: async (ctx, { dealId }) => {
-    const rows = await versions(ctx, dealId);
-    const proposal =
-      rows.find((row) => row.status === "accepted") ?? rows[0] ?? null;
+    const proposal = await proposalFor(ctx, dealId);
     if (!proposal) return null;
     const pricing = priceLines(
       proposal.lines,
@@ -211,7 +213,6 @@ export const current = memberQuery({
     );
     return {
       _id: proposal._id,
-      version: proposal.version,
       status: proposal.status,
       approvalState: proposal.approval?.state ?? null,
       needsApproval: pricing.needsApproval,
@@ -268,7 +269,7 @@ export const handoff = memberQuery({
     return {
       json: JSON.stringify(
         {
-          crm_proposal: `v${proposal.version}`,
+          crm_proposal: proposal._id,
           organization: {
             platform_org_id: orgId,
             name: account?.name ?? null,
@@ -287,7 +288,10 @@ export const handoff = memberQuery({
   },
 });
 
-/** Starts a draft: a copy of the newest version, or a single blank line for a deal's first. */
+/**
+ * Starts the deal's proposal with one line. After a rejection the new draft
+ * replaces the rejected proposal, starting from its lines.
+ */
 export const create = memberMutation({
   args: {
     dealId: v.id("deals"),
@@ -296,39 +300,60 @@ export const create = memberMutation({
   },
   handler: async (ctx, args) => {
     const deal = await requireDeal(ctx, args.dealId);
-    const [latest] = await versions(ctx, deal._id);
-    if (latest?.status === "draft") {
-      fail("conflict", `Draft v${latest.version} is still open`);
-    }
-    const lines = latest
-      ? latest.lines
-      : args.line
-        ? [cleanLine(args.line)]
-        : [];
+    const existing = await proposalFor(ctx, deal._id);
+    const validUntil = cleanValidUntil(
+      args.validUntil ?? istToday(DEFAULT_VALIDITY_DAYS),
+    );
     const now = Date.now();
-    const version = (latest?.version ?? 0) + 1;
+    if (existing) {
+      if (existing.status !== "rejected") {
+        fail("conflict", "This deal already has a proposal");
+      }
+      await ctx.db.patch(existing._id, {
+        status: "draft",
+        validUntil,
+        policy: undefined,
+        approval: undefined,
+        sentAt: undefined,
+        decidedAt: undefined,
+        createdById: ctx.viewer._id,
+        updatedAt: now,
+      });
+      await log(ctx, deal, "started a new proposal after the rejection");
+      return existing._id;
+    }
     const id = await ctx.db.insert("proposals", {
       dealId: deal._id,
-      version,
       status: "draft",
       currency: PROPOSAL_CURRENCY,
-      lines,
-      validUntil: cleanValidUntil(
-        args.validUntil ?? istToday(DEFAULT_VALIDITY_DAYS),
-      ),
-      terms: latest?.terms ?? DEFAULT_TERMS,
-      payment: latest?.payment ?? DEFAULT_PAYMENT,
+      lines: args.line ? [cleanLine(args.line)] : [],
+      validUntil,
+      terms: DEFAULT_TERMS,
+      payment: DEFAULT_PAYMENT,
       createdById: ctx.viewer._id,
       updatedAt: now,
     });
-    await log(
-      ctx,
-      deal,
-      latest
-        ? `started proposal v${version} from v${latest.version}`
-        : "started proposal v1",
-    );
+    await log(ctx, deal, "started a proposal");
     return id;
+  },
+});
+
+/** Takes a sent proposal back to draft so it can be changed; the sent copy stays on the timeline. */
+export const edit = memberMutation({
+  args: { id: v.id("proposals") },
+  handler: async (ctx, { id }) => {
+    const proposal = await requireProposal(ctx, id);
+    if (proposal.status !== "sent") {
+      fail("conflict", "Only a sent proposal can be reopened for editing");
+    }
+    const deal = await requireDeal(ctx, proposal.dealId);
+    await ctx.db.patch(id, {
+      status: "draft",
+      policy: undefined,
+      sentAt: undefined,
+      updatedAt: Date.now(),
+    });
+    await log(ctx, deal, "reopened the proposal to edit it");
   },
 });
 
@@ -442,12 +467,7 @@ export const requestApproval = memberMutation({
       updatedAt: Date.now(),
     });
     const reasons = approvalReasons(pricing, policy).join(". ");
-    await log(
-      ctx,
-      deal,
-      `asked for approval of ${versionLabel(proposal)}`,
-      reasons,
-    );
+    await log(ctx, deal, "asked for approval of the proposal", reasons);
     const managers = (await leadershipIds(ctx)).filter(
       (memberId) => memberId !== ctx.viewer._id,
     );
@@ -499,7 +519,7 @@ export const decide = managerMutation({
     await log(
       ctx,
       deal,
-      `${verb} the pricing on ${versionLabel(proposal)} at ${rateLabel(pricing.marginRate)} blended margin`,
+      `${verb} the proposal's pricing at ${rateLabel(pricing.marginRate)} blended margin`,
       reason,
     );
     const requester = proposal.approval?.requestedById;
@@ -514,7 +534,7 @@ export const decide = managerMutation({
   },
 });
 
-/** Freezes the version: default prices are written onto the lines and the policy is kept with it. */
+/** Default prices are written onto the lines and the policy is kept with them. */
 export const send = memberMutation({
   args: { id: v.id("proposals") },
   handler: async (ctx, { id }) => {
@@ -542,8 +562,8 @@ export const send = memberMutation({
     await log(
       ctx,
       deal,
-      `sent ${versionLabel(proposal)} to the brand`,
-      summaryLine(pricing),
+      "sent the proposal to the brand",
+      sentCopy(proposal.lines, pricing),
     );
   },
 });
@@ -558,15 +578,6 @@ export const accept = memberMutation({
     const proposal = await requireProposal(ctx, id);
     requireMove(proposal, "accepted");
     const deal = await requireDeal(ctx, proposal.dealId);
-    const accepted = (await versions(ctx, deal._id)).find(
-      (row) => row.status === "accepted" && row._id !== proposal._id,
-    );
-    if (accepted) {
-      fail(
-        "conflict",
-        `${versionLabel(accepted)} is already accepted; reopen it first`,
-      );
-    }
     const pricing = priceLines(
       proposal.lines,
       policyFor(proposal, await pricingPolicy(ctx)),
@@ -581,7 +592,7 @@ export const accept = memberMutation({
     await log(
       ctx,
       deal,
-      `marked ${versionLabel(proposal)} as accepted`,
+      "marked the proposal as accepted",
       summaryLine(pricing),
     );
     const previousAmount = deal.amount;
@@ -620,12 +631,7 @@ export const reject = memberMutation({
       decidedAt: now,
       updatedAt: now,
     });
-    await log(
-      ctx,
-      deal,
-      `marked ${versionLabel(proposal)} as rejected`,
-      reason,
-    );
+    await log(ctx, deal, "marked the proposal as rejected", reason);
   },
 });
 
@@ -656,7 +662,7 @@ export const reopen = memberMutation({
       decidedAt: undefined,
       updatedAt: now,
     });
-    await log(ctx, deal, `reopened ${versionLabel(proposal)}`);
+    await log(ctx, deal, "reopened the proposal");
     if (
       restore &&
       proposal.status === "accepted" &&
@@ -691,7 +697,7 @@ export const remove = memberMutation({
     requireDraft(proposal);
     const deal = await requireDeal(ctx, proposal.dealId);
     await ctx.db.delete(id);
-    await log(ctx, deal, `deleted draft ${versionLabel(proposal)}`);
+    await log(ctx, deal, "deleted the draft proposal");
     const { _id, _creationTime, ...fields } = proposal;
     void _id;
     void _creationTime;
@@ -703,7 +709,6 @@ export const restore = memberMutation({
   args: {
     proposal: v.object({
       dealId: v.id("deals"),
-      version: v.number(),
       status: vProposalStatus,
       currency: vCurrency,
       lines: v.array(vProposalLine),
@@ -722,12 +727,8 @@ export const restore = memberMutation({
     const deal = await requireDeal(ctx, proposal.dealId);
     if (proposal.status !== "draft")
       invalid("status", "Only drafts are restored");
-    const rows = await versions(ctx, deal._id);
-    if (rows.some((row) => row.status === "draft")) {
-      fail("conflict", "Another draft is open");
-    }
-    if (rows.some((row) => row.version === proposal.version)) {
-      fail("conflict", `v${proposal.version} already exists`);
+    if (await proposalFor(ctx, deal._id)) {
+      fail("conflict", "This deal already has a proposal");
     }
     checkLineCount(proposal.lines.length);
     // The copy comes from the client: only a decision this viewer could make survives.
@@ -753,7 +754,7 @@ export const restore = memberMutation({
       terms: cleanTerms(proposal.terms),
       updatedAt: Date.now(),
     });
-    await log(ctx, deal, `restored draft ${versionLabel(proposal)}`);
+    await log(ctx, deal, "restored the draft proposal");
     return id;
   },
 });

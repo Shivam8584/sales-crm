@@ -68,30 +68,6 @@ export function signed(value: number, unit = "") {
   return `${value > 0 ? "+" : "−"}${NUMBER.format(Math.abs(value))}${unit}`;
 }
 
-const MONTH = new Intl.DateTimeFormat("en-IN", {
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
-const WEEK = new Intl.DateTimeFormat("en-IN", {
-  day: "numeric",
-  month: "short",
-  timeZone: "Asia/Kolkata",
-});
-
-/** "Oct 2026" for `2026-10`. */
-export function monthLabel(month: string) {
-  const [year, index] = month.split("-").map(Number);
-  return MONTH.format(Date.UTC(year, index - 1, 1));
-}
-
-/** "19 Oct" for a week start. */
-export const weekLabel = (start: number) => WEEK.format(start);
-
-/** One amount in minor units, compact. */
-export const amount = (value: number, currency: Money["currency"]) =>
-  formatMoney({ amount: value, currency }, { compact: true });
-
 /** "+3" next to a figure, against the previous period. */
 export function change(current: number, previous: number) {
   return current === previous ? "±0" : signed(current - previous);

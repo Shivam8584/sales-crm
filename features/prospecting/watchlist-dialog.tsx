@@ -27,7 +27,7 @@ export type WatchlistDraft = {
 
 type Errors = Partial<Record<"name" | "benchmark" | "form", string>>;
 
-/** Create a watchlist, or rename one and set its ratings benchmark. */
+/** Create a source, or rename one and set its ratings benchmark. */
 export default function WatchlistDialog({
   draft,
   onClose,
@@ -64,7 +64,7 @@ function WatchlistForm({
     event.preventDefault();
     const digits = benchmark.replace(/[,\s]/g, "");
     const next: Errors = {};
-    if (!name.trim()) next.name = "Name the watchlist";
+    if (!name.trim()) next.name = "Name the source";
     if (digits && !/^\d+$/.test(digits)) {
       next.benchmark = "Enter a whole number of ratings";
     }
@@ -80,7 +80,7 @@ function WatchlistForm({
           benchmark: value,
         });
         const id = draft._id;
-        toast("Watchlist saved", () => void update({ id, ...previous }));
+        toast("Source saved", () => void update({ id, ...previous }));
       } else {
         await create({ name, benchmark: value ?? undefined });
         toast(`${name.trim()} created`);
@@ -99,9 +99,7 @@ function WatchlistForm({
   return (
     <form onSubmit={submit} noValidate>
       <DialogHeader>
-        <DialogTitle>
-          {draft._id ? "Edit watchlist" : "New watchlist"}
-        </DialogTitle>
+        <DialogTitle>{draft._id ? "Edit source" : "New source"}</DialogTitle>
         <DialogDescription>
           Group products that compete with each other, such as one category on
           one marketplace, so the leaders set a fair benchmark.
@@ -160,7 +158,7 @@ function WatchlistForm({
           </Button>
         </DialogClose>
         <Button type="submit" variant="primary" size="sm" loading={saving}>
-          {draft._id ? "Save" : "Create watchlist"}
+          {draft._id ? "Save" : "Create source"}
         </Button>
       </DialogFooter>
     </form>

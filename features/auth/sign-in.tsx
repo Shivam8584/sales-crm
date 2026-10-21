@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
+import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
 import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
 import { ROLE_TONE } from "@/features/team/roles";
@@ -28,10 +29,126 @@ function inviteToken() {
 }
 
 export default function SignIn() {
-  const { signIn } = useAuthActions();
+  const methods = useQuery(api.auth.methods);
   const [token] = useState(inviteToken);
   const invite = useQuery(api.invites.lookup, token ? { token } : "skip");
+  const [preferPassword, setPreferPassword] = useState(false);
   const [flow, setFlow] = useState<Flow>(token ? "signUp" : "signIn");
+  const passwordView =
+    !!methods?.password && (!methods.logto || preferPassword);
+  const signingUp = passwordView && flow === "signUp";
+  const inviteNote = token && invite !== undefined && (
+    <InviteNote invite={invite} />
+  );
+
+  return (
+    <AuthCard
+      title={
+        invite
+          ? "Join your team on Hypedrive"
+          : signingUp
+            ? "Create your account"
+            : "Sign in to Hypedrive"
+      }
+      description={
+        signingUp
+          ? "Set a password to start working leads, accounts and deals."
+          : "Pick up your team's pipeline where you left it."
+      }
+    >
+      {methods === undefined ? (
+        <div className="border-border border-t px-6 py-5">
+          <Skeleton className="h-9 w-full rounded-full" />
+        </div>
+      ) : passwordView ? (
+        <PasswordForm
+          flow={flow}
+          onFlowChange={setFlow}
+          invite={invite}
+          inviteNote={inviteNote}
+          onUseSso={methods.logto ? () => setPreferPassword(false) : undefined}
+        />
+      ) : methods.logto ? (
+        <SsoPanel
+          inviteNote={inviteNote}
+          onUsePassword={
+            methods.password ? () => setPreferPassword(true) : undefined
+          }
+        />
+      ) : (
+        <p className="border-border text-fg-secondary border-t px-6 py-5 text-center">
+          Sign-in isn&apos;t set up for this workspace yet. Ask an admin.
+        </p>
+      )}
+    </AuthCard>
+  );
+}
+
+function SsoPanel({
+  inviteNote,
+  onUsePassword,
+}: {
+  inviteNote: ReactNode;
+  onUsePassword?: () => void;
+}) {
+  const { signIn } = useAuthActions();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function continueWithSso() {
+    setPending(true);
+    setError(null);
+    try {
+      await signIn("logto", {
+        redirectTo: window.location.pathname + window.location.search,
+      });
+    } catch (caught) {
+      setError(readError(caught, "Couldn't reach Hypedrive SSO.").message);
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="border-border flex flex-col gap-3 border-t px-6 pt-5 pb-6">
+      {inviteNote}
+      <Button
+        variant="primary"
+        size="md"
+        loading={pending}
+        onClick={continueWithSso}
+        className="w-full"
+      >
+        Continue with Hypedrive SSO
+      </Button>
+      {error && <ErrorLine message={error} />}
+      {onUsePassword && (
+        <Button
+          variant="ghost"
+          size="md"
+          onClick={onUsePassword}
+          className="w-full"
+        >
+          Use email and password
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function PasswordForm({
+  flow,
+  onFlowChange,
+  invite,
+  inviteNote,
+  onUseSso,
+}: {
+  flow: Flow;
+  onFlowChange: (flow: Flow) => void;
+  invite: { email: string; role: Role } | null | undefined;
+  inviteNote: ReactNode;
+  onUseSso?: () => void;
+}) {
+  const { signIn } = useAuthActions();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,24 +179,11 @@ export default function SignIn() {
   }
 
   return (
-    <AuthCard
-      title={
-        invite
-          ? "Join your team on Hypedrive"
-          : flow === "signIn"
-            ? "Sign in to Hypedrive"
-            : "Create your account"
-      }
-      description={
-        flow === "signIn"
-          ? "Pick up your team's pipeline where you left it."
-          : "Set a password to start working leads, accounts and deals."
-      }
-    >
+    <>
       <Tabs
         value={flow}
         onValueChange={(value) => {
-          setFlow(value as Flow);
+          onFlowChange(value as Flow);
           setError(null);
         }}
       >
@@ -100,7 +204,7 @@ export default function SignIn() {
         onSubmit={handleSubmit}
         className="flex flex-col gap-4 px-6 pt-5 pb-6"
       >
-        {token && invite !== undefined && <InviteNote invite={invite} />}
+        {inviteNote}
         {flow === "signUp" && (
           <Field label="Full name" htmlFor="auth-name">
             <Input
@@ -149,26 +253,42 @@ export default function SignIn() {
             }
           />
         </Field>
-        {error && (
-          <p
-            role="alert"
-            className="caption-style text-danger flex items-start gap-1.5 leading-snug"
+        {error && <ErrorLine message={error} />}
+        <div className="mt-1 flex flex-col gap-2">
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            loading={pending}
+            className="w-full"
           >
-            <AlertIcon aria-hidden className="mt-px size-3 shrink-0" />
-            {error}
-          </p>
-        )}
-        <Button
-          type="submit"
-          variant="primary"
-          size="md"
-          loading={pending}
-          className="mt-1 w-full"
-        >
-          {flow === "signIn" ? "Sign in" : "Create account"}
-        </Button>
+            {flow === "signIn" ? "Sign in" : "Create account"}
+          </Button>
+          {onUseSso && (
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={onUseSso}
+              className="w-full"
+            >
+              Use Hypedrive SSO instead
+            </Button>
+          )}
+        </div>
       </form>
-    </AuthCard>
+    </>
+  );
+}
+
+function ErrorLine({ message }: { message: string }) {
+  return (
+    <p
+      role="alert"
+      className="caption-style text-danger flex items-start gap-1.5 leading-snug"
+    >
+      <AlertIcon aria-hidden className="mt-px size-3 shrink-0" />
+      {message}
+    </p>
   );
 }
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { istToday } from "@/lib/domain/day";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
+import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
@@ -14,11 +14,7 @@ import SearchInput from "@/components/data-table/search-input";
 import SelectionBar from "@/components/data-table/selection-bar";
 import AddToAutomation from "@/features/automations/add-to-automation";
 import OptionPicker from "@/components/fields/option-picker";
-import {
-  compareBy,
-  type Column,
-  type SortState,
-} from "@/components/data-table/types";
+import type { Column, SortState } from "@/components/data-table/types";
 import {
   CreateButton,
   ExportButton,
@@ -28,17 +24,20 @@ import {
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
+import { useCsvExport } from "@/hooks/use-csv-export";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { isPartial, usePagedList, viewCount } from "@/hooks/use-paged-list";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
-import { downloadCsv } from "@/lib/csv";
 import {
   LEAD_KINDS,
   LEAD_STATUSES,
   type DisqualifyReason,
+  type LeadKind,
   type LeadStatus,
 } from "@/lib/domain/enums";
 import { LEAD_KIND_LABEL, LEAD_STATUS_LABEL } from "@/lib/domain/labels";
-import { toast } from "@/stores/toast-store";
+import { LEAD_SOURCE_LABEL } from "@/lib/domain/leads";
 import { useUiStore } from "@/stores/ui-store";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
@@ -53,16 +52,20 @@ import {
   ownerOptions,
 } from "./lead-meta";
 import LeadStatusMenu from "./lead-status-menu";
-import { SlaCell, slaState, useNow } from "./sla";
+import { SlaCell, useNow } from "./sla";
 import { useBulkLeadActions, useLeadActions } from "./use-lead-actions";
 
-type LeadsData = FunctionReturnType<typeof api.leads.list>;
-export type LeadRow = LeadsData["leads"][number];
+type LeadRow = FunctionReturnType<typeof api.leads.page>["page"][number];
+type ListArgs = Omit<FunctionArgs<typeof api.leads.page>, "paginationOpts">;
 
 const ANY = "any";
 const MINE = "mine";
 const UNASSIGNED = "unassigned";
 const DEFAULT_SORT: SortState = { id: "sla", dir: "asc" };
+const SOURCES = Object.entries(LEAD_SOURCE_LABEL).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 const SORT_OPTIONS = [
   { value: "sla", label: "SLA urgency" },
@@ -70,82 +73,22 @@ const SORT_OPTIONS = [
   { value: "demo", label: "Demo date" },
   { value: "lead", label: "Name" },
 ];
-
-function matches(row: LeadRow, query: string) {
-  const text =
-    `${row.name} ${row.companyName} ${row.email ?? ""} ${row.phone ?? ""} ${row.channel} ${row.utm.campaign ?? ""} ${row.owner?.name ?? ""}`.toLowerCase();
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((word) => text.includes(word));
-}
+const SORT_DIR: Record<string, "asc" | "desc"> = { demo: "desc" };
 
 function isClosed(row: LeadRow) {
   return row.status === "disqualified" || row.status === "converted";
-}
-
-function median(values: number[]) {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2
-    ? sorted[middle]
-    : (sorted[middle - 1] + sorted[middle]) / 2;
-}
-
-function iso(at: number | null) {
-  return at ? new Date(at).toISOString() : "";
-}
-
-function exportRows(rows: LeadRow[]) {
-  const day = istToday();
-  downloadCsv(`leads-${day}.csv`, [
-    [
-      "Name",
-      "Account",
-      "Email",
-      "Phone",
-      "Kind",
-      "Status",
-      "Source",
-      "Campaign",
-      "Owner",
-      "Received",
-      "First touch",
-      "Speed to lead (min)",
-      "Demo",
-    ],
-    ...rows.map((row) => [
-      row.name,
-      row.companyName,
-      row.email ?? "",
-      row.phone ?? "",
-      LEAD_KIND_LABEL[row.kind],
-      LEAD_STATUS_LABEL[row.status],
-      row.channel,
-      row.utm.campaign ?? "",
-      row.owner?.name ?? "",
-      iso(row._creationTime),
-      iso(row.firstTouchedAt),
-      row.firstTouchedAt
-        ? Math.round((row.firstTouchedAt - row._creationTime) / 6000) / 10
-        : "",
-      iso(row.demoAt),
-    ]),
-  ]);
 }
 
 /** The inbound lead inbox: triage by status, watch the SLA, peek or open a lead. */
 export default function LeadsPage() {
   const viewer = useViewer();
   const members = useMembers();
-  const data = useQuery(api.leads.list);
   const { assign, setStatus } = useLeadActions();
   const bulk = useBulkLeadActions();
   const setCreate = useUiStore((state) => state.setCreate);
   const setPeek = useUiStore((state) => state.setPeek);
   const now = useNow(true, 30_000);
+  const { exportCsv, pending: exporting } = useCsvExport(["lead", "leads"]);
 
   const [search, setSearch] = useUrlState("q", "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -164,14 +107,28 @@ export default function LeadsPage() {
   )
     ? (statusParam as LeadStatus)
     : "new";
-  const slaMs = data?.slaMs ?? 0;
+  const query = useDebouncedValue(search);
+  const ownerId =
+    owner === ANY
+      ? undefined
+      : owner === UNASSIGNED
+        ? null
+        : ((owner === MINE ? viewer._id : owner) as Id<"members">);
+  const filters = {
+    ownerId,
+    kind: LEAD_KINDS.find((value) => value === kind) as LeadKind | undefined,
+    source: channel === ANY ? undefined : channel,
+    search: query.trim() || undefined,
+  };
+  const counts = useQuery(api.leads.counts, filters);
+  const slaMs = counts?.slaMs ?? 0;
 
   const columns: Column<LeadRow>[] = [
     {
       id: "lead",
       header: "Lead",
       width: "minmax(14rem,1.8fr)",
-      sortValue: (row) => row.name,
+      sortable: true,
       cell: (row) => (
         <>
           <Avatar name={row.name} />
@@ -194,7 +151,6 @@ export default function LeadsPage() {
       header: "Source",
       width: "minmax(9rem,1fr)",
       minViewport: 900,
-      sortValue: (row) => row.channel,
       cell: (row) => <SourceTag utm={row.utm} channel={row.channel} />,
     },
     {
@@ -202,19 +158,13 @@ export default function LeadsPage() {
       header: "Owner",
       width: "minmax(8.75rem,1fr)",
       minViewport: 1000,
-      sortValue: (row) => row.owner?.name ?? null,
       cell: (row) => <OwnerCell owner={row.owner} />,
     },
     {
       id: "sla",
       header: "SLA",
       width: "minmax(9.5rem,1fr)",
-      sortValue: (row) => {
-        const state = slaState(row, slaMs, now);
-        if (state.kind === "pending") return state.remainingMs;
-        if (state.kind === "breached") return -state.overMs;
-        return null;
-      },
+      sortable: true,
       cell: (row) => <SlaCell lead={row} slaMs={slaMs} />,
     },
     {
@@ -222,7 +172,8 @@ export default function LeadsPage() {
       header: "Demo",
       width: "minmax(8.5rem,0.9fr)",
       minViewport: 1100,
-      sortValue: (row) => row.demoAt,
+      defaultDir: "desc",
+      sortable: true,
       cell: (row) => <DemoCell at={row.demoAt} now={now} />,
     },
     {
@@ -231,7 +182,7 @@ export default function LeadsPage() {
       width: "5.5rem",
       align: "end",
       defaultDir: "asc",
-      sortValue: (row) => now - row._creationTime,
+      sortable: true,
       cell: (row) => (
         <span
           className="whitespace-nowrap tabular-nums"
@@ -245,74 +196,20 @@ export default function LeadsPage() {
 
   const [sortId, sortDir] = sortParam.split(":");
   const sort: SortState = {
-    id: columns.some((column) => column.id === sortId)
+    id: SORT_OPTIONS.some((option) => option.value === sortId)
       ? sortId
       : DEFAULT_SORT.id,
     dir: sortDir === "desc" ? "desc" : "asc",
   };
 
-  const leads = data?.leads;
-  const filtered = useMemo(() => {
-    if (!leads) return undefined;
-    return leads.filter(
-      (row) =>
-        (owner === ANY ||
-          (owner === UNASSIGNED
-            ? !row.owner
-            : owner === MINE
-              ? row.owner?._id === viewer._id
-              : row.owner?._id === owner)) &&
-        (channel === ANY || row.channel === channel) &&
-        (kind === ANY || row.kind === kind) &&
-        (!search.trim() || matches(row, search)),
-    );
-  }, [leads, owner, channel, kind, search, viewer._id]);
-
-  const counts = useMemo(() => {
-    if (!filtered) return undefined;
-    const result = Object.fromEntries(
-      LEAD_STATUSES.map((value) => [value, 0]),
-    ) as Record<LeadStatus, number>;
-    for (const row of filtered) result[row.status]++;
-    return result;
-  }, [filtered]);
-
-  const rows = useMemo(
-    () => filtered?.filter((row) => row.status === status),
-    [filtered, status],
-  );
-
-  const breached = useMemo(
-    () =>
-      (leads ?? []).filter(
-        (row) => slaState(row, slaMs, now).kind === "breached",
-      ).length,
-    [leads, slaMs, now],
-  );
-  const openCount = leads?.filter((row) => !isClosed(row)).length;
-
-  const stats = useMemo(() => {
-    if (!rows) return null;
-    let within = 0;
-    let judged = 0;
-    const speeds: number[] = [];
-    for (const row of rows) {
-      const state = slaState(row, slaMs, now);
-      if (state.kind === "replied") {
-        speeds.push(state.tookMs);
-        judged++;
-        if (!state.late) within++;
-      } else if (state.kind === "breached") {
-        judged++;
-      }
-    }
-    return {
-      untouched: rows.filter((row) => !row.firstTouchedAt && !isClosed(row))
-        .length,
-      median: median(speeds),
-      within: judged ? Math.round((within / judged) * 100) : null,
-    };
-  }, [rows, slaMs, now]);
+  const args: ListArgs = {
+    status,
+    ...filters,
+    sort: sort.id as ListArgs["sort"],
+    dir: sort.dir,
+  };
+  const { rows, paging } = usePagedList(api.leads.page, args);
+  const statusCounts = counts?.statuses;
 
   const selectedIds = (rows ?? [])
     .filter((row) => selected.has(row._id))
@@ -324,10 +221,6 @@ export default function LeadsPage() {
     void bulk.setStatus(ids, next, reason);
   }
 
-  const channels = useMemo(
-    () => [...new Set((leads ?? []).map((row) => row.channel))].sort(),
-    [leads],
-  );
   const hasFilters =
     owner !== ANY || channel !== ANY || kind !== ANY || search.trim() !== "";
 
@@ -338,45 +231,36 @@ export default function LeadsPage() {
     setKind(ANY);
   }
 
-  function exportView() {
-    if (!rows) return;
-    const column = columns.find((item) => item.id === sort.id);
-    const sorted = column?.sortValue
-      ? [...rows].sort(compareBy(column, sort.dir))
-      : rows;
-    exportRows(sorted);
-    toast(
-      `Exported ${sorted.length} ${sorted.length === 1 ? "lead" : "leads"}`,
-    );
-  }
-
-  const sortMenu = SORT_OPTIONS.some((option) => option.value === sort.id)
-    ? sort.id
-    : DEFAULT_SORT.id;
-  const dash = <span className="text-fg-tertiary">—</span>;
+  const breachedLabel = counts
+    ? `${counts.breached}${counts.breachedCapped ? "+" : ""}`
+    : "";
 
   return (
     <Page>
       <PageHeader
         title="Leads"
         meta={
-          leads && (
+          counts && (
             <>
               <PageStatus tone="neutral">
-                <span className="tabular-nums">{openCount} open</span>
+                <span className="tabular-nums">
+                  {counts.open.toLocaleString("en-IN")} open
+                </span>
               </PageStatus>
-              {breached > 0 && (
+              {counts.breached > 0 && (
                 <button
                   type="button"
                   onClick={() => {
                     setStatusView("new");
                     setSortParam("sla:asc");
                   }}
-                  aria-label={`${breached} past SLA. Show them first`}
+                  aria-label={`${breachedLabel} past SLA. Show them first`}
                   className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
                 >
                   <PageStatus tone="danger">
-                    <span className="tabular-nums">{breached} past SLA</span>
+                    <span className="tabular-nums">
+                      {breachedLabel} past SLA
+                    </span>
                   </PageStatus>
                 </button>
               )}
@@ -391,16 +275,23 @@ export default function LeadsPage() {
           setStatusView(next);
           setSelected(new Set());
         }}
-        views={LEAD_STATUSES.map((value) => ({
-          id: value,
-          label: LEAD_STATUS_LABEL[value],
-          count: counts?.[value],
-        }))}
+        views={LEAD_STATUSES.map((value) =>
+          statusCounts === null
+            ? { id: value, label: LEAD_STATUS_LABEL[value] }
+            : {
+                id: value,
+                label: LEAD_STATUS_LABEL[value],
+                count: statusCounts?.[value],
+              },
+        )}
       />
       <PageToolbar
         actions={
           <>
-            <ExportButton disabled={!rows?.length} onClick={exportView} />
+            <ExportButton
+              disabled={!rows?.length || exporting}
+              onClick={() => void exportCsv({ name: "leads", args })}
+            />
             <CreateButton onClick={() => setCreate({ type: "lead" })}>
               New lead
             </CreateButton>
@@ -414,9 +305,9 @@ export default function LeadsPage() {
         />
         <FilterMenu
           label="Sort by"
-          value={sortMenu}
+          value={sort.id}
           options={SORT_OPTIONS}
-          onChange={(id) => setSortParam(`${id}:asc`)}
+          onChange={(id) => setSortParam(`${id}:${SORT_DIR[id] ?? "asc"}`)}
         />
         <FilterMenu
           label="Owner"
@@ -435,10 +326,7 @@ export default function LeadsPage() {
           label="Source"
           value={channel}
           onChange={setChannel}
-          options={[
-            { value: ANY, label: "Any" },
-            ...channels.map((value) => ({ value, label: value })),
-          ]}
+          options={[{ value: ANY, label: "Any" }, ...SOURCES]}
         />
         <FilterMenu
           label="Kind"
@@ -485,24 +373,11 @@ export default function LeadsPage() {
               onSelect: () => setDisqualifying(row),
             },
           ]}
+          paging={paging}
           footer={[
-            { label: "Leads in view", value: rows?.length ?? 0 },
-            { label: "Untouched", value: stats?.untouched ?? 0 },
             {
-              label: "Median speed to lead",
-              value: stats?.median == null ? dash : compactSpan(stats.median),
-            },
-            {
-              label: "Within SLA",
-              value:
-                stats?.within == null ? (
-                  dash
-                ) : (
-                  <>
-                    {stats.within}
-                    <span className="text-fg-tertiary">%</span>
-                  </>
-                ),
+              label: "Leads in view",
+              value: viewCount(statusCounts?.[status], rows?.length, paging),
             },
           ]}
           renderCard={(row) => <LeadCard row={row} slaMs={slaMs} now={now} />}
@@ -547,6 +422,7 @@ export default function LeadsPage() {
         />
         <SelectionBar
           count={selectedIds.length}
+          loaded={isPartial(paging) ? rows?.length : undefined}
           noun={["lead", "leads"]}
           onClear={() => setSelected(new Set())}
         >

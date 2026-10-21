@@ -3,6 +3,7 @@ import {
   platformState,
   type StateEvent,
 } from "../../lib/domain/platform-state";
+import { demoEmail } from "./demo";
 
 /**
  * Read-only client for the Hypedrive admin API, authenticated as a Logto M2M
@@ -630,7 +631,7 @@ export function sandboxApi(source: SandboxSource, now: number): PlatformApi {
       members.push({
         user_id: userId,
         name,
-        email: `accounts@${source.domain}`,
+        email: demoEmail("accounts", source.domain),
         roles: ["finance_manager"],
       });
     }

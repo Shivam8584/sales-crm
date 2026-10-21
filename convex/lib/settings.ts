@@ -84,7 +84,6 @@ export async function roundRobinMemberIds(ctx: QueryCtx) {
 
 export const PRICING_KEYS = {
   marginFloorBps: "pricing.marginFloorBps",
-  approvalBps: "pricing.approvalBps",
   defaultMarginBps: "pricing.defaultMarginBps",
   defaultFundBps: "pricing.defaultFundBps",
   defaultFeeBps: "pricing.defaultFeeBps",

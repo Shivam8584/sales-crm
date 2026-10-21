@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/domain/money";
 import { rateLabel } from "@/lib/domain/pricing";
 import { ProposalStatusTag } from "./status";
 
-/** One line on the current proposal for the deal peek: version, status, take and margin. */
+/** One line on the deal's proposal for the peek: status, take and margin. */
 export default function ProposalSummary({
   dealId,
   onNavigate,
@@ -33,7 +33,6 @@ export default function ProposalSummary({
         <span className="text-fg-tertiary truncate">Start a proposal</span>
       ) : (
         <>
-          <span className="shrink-0 font-medium">v{proposal.version}</span>
           <ProposalStatusTag status={proposal.status} />
           <span
             className="truncate tabular-nums"

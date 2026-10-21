@@ -88,7 +88,7 @@ function PrintView({ id }: { id: string }) {
           </Button>
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h1 className="truncate text-base">
-              {proposal ? `Proposal v${proposal.version}` : "Proposal"}
+              Proposal
               {proposal?.account && (
                 <span className="text-fg-tertiary font-normal">
                   {" "}
@@ -141,7 +141,7 @@ function Document({ proposal }: { proposal: PrintProposal }) {
   return (
     <article
       data-theme="light"
-      aria-label={`Proposal v${proposal.version}`}
+      aria-label={`Proposal for ${proposal.deal.title}`}
       className="bg-card text-foreground shadow-overlay mx-auto flex max-w-[210mm] flex-col gap-10 rounded-xl px-6 py-8 [print-color-adjust:exact] sm:px-12 sm:py-12 print:max-w-none print:rounded-none print:bg-transparent print:p-0 print:shadow-none"
     >
       <header className="flex flex-wrap items-start justify-between gap-6">
@@ -159,7 +159,7 @@ function Document({ proposal }: { proposal: PrintProposal }) {
         <dl className="caption-style grid grid-cols-[auto_auto] gap-x-4 gap-y-2 sm:text-right">
           <dt className="text-fg-tertiary">Proposal</dt>
           <dd className="text-foreground flex items-center gap-1.5 font-medium sm:justify-end">
-            v{proposal.version}
+            {proposal.deal.title}
             {proposal.status === "draft" && (
               <ProposalStatusTag status="draft" />
             )}

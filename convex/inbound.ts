@@ -13,11 +13,7 @@
  * `?token=` or `X-Chatwoot-Token`.
  */
 import { v } from "convex/values";
-import {
-  httpAction,
-  internalMutation,
-  type MutationCtx,
-} from "./_generated/server";
+import { httpAction, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -39,15 +35,16 @@ import {
   timingSafeEqual,
 } from "./lib/http";
 import { isOpen } from "./lib/leads";
+import { rateLimiter } from "./lib/rateLimiter";
 import type { RecordRefs } from "./lib/timeline";
 import { notify } from "./notifications";
+import { internalMutation } from "./lib/functions";
 
 const BODY_LIMIT = 512 * 1024;
 const MAX_TEXT = 10_000;
 const MAX_SUBJECT = 300;
 const MAX_ID = 300;
 const SKEW_MS = 5 * 60_000;
-const DEDUPE_MS = 30 * 24 * 60 * 60_000;
 const MATCH_LIMIT = 20;
 
 const vChannel = v.union(v.literal("email"), v.literal("whatsapp"));
@@ -226,12 +223,10 @@ export const receive = internalMutation({
     receivedAt: v.number(),
   },
   handler: async (ctx, input) => {
-    const key = `inbound:${input.source}:${input.externalId}`;
-    const seen = await ctx.db
-      .query("rateLimits")
-      .withIndex("by_key", (q) => q.eq("key", key))
-      .unique();
-    if (seen) return { status: "duplicate" as const, matched: 0, exited: 0 };
+    const dedupe = { key: `${input.source}:${input.externalId}` };
+    if (!(await rateLimiter.check(ctx, "inboundMessage", dedupe)).ok) {
+      return { status: "duplicate" as const, matched: 0, exited: 0 };
+    }
 
     const contact: Contact = {
       email: input.email
@@ -248,15 +243,7 @@ export const receive = internalMutation({
 
     const now = Date.now();
     const at = Math.min(input.receivedAt, now);
-    const id = await ctx.db.insert("rateLimits", {
-      key,
-      windowStart: now,
-      count: 1,
-    });
-    await ctx.scheduler.runAfter(DEDUPE_MS, internal.lib.http.expire, {
-      id,
-      windowMs: DEDUPE_MS,
-    });
+    await rateLimiter.limit(ctx, "inboundMessage", dedupe);
 
     const channelLabel = REPLY_CHANNEL_LABEL[input.channel];
     let exited = 0;

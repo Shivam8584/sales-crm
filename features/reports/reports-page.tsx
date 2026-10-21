@@ -14,34 +14,24 @@ import {
 import { PERIODS, UNASSIGNED, type Period } from "@/convex/lib/reports";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
-import ActivationTab from "./activation-tab";
-import ForecastTab from "./forecast-tab";
 import { range } from "./format";
-import { FunnelTab, OverviewTab, SourcesTab } from "./lead-tabs";
+import { FunnelTab, OverviewTab } from "./lead-tabs";
 import { PERIOD_LABEL } from "./periods";
-import RevenueTab from "./revenue-tab";
 import TeamTab from "./team-tab";
 import { useLatest } from "./use-report";
 
 const TABS = [
   { id: "overview", label: "Overview" },
-  { id: "funnel", label: "Funnel" },
-  { id: "sources", label: "Sources" },
+  { id: "funnel", label: "Funnel & sources" },
   { id: "team", label: "Team" },
-  { id: "forecast", label: "Forecast" },
-  { id: "activation", label: "Activation" },
-  { id: "revenue", label: "Revenue" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
-
-const LEAD_TABS: readonly Tab[] = ["overview", "funnel", "sources"];
-const OWNER_TABS: readonly Tab[] = [...LEAD_TABS, "forecast", "revenue"];
 
 const ALL = "all";
 const MINE = "mine";
 const DEFAULT_PERIOD: Period = "30d";
 
-/** Funnel, sources, team, forecast, activation and revenue reports, one tab each. */
+/** Overview, funnel and sources, and the team leaderboard. */
 export default function ReportsPage() {
   const viewer = useViewer();
   const members = useMembers();
@@ -50,18 +40,18 @@ export default function ReportsPage() {
   const [source, setSource] = useUrlState("source", ALL);
   const [ownerParam, setOwner] = useUrlState("owner", ALL);
 
-  const tab: Tab = TABS.some((item) => item.id === tabParam)
-    ? (tabParam as Tab)
-    : "overview";
+  const tab: Tab =
+    tabParam === "sources"
+      ? "funnel"
+      : TABS.some((item) => item.id === tabParam)
+        ? (tabParam as Tab)
+        : "overview";
   const period = (PERIODS as readonly string[]).includes(periodParam)
     ? (periodParam as Period)
     : DEFAULT_PERIOD;
-  const leadTab = LEAD_TABS.includes(tab);
-  const usesOwner = OWNER_TABS.includes(tab);
-  const usesPeriod = tab !== "forecast";
-  const ownerShown = !leadTab && ownerParam === UNASSIGNED ? ALL : ownerParam;
-  const ownerValue = ownerShown === MINE ? viewer._id : ownerShown;
-  const owner = !usesOwner || ownerValue === ALL ? undefined : ownerValue;
+  const leadTab = tab !== "team";
+  const ownerValue = ownerParam === MINE ? viewer._id : ownerParam;
+  const owner = !leadTab || ownerValue === ALL ? undefined : ownerValue;
 
   const live = useQuery(
     api.reports.overview,
@@ -72,8 +62,7 @@ export default function ReportsPage() {
   const overview = useLatest(live);
   const report = overview.data;
 
-  const filtered =
-    (leadTab && source !== ALL) || (usesOwner && ownerShown !== ALL);
+  const filtered = leadTab && (source !== ALL || ownerParam !== ALL);
 
   function clearFilters() {
     setSource(ALL);
@@ -97,7 +86,7 @@ export default function ReportsPage() {
   const ownerOptions = [
     { value: ALL, label: "Anyone" },
     { value: MINE, label: "Me" },
-    ...(leadTab ? [{ value: UNASSIGNED, label: "Unassigned" }] : []),
+    { value: UNASSIGNED, label: "Unassigned" },
     ...(members ?? [])
       .filter((member) => member._id !== viewer._id)
       .map((member) => ({ value: member._id, label: member.name })),
@@ -106,7 +95,7 @@ export default function ReportsPage() {
   const filters = {
     period,
     owner,
-    ownerParam: ownerShown,
+    ownerParam,
     filtered,
     clearFilters,
     setPeriod: (next: Period) => setPeriod(next),
@@ -117,11 +106,9 @@ export default function ReportsPage() {
       <PageHeader
         title="Reports"
         meta={
-          usesPeriod && (
-            <PageStatus tone="info">
-              <span className="tabular-nums">{PERIOD_LABEL[period].long}</span>
-            </PageStatus>
-          )
+          <PageStatus tone="info">
+            <span className="tabular-nums">{PERIOD_LABEL[period].long}</span>
+          </PageStatus>
         }
       />
       <PageViews
@@ -132,17 +119,15 @@ export default function ReportsPage() {
         views={TABS.map((item) => ({ id: item.id, label: item.label }))}
       />
       <PageToolbar>
-        {usesPeriod && (
-          <FilterMenu
-            label="Period"
-            value={period}
-            onChange={setPeriod}
-            options={PERIODS.map((id) => ({
-              value: id,
-              label: PERIOD_LABEL[id].long,
-            }))}
-          />
-        )}
+        <FilterMenu
+          label="Period"
+          value={period}
+          onChange={setPeriod}
+          options={PERIODS.map((id) => ({
+            value: id,
+            label: PERIOD_LABEL[id].long,
+          }))}
+        />
         {leadTab && (
           <FilterMenu
             label="Source"
@@ -151,10 +136,10 @@ export default function ReportsPage() {
             options={sourceOptions}
           />
         )}
-        {usesOwner && (
+        {leadTab && (
           <FilterMenu
             label="Owner"
-            value={ownerShown}
+            value={ownerParam}
             onChange={setOwner}
             options={ownerOptions}
           />
@@ -164,18 +149,11 @@ export default function ReportsPage() {
             Clear
           </Button>
         )}
-        {tab === "forecast" ? (
-          <span className="caption-style text-fg-tertiary ml-auto max-md:hidden">
-            Open deals as of today
+        {report && leadTab && (
+          <span className="caption-style text-fg-tertiary ml-auto tabular-nums max-md:hidden">
+            {range(report.windows.current)} · compared with{" "}
+            {range(report.windows.previous)}
           </span>
-        ) : (
-          report &&
-          leadTab && (
-            <span className="caption-style text-fg-tertiary ml-auto tabular-nums max-md:hidden">
-              {range(report.windows.current)} · compared with{" "}
-              {range(report.windows.previous)}
-            </span>
-          )
         )}
       </PageToolbar>
 
@@ -195,19 +173,7 @@ export default function ReportsPage() {
               {...filters}
             />
           )}
-          {tab === "sources" && (
-            <SourcesTab
-              report={report}
-              loading={overview.loading}
-              {...filters}
-            />
-          )}
           {tab === "team" && <TeamTab period={period} />}
-          {tab === "forecast" && (
-            <ForecastTab owner={owner} ownerParam={ownerShown} />
-          )}
-          {tab === "activation" && <ActivationTab period={period} />}
-          {tab === "revenue" && <RevenueTab period={period} owner={owner} />}
         </div>
       </div>
     </Page>

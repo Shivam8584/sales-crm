@@ -21,14 +21,12 @@ const currency = PROPOSAL_CURRENCY;
 
 const BAND_TEXT = {
   below_floor: "text-danger",
-  low: "text-warning",
   target: "text-foreground",
   default: "text-success",
 } as const;
 
 const BAND_FILL = {
   below_floor: "bg-danger",
-  low: "bg-warning",
   target: "bg-foreground",
   default: "bg-success",
 } as const;
@@ -104,7 +102,7 @@ function Row({
   );
 }
 
-/** Margin on a 0–40% scale with the policy's floor, approval line and default marked. */
+/** Margin on a 0–40% scale with the policy's floor and default marked. */
 function MarginGauge({
   margin,
   charge,
@@ -120,7 +118,6 @@ function MarginGauge({
   const bps = Math.round(rate * 10_000);
   const marks = [
     { bps: policy.marginFloorBps, label: "Floor" },
-    { bps: policy.approvalBps, label: "Approval" },
     { bps: policy.defaultMarginBps, label: "Default" },
   ];
   return (
@@ -139,14 +136,14 @@ function MarginGauge({
         aria-valuemin={0}
         aria-valuemax={SCALE_BPS / 100}
         aria-valuenow={Math.max(0, Math.min(SCALE_BPS, bps)) / 100}
-        aria-valuetext={`${rateLabel(rate)}; floor ${bpsLabel(policy.marginFloorBps)}, approval under ${bpsLabel(policy.approvalBps)}, default ${bpsLabel(policy.defaultMarginBps)}`}
+        aria-valuetext={`${rateLabel(rate)}; approval under the ${bpsLabel(policy.marginFloorBps)} floor, default ${bpsLabel(policy.defaultMarginBps)}`}
         className="bg-track relative h-1.5 rounded-full"
       >
         <span
           aria-hidden
           className="bg-success/25 absolute inset-y-0 rounded-full"
           style={{
-            left: position(policy.approvalBps),
+            left: position(policy.marginFloorBps),
             right: `calc(100% - ${position(policy.defaultMarginBps)})`,
           }}
         />

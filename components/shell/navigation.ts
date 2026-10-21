@@ -1,4 +1,5 @@
 import type { ComponentType, SVGProps } from "react";
+import { ROLE_RANK, type Role } from "@/lib/domain/enums";
 import ActivityIcon from "@/public/assets/icons/activity.svg";
 import InboxIcon from "@/public/assets/icons/inbox.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
@@ -18,6 +19,8 @@ export type NavItem = {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   /** Key pressed after `G` to jump here. */
   shortcut: string;
+  /** Hidden from roles below this one. */
+  minRole?: Role;
 };
 
 export type NavSection = { title?: string; items: NavItem[] };
@@ -47,6 +50,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Activation",
         icon: AlertTriangleIcon,
         shortcut: "V",
+        minRole: "manager",
       },
       {
         href: "/automations",
@@ -83,10 +87,24 @@ export const SETTINGS_ITEM: NavItem = {
   shortcut: "S",
 };
 
-const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((section) => section.items);
+export const canSee = (item: NavItem, role: Role) =>
+  !item.minRole || ROLE_RANK[role] >= ROLE_RANK[item.minRole];
 
-/** Every item reachable with `G` then a key, including settings. */
-export const ALL_NAV_ITEMS: NavItem[] = [...NAV_ITEMS, SETTINGS_ITEM];
+/** The sidebar sections a role sees. */
+export function navSections(role: Role): NavSection[] {
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => canSee(item, role)),
+  })).filter((section) => section.items.length > 0);
+}
+
+/** Every item a role can reach with `G` then a key, including settings. */
+export function navItems(role: Role): NavItem[] {
+  return [
+    ...navSections(role).flatMap((section) => section.items),
+    SETTINGS_ITEM,
+  ];
+}
 
 export const SETTINGS_PAGES = [
   { href: "/settings/profile", label: "Profile", adminOnly: false },

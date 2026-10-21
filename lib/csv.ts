@@ -8,7 +8,7 @@ function escapeCell(cell: CsvCell) {
   return value;
 }
 
-function toCsv(rows: CsvCell[][]) {
+export function toCsv(rows: CsvCell[][]) {
   return rows.map((row) => row.map(escapeCell).join(",")).join("\r\n");
 }
 

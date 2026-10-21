@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
+import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
@@ -16,7 +15,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import { ENTRY_ANCHOR } from "@/lib/domain/notifications";
 import {
   FILTERS,
@@ -28,8 +26,9 @@ import {
 import TimelineComposer from "./timeline-composer";
 import EntryBody from "./entry-body";
 import MentionTextarea, { useMentionDraft } from "./mention-textarea";
+import { useTimelineEntries, type TimelineEntry } from "./use-timeline-entries";
 
-type Entry = FunctionReturnType<typeof api.timeline.forRecord>[number];
+type Entry = TimelineEntry;
 
 const WEEKDAY_DATE = new Intl.DateTimeFormat("en-IN", {
   weekday: "short",
@@ -83,7 +82,7 @@ export default function Timeline({
   /** History only: no composer and no edits, e.g. for an erased person. */
   readOnly?: boolean;
 }) {
-  const entries = useQuery(api.timeline.forRecord, { target });
+  const { entries, more, loadingMore, loadMore } = useTimelineEntries(target);
   const [filter, setFilter] = useState<TimelineFilter>("all");
 
   const counts = useMemo(() => {
@@ -134,7 +133,10 @@ export default function Timeline({
                 )}
               >
                 {item.label}
-                <span className="text-fg-tertiary tabular-nums">{count}</span>
+                <span className="text-fg-tertiary tabular-nums">
+                  {count}
+                  {more && "+"}
+                </span>
               </button>
             );
           })}
@@ -190,6 +192,17 @@ export default function Timeline({
             </section>
           ))}
         </div>
+      )}
+      {more && (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={loadingMore}
+          onClick={loadMore}
+          className="text-fg-secondary self-center"
+        >
+          {loadingMore ? "Loading…" : "Show older activity"}
+        </Button>
       )}
     </div>
   );
@@ -448,9 +461,6 @@ function LoggedItem({
   const meta = KIND_META[entry.kind];
   const canManage =
     !readOnly && (entry.actorId === viewer._id || viewer.role === "admin");
-  const canAck = !readOnly && entry.actorId !== viewer._id;
-  const acked = entry.acked.some((member) => member._id === viewer._id);
-  const acknowledge = useAcknowledge();
   const actorName = entry.actor?.name ?? "Hypedrive";
   const details = [
     entry.outcome && CALL_OUTCOME_LABEL[entry.outcome],
@@ -538,55 +548,33 @@ function LoggedItem({
               <span className="text-fg-tertiary"> · {details.join(" · ")}</span>
             )}
           </p>
-          {(canManage || canAck) && !editing && (
+          {canManage && !editing && (
             <span className="flex gap-0.5 self-center opacity-0 group-focus-within/item:opacity-100 group-hover/item:opacity-100 pointer-coarse:opacity-100">
-              {canAck && (
-                <Tooltip
-                  content={acked ? "Remove acknowledgement" : "Acknowledge"}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={
-                      acked ? "Remove acknowledgement" : "Acknowledge"
-                    }
-                    aria-pressed={acked}
-                    onClick={() => acknowledge(entry._id)}
-                    className={cn(acked && "text-info-foreground")}
-                  >
-                    <CheckCircleIcon aria-hidden className="size-3" />
-                  </Button>
-                </Tooltip>
-              )}
-              {canManage && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Edit entry"
-                    onClick={() => {
-                      draft.reset(
-                        entry.body ?? "",
-                        entry.mentioned.map((member) => ({
-                          id: member._id,
-                          name: member.name,
-                        })),
-                      );
-                      setEditing(true);
-                    }}
-                  >
-                    <EditIcon aria-hidden className="size-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Delete entry"
-                    onClick={() => void onDelete()}
-                  >
-                    <TrashIcon aria-hidden className="size-3" />
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Edit entry"
+                onClick={() => {
+                  draft.reset(
+                    entry.body ?? "",
+                    entry.mentioned.map((member) => ({
+                      id: member._id,
+                      name: member.name,
+                    })),
+                  );
+                  setEditing(true);
+                }}
+              >
+                <EditIcon aria-hidden className="size-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Delete entry"
+                onClick={() => void onDelete()}
+              >
+                <TrashIcon aria-hidden className="size-3" />
+              </Button>
             </span>
           )}
           <Time at={entry.occurredAt} edited={Boolean(entry.editedAt)} />
@@ -630,83 +618,7 @@ function LoggedItem({
             </p>
           )
         )}
-        {!editing && (
-          <Acknowledgements
-            entry={entry}
-            canAck={canAck}
-            onToggle={() => acknowledge(entry._id)}
-          />
-        )}
       </div>
     </li>
-  );
-}
-
-function useAcknowledge() {
-  const viewer = useViewer();
-  const acknowledge = useMutation(
-    api.mentions.acknowledge,
-  ).withOptimisticUpdate((store, { id }) => {
-    for (const { args, value } of store.getAllQueries(api.timeline.forRecord)) {
-      if (!value) continue;
-      store.setQuery(
-        api.timeline.forRecord,
-        args,
-        value.map((item) =>
-          item._id !== id
-            ? item
-            : {
-                ...item,
-                acked: item.acked.some((member) => member._id === viewer._id)
-                  ? item.acked.filter((member) => member._id !== viewer._id)
-                  : [...item.acked, { _id: viewer._id, name: viewer.name }],
-              },
-        ),
-      );
-    }
-  });
-  return (id: Entry["_id"]) =>
-    void acknowledge({ id }).catch((error) =>
-      toast(readError(error).message, { tone: "danger" }),
-    );
-}
-
-/** Who acknowledged an entry; a toggle for anyone but its author. */
-function Acknowledgements({
-  entry,
-  canAck,
-  onToggle,
-}: {
-  entry: Entry;
-  canAck: boolean;
-  onToggle: () => void;
-}) {
-  const viewer = useViewer();
-  if (entry.acked.length === 0) return null;
-  const mine = entry.acked.some((member) => member._id === viewer._id);
-  const names = entry.acked.map((member) =>
-    member._id === viewer._id ? "You" : member.name,
-  );
-  const label = `Acknowledged by ${names.join(", ")}`;
-  return (
-    <Tooltip content={canAck && mine ? `${label}. Click to undo.` : label}>
-      <button
-        type="button"
-        aria-disabled={!canAck}
-        aria-pressed={canAck ? mine : undefined}
-        aria-label={label}
-        onClick={() => canAck && onToggle()}
-        className={cn(
-          "caption-style text-fg-secondary bg-overlay-1 focus-visible:ring-ring duration-fast flex h-6 items-center gap-1 self-start rounded-full px-2 tabular-nums transition-colors outline-none focus-visible:ring-2",
-          canAck
-            ? "hover:bg-overlay-2 hover:text-foreground"
-            : "cursor-default",
-          mine && "bg-info-surface text-info-foreground hover:bg-info-surface",
-        )}
-      >
-        <CheckCircleIcon aria-hidden className="size-3" />
-        {entry.acked.length}
-      </button>
-    </Tooltip>
   );
 }

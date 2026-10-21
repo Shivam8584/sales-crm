@@ -5,22 +5,16 @@ import type { OptimisticLocalStore } from "convex/browser";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { snoozeUntil } from "@/lib/domain/notifications";
 
 export type NotificationItem = FunctionReturnType<
   typeof api.notifications.listMine
 >[number];
 type InboxArgs = FunctionArgs<typeof api.notifications.inbox>;
-type Change = Partial<Pick<NotificationItem, "read" | "done" | "snoozedUntil">>;
-type NotificationId = Id<"notifications">;
-
-const inInbox = (item: NotificationItem) =>
-  !item.done && item.snoozedUntil === null;
+type Change = Partial<Pick<NotificationItem, "read" | "archived">>;
 
 function belongs(item: NotificationItem, args: InboxArgs) {
-  if (args.view === "done") return item.done;
-  if (args.view === "snoozed") return !item.done && item.snoozedUntil !== null;
-  if (!inInbox(item)) return false;
+  if (args.view === "archived") return item.archived;
+  if (item.archived) return false;
   if (args.view === "mentions" && item.kind !== "mention") return false;
   return !args.unreadOnly || !item.read;
 }
@@ -28,7 +22,7 @@ function belongs(item: NotificationItem, args: InboxArgs) {
 /** Applies `change` to the given notifications in every cached list and count. */
 function apply(
   store: OptimisticLocalStore,
-  ids: NotificationId[] | "all-unread",
+  ids: Id<"notifications">[] | "all-unread",
   change: (item: NotificationItem) => Change,
 ) {
   const matches = (item: NotificationItem) =>
@@ -60,23 +54,16 @@ function apply(
     store.setQuery(
       api.notifications.listMine,
       args,
-      value.map(next).filter(inInbox),
+      value.map(next).filter((item) => !item.archived),
     );
   }
 
   let unread = 0;
-  let inboxUnread = 0;
   let mentions = 0;
-  let snoozed = 0;
   for (const [before, after] of known.values()) {
-    unread += Number(!after.read) - Number(!before.read);
-    const fresh = (item: NotificationItem) => !item.read && inInbox(item);
-    const delta = Number(fresh(after)) - Number(fresh(before));
-    inboxUnread += delta;
+    const delta = Number(!after.read) - Number(!before.read);
+    unread += delta;
     if (after.kind === "mention") mentions += delta;
-    snoozed +=
-      Number(!after.done && after.snoozedUntil !== null) -
-      Number(!before.done && before.snoozedUntil !== null);
   }
   const count = store.getQuery(api.notifications.unreadCount, {});
   if (count !== undefined) {
@@ -92,11 +79,10 @@ function apply(
       api.notifications.counts,
       {},
       ids === "all-unread"
-        ? { ...counts, inbox: 0, mentions: 0 }
+        ? { inbox: 0, mentions: 0 }
         : {
-            inbox: Math.max(0, counts.inbox + inboxUnread),
+            inbox: Math.max(0, counts.inbox + unread),
             mentions: Math.max(0, counts.mentions + mentions),
-            snoozed: Math.max(0, counts.snoozed + snoozed),
           },
     );
   }
@@ -104,36 +90,23 @@ function apply(
 
 /** Inbox mutations that update the bell, the inbox views and the counts instantly. */
 export function useNotificationActions() {
-  const markRead = useMutation(api.notifications.markRead).withOptimisticUpdate(
-    (store, { id }) => apply(store, [id], () => ({ read: true })),
-  );
-  const markUnread = useMutation(
-    api.notifications.markUnread,
-  ).withOptimisticUpdate((store, { id }) =>
-    apply(store, [id], () => ({
-      read: false,
-      done: false,
-      snoozedUntil: null,
-    })),
+  const setRead = useMutation(api.notifications.setRead).withOptimisticUpdate(
+    (store, { ids, read }) =>
+      apply(store, ids, () =>
+        read ? { read: true } : { read: false, archived: false },
+      ),
   );
   const markAllRead = useMutation(
     api.notifications.markAllRead,
   ).withOptimisticUpdate((store) =>
     apply(store, "all-unread", () => ({ read: true })),
   );
-  const setDone = useMutation(api.notifications.setDone).withOptimisticUpdate(
-    (store, { ids, done }) =>
-      apply(store, ids, () =>
-        done ? { done: true, read: true, snoozedUntil: null } : { done: false },
-      ),
-  );
-  const snooze = useMutation(api.notifications.snooze).withOptimisticUpdate(
-    (store, { ids, preset }) =>
-      apply(store, ids, () => ({
-        snoozedUntil: snoozeUntil(preset, Date.now()),
-        read: true,
-        done: false,
-      })),
+  const setArchived = useMutation(
+    api.notifications.setArchived,
+  ).withOptimisticUpdate((store, { ids, archived }) =>
+    apply(store, ids, () =>
+      archived ? { archived: true, read: true } : { archived: false },
+    ),
   );
   const restoreState = useMutation(
     api.notifications.restoreState,
@@ -141,10 +114,9 @@ export function useNotificationActions() {
     for (const state of items) {
       apply(store, [state.id], () => ({
         read: state.readAt !== undefined,
-        done: state.doneAt !== undefined,
-        snoozedUntil: state.snoozedUntil ?? null,
+        archived: state.archivedAt !== undefined,
       }));
     }
   });
-  return { markRead, markUnread, markAllRead, setDone, snooze, restoreState };
+  return { setRead, markAllRead, setArchived, restoreState };
 }

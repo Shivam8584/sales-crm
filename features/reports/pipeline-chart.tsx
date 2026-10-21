@@ -36,6 +36,15 @@ export default function PipelineChart({
             <span className="text-foreground font-medium tabular-nums">
               {totals(pipeline.openTotals, "no value set")}
             </span>
+            {pipeline.weightedTotals.some((value) => value.amount > 0) && (
+              <>
+                {" · "}
+                <span className="tabular-nums">
+                  {totals(pipeline.weightedTotals)}
+                </span>{" "}
+                weighted
+              </>
+            )}
           </>
         )}
       </p>

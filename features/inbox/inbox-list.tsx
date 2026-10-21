@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
@@ -11,20 +10,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/_ui/dropdown-menu";
-import Kbd from "@/components/_ui/kbd";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
 import { isUrgentKind, KindIcon } from "@/features/notifications/kinds";
-import type { RecordType, SnoozePreset } from "@/lib/domain/notifications";
+import { parseRecordKey, type RecordType } from "@/lib/domain/notifications";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
+import ArchiveIcon from "@/public/assets/icons/archive.svg";
 import BuildingIcon from "@/public/assets/icons/building.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
+import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
 import InboxIcon from "@/public/assets/icons/inbox.svg";
 import MailIcon from "@/public/assets/icons/mail.svg";
@@ -51,27 +49,15 @@ const RECORD_LABEL: Record<RecordType, string> = {
   people: "Person",
 };
 
-const WAKE = new Intl.DateTimeFormat("en-IN", {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: "Asia/Kolkata",
-});
-
-export function wakeLabel(at: number) {
-  return WAKE.format(at);
-}
-
-export const SNOOZE_OPTIONS: {
-  value: SnoozePreset;
-  label: string;
-  hint: string;
-}[] = [
-  { value: "tomorrow", label: "Tomorrow", hint: "9:00" },
-  { value: "next_week", label: "Next week", hint: "Mon 9:00" },
-];
+const TASK_LINK: Record<
+  RecordType,
+  "accountId" | "personId" | "dealId" | "leadId"
+> = {
+  accounts: "accountId",
+  people: "personId",
+  deals: "dealId",
+  leads: "leadId",
+};
 
 export type Group = {
   key: string;
@@ -101,8 +87,7 @@ export function groupByRecord(
 
 export type RowActions = {
   open: (item: InboxItem) => void;
-  done: (items: InboxItem[], done: boolean) => void;
-  snooze: (items: InboxItem[], preset: SnoozePreset) => void;
+  archive: (items: InboxItem[], archived: boolean) => void;
   toggleRead: (item: InboxItem) => void;
   select: (item: InboxItem, on: boolean) => void;
   setCursor: (id: string) => void;
@@ -161,29 +146,19 @@ function Tile({ item }: { item: InboxItem }) {
 
 export function InboxRow({
   item,
-  view,
   cursor,
   selected,
   selecting,
-  snoozeOpen,
-  onSnoozeOpenChange,
   actions,
 }: {
   item: InboxItem;
-  view: string;
   cursor: boolean;
   selected: boolean;
   selecting: boolean;
-  snoozeOpen: boolean;
-  onSnoozeOpenChange: (open: boolean) => void;
   actions: RowActions;
 }) {
   const href = item.href ?? "/inbox";
-  const when =
-    view === "snoozed" && item.snoozedUntil
-      ? { at: item.snoozedUntil, text: `Until ${wakeLabel(item.snoozedUntil)}` }
-      : { at: item._creationTime, text: relativeTime(item._creationTime) };
-  const done = item.done;
+  const archived = item.archived;
 
   return (
     <li
@@ -227,11 +202,11 @@ export function InboxRow({
               </span>
             )}
             <time
-              dateTime={new Date(when.at).toISOString()}
-              title={dateTime(when.at)}
+              dateTime={new Date(item._creationTime).toISOString()}
+              title={dateTime(item._creationTime)}
               className="caption-style text-fg-tertiary shrink-0 whitespace-nowrap tabular-nums group-focus-within/row:invisible group-hover/row:invisible group-data-[cursor]/row:invisible pointer-coarse:visible!"
             >
-              {when.text}
+              {relativeTime(item._creationTime)}
             </time>
           </span>
           {(item.body || item.actor) && (
@@ -263,27 +238,20 @@ export function InboxRow({
       </span>
 
       <span className="bg-row-hover absolute top-1.5 right-2 flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 group-data-[cursor]/row:opacity-100 has-[[data-state=open]]:opacity-100 pointer-coarse:hidden">
-        <Tooltip content={done ? "Move to inbox" : "Done"} shortcut="E">
+        <Tooltip content={archived ? "Move to inbox" : "Archive"} shortcut="E">
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={done ? "Move to inbox" : "Mark done"}
-            onClick={() => actions.done([item], !done)}
+            aria-label={archived ? "Move to inbox" : "Archive"}
+            onClick={() => actions.archive([item], !archived)}
           >
-            {done ? (
+            {archived ? (
               <InboxIcon aria-hidden className="size-3" />
             ) : (
-              <CheckCircleIcon aria-hidden className="size-3" />
+              <ArchiveIcon aria-hidden className="size-3" />
             )}
           </Button>
         </Tooltip>
-        {!done && (
-          <SnoozeMenu
-            open={snoozeOpen}
-            onOpenChange={onSnoozeOpenChange}
-            onSnooze={(preset) => actions.snooze([item], preset)}
-          />
-        )}
         <Tooltip content={item.read ? "Mark unread" : "Mark read"} shortcut="U">
           <Button
             variant="ghost"
@@ -294,6 +262,7 @@ export function InboxRow({
             <MailIcon aria-hidden className="size-3" />
           </Button>
         </Tooltip>
+        <RowMenu item={item} actions={actions} />
       </span>
 
       <span className="absolute top-2 right-2 hidden pointer-coarse:flex">
@@ -303,70 +272,9 @@ export function InboxRow({
   );
 }
 
-/** Snooze choices; `S` opens it for the row under the cursor. */
-export function SnoozeMenu({
-  open,
-  onOpenChange,
-  onSnooze,
-  trigger,
-}: {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  onSnooze: (preset: SnoozePreset) => void;
-  trigger?: ReactNode;
-}) {
-  const [own, setOwn] = useState(false);
-  const isOpen = open ?? own;
-  const setOpen = (next: boolean) => {
-    setOwn(next);
-    onOpenChange?.(next);
-  };
-  return (
-    <DropdownMenu open={isOpen} onOpenChange={setOpen}>
-      <Tooltip content="Snooze" shortcut="S">
-        <DropdownMenuTrigger asChild>
-          {trigger ?? (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Snooze"
-              className="data-[state=open]:bg-overlay-2"
-            >
-              <ClockIcon aria-hidden className="size-3" />
-            </Button>
-          )}
-        </DropdownMenuTrigger>
-      </Tooltip>
-      <DropdownMenuContent
-        align="end"
-        className="min-w-52"
-        onCloseAutoFocus={(event) => event.preventDefault()}
-        onKeyDown={(event) => {
-          const option = SNOOZE_OPTIONS[Number(event.key) - 1];
-          if (!option) return;
-          event.preventDefault();
-          setOpen(false);
-          onSnooze(option.value);
-        }}
-      >
-        <DropdownMenuLabel>Snooze until</DropdownMenuLabel>
-        {SNOOZE_OPTIONS.map((option, index) => (
-          <DropdownMenuItem
-            key={option.value}
-            onSelect={() => onSnooze(option.value)}
-          >
-            <ClockIcon aria-hidden className="text-fg-tertiary size-3" />
-            <span className="flex-1">{option.label}</span>
-            <span className="text-fg-tertiary tabular-nums">{option.hint}</span>
-            <Kbd className="ml-1">{index + 1}</Kbd>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 function RowMenu({ item, actions }: { item: InboxItem; actions: RowActions }) {
+  const setCreate = useUiStore((state) => state.setCreate);
+  const record = item.record ? parseRecordKey(item.record) : null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -374,37 +282,41 @@ function RowMenu({ item, actions }: { item: InboxItem; actions: RowActions }) {
           variant="ghost"
           size="icon-xs"
           aria-label={`Actions for ${item.title}`}
+          className="data-[state=open]:bg-overlay-2"
         >
           <DotsIcon aria-hidden className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52">
-        <DropdownMenuItem onSelect={() => actions.done([item], !item.done)}>
-          {item.done ? (
+      <DropdownMenuContent
+        align="end"
+        className="min-w-52"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
+        <DropdownMenuItem
+          onSelect={() => actions.archive([item], !item.archived)}
+        >
+          {item.archived ? (
             <InboxIcon aria-hidden className="size-3" />
           ) : (
-            <CheckCircleIcon aria-hidden className="size-3" />
+            <ArchiveIcon aria-hidden className="size-3" />
           )}
-          {item.done ? "Move to inbox" : "Mark done"}
+          {item.archived ? "Move to inbox" : "Archive"}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => actions.toggleRead(item)}>
           <MailIcon aria-hidden className="size-3" />
           {item.read ? "Mark unread" : "Mark read"}
         </DropdownMenuItem>
-        {!item.done && (
+        {record && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Snooze until</DropdownMenuLabel>
-            {SNOOZE_OPTIONS.map((option) => (
-              <DropdownMenuItem
-                key={option.value}
-                onSelect={() => actions.snooze([item], option.value)}
-              >
-                <ClockIcon aria-hidden className="size-3" />
-                <span className="flex-1">{option.label}</span>
-                <span className="text-fg-tertiary">{option.hint}</span>
-              </DropdownMenuItem>
-            ))}
+            <DropdownMenuItem
+              onSelect={() =>
+                setCreate({ type: "task", [TASK_LINK[record.type]]: record.id })
+              }
+            >
+              <CheckSquareIcon aria-hidden className="size-3" />
+              Create follow-up task
+            </DropdownMenuItem>
           </>
         )}
       </DropdownMenuContent>

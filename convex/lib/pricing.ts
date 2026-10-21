@@ -1,6 +1,6 @@
 import { v, type Infer } from "convex/values";
 import type { QueryCtx } from "../_generated/server";
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Id } from "../_generated/dataModel";
 import type { Money } from "../../lib/domain/money";
 import {
   APPROVAL_STATES,
@@ -73,7 +73,8 @@ export const vPayment = v.object({
 /** The policy a sent proposal was priced under. */
 export const vPolicy = v.object({
   marginFloorBps: v.number(),
-  approvalBps: v.number(),
+  /** Legacy: cleared by `migrations:runSimplify`; remove once production has run it. */
+  approvalBps: v.optional(v.number()),
   defaultMarginBps: v.number(),
   defaultFundBps: v.number(),
   defaultFeeBps: v.number(),
@@ -220,8 +221,4 @@ export async function requireDeal(ctx: QueryCtx, id: Id<"deals">) {
   const deal = await ctx.db.get(id);
   if (!deal) notFound("Deal");
   return deal;
-}
-
-export function versionLabel(proposal: Pick<Doc<"proposals">, "version">) {
-  return `proposal v${proposal.version}`;
 }

@@ -1,12 +1,14 @@
-import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
+import { v, type ObjectType } from "convex/values";
 import {
-  internalMutation,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+  paginationOptsValidator,
+  type FilterBuilder,
+  type NamedTableInfo,
+  type PaginationOptions,
+  type PaginationResult,
+} from "convex/server";
+import { type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { DEAL_STAGES, type DealStage } from "../lib/domain/enums";
 import { DEAL_STAGE_LABEL, personName } from "../lib/domain/labels";
 import { DEFAULT_CURRENCY, formatMoney } from "../lib/domain/money";
@@ -14,8 +16,15 @@ import { cleanText, isValidDay } from "../lib/domain/normalize";
 import { PROPOSAL_CURRENCY } from "../lib/domain/pricing";
 import { dealStageEffects, isDealClosed } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
-import { invalid, notFound } from "./lib/errors";
-import { memberMutation, memberQuery } from "./lib/functions";
+import { fail, invalid, notFound } from "./lib/errors";
+import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
+import {
+  mapPage,
+  paginateEmptyLast,
+  searchText,
+  vDir,
+  vSearch,
+} from "./lib/lists";
 import { assertCanReassign } from "./lib/ownership";
 import { assertCan } from "./lib/permissions";
 import schema from "./schema";
@@ -27,7 +36,7 @@ import {
   requireActiveMember,
 } from "./lib/records";
 import { logChanges, logSystem } from "./lib/timeline";
-import { vDay, vDealStage, vMoney } from "./lib/validators";
+import { literals, vDay, vDealStage, vMoney } from "./lib/validators";
 
 const MAX_TITLE = 120;
 const MAX_REASON = 280;
@@ -205,6 +214,7 @@ async function toClient(
 }
 
 const OPEN_STAGES = DEAL_STAGES.filter((stage) => !isClosed(stage));
+const CLOSED_STAGES = DEAL_STAGES.filter(isClosed);
 
 async function openDeals(ctx: QueryCtx) {
   const columns = await Promise.all(
@@ -218,13 +228,14 @@ async function openDeals(ctx: QueryCtx) {
   return columns.flat();
 }
 
-/** Deals in board order; pass `accountId` for one account's deals, `open` to skip won and lost. */
+/** One account's deals, or every open deal, in board order. */
 export const list = memberQuery({
   args: {
     accountId: v.optional(v.id("accounts")),
     open: v.optional(v.boolean()),
   },
   handler: async (ctx, { accountId, open }) => {
+    if (!accountId && !open) fail("invalid", "Pass an account or open: true");
     const [deals, members] = await Promise.all([
       accountId
         ? ctx.db
@@ -234,9 +245,7 @@ export const list = memberQuery({
             .then((rows) =>
               open ? rows.filter((deal) => !isClosed(deal.stage)) : rows,
             )
-        : open
-          ? openDeals(ctx)
-          : ctx.db.query("deals").collect(),
+        : openDeals(ctx),
       memberIndex(ctx),
     ]);
     deals.sort((a, b) => a.position - b.position);
@@ -244,26 +253,234 @@ export const list = memberQuery({
   },
 });
 
-/** Cursor-paginated deals in one stage: board order for open stages, latest closed first for won and lost. */
-export const page = memberQuery({
-  args: { paginationOpts: paginationOptsValidator, stage: vDealStage },
-  handler: async (ctx, { paginationOpts, stage }) => {
-    const result = isClosed(stage)
-      ? await ctx.db
-          .query("deals")
-          .withIndex("by_stage_closed", (q) => q.eq("stage", stage))
-          .order("desc")
-          .paginate(paginationOpts)
-      : await ctx.db
-          .query("deals")
-          .withIndex("by_stage_position", (q) => q.eq("stage", stage))
-          .paginate(paginationOpts);
-    return {
-      ...result,
-      page: await toClient(ctx, result.page, await memberIndex(ctx)),
-    };
+/**
+ * The pipeline board: every open deal, and won and lost deals closed since
+ * `closedSince`, in board order. Open deals are the team's working set;
+ * older closed deals are in the list view.
+ */
+export const board = memberQuery({
+  args: { closedSince: v.number() },
+  handler: async (ctx, { closedSince }) => {
+    const [open, closed, members] = await Promise.all([
+      openDeals(ctx),
+      Promise.all(
+        CLOSED_STAGES.map((stage) =>
+          ctx.db
+            .query("deals")
+            .withIndex("by_stage_closed", (q) =>
+              q.eq("stage", stage).gte("closedAt", closedSince),
+            )
+            .collect(),
+        ),
+      ),
+      memberIndex(ctx),
+    ]);
+    const deals = [...open, ...closed.flat()].sort(
+      (a, b) => a.position - b.position,
+    );
+    return await toClient(ctx, deals, members);
   },
 });
+
+type DealsTable = NamedTableInfo<DataModel, "deals">;
+
+/** Filters and sort of the list; `page`, `counts` and CSV export share them. */
+export const vListArgs = {
+  ownerId: v.optional(v.id("members")),
+  accountId: v.optional(v.id("accounts")),
+  close: v.optional(literals(["month", "overdue", "none"])),
+  /** The viewer's calendar day, for the "this month" and "overdue" filters. */
+  today: vDay,
+  hideClosed: v.optional(v.boolean()),
+  search: vSearch,
+  sort: v.optional(literals(["close", "amount", "title"])),
+  dir: v.optional(vDir),
+};
+type ListArgs = ObjectType<typeof vListArgs>;
+
+function monthRange(today: string) {
+  const [year, month] = today.split("-").map(Number);
+  const next =
+    month === 12
+      ? `${year + 1}-01`
+      : `${year}-${String(month + 1).padStart(2, "0")}`;
+  return { from: `${today.slice(0, 7)}-01`, to: `${next}-01` };
+}
+
+/** The close-date filter, the open-only filter and anything the index didn't cover. */
+function narrow(
+  q: FilterBuilder<DealsTable>,
+  args: ListArgs,
+  covered: { owner: boolean; close: boolean },
+) {
+  const field = q.field("closeDate");
+  const { from, to } = monthRange(args.today);
+  return q.and(
+    args.ownerId && !covered.owner
+      ? q.eq(q.field("ownerId"), args.ownerId)
+      : true,
+    args.accountId ? q.eq(q.field("accountId"), args.accountId) : true,
+    args.hideClosed || args.close === "overdue"
+      ? q.and(q.neq(q.field("stage"), "won"), q.neq(q.field("stage"), "lost"))
+      : true,
+    covered.close || !args.close
+      ? true
+      : args.close === "none"
+        ? q.eq(field, undefined)
+        : args.close === "month"
+          ? q.and(q.gte(field, from), q.lt(field, to))
+          : q.and(q.neq(field, undefined), q.lt(field, args.today)),
+  );
+}
+
+function compareDeals(sort: "close" | "amount" | "title", dir: "asc" | "desc") {
+  const factor = dir === "asc" ? 1 : -1;
+  return (a: Doc<"deals">, b: Doc<"deals">) => {
+    if (sort === "amount") return (a.amount.amount - b.amount.amount) * factor;
+    if (sort === "title") return a.title.localeCompare(b.title) * factor;
+    if (a.closeDate === b.closeDate) return 0;
+    if (!a.closeDate) return 1;
+    if (!b.closeDate) return -1;
+    return a.closeDate.localeCompare(b.closeDate) * factor;
+  };
+}
+
+/**
+ * Deals for the list view. Close date, amount and title each have an index
+ * with and without the owner, and "this month" and "overdue" become index
+ * ranges when sorting by close date. One account's deals come in one page.
+ */
+async function listPage(
+  ctx: QueryCtx,
+  args: ListArgs,
+  opts: PaginationOptions,
+): Promise<PaginationResult<Doc<"deals">>> {
+  const deals = ctx.db.query("deals");
+  const sort = args.sort ?? "close";
+  const dir = args.dir ?? (sort === "amount" ? "desc" : "asc");
+  const { ownerId, accountId } = args;
+  const text = searchText(args.search);
+
+  if (text) {
+    return await deals
+      .withSearchIndex("search_title", (q) => {
+        let search = q.search("title", text);
+        if (ownerId) search = search.eq("ownerId", ownerId);
+        if (accountId) search = search.eq("accountId", accountId);
+        return search;
+      })
+      .filter((q) =>
+        narrow(
+          q,
+          { ...args, accountId: undefined },
+          { owner: true, close: false },
+        ),
+      )
+      .paginate(opts);
+  }
+
+  if (accountId) {
+    const rows = await deals
+      .withIndex("by_account", (q) => q.eq("accountId", accountId))
+      .filter((q) =>
+        narrow(
+          q,
+          { ...args, accountId: undefined },
+          { owner: false, close: false },
+        ),
+      )
+      .collect();
+    return {
+      page: rows.sort(compareDeals(sort, dir)),
+      isDone: true,
+      continueCursor: "",
+    };
+  }
+
+  if (sort === "amount" || sort === "title") {
+    const query =
+      sort === "amount"
+        ? ownerId
+          ? deals.withIndex("list_owner_amount", (q) =>
+              q.eq("ownerId", ownerId),
+            )
+          : deals.withIndex("list_amount")
+        : ownerId
+          ? deals.withIndex("list_owner_title", (q) => q.eq("ownerId", ownerId))
+          : deals.withIndex("list_title");
+    return await query
+      .filter((q) => narrow(q, args, { owner: true, close: false }))
+      .order(dir)
+      .paginate(opts);
+  }
+
+  const { from, to } = monthRange(args.today);
+  const byClose = (range: "all" | "filled" | "empty") =>
+    ownerId
+      ? deals.withIndex("list_owner_close", (q) => {
+          const base = q.eq("ownerId", ownerId);
+          if (args.close === "none" || range === "empty")
+            return base.eq("closeDate", undefined);
+          if (args.close === "month")
+            return base.gte("closeDate", from).lt("closeDate", to);
+          if (args.close === "overdue")
+            return base.gte("closeDate", "").lt("closeDate", args.today);
+          return range === "filled" ? base.gte("closeDate", "") : base;
+        })
+      : deals.withIndex("list_close", (q) => {
+          if (args.close === "none" || range === "empty")
+            return q.eq("closeDate", undefined);
+          if (args.close === "month")
+            return q.gte("closeDate", from).lt("closeDate", to);
+          if (args.close === "overdue")
+            return q.gte("closeDate", "").lt("closeDate", args.today);
+          return range === "filled" ? q.gte("closeDate", "") : q;
+        });
+  const run =
+    (range: "all" | "filled" | "empty", order: "asc" | "desc") =>
+    (page: PaginationOptions) =>
+      byClose(range)
+        .filter((q) => narrow(q, args, { owner: true, close: true }))
+        .order(order)
+        .paginate(page);
+  if (dir === "asc" && !args.close) {
+    return await paginateEmptyLast(
+      opts,
+      run("filled", "asc"),
+      run("empty", "asc"),
+    );
+  }
+  return await run("all", dir)(opts);
+}
+
+/** One page of the deals list. */
+export const page = memberQuery({
+  args: { paginationOpts: paginationOptsValidator, ...vListArgs },
+  handler: async (ctx, { paginationOpts, ...args }) => {
+    const [result, members] = await Promise.all([
+      listPage(ctx, args, paginationOpts),
+      memberIndex(ctx),
+    ]);
+    return await mapPage(result, (deals) => toClient(ctx, deals, members));
+  },
+});
+
+/** Deals matching `search` by title, open ones first. */
+export async function findDeals(ctx: QueryCtx, search: string, limit: number) {
+  const text = searchText(search);
+  if (!text) return [];
+  const deals = await ctx.db
+    .query("deals")
+    .withSearchIndex("search_title", (q) => q.search("title", text))
+    .take(limit);
+  deals.sort((a, b) => Number(isClosed(a.stage)) - Number(isClosed(b.stage)));
+  return (await toClient(ctx, deals, await memberIndex(ctx))).map((deal) => ({
+    _id: deal._id,
+    title: deal.title,
+    stage: deal.stage,
+    account: deal.account,
+  }));
+}
 
 /** Takes a raw string because the id comes from the URL and may be stale or mistyped. */
 export const get = memberQuery({

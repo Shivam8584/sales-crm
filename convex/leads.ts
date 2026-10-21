@@ -1,15 +1,21 @@
-import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
+import { v, type ObjectType } from "convex/values";
+import {
+  paginationOptsValidator,
+  type FilterBuilder,
+  type NamedTableInfo,
+  type PaginationOptions,
+  type PaginationResult,
+} from "convex/server";
 import {
   httpAction,
-  internalMutation,
   internalQuery,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { checkGstin, panRoot } from "../lib/domain/gstin";
+import { LEAD_STATUSES } from "../lib/domain/enums";
 import type {
   DisqualifyReason,
   LeadKind,
@@ -40,9 +46,18 @@ import {
   leadStatusProblem,
 } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
+import { countLeads } from "./lib/counts";
 import { fail, invalid, notFound } from "./lib/errors";
-import { memberMutation, memberQuery } from "./lib/functions";
+import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
 import { findAccount, findPerson } from "./lib/identity";
+import {
+  mapPage,
+  paginateEmptyLast,
+  searchText,
+  uniqueById,
+  vDir,
+  vSearch,
+} from "./lib/lists";
 import { reassignedBy } from "./lib/ownership";
 import { canAssignLead, assertCanAssignLead } from "./lib/permissions";
 import {
@@ -53,12 +68,12 @@ import {
   originAllowed,
   parseJsonObject,
   preflight,
-  rateLimit,
   readBody,
   readJson,
   siteOrigins,
   verifyHmac,
 } from "./lib/http";
+import { rateLimiter } from "./lib/rateLimiter";
 import {
   createLead,
   findRecentOpenLead,
@@ -76,13 +91,16 @@ import {
   requireActiveMember,
 } from "./lib/records";
 import { diff, logChanges, logSystem } from "./lib/timeline";
-import { vDisqualifyReason, vLeadStatus, vUtm } from "./lib/validators";
+import {
+  literals,
+  vDisqualifyReason,
+  vLeadKind,
+  vLeadStatus,
+  vUtm,
+} from "./lib/validators";
 import { leadershipIds, notify, notifyMany } from "./notifications";
 
-const LIST_LIMIT = 2000;
 const FORM_SOURCE = "demo_form";
-const FORM_RATE_LIMIT = 5;
-const FORM_RATE_WINDOW_MS = 60_000;
 const MIN_FILL_MS = 2000;
 const WEBHOOK_BODY_LIMIT = 256 * 1024;
 // Moving a lead into one of these means someone spoke to them; disqualifying spam does not.
@@ -123,54 +141,231 @@ function toRow(
   };
 }
 
-/** The newest 2,000 leads; `page` walks them all. */
-export const list = memberQuery({
-  args: {},
-  handler: async (ctx) => {
-    const [leads, members] = await Promise.all([
-      ctx.db.query("leads").order("desc").take(LIST_LIMIT),
-      memberIndex(ctx),
+const OPEN_STATUSES = LEAD_STATUSES.filter(
+  (status) => status !== "disqualified" && status !== "converted",
+);
+const BREACH_CAP = 99;
+const SEARCH_LIMIT = 50;
+
+type LeadsTable = NamedTableInfo<DataModel, "leads">;
+
+/** Filters and sort of the list; `page`, `counts` and CSV export share them. */
+export const vListArgs = {
+  status: vLeadStatus,
+  /** `null` lists unassigned leads. */
+  ownerId: v.optional(v.union(v.id("members"), v.null())),
+  kind: v.optional(vLeadKind),
+  source: v.optional(v.string()),
+  search: vSearch,
+  sort: v.optional(literals(["sla", "age", "demo", "lead"])),
+  dir: v.optional(vDir),
+};
+type ListArgs = ObjectType<typeof vListArgs>;
+
+function narrow(q: FilterBuilder<LeadsTable>, args: ListArgs) {
+  return q.and(
+    args.kind ? q.eq(q.field("kind"), args.kind) : true,
+    args.source ? q.eq(q.field("source"), args.source) : true,
+  );
+}
+
+/**
+ * Leads in one status. Each sort has an index with and without the owner;
+ * kind and source narrow the scan. "SLA" puts untouched leads first, the
+ * longest-waiting at the top; "age" ascending means newest first.
+ */
+async function listPage(
+  ctx: QueryCtx,
+  args: ListArgs,
+  opts: PaginationOptions,
+): Promise<PaginationResult<Doc<"leads">>> {
+  const leads = ctx.db.query("leads");
+  const { status, ownerId } = args;
+  const owned = ownerId !== undefined;
+  const owner = ownerId ?? undefined;
+  const text = searchText(args.search);
+  if (text) {
+    const run = (index: "search_name" | "search_company") =>
+      leads
+        .withSearchIndex(index, (q) => {
+          const search = q
+            .search(index === "search_name" ? "name" : "companyName", text)
+            .eq("status", status);
+          return owned ? search.eq("ownerId", owner) : search;
+        })
+        .filter((q) => narrow(q, args))
+        .take(SEARCH_LIMIT);
+    const [byName, byCompany] = await Promise.all([
+      run("search_name"),
+      run("search_company"),
     ]);
     return {
-      slaMs: (await leadSlaSeconds(ctx)) * 1000,
-      leads: leads.map((lead) => toRow(lead, members)),
+      page: uniqueById([...byName, ...byCompany]),
+      isDone: true,
+      continueCursor: "",
+    };
+  }
+
+  const sort = args.sort ?? "sla";
+  const dir = args.dir ?? (sort === "demo" ? "desc" : "asc");
+  if (sort === "age") {
+    return await (
+      owned
+        ? leads.withIndex("by_owner_status", (q) =>
+            q.eq("ownerId", owner).eq("status", status),
+          )
+        : leads.withIndex("by_status", (q) => q.eq("status", status))
+    )
+      .filter((q) => narrow(q, args))
+      .order(dir === "asc" ? "desc" : "asc")
+      .paginate(opts);
+  }
+  if (sort === "lead") {
+    return await (
+      owned
+        ? leads.withIndex("list_owner_name", (q) =>
+            q.eq("ownerId", owner).eq("status", status),
+          )
+        : leads.withIndex("list_name", (q) => q.eq("status", status))
+    )
+      .filter((q) => narrow(q, args))
+      .order(dir)
+      .paginate(opts);
+  }
+  if (sort === "sla") {
+    return await (
+      owned
+        ? leads.withIndex("list_owner_touched", (q) =>
+            q.eq("ownerId", owner).eq("status", status),
+          )
+        : leads.withIndex("list_touched", (q) => q.eq("status", status))
+    )
+      .filter((q) => narrow(q, args))
+      .order(dir)
+      .paginate(opts);
+  }
+  const demo = (range: "filled" | "empty") => (page: PaginationOptions) =>
+    (owned
+      ? leads.withIndex("list_owner_demo", (q) => {
+          const base = q.eq("ownerId", owner).eq("status", status);
+          return range === "filled"
+            ? base.gte("demoAt", 0)
+            : base.eq("demoAt", undefined);
+        })
+      : leads.withIndex("list_demo", (q) => {
+          const base = q.eq("status", status);
+          return range === "filled"
+            ? base.gte("demoAt", 0)
+            : base.eq("demoAt", undefined);
+        })
+    )
+      .filter((q) => narrow(q, args))
+      .order("asc")
+      .paginate(page);
+  if (dir === "asc") {
+    return await paginateEmptyLast(opts, demo("filled"), demo("empty"));
+  }
+  return await (
+    owned
+      ? leads.withIndex("list_owner_demo", (q) =>
+          q.eq("ownerId", owner).eq("status", status),
+        )
+      : leads.withIndex("list_demo", (q) => q.eq("status", status))
+  )
+    .filter((q) => narrow(q, args))
+    .order("desc")
+    .paginate(opts);
+}
+
+/** One page of leads in a status; a search returns the best matches in one page. */
+export const page = memberQuery({
+  args: { paginationOpts: paginationOptsValidator, ...vListArgs },
+  handler: async (ctx, { paginationOpts, ...args }) => {
+    const [result, members] = await Promise.all([
+      listPage(ctx, args, paginationOpts),
+      memberIndex(ctx),
+    ]);
+    return await mapPage(result, (leads) =>
+      leads.map((lead) => toRow(lead, members)),
+    );
+  },
+});
+
+/**
+ * Counts for the status views and the page header: per status with the owner
+ * and kind filters (null with a source or search filter, which can't be
+ * counted without a scan), open leads, leads past their SLA (capped), and the
+ * SLA itself.
+ */
+export const counts = memberQuery({
+  args: {
+    ownerId: vListArgs.ownerId,
+    kind: vListArgs.kind,
+    source: vListArgs.source,
+    search: vSearch,
+  },
+  handler: async (ctx, args) => {
+    const slaMs = (await leadSlaSeconds(ctx)) * 1000;
+    const now = Date.now();
+    const [statuses, open, waiting] = await Promise.all([
+      args.source || searchText(args.search)
+        ? null
+        : countLeads(ctx, LEAD_STATUSES, {
+            ownerId: args.ownerId,
+            kind: args.kind,
+          }),
+      countLeads(ctx, OPEN_STATUSES, {}),
+      Promise.all(
+        OPEN_STATUSES.map((status) =>
+          ctx.db
+            .query("leads")
+            .withIndex("list_touched", (q) =>
+              q.eq("status", status).eq("firstTouchedAt", undefined),
+            )
+            .take(BREACH_CAP + 1),
+        ),
+      ),
+    ]);
+    const breached = waiting
+      .flat()
+      .filter(
+        (lead) =>
+          lead.slaBreachedAt || slaDueAt(lead._creationTime, slaMs) <= now,
+      ).length;
+    return {
+      slaMs,
+      statuses,
+      open: Object.values(open).reduce((sum, count) => sum + count, 0),
+      breached: Math.min(breached, BREACH_CAP),
+      breachedCapped: breached > BREACH_CAP,
     };
   },
 });
 
-/** Cursor-paginated leads, newest first, optionally by status and owner. */
-export const page = memberQuery({
-  args: {
-    paginationOpts: paginationOptsValidator,
-    status: v.optional(vLeadStatus),
-    ownerId: v.optional(v.id("members")),
-  },
-  handler: async (ctx, { paginationOpts, status, ownerId }) => {
-    const base =
-      ownerId && status
-        ? ctx.db
-            .query("leads")
-            .withIndex("by_owner_status", (q) =>
-              q.eq("ownerId", ownerId).eq("status", status),
-            )
-        : status
-          ? ctx.db
-              .query("leads")
-              .withIndex("by_status", (q) => q.eq("status", status))
-          : ctx.db.query("leads");
-    const result = await base
-      .filter((q) =>
-        ownerId && !status ? q.eq(q.field("ownerId"), ownerId) : true,
-      )
-      .order("desc")
-      .paginate(paginationOpts);
-    const members = await memberIndex(ctx);
-    return {
-      ...result,
-      page: result.page.map((lead) => toRow(lead, members)),
-    };
-  },
-});
+/** Leads matching `search` by name or company, open ones first. */
+export async function findLeads(ctx: QueryCtx, search: string, limit: number) {
+  const text = searchText(search);
+  if (!text) return [];
+  const [byName, byCompany] = await Promise.all(
+    (["search_name", "search_company"] as const).map((index) =>
+      ctx.db
+        .query("leads")
+        .withSearchIndex(index, (q) =>
+          q.search(index === "search_name" ? "name" : "companyName", text),
+        )
+        .take(limit),
+    ),
+  );
+  return uniqueById([...byName, ...byCompany])
+    .sort((a, b) => Number(!isOpen(a)) - Number(!isOpen(b)))
+    .slice(0, limit)
+    .map((lead) => ({
+      _id: lead._id,
+      name: lead.name,
+      companyName: lead.companyName,
+      status: lead.status,
+    }));
+}
 
 /** The viewer's new leads, the longest-waiting untouched ones first. */
 export const waiting = memberQuery({
@@ -1135,9 +1330,7 @@ export const submit = httpAction(async (ctx, request) => {
     return json({ ok: false, error: "Origin not allowed" }, 403, cors);
   }
   const ip = clientIp(request);
-  if (
-    !(await rateLimit(ctx, `leads:${ip}`, FORM_RATE_LIMIT, FORM_RATE_WINDOW_MS))
-  ) {
+  if (!(await rateLimiter.limit(ctx, "leadForm", { key: ip })).ok) {
     return json(
       { ok: false, error: "Too many requests. Try again in a minute." },
       429,

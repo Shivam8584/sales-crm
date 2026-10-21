@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -22,7 +22,15 @@ import {
   LEAD_STATUS_LABEL,
   personName,
 } from "@/lib/domain/labels";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useViewer } from "@/hooks/use-viewer";
 import { useMobileBreakpoints } from "@/hooks/use-mobile-breakpoints";
+import {
+  recordAt,
+  rememberRecord,
+  useRecentRecords,
+  type RecentRecord,
+} from "@/hooks/use-recent-records";
 import { toast } from "@/stores/toast-store";
 import { useUiStore, type CreateDialog } from "@/stores/ui-store";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
@@ -35,10 +43,14 @@ import {
   useRegisteredCommandActions,
   type CommandAction,
 } from "./command-actions";
-import { ALL_NAV_ITEMS } from "./navigation";
+import { navItems } from "./navigation";
 
-const RESULTS_PER_GROUP = 5;
-const RECORD_PATH = /^\/(accounts|people|leads|deals)\/[^/]+$/;
+const RECORD_HREF: Record<RecentRecord["type"], string> = {
+  account: "/accounts",
+  person: "/people",
+  lead: "/leads",
+  deal: "/deals",
+};
 
 const CREATE: { label: string; dialog: NonNullable<CreateDialog> }[] = [
   { label: "New account", dialog: { type: "account" } },
@@ -79,7 +91,10 @@ function rank<T>(
     .map((entry) => entry.item);
 }
 
-/** ⌘K: contextual actions, record search across every type, create and navigation. */
+/**
+ * ⌘K: contextual actions, server-side record search across every type
+ * (recently opened records while the box is empty), create and navigation.
+ */
 export default function CommandMenu() {
   const router = useRouter();
   const pathname = usePathname();
@@ -87,21 +102,36 @@ export default function CommandMenu() {
   const setOpen = useUiStore((state) => state.setCommandOpen);
   const setCreate = useUiStore((state) => state.setCreate);
   const registered = useRegisteredCommandActions();
+  const { role } = useViewer();
   const { belowLg } = useMobileBreakpoints();
   const [search, setSearch] = useState("");
   const deferred = useRef<(() => void) | null>(null);
 
-  const accounts = useQuery(api.accounts.list, open ? {} : "skip");
-  const people = useQuery(api.people.list, open ? {} : "skip");
-  const leads = useQuery(api.leads.list, open ? {} : "skip");
-  const deals = useQuery(api.deals.list, open ? {} : "skip");
+  const recent = useRecentRecords();
+  const query = useDebouncedValue(search.trim(), 150);
+
+  useEffect(() => {
+    const record = recordAt(pathname);
+    if (record) rememberRecord(record);
+  }, [pathname]);
 
   const terms = useMemo(() => words(search), [search]);
   const searching = terms.length > 0;
+  const found = useQuery(
+    api.shell.search,
+    open && query ? { search: query } : "skip",
+  );
+  const [shown, setShown] = useState(found);
+  if (found !== undefined && found !== shown) setShown(found);
+  const results = searching ? (found ?? shown) : null;
+  const recentItems = useQuery(
+    api.shell.recent,
+    open && !searching && recent.length > 0 ? { refs: recent } : "skip",
+  );
 
   const contextual = useMemo<CommandAction[]>(() => {
     const builtIn: CommandAction[] = [];
-    if (RECORD_PATH.test(pathname)) {
+    if (recordAt(pathname)) {
       builtIn.push({
         id: "copy-link",
         label: "Copy link",
@@ -123,46 +153,16 @@ export default function CommandMenu() {
     action.label,
     action.keywords,
   ]);
-  const accountResults = searching
-    ? rank(
-        accounts,
-        terms,
-        (account) => [account.name, account.domain ?? ""],
-        RESULTS_PER_GROUP,
-      )
-    : [];
-  const peopleResults = searching
-    ? rank(
-        people,
-        terms,
-        (person) => [
-          personName(person),
-          `${person.email ?? ""} ${person.account?.name ?? ""}`,
-        ],
-        RESULTS_PER_GROUP,
-      )
-    : [];
-  const leadResults = searching
-    ? rank(
-        leads?.leads,
-        terms,
-        (lead) => [lead.name, `${lead.companyName} ${lead.email ?? ""}`],
-        RESULTS_PER_GROUP,
-      )
-    : [];
-  const dealResults = searching
-    ? rank(
-        deals,
-        terms,
-        (deal) => [deal.title, deal.account?.name ?? ""],
-        RESULTS_PER_GROUP,
-      )
-    : [];
+  const accountResults = results?.accounts ?? [];
+  const peopleResults = results?.people ?? [];
+  const leadResults = results?.leads ?? [];
+  const dealResults = results?.deals ?? [];
+  const recentResults = searching ? [] : (recentItems ?? []);
   const createResults = rank(CREATE, terms, (item) => [
     item.label,
     `create add ${item.dialog.type}`,
   ]);
-  const navResults = rank(ALL_NAV_ITEMS, terms, (item) => [
+  const navResults = rank(navItems(role), terms, (item) => [
     item.label,
     "go to open",
   ]);
@@ -171,12 +171,7 @@ export default function CommandMenu() {
     "collapse expand navigation",
   ]);
 
-  const loading =
-    searching &&
-    (accounts === undefined ||
-      people === undefined ||
-      leads === undefined ||
-      deals === undefined);
+  const loading = searching && (found === undefined || query !== search.trim());
 
   function onOpenChange(next: boolean) {
     setOpen(next);
@@ -243,6 +238,34 @@ export default function CommandMenu() {
                   {action.shortcut && (
                     <Kbd className="ml-auto">{action.shortcut}</Kbd>
                   )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {recentResults.length > 0 && (
+            <CommandGroup heading="Recent">
+              {recentResults.map((item) => (
+                <CommandItem
+                  key={`${item.type}:${item.id}`}
+                  value={`recent:${item.type}:${item.id}`}
+                  onSelect={() => go(`${RECORD_HREF[item.type]}/${item.id}`)}
+                >
+                  {item.account ? (
+                    <AccountLogo account={item.account} size="xs" />
+                  ) : item.type === "person" ? (
+                    <Avatar name={item.title} />
+                  ) : (
+                    <ItemIcon>
+                      {item.type === "lead" ? (
+                        <TargetIcon aria-hidden className="size-3" />
+                      ) : (
+                        <ClipboardIcon aria-hidden className="size-3" />
+                      )}
+                    </ItemIcon>
+                  )}
+                  <span className="truncate">{item.title}</span>
+                  <Hint>{item.hint}</Hint>
                 </CommandItem>
               ))}
             </CommandGroup>

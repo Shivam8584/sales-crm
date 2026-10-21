@@ -10,7 +10,6 @@ import MessageIcon from "@/public/assets/icons/message.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
-import { NOTIFICATION_GROUPS } from "@/lib/domain/notifications";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -43,6 +42,3 @@ export function KindIcon({
 }
 
 export const isUrgentKind = (kind: string) => kind === "lead_sla";
-
-/** Inbox filter groups; each maps to the notification kinds it covers. */
-export const KIND_GROUPS = NOTIFICATION_GROUPS;

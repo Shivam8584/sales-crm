@@ -28,6 +28,7 @@ export const LEAD_SOURCE_LABEL: Record<string, string> = {
   calcom: "Cal.com",
   platform: "Platform",
   prospecting: "Prospecting",
+  review_gap: "Review-gap check",
 };
 
 export const UTM_KEYS = [
