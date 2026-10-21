@@ -60,6 +60,7 @@
     var(--background)
   );
 
+  --color-info: var(--info);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
@@ -189,6 +190,7 @@
   --scrim: rgb(0 0 0 / 0.6);
   --image-outline: rgb(255 255 255 / 0.1);
 
+  --info: #3b82f6;
   --success: #22c55e;
   --warning: #fbbf24;
   --danger: #f97373;
@@ -284,6 +286,7 @@
   --scrim: rgb(17 17 19 / 0.24);
   --image-outline: rgb(0 0 0 / 0.1);
 
+  --info: #0d5fea;
   --success: #15923f;
   --warning: #c46a05;
   --danger: #c92222;
