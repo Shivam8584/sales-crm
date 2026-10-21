@@ -502,6 +502,14 @@ const APP_TABLES = [
   "platformSnapshots",
   "retentionReviews",
   "rateLimits",
+  "follows",
+  "watchlists",
+  "watchedProducts",
+  "productSnapshots",
+  "prospectBrands",
+  "automationEnrollments",
+  "automationSteps",
+  "automationMessages",
 ] as const;
 
 function line(

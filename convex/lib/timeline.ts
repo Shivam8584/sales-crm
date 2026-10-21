@@ -28,10 +28,11 @@ export function isInteraction(entry: {
   kind: string;
   actorId?: unknown;
   automated?: boolean;
+  direction?: "inbound" | "outbound";
 }) {
   return (
     (INTERACTION_KINDS as readonly string[]).includes(entry.kind) &&
-    entry.actorId !== undefined &&
+    (entry.actorId !== undefined || entry.direction === "inbound") &&
     !entry.automated
   );
 }

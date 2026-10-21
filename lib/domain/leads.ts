@@ -27,6 +27,7 @@ export const LEAD_SOURCE_LABEL: Record<string, string> = {
   manual: "Manual",
   calcom: "Cal.com",
   platform: "Platform",
+  prospecting: "Prospecting",
 };
 
 export const UTM_KEYS = [

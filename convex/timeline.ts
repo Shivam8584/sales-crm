@@ -385,6 +385,9 @@ export const restore = memberMutation({
       outcome: v.optional(vCallOutcome),
       editedAt: v.optional(v.number()),
       automated: v.optional(v.boolean()),
+      direction: v.optional(
+        v.union(v.literal("inbound"), v.literal("outbound")),
+      ),
       mentions: v.optional(v.array(v.id("members"))),
       acks: v.optional(v.array(v.id("members"))),
     }),

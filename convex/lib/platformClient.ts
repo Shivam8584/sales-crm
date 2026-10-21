@@ -621,7 +621,12 @@ export function sandboxApi(source: SandboxSource, now: number): PlatformApi {
   if (state.funding.count > 0 && source.domain) {
     const name = FINANCE_NAMES[Math.floor(random() * FINANCE_NAMES.length)];
     const userId = `usr_sandbox_fin_${source.orgId.slice(-8)}`;
-    if (!members.some((member) => member.roles.includes("finance_manager"))) {
+    if (
+      !members.some(
+        (member) =>
+          member.user_id === userId || member.roles.includes("finance_manager"),
+      )
+    ) {
       members.push({
         user_id: userId,
         name,

@@ -495,10 +495,21 @@ function LoggedItem({
       <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
         <div className="flex min-h-5 items-baseline gap-2 text-sm leading-5">
           <p className="text-fg-secondary min-w-0 flex-1">
-            <span className="text-foreground font-medium">{actorName}</span>{" "}
-            {entry.kind === "note"
-              ? "added a note"
-              : `logged ${entry.kind === "email" ? "an" : "a"} ${meta.label.toLowerCase()}`}
+            {entry.direction === "inbound" ? (
+              <>
+                <span className="text-foreground font-medium">
+                  {entry.person?.name ?? "Contact"}
+                </span>{" "}
+                replied by {entry.kind === "whatsapp" ? "WhatsApp" : "email"}
+              </>
+            ) : (
+              <>
+                <span className="text-foreground font-medium">{actorName}</span>{" "}
+                {entry.kind === "note"
+                  ? "added a note"
+                  : `logged ${entry.kind === "email" ? "an" : "a"} ${meta.label.toLowerCase()}`}
+              </>
+            )}
             {showContext && entry.person && (
               <>
                 {" "}
