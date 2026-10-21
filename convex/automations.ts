@@ -976,7 +976,7 @@ export const deliver = internalAction({
       messageId,
     });
     if (!message) return;
-    const result = await deliverMessage({
+    const result = await deliverMessage(ctx, {
       ...message,
       recipientId: String(message.recipientId),
     });

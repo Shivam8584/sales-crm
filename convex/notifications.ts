@@ -573,7 +573,7 @@ export const sendDigests = internalAction({
       const result =
         provider === "outbox"
           ? null
-          : await deliver({
+          : await deliver(ctx, {
               channel: "email",
               provider,
               stepKey: `digest:${entry.memberId}:${day}`,

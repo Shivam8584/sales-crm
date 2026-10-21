@@ -1,0 +1,126 @@
+name: hypedrive-crm
+
+# Traefik (Dokploy) on the host owns 80/443 and only routes containers on the
+# external `dokploy-network`; Postgres stays on the private network.
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    shm_size: 256mb
+    environment:
+      POSTGRES_USER: convex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${PG_DATABASE:-hypedrive_crm}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: pg_isready -U convex -d ${PG_DATABASE:-hypedrive_crm}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ghcr.io/convex/convex-backend:${CONVEX_REV:?}
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - convex-data:/convex/data
+    environment:
+      INSTANCE_NAME: ${INSTANCE_NAME:-hypedrive-crm}
+      INSTANCE_SECRET: ${INSTANCE_SECRET:?}
+      CONVEX_CLOUD_ORIGIN: https://${CONVEX_HOST:?}
+      CONVEX_SITE_ORIGIN: https://${CONVEX_SITE_HOST:?}
+      POSTGRES_URL: postgresql://convex:${POSTGRES_PASSWORD}@postgres:5432
+      DO_NOT_REQUIRE_SSL: "1"
+      DISABLE_BEACON: "true"
+      DISABLE_METRICS_ENDPOINT: "true"
+      DOCUMENT_RETENTION_DELAY: "172800"
+      REDACT_LOGS_TO_CLIENT: "true"
+      RUST_LOG: info
+    networks: [internal, dokploy-network]
+    healthcheck:
+      test: curl -f http://localhost:3210/version
+      interval: 5s
+      start_period: 20s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: dokploy-network
+      traefik.http.routers.hdcrm-convex.rule: Host(`${CONVEX_HOST}`)
+      traefik.http.routers.hdcrm-convex.entrypoints: websecure
+      traefik.http.routers.hdcrm-convex.tls.certresolver: letsencrypt
+      traefik.http.routers.hdcrm-convex.service: hdcrm-convex
+      traefik.http.services.hdcrm-convex.loadbalancer.server.port: "3210"
+      traefik.http.routers.hdcrm-convex-http.rule: Host(`${CONVEX_HOST}`) || Host(`${CONVEX_SITE_HOST}`)
+      traefik.http.routers.hdcrm-convex-http.entrypoints: web
+      traefik.http.routers.hdcrm-convex-http.middlewares: redirect-to-https@file
+      traefik.http.routers.hdcrm-convex-http.service: hdcrm-convex
+      traefik.http.routers.hdcrm-convex-site.rule: Host(`${CONVEX_SITE_HOST}`)
+      traefik.http.routers.hdcrm-convex-site.entrypoints: websecure
+      traefik.http.routers.hdcrm-convex-site.tls.certresolver: letsencrypt
+      traefik.http.routers.hdcrm-convex-site.service: hdcrm-convex-site
+      traefik.http.services.hdcrm-convex-site.loadbalancer.server.port: "3211"
+
+  dashboard:
+    image: ghcr.io/convex/convex-dashboard:${CONVEX_REV:?}
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_DEPLOYMENT_URL: https://${CONVEX_HOST}
+    networks: [dokploy-network]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: dokploy-network
+      traefik.http.middlewares.hdcrm-dash-auth.basicauth.users: ${DASHBOARD_BASIC_AUTH:?}
+      traefik.http.routers.hdcrm-dash.rule: Host(`${DASHBOARD_HOST:?}`)
+      traefik.http.routers.hdcrm-dash.entrypoints: websecure
+      traefik.http.routers.hdcrm-dash.tls.certresolver: letsencrypt
+      traefik.http.routers.hdcrm-dash.middlewares: hdcrm-dash-auth
+      traefik.http.routers.hdcrm-dash-http.rule: Host(`${DASHBOARD_HOST}`)
+      traefik.http.routers.hdcrm-dash-http.entrypoints: web
+      traefik.http.routers.hdcrm-dash-http.middlewares: redirect-to-https@file
+      traefik.http.services.hdcrm-dash.loadbalancer.server.port: "6791"
+
+  web:
+    image: hypedrive-crm-web:${WEB_TAG:-latest}
+    build:
+      context: ${WEB_SOURCE:-./src}
+      args:
+        NEXT_PUBLIC_CONVEX_URL: https://${CONVEX_HOST}
+        NEXT_PUBLIC_CONVEX_SITE_URL: https://${CONVEX_SITE_HOST}
+        NEXT_PUBLIC_SITE_URL: https://${WEB_HOST:?}
+        NEXT_PUBLIC_CALCOM_LINK: ${NEXT_PUBLIC_CALCOM_LINK:-}
+    restart: unless-stopped
+    networks: [dokploy-network]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: dokploy-network
+      traefik.http.middlewares.hdcrm-web-headers.headers.stsSeconds: "31536000"
+      traefik.http.middlewares.hdcrm-web-headers.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.hdcrm-web-headers.headers.referrerPolicy: strict-origin-when-cross-origin
+      traefik.http.routers.hdcrm-web.rule: Host(`${WEB_HOST}`)
+      traefik.http.routers.hdcrm-web.entrypoints: websecure
+      traefik.http.routers.hdcrm-web.tls.certresolver: letsencrypt
+      traefik.http.routers.hdcrm-web.middlewares: hdcrm-web-headers
+      traefik.http.routers.hdcrm-web-http.rule: Host(`${WEB_HOST}`)
+      traefik.http.routers.hdcrm-web-http.entrypoints: web
+      traefik.http.routers.hdcrm-web-http.middlewares: redirect-to-https@file
+      traefik.http.services.hdcrm-web.loadbalancer.server.port: "3000"
+
+volumes:
+  pgdata:
+  convex-data:
+
+networks:
+  internal:
+  dokploy-network:
+    external: true

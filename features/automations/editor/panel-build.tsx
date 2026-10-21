@@ -726,7 +726,9 @@ function DeliveryNote({ channel }: { channel: "email" | "whatsapp" }) {
             ? "the WhatsApp Cloud API"
             : status.provider === "novu"
               ? "Novu"
-              : "Resend"}
+              : status.provider === "smtp"
+                ? "SMTP"
+                : "Resend"}
           .
         </>
       )}

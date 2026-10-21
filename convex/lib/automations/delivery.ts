@@ -1,13 +1,17 @@
+import type { ActionCtx } from "../../_generated/server";
+import { internal } from "../../_generated/api";
+
 /**
  * Outbound delivery. With no provider configured a message stays in the outbox
  * as "queued" and is never reported as sent.
  *
  * Email: EMAIL_PROVIDER=resend (RESEND_API_KEY, EMAIL_FROM) or
- * EMAIL_PROVIDER=novu (NOVU_API_KEY, NOVU_EMAIL_WORKFLOW, optional NOVU_API_URL).
+ * EMAIL_PROVIDER=novu (NOVU_API_KEY, NOVU_EMAIL_WORKFLOW, optional NOVU_API_URL) or
+ * EMAIL_PROVIDER=smtp (SMTP_HOST, SMTP_USER, SMTP_PASSWORD, EMAIL_FROM, optional SMTP_PORT).
  * WhatsApp (Meta Cloud API, approved templates only): WHATSAPP_PHONE_NUMBER_ID and
  * WHATSAPP_ACCESS_TOKEN, optional WHATSAPP_API_VERSION.
  */
-export type Provider = "outbox" | "resend" | "novu" | "meta";
+export type Provider = "outbox" | "resend" | "novu" | "smtp" | "meta";
 
 export type ProviderStatus = {
   provider: Provider;
@@ -39,6 +43,20 @@ export function emailProvider(): ProviderStatus {
           problem: `EMAIL_PROVIDER is novu but ${missing.join(" and ")} ${missing.length > 1 ? "are" : "is"} missing`,
         }
       : { provider: "novu" };
+  }
+  if (choice === "smtp") {
+    const missing = [
+      "SMTP_HOST",
+      "SMTP_USER",
+      "SMTP_PASSWORD",
+      "EMAIL_FROM",
+    ].filter((key) => !env(key));
+    return missing.length
+      ? {
+          provider: "outbox",
+          problem: `EMAIL_PROVIDER is smtp but ${missing.join(" and ")} ${missing.length > 1 ? "are" : "is"} missing`,
+        }
+      : { provider: "smtp" };
   }
   return { provider: "outbox", problem: `Unknown EMAIL_PROVIDER “${choice}”` };
 }
@@ -112,8 +130,17 @@ function describe(json: Record<string, unknown> | null, status: number) {
  * which means the request was refused rather than possibly delivered.
  */
 export async function deliver(
+  ctx: Pick<ActionCtx, "runAction">,
   message: OutboundMessage,
 ): Promise<DeliveryResult> {
+  if (message.provider === "smtp") {
+    return ctx.runAction(internal.smtp.send, {
+      to: message.to,
+      subject: message.subject ?? "",
+      text: message.body ?? "",
+      key: message.stepKey,
+    });
+  }
   if (message.provider === "resend") {
     const result = await post(
       "https://api.resend.com/emails",
@@ -214,5 +241,31 @@ export const PROVIDER_LABEL: Record<Provider, string> = {
   outbox: "Outbox only",
   resend: "Resend",
   novu: "Novu",
+  smtp: "SMTP",
   meta: "WhatsApp Cloud API",
 };
+
+/**
+ * SMTP has no idempotency key, so only failures where the server certainly
+ * didn't accept the message are retried: 4xx replies and failed connections.
+ */
+export function smtpFailure(error: unknown): DeliveryResult {
+  const { code, responseCode, message } = (error ?? {}) as {
+    code?: string;
+    responseCode?: number;
+    message?: string;
+  };
+  const text = message || String(error);
+  if (typeof responseCode === "number") {
+    return {
+      ok: false,
+      error: `${responseCode}: ${text}`,
+      retryable: responseCode >= 400 && responseCode < 500,
+    };
+  }
+  return {
+    ok: false,
+    error: text,
+    retryable: code === "ECONNECTION" || code === "EDNS",
+  };
+}

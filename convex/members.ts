@@ -14,13 +14,13 @@ import {
 } from "./lib/functions";
 import { vMemberStatus, vRole } from "./lib/validators";
 
-/** Comma-separated domains such as "hypedrive.in"; empty allows any email. */
+/** Comma-separated domains such as "hypedrive.app"; empty means invite only. */
 function domainAllowed(email: string) {
   const allowed = (process.env.ALLOWED_EMAIL_DOMAINS ?? "")
     .split(",")
     .map((domain) => domain.trim().toLowerCase())
     .filter(Boolean);
-  return allowed.length === 0 || allowed.includes(email.split("@")[1] ?? "");
+  return allowed.includes(email.split("@")[1] ?? "");
 }
 
 /**

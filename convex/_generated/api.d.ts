@@ -67,6 +67,7 @@ import type * as reports from "../reports.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
 import type * as shell from "../shell.js";
+import type * as smtp from "../smtp.js";
 import type * as tasks from "../tasks.js";
 import type * as timeline from "../timeline.js";
 
@@ -136,6 +137,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   settings: typeof settings;
   shell: typeof shell;
+  smtp: typeof smtp;
   tasks: typeof tasks;
   timeline: typeof timeline;
 }>;
