@@ -267,6 +267,9 @@ export const PROVIDER_LABEL: Record<Provider, string> = {
  * SMTP has no idempotency key, so only failures where the server certainly
  * didn't accept the message are retried: 4xx replies and failed connections.
  */
+/** Errors raised before any mail was handed to the server, so a retry cannot duplicate it. */
+const NOT_SENT = /ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH/;
+
 export function smtpFailure(error: unknown): DeliveryResult {
   const { code, responseCode, message } = (error ?? {}) as {
     code?: string;
@@ -284,6 +287,6 @@ export function smtpFailure(error: unknown): DeliveryResult {
   return {
     ok: false,
     error: text,
-    retryable: code === "ECONNECTION" || code === "EDNS",
+    retryable: code === "ECONNECTION" || code === "EDNS" || NOT_SENT.test(text),
   };
 }

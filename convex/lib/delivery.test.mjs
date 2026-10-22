@@ -43,6 +43,17 @@ test("smtp failures retry only when the server surely refused", () => {
     smtpFailure({ code: "ETIMEDOUT", message: "timed out" }).retryable,
     false,
   );
+  assert.equal(
+    smtpFailure({
+      code: "ESOCKET",
+      message: "connect ECONNREFUSED 10.0.0.9:587",
+    }).retryable,
+    true,
+  );
+  assert.equal(
+    smtpFailure({ code: "ESOCKET", message: "read ECONNRESET" }).retryable,
+    false,
+  );
 });
 
 test("email to anything but one plain address is refused before sending", async () => {
