@@ -6,7 +6,8 @@ import { vListArgs as accountArgs } from "./accounts";
 import { vListArgs as dealArgs } from "./deals";
 import { vListArgs as leadArgs } from "./leads";
 import { fail } from "./lib/errors";
-import { internalMutation } from "./lib/functions";
+import { internalMutation, memberQuery } from "./lib/functions";
+import { assertCan } from "./lib/permissions";
 import { vListArgs as peopleArgs } from "./people";
 import { HEALTH_BAND_LABEL } from "../lib/domain/health";
 import {
@@ -23,7 +24,7 @@ const BATCH = 100;
 const IDS_PAGE = 2000;
 const PARALLEL = 8;
 const MAX_ROWS = 50_000;
-const KEEP_FILE_MS = 15 * 60_000;
+const KEEP_FILE_MS = 5 * 60_000;
 
 type Row = CsvCell[];
 type Page<T> = PaginationResult<T>;
@@ -243,6 +244,14 @@ async function collectByIds<I, R>(
   return (await Promise.all(built)).flat().map(cells);
 }
 
+/** Bulk downloads are for managers and admins; the CSV action calls this first so reps are refused. */
+export const assertCanExport = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    assertCan(ctx.viewer, "record.export");
+  },
+});
+
 /**
  * The whole filtered list as a CSV file, built from the list's own filters and
  * row builders so the export always matches what the list shows. Accounts and
@@ -259,6 +268,7 @@ export const csv = action({
     ),
   },
   handler: async (ctx, { list }): Promise<{ url: string; count: number }> => {
+    await ctx.runQuery(api.exports.assertCanExport, {});
     const opts = (cursor: string | null) => ({ numItems: BATCH, cursor });
     const idsOpts = (cursor: string | null) => ({
       numItems: IDS_PAGE,

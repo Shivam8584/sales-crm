@@ -19,6 +19,7 @@ export const PERMISSIONS = {
   "record.create": { min: "rep" },
   "record.edit": { min: "rep" },
   "record.import": { min: "rep" },
+  "record.export": { min: "manager" },
 
   "account.reassign": { min: "manager", own: true },
   "account.archive": { min: "manager", own: true },

@@ -4,6 +4,7 @@ import { convexAuth } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
 import { query, type MutationCtx } from "./_generated/server";
 import { normalizeEmail } from "../lib/domain/normalize";
+import { sha256Hex } from "./lib/crypto";
 
 const logtoEnabled = () =>
   !!(process.env.AUTH_LOGTO_ID && process.env.AUTH_LOGTO_ISSUER);
@@ -38,8 +39,12 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         if (params.flow === "signUp" && !name) {
           throw new ConvexError("Enter your name");
         }
-        const profile: { email: string; name?: string } = { email };
+        const profile: { email: string; name?: string; invite?: string } = {
+          email,
+        };
         if (name) profile.name = name;
+        const invite = String(params.invite ?? "").trim();
+        if (invite) profile.invite = invite;
         return profile as { email: string };
       },
     }),
@@ -57,6 +62,13 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         provider.id === "logto" && profile.emailVerified === true;
       if (provider.id === "logto" && !verified) {
         throw new ConvexError("Verify your email in Hypedrive SSO first");
+      }
+      if (provider.id === "password" && email) {
+        await requireInviteToSignUp(
+          ctx,
+          email,
+          (profile as { invite?: string }).invite,
+        );
       }
       if (verified && email) {
         const existing = await ctx.db
@@ -78,6 +90,40 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     },
   },
 });
+
+/**
+ * A password sign-up never proves the address is the person's, so an account
+ * row for someone's email must not exist before they ask for it: new password
+ * accounts need that email's invite token (the first member of a fresh
+ * deployment is the exception).
+ */
+async function requireInviteToSignUp(
+  ctx: MutationCtx,
+  email: string,
+  token: string | undefined,
+) {
+  if (!(await ctx.db.query("members").first())) return;
+  const hash = token ? await sha256Hex(token) : null;
+  const invites = hash
+    ? await ctx.db
+        .query("invites")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .collect()
+    : [];
+  const now = Date.now();
+  const open = invites.some(
+    (item) =>
+      !item.acceptedAt &&
+      !item.revokedAt &&
+      item.expiresAt > now &&
+      item.tokenHash === hash,
+  );
+  if (!open) {
+    throw new ConvexError(
+      "Accounts are created by invitation. Ask an admin to invite you, or sign in with Hypedrive SSO.",
+    );
+  }
+}
 
 /** Which sign-in methods the sign-in screen offers. */
 export const methods = query({

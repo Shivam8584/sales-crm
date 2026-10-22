@@ -21,7 +21,9 @@ import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
 import NotificationBell from "@/features/notifications/notification-bell";
+import { can } from "@/convex/lib/permissions";
 import { useUrlState } from "@/hooks/use-url-state";
+import { useViewer } from "@/hooks/use-viewer";
 import { MOD_KEY } from "@/lib/keyboard";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
@@ -438,7 +440,7 @@ export function PageToolbar({
   );
 }
 
-/** Secondary "Export" button for `PageToolbar` actions; icon-only on phones. */
+/** Secondary "Export" button for `PageToolbar` actions; icon-only on phones, hidden below manager. */
 export function ExportButton({
   onClick,
   disabled,
@@ -448,6 +450,8 @@ export function ExportButton({
   disabled?: boolean;
   label?: string;
 }) {
+  const viewer = useViewer();
+  if (!can(viewer, "record.export")) return null;
   return (
     <Button
       variant="secondary"

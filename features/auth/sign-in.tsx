@@ -161,6 +161,8 @@ function PasswordForm({
       return;
     }
     form.set("flow", flow);
+    const invite = inviteToken();
+    if (invite) form.set("invite", invite);
     setPending(true);
     setError(null);
     try {

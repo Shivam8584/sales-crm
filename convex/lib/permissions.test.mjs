@@ -18,6 +18,7 @@ const MATRIX = [
   ["record.create", true, true, true, true],
   ["record.edit", true, true, true, true],
   ["record.import", true, true, true, true],
+  ["record.export", false, false, true, true],
   ["account.reassign", false, true, true, true],
   ["account.archive", false, true, true, true],
   ["person.reassign", false, true, true, true],

@@ -1,0 +1,6 @@
+name = "hypedrive-crm-inbound-email"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+WEBHOOK_URL = "https://convex-sales-site.hypedrive.app/webhooks/email-inbound"

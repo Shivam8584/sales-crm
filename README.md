@@ -177,18 +177,14 @@ Convex stores its data in a dedicated `postgres:17` container (database `hypedri
 
 ### Deploying a new version
 
-From the repo, with `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY` from `.env.production.local`:
+Merging to `main` deploys: GitHub Actions (`.github/workflows/ci.yml`) runs the checks and a production build, then `npx convex deploy`, then `deploy/deploy.sh`, which syncs the source to the server, builds the image there, restarts `web` and polls `/api/health`. If the new container isn't healthy within two minutes it re-tags the previous image and restarts it, and the job fails. The workflow reads these repository secrets: `DEPLOY_SSH_KEY` (a key authorised for `ubuntu@ampere2`), `DEPLOY_KNOWN_HOSTS`, `DEPLOY_HOST`, `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY`.
+
+By hand, with the two Convex variables from `.env.production.local` exported:
 
 ```bash
 set -a; . ./.env.production.local; set +a
-npx convex deploy                                    # functions, schema, crons
-git ls-files -co --exclude-standard > /tmp/files.txt
-rsync -a --files-from=/tmp/files.txt --rsync-path="sudo rsync" ./ ampere2:/opt/hypedrive-crm/src/
-# --files-from never deletes, so remove files deleted from the repo by hand
-ssh ampere2 "sudo find /opt/hypedrive-crm/src -path '*/node_modules' -prune -o -path '*/.next' -prune -o -type f -printf '%P\n'" \
-  | LC_ALL=C sort | LC_ALL=C comm -23 - <(LC_ALL=C sort /tmp/files.txt) | grep -v '^\.env' \
-  | ssh ampere2 "sudo sh -c 'cd /opt/hypedrive-crm/src && xargs -r -d \"\\n\" rm -f'"
-ssh ampere2 "sudo sh -c 'cd /opt/hypedrive-crm && docker compose build web && docker compose up -d web'"
+npx convex deploy      # functions, schema, crons
+deploy/deploy.sh       # web
 ```
 
 The production workspace is a demo for now (`DEMO_DEPLOYMENT=1`), so it can be reset to fresh demo data:
