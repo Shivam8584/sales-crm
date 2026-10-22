@@ -333,7 +333,7 @@ export default function CsvImportDialog({
           {(step.name === "upload" || step.name === "done") && (
             <DialogClose asChild>
               <Button
-                variant={step.name === "done" ? "primary" : "subtle"}
+                variant={step.name === "done" ? "primary" : "secondary"}
                 size="sm"
               >
                 {step.name === "done" ? "Done" : "Cancel"}

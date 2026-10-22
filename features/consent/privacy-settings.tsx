@@ -239,7 +239,7 @@ function RetentionRow({ privacy }: { privacy: Privacy }) {
             </div>
             <Button
               type="submit"
-              variant={dirty ? "primary" : "subtle"}
+              variant={dirty ? "primary" : "secondary"}
               size="control"
               className="px-3.5"
               disabled={!dirty}

@@ -149,7 +149,7 @@ export default function GuardedContactActions({
                     }
                   : undefined
               }
-              className={buttonVariants({ variant: "subtle", size: "xs" })}
+              className={buttonVariants({ variant: "secondary", size: "xs" })}
             >
               <Icon aria-hidden className="size-3" />
               {action.label}
