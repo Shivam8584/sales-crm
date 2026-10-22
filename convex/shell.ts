@@ -9,6 +9,7 @@ import { findPeople } from "./people";
 import { personName } from "../lib/domain/labels";
 
 const CAP = 100;
+const OPEN_TASK_STATUSES = ["todo", "in_progress"] as const;
 const RESULTS_PER_TYPE = 5;
 const RECENT_LIMIT = 8;
 
@@ -17,21 +18,23 @@ export const navCounts = memberQuery({
   args: { today: vDay },
   handler: async (ctx, { today }) => {
     const me = ctx.viewer._id;
-    const [accounts, leads, todo, inProgress, unread] = await Promise.all([
+    const [accounts, leads, overdue, unread] = await Promise.all([
       countAccounts(ctx, { archived: false }),
       countLeads(ctx, ["new"], {}),
-      ctx.db
-        .query("tasks")
-        .withIndex("by_assignee_status_completed", (q) =>
-          q.eq("assigneeId", me).eq("status", "todo"),
-        )
-        .collect(),
-      ctx.db
-        .query("tasks")
-        .withIndex("by_assignee_status_completed", (q) =>
-          q.eq("assigneeId", me).eq("status", "in_progress"),
-        )
-        .collect(),
+      Promise.all(
+        OPEN_TASK_STATUSES.map((status) =>
+          ctx.db
+            .query("tasks")
+            .withIndex("by_assignee_status_due", (q) =>
+              q
+                .eq("assigneeId", me)
+                .eq("status", status)
+                .gt("dueDate", "")
+                .lt("dueDate", today),
+            )
+            .take(CAP),
+        ),
+      ),
       ctx.db
         .query("notifications")
         .withIndex("by_recipient", (q) =>
@@ -42,9 +45,10 @@ export const navCounts = memberQuery({
     return {
       accounts,
       leads: leads.new,
-      tasks: [...todo, ...inProgress].filter(
-        (task) => task.dueDate !== undefined && task.dueDate < today,
-      ).length,
+      tasks: Math.min(
+        CAP,
+        overdue.reduce((sum, tasks) => sum + tasks.length, 0),
+      ),
       inbox: unread.length,
     };
   },

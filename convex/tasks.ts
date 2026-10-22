@@ -57,6 +57,7 @@ async function statusEffects(
 const MAX_NOTES = 5_000;
 const RECENT_DONE_MS = 14 * 24 * 60 * 60_000;
 const SEARCH_LIMIT = 200;
+const COLUMN_LIMIT = 500;
 
 const editable = {
   title: v.optional(v.string()),
@@ -252,53 +253,51 @@ export const list = memberQuery({
       tasks = await ctx.db
         .query("tasks")
         .withIndex("by_account", (q) => q.eq("accountId", id))
-        .collect();
+        .take(COLUMN_LIMIT);
     } else if (args.personId) {
       const id = args.personId;
       tasks = await ctx.db
         .query("tasks")
         .withIndex("by_person", (q) => q.eq("personId", id))
-        .collect();
+        .take(COLUMN_LIMIT);
     } else if (args.dealId) {
       const id = args.dealId;
       tasks = await ctx.db
         .query("tasks")
         .withIndex("by_deal", (q) => q.eq("dealId", id))
-        .collect();
+        .take(COLUMN_LIMIT);
     } else if (args.leadId) {
       const id = args.leadId;
       tasks = await ctx.db
         .query("tasks")
         .withIndex("by_lead", (q) => q.eq("leadId", id))
-        .collect();
+        .take(COLUMN_LIMIT);
     } else {
       const assigneeId = args.assigneeId;
       for (const status of statuses) {
         const recentOnly = status === "done" && done === "recent";
-        tasks.push(
-          ...(assigneeId
-            ? await ctx.db
+        const column = assigneeId
+          ? ctx.db
+              .query("tasks")
+              .withIndex("by_assignee_status_completed", (q) => {
+                const scoped = q
+                  .eq("assigneeId", assigneeId)
+                  .eq("status", status);
+                return recentOnly ? scoped.gte("completedAt", since) : scoped;
+              })
+          : recentOnly
+            ? ctx.db
                 .query("tasks")
-                .withIndex("by_assignee_status_completed", (q) => {
-                  const scoped = q
-                    .eq("assigneeId", assigneeId)
-                    .eq("status", status);
-                  return recentOnly ? scoped.gte("completedAt", since) : scoped;
-                })
-                .collect()
-            : recentOnly
-              ? await ctx.db
-                  .query("tasks")
-                  .withIndex("by_status_completed", (q) =>
-                    q.eq("status", "done").gte("completedAt", since),
-                  )
-                  .collect()
-              : await ctx.db
-                  .query("tasks")
-                  .withIndex("by_status_position", (q) =>
-                    q.eq("status", status),
-                  )
-                  .collect()),
+                .withIndex("by_status_completed", (q) =>
+                  q.eq("status", "done").gte("completedAt", since),
+                )
+            : ctx.db
+                .query("tasks")
+                .withIndex("by_status_position", (q) => q.eq("status", status));
+        tasks.push(
+          ...(await (status === "done" ? column.order("desc") : column).take(
+            COLUMN_LIMIT,
+          )),
         );
       }
     }

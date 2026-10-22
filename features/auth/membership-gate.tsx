@@ -28,6 +28,7 @@ export default function MembershipGate({ children }: { children: ReactNode }) {
   const join = useMutation(api.members.join);
   const { signOut } = useAuthActions();
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const joining = useRef(false);
 
   const needsJoin = viewer !== undefined && viewer !== null && !viewer.member;
@@ -47,7 +48,7 @@ export default function MembershipGate({ children }: { children: ReactNode }) {
       .finally(() => {
         joining.current = false;
       });
-  }, [needsJoin, join]);
+  }, [needsJoin, join, attempt]);
 
   if (!isLoading && !isAuthenticated) return <SignIn />;
 
@@ -56,6 +57,14 @@ export default function MembershipGate({ children }: { children: ReactNode }) {
       <Blocked
         message={joinError ?? "Your access to this workspace has been removed."}
         onSignOut={() => void signOut()}
+        onRetry={
+          joinError
+            ? () => {
+                setJoinError(null);
+                setAttempt((count) => count + 1);
+              }
+            : undefined
+        }
       />
     );
   }
@@ -83,9 +92,11 @@ function Splash() {
 function Blocked({
   message,
   onSignOut,
+  onRetry,
 }: {
   message: string;
   onSignOut: () => void;
+  onRetry?: () => void;
 }) {
   return (
     <AuthCard title="You can't enter this workspace" description={message}>
@@ -93,6 +104,16 @@ function Blocked({
         <p className="caption-style text-fg-tertiary text-center leading-snug">
           Signed in with the wrong account? Sign out and use your work email.
         </p>
+        {onRetry && (
+          <Button
+            variant="primary"
+            size="md"
+            onClick={onRetry}
+            className="w-full"
+          >
+            Try again
+          </Button>
+        )}
         <Button
           variant="secondary"
           size="md"

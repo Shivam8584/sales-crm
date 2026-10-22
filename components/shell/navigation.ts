@@ -111,6 +111,7 @@ export const SETTINGS_PAGES = [
   { href: "/settings/team", label: "Team", adminOnly: false },
   { href: "/settings/workspace", label: "Workspace", adminOnly: true },
   { href: "/settings/integrations", label: "Integrations", adminOnly: true },
+  { href: "/settings/system", label: "System", adminOnly: true },
 ] as const;
 
 export function isActive(pathname: string, href: string) {

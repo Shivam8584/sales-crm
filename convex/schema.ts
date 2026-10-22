@@ -276,6 +276,8 @@ export default defineSchema({
       "status",
       "completedAt",
     ])
+    .index("by_assignee_status_due", ["assigneeId", "status", "dueDate"])
+    .index("by_status_due", ["status", "dueDate"])
     .index("by_status_position", ["status", "position"])
     .index("by_status_completed", ["status", "completedAt"])
     .index("by_account", ["accountId"])

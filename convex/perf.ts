@@ -101,6 +101,18 @@ export const seed = internalMutation({
         ownerId: i % 4 === 0 ? undefined : owner,
         firstTouchedAt: i % 3 === 0 ? undefined : now - (i % 30) * DAY,
       });
+      const taskStatus = pick(["todo", "in_progress", "done"] as const, i);
+      await ctx.db.insert("tasks", {
+        title: `Follow up with ${name}`,
+        status: taskStatus,
+        priority: "normal",
+        assigneeId: owner,
+        dueDate: istToday((i % 60) - 30, now),
+        accountId,
+        position: i,
+        completedAt: taskStatus === "done" ? now - (i % 30) * DAY : undefined,
+        updatedAt: now,
+      });
       if (k < DEALS_PER_BATCH) {
         const stage = pick(DEAL_STAGES, i);
         const closed = stage === "won" || stage === "lost";
@@ -143,6 +155,7 @@ export const seed = internalMutation({
 
 const WIPE_TABLES = [
   "timeline",
+  "tasks",
   "deals",
   "leads",
   "people",

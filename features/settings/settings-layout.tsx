@@ -16,6 +16,7 @@ import UserIcon from "@/public/assets/icons/kanban/user-03.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
+import ActivityIcon from "@/public/assets/icons/activity.svg";
 
 type SettingsHref = (typeof SETTINGS_PAGES)[number]["href"];
 
@@ -24,13 +25,19 @@ const ICONS: Record<SettingsHref, ComponentType<SVGProps<SVGSVGElement>>> = {
   "/settings/team": UsersIcon,
   "/settings/workspace": BuildingIcon,
   "/settings/integrations": LinkIcon,
+  "/settings/system": ActivityIcon,
 };
 
 const GROUPS: { title: string; hrefs: SettingsHref[] }[] = [
   { title: "Personal", hrefs: ["/settings/profile"] },
   {
     title: "Workspace",
-    hrefs: ["/settings/team", "/settings/workspace", "/settings/integrations"],
+    hrefs: [
+      "/settings/team",
+      "/settings/workspace",
+      "/settings/integrations",
+      "/settings/system",
+    ],
   },
 ];
 

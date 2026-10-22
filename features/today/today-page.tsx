@@ -16,8 +16,9 @@ import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Kbd from "@/components/_ui/kbd";
+import SegmentedControl from "@/components/_ui/segmented-control";
 import Skeleton from "@/components/_ui/skeleton";
-import { BigNumber, DetailSection } from "@/components/record/detail";
+import { DetailSection } from "@/components/record/detail";
 import {
   CreateButton,
   Page,
@@ -263,7 +264,6 @@ export default function TodayPage() {
   const trend = useMemo(() => completedPerDay(tasks, now), [tasks, now]);
   const completed = trend.reduce((sum, value) => sum + value, 0);
   const doneToday = trend[trend.length - 1];
-  const activeDays = trend.filter((value) => value > 0).length;
 
   function openItem(item: Item) {
     switch (item.kind) {
@@ -411,9 +411,18 @@ export default function TodayPage() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 sm:px-6 lg:py-7">
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-            <h2 className="text-xl leading-tight font-semibold tracking-[-0.01em]">
-              {greeting(now.getHours())}, {firstName}
-            </h2>
+            <div className="flex min-w-0 flex-col gap-1">
+              <h2 className="text-xl leading-tight font-semibold tracking-[-0.01em]">
+                {greeting(now.getHours())}, {firstName}
+              </h2>
+              {tasks !== undefined && (
+                <p className="caption-style text-fg-tertiary">
+                  {completed === 0
+                    ? "Nothing closed in the last two weeks. Tick one off to start a streak."
+                    : `${doneToday} done today · ${completed} in the last ${TREND_DAYS} days`}
+                </p>
+              )}
+            </div>
             <p className="caption-style text-fg-tertiary hidden items-center gap-1.5 lg:flex">
               <Kbd>J</Kbd>
               <Kbd>K</Kbd> to move · <Kbd>X</Kbd> to complete · <Kbd>Enter</Kbd>{" "}
@@ -421,77 +430,26 @@ export default function TodayPage() {
             </p>
           </div>
 
-          <section
-            aria-label="Your day at a glance"
-            className="border-border bg-background grid overflow-hidden rounded-xl border lg:grid-cols-[17rem_minmax(0,1fr)]"
-          >
-            <DetailSection
-              title="Completed"
-              divider={false}
-              className="border-border gap-3 px-4 py-4 max-lg:border-b sm:px-5 lg:border-r"
-              action={
-                <span className="caption-style text-fg-tertiary">
-                  Last {TREND_DAYS} days
-                </span>
-              }
-            >
-              {tasks === undefined ? (
-                <div className="flex flex-col gap-2">
-                  <Skeleton className="h-7 w-28" />
-                  <Skeleton className="h-3 w-40" />
-                </div>
-              ) : (
-                <div
-                  role="img"
-                  aria-label={`${completed} tasks completed in the last ${TREND_DAYS} days, ${doneToday} today`}
-                >
-                  <BigNumber
-                    size="md"
-                    value={completed}
-                    trend={trend}
-                    caption={
-                      completed === 0
-                        ? "No tasks closed yet. Tick one off to start the streak."
-                        : `${doneToday} today · active on ${activeDays} of ${TREND_DAYS} days`
-                    }
-                  />
-                </div>
-              )}
-            </DetailSection>
-            <DetailSection
-              title="Focus"
-              divider={false}
-              className="gap-3 px-4 py-4 sm:px-5"
-              action={
-                focus && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => setFocus(null)}
-                  >
-                    Show everything
-                  </Button>
+          <SegmentedControl
+            label="Focus on one section"
+            value={focus ?? "all"}
+            onChange={(next) =>
+              setFocus(next === "all" ? null : (next as SectionId))
+            }
+            segments={[
+              { value: "all", label: "All", count: loaded ? total : undefined },
+              ...sections
+                .filter(
+                  (section) => section.items?.length || section.id === focus,
                 )
-              }
-            >
-              <div
-                role="group"
-                aria-label="Focus on one section"
-                className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
-              >
-                {sections.map((section) => (
-                  <FocusTile
-                    key={section.id}
-                    section={section}
-                    active={focus === section.id}
-                    onClick={() =>
-                      setFocus(focus === section.id ? null : section.id)
-                    }
-                  />
-                ))}
-              </div>
-            </DetailSection>
-          </section>
+                .map((section) => ({
+                  value: section.id,
+                  label: section.stat,
+                  count: section.items?.length,
+                })),
+            ]}
+            className="max-w-full self-start overflow-x-auto"
+          />
 
           {loaded && total === 0 && !focus ? (
             <div className="border-border bg-background rounded-xl border">
@@ -532,53 +490,6 @@ export default function TodayPage() {
         </div>
       </div>
     </Page>
-  );
-}
-
-function FocusTile({
-  section,
-  active,
-  onClick,
-}: {
-  section: Section;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const count = section.items?.length;
-  const alert = Boolean(count) && section.tone;
-  const Icon = section.icon;
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "border-line-strong hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex min-w-0 cursor-pointer flex-col gap-3 rounded-lg border p-2.75 text-left transition-colors outline-none focus-visible:ring-2 max-sm:flex-row max-sm:items-center max-sm:justify-between max-sm:gap-2",
-        active && "bg-overlay-2 hover:bg-overlay-2 border-fg-tertiary",
-      )}
-    >
-      <span className="caption-style text-fg-secondary flex min-w-0 items-center gap-1">
-        <Icon
-          aria-hidden
-          className={cn(
-            "size-3 shrink-0",
-            alert && section.tone === "danger" && "text-danger",
-            alert && section.tone === "warning" && "text-warning",
-          )}
-        />
-        <span className="truncate">{section.stat}</span>
-      </span>
-      <span
-        className={cn(
-          "lead-style block truncate font-medium tabular-nums",
-          alert && section.tone === "danger" && "text-danger",
-          alert && section.tone === "warning" && "text-warning",
-          count === 0 && "text-fg-tertiary",
-        )}
-      >
-        {count === undefined ? <Skeleton className="h-3.5 w-5" /> : count}
-      </span>
-    </button>
   );
 }
 
