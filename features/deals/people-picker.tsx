@@ -68,7 +68,7 @@ export default function PeoplePicker({
         id={id}
         disabled={disabled}
         aria-describedby={describedBy}
-        className="group border-input bg-secondary duration-fast ease-power3-out focus-visible:border-selected focus-visible:ring-selected/20 data-[state=open]:border-selected flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-3 text-left text-sm leading-none transition-[border-color,box-shadow] outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-60"
+        className="group bg-well duration-fast ease-power3-out focus-visible:ring-foreground/15 data-[state=open]:bg-well-hover flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl px-3 text-left text-sm leading-none transition-[background-color,box-shadow] outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {selected.length > 0 && (
           <span className="flex shrink-0 -space-x-1">

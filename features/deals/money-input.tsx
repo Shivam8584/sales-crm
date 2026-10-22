@@ -126,7 +126,7 @@ export default function MoneyInput({
   return (
     <div
       className={cn(
-        "border-input bg-secondary duration-fast ease-power3-out focus-within:border-selected focus-within:ring-selected/20 flex h-9 w-full min-w-0 items-center rounded-lg border transition-[border-color,box-shadow] focus-within:ring-3",
+        "bg-well duration-fast ease-power3-out focus-within:ring-foreground/15 flex h-10 w-full min-w-0 items-center rounded-xl transition-[background-color,box-shadow] focus-within:ring-2",
         invalid && "border-danger",
         className,
       )}
@@ -139,7 +139,7 @@ export default function MoneyInput({
       >
         <SelectPrimitive.Trigger
           aria-label="Currency"
-          className="group text-fg-secondary hover:text-foreground border-input focus-visible:bg-overlay-2 flex h-full shrink-0 cursor-pointer items-center gap-1 rounded-l-lg border-r pr-2 pl-3 text-xs font-medium outline-none"
+          className="group text-fg-secondary hover:text-foreground focus-visible:bg-overlay-2 flex h-full shrink-0 cursor-pointer items-center gap-1 rounded-l-lg border-r pr-2 pl-3 text-xs font-medium outline-none"
         >
           <SelectPrimitive.Value />
           <ChevronDownIcon

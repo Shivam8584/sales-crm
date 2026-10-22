@@ -280,7 +280,7 @@ export function CopyField({
       currentTarget: HTMLInputElement | HTMLTextAreaElement;
     }) => event.currentTarget.select(),
     className:
-      "border-input bg-secondary text-fg-secondary focus-visible:border-selected focus-visible:ring-selected/20 duration-fast w-full min-w-0 rounded-lg border px-3 font-mono text-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-3",
+      "bg-well text-fg-secondary focus-visible:ring-foreground/15 duration-fast w-full min-w-0 rounded-xl px-3 font-mono text-xs transition-[background-color,box-shadow] outline-none focus-visible:ring-2",
   };
 
   return (

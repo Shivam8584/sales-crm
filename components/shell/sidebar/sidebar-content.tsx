@@ -30,11 +30,11 @@ export default function SidebarContent() {
 
   return (
     <div className="group/rail flex h-full min-h-0 flex-col">
-      <div className="collapsed:pl-[30px] ease-out-hd relative flex h-16 shrink-0 items-center pl-7 transition-[padding] duration-280">
+      <div className="collapsed:pl-[31px] ease-out-hd relative flex h-16 shrink-0 items-center pl-7 transition-[padding] duration-280">
         <Link
           href={routes.today}
           aria-label="Hypedrive, go to Today"
-          className="focus-visible:ring-ring collapsed:w-[13px] collapsed:group-hover/rail:opacity-0 ease-out-hd -m-1 block w-[102px] overflow-hidden rounded-md p-1 transition-[width,opacity] duration-280 outline-none focus-visible:ring-2"
+          className="focus-visible:ring-ring collapsed:w-[11px] collapsed:group-hover/rail:opacity-0 ease-out-hd -m-1 block w-[102px] overflow-hidden rounded-md p-1 transition-[width,opacity] duration-280 outline-none focus-visible:ring-2"
         >
           <Wordmark
             aria-hidden

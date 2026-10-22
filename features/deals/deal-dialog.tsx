@@ -52,8 +52,7 @@ type Form = {
 type FieldKey = "title" | "accountId" | "amount" | "closeDate" | "lostReason";
 type Errors = Partial<Record<FieldKey | "form", string>>;
 
-const PICKER_CLASS =
-  "border-input bg-secondary mx-0 h-9 w-full rounded-lg border px-3";
+const PICKER_CLASS = "bg-well mx-0 h-10 w-full rounded-xl px-3";
 
 type Preset = Extract<CreateDialog, { type: "deal" }>;
 

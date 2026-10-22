@@ -33,9 +33,9 @@ export default function FunnelStrip({
   return (
     <section
       aria-label="Activation funnel"
-      className="border-border scrollbar-none shrink-0 overflow-x-auto border-b px-2 py-2"
+      className="scrollbar-none mx-(--page-x) mb-4 shrink-0 overflow-x-auto"
     >
-      <div className="grid min-w-[48rem] grid-cols-5">
+      <div className="bg-well grid min-w-[48rem] grid-cols-5 gap-1 rounded-3xl p-1">
         {ACTIVATION_STAGES.map((stage, step) => {
           const item = desk?.funnel[step];
           const leak = desk?.leak === step;
@@ -49,8 +49,8 @@ export default function FunnelStrip({
               disabled={!desk}
               onClick={() => onSelect(active ? null : stage)}
               className={cn(
-                "hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex min-w-0 cursor-pointer flex-col gap-1.5 rounded-lg p-2.5 text-left transition-colors outline-none focus-visible:ring-2 disabled:cursor-default",
-                active && "bg-overlay-2 hover:bg-overlay-2",
+                "hover:bg-background focus-visible:ring-ring duration-base flex min-w-0 cursor-pointer flex-col gap-1.5 rounded-2xl px-4 py-3.5 text-left transition-[background-color,scale] outline-none hover:duration-[120ms] focus-visible:ring-2 active:scale-[0.985] disabled:cursor-default",
+                active && "bg-background shadow-capsule",
               )}
             >
               <span className="caption-style text-fg-secondary flex min-w-0 items-center justify-between gap-2">
@@ -64,7 +64,7 @@ export default function FunnelStrip({
               </span>
               {item ? (
                 <span className="flex items-baseline justify-between gap-2 tabular-nums">
-                  <span className="text-lg leading-none font-medium">
+                  <span className="text-xl leading-none font-semibold">
                     {item.count}
                   </span>
                   <span

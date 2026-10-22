@@ -561,7 +561,7 @@ function FocusCard({
           <div className="min-w-0">
             <p
               className={cn(
-                "flex items-center gap-1.5 text-sm font-medium",
+                "flex flex-wrap items-center gap-x-1.5 text-sm font-medium",
                 lead.slaBreachedAt ? "text-danger" : "text-warning",
               )}
             >

@@ -125,7 +125,9 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           </div>
         </nav>
         {fullBleed ? (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col md:-ml-(--page-x)">
+            {children}
+          </div>
         ) : (
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
             <div className="flex w-full max-w-180 flex-col gap-12 px-(--page-x) pt-6 pb-16 md:pt-1 md:pl-0">

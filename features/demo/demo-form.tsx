@@ -396,7 +396,7 @@ export default function DemoForm() {
               {ORDER_BANDS.map((band, index) => (
                 <label
                   key={band.value}
-                  className="border-input bg-secondary text-fg-secondary hover:text-foreground has-checked:border-selected has-checked:bg-overlay-2 has-checked:text-foreground has-focus-visible:ring-selected/20 duration-fast flex h-8 cursor-pointer items-center rounded-full border px-3 text-xs leading-none transition-[color,border-color,background-color,box-shadow] select-none has-focus-visible:ring-3"
+                  className="bg-well text-fg-secondary hover:text-foreground has-checked:ring-foreground has-checked:bg-background has-checked:text-foreground has-focus-visible:ring-foreground/15 duration-fast flex h-8 cursor-pointer items-center rounded-full px-3 text-xs leading-none transition-[color,border-color,background-color,box-shadow] select-none has-checked:ring-2 has-checked:ring-inset has-focus-visible:ring-2"
                 >
                   <input
                     id={`demo-orders-${index}`}

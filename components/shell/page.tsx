@@ -235,7 +235,7 @@ export function PageHeader({
               </h1>
             )}
             {meta && (
-              <div className="text-body text-fg-secondary mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 tabular-nums max-[399px]:hidden">
+              <div className="text-body text-fg-secondary mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 tabular-nums">
                 {meta}
               </div>
             )}
@@ -331,7 +331,7 @@ export function PageStatus({
 /** The quiet slash between items of a head's meta line. */
 export function MetaSeparator() {
   return (
-    <span aria-hidden className="text-fg-disabled/60">
+    <span aria-hidden className="text-fg-disabled/60 max-sm:hidden">
       /
     </span>
   );

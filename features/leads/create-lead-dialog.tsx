@@ -223,7 +223,7 @@ export default function CreateLeadDialog() {
               <MemberPicker
                 value={ownerId}
                 onChange={setOwnerId}
-                className="border-input bg-secondary mx-0 h-9 border px-3"
+                className="bg-well mx-0 h-10 px-3"
               />
               {ownerId !== viewer._id && (
                 <span className="caption-style text-fg-tertiary leading-snug">

@@ -152,7 +152,7 @@ export function TemplateInput({
         <textarea
           {...common}
           rows={rows}
-          className="border-input bg-secondary text-foreground placeholder:text-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 hover:border-fg-tertiary aria-invalid:border-danger duration-fast w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed transition-[border-color,box-shadow] outline-none focus-visible:ring-3 disabled:opacity-60"
+          className="bg-well text-foreground placeholder:text-fg-tertiary focus-visible:ring-foreground/15 hover:bg-well-hover aria-invalid:ring-danger/40 duration-fast w-full resize-y rounded-xl px-3 py-2 text-sm leading-relaxed transition-[background-color,box-shadow] outline-none focus-visible:ring-2 disabled:opacity-60 aria-invalid:ring-2"
         />
       ) : (
         <Input {...common} className="aria-invalid:border-danger" />

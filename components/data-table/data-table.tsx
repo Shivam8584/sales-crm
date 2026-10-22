@@ -322,7 +322,7 @@ export default function DataTable<T>({
 
   if (sorted && sorted.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col justify-center overflow-auto pb-[8vh]">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto px-(--page-x) pb-[8vh] [&>*]:w-full [&>*]:max-w-xl">
         {empty}
       </div>
     );

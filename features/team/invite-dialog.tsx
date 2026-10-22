@@ -145,7 +145,7 @@ export default function InviteDialog({
                   <label
                     key={value}
                     className={cn(
-                      "border-input has-focus-visible:ring-selected/20 has-focus-visible:border-selected duration-fast flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-[border-color,background-color,box-shadow] has-focus-visible:ring-3",
+                      "has-focus-visible:ring-foreground/15 duration-fast flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 transition-[background-color,box-shadow] has-focus-visible:ring-2",
                       role === value
                         ? "border-selected bg-overlay-1"
                         : "hover:bg-overlay-1",
