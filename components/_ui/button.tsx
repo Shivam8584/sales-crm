@@ -4,23 +4,26 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-medium leading-none outline-none select-none transition-[background-color,color,box-shadow,scale] duration-fast ease-power3-out active:scale-[0.98] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:inset-y-[min(0px,calc((100%-44px)/2))] pointer-coarse:after:content-['']",
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium leading-none outline-none select-none transition-[background-color,color,box-shadow,scale] duration-base hover:duration-[120ms] ease-out active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:inset-y-[min(0px,calc((100%-44px)/2))] pointer-coarse:after:content-['']",
   {
     variants: {
       variant: {
-        primary: "bg-primary text-primary-foreground hover:bg-primary-hover",
-        secondary: "text-foreground shadow-raised hover:bg-overlay-2",
-        ghost: "text-fg-tertiary hover:bg-overlay-2 hover:text-foreground",
+        primary:
+          "bg-primary text-primary-foreground font-semibold hover:bg-primary-hover",
+        secondary: "text-foreground shadow-raised hover:bg-well",
+        well: "bg-well text-foreground hover:bg-well-hover",
+        ghost: "text-fg-secondary hover:bg-well hover:text-foreground",
         nav: "w-full justify-start active:scale-100 text-sidebar-foreground hover:text-foreground data-[active=true]:bg-overlay-2 data-[active=true]:text-foreground",
         link: "rounded-none active:scale-100 text-foreground underline decoration-from-font underline-offset-2 hover:text-fg-secondary",
       },
       size: {
-        xs: "h-control-sm px-2 text-xs leading-none font-normal",
-        sm: "p-2.25 text-xs leading-none",
-        control: "h-control-md text-xs leading-none",
+        xs: "h-control-sm px-2.5 text-xs leading-none",
+        sm: "h-8 px-3 text-[13px] leading-none",
+        control: "h-8 px-3 text-[13px] leading-none",
         avatar:
-          "h-control-md gap-1.5 py-1.25 pr-1.75 pl-1.25 text-xs leading-none font-normal",
-        md: "p-2 text-sm leading-none",
+          "h-10 gap-2 py-0.5 pr-3 pl-0.5 text-sm leading-none font-medium",
+        md: "h-10 px-4 text-sm leading-none",
+        lg: "h-11 px-5 text-sm leading-none",
         icon: "relative size-control-md p-0 pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']",
         "icon-xs":
           "relative size-control-xs p-0 after:absolute after:-inset-1.5 after:content-['']",

@@ -9,7 +9,7 @@ export default function Skeleton({
     <span
       aria-hidden
       className={cn(
-        "bg-overlay-3 block animate-pulse rounded-sm motion-reduce:animate-none",
+        "animate-shimmer block rounded-lg bg-[linear-gradient(90deg,var(--overlay-2)_25%,var(--overlay-4)_37%,var(--overlay-2)_63%)] [background-size:400%_100%] motion-reduce:animate-none",
         className,
       )}
       {...props}

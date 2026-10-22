@@ -42,13 +42,13 @@ function DropdownMenuContent({
         align={align}
         collisionPadding={collisionPadding}
         className={cn(
-          "bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1 data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-base data-[state=closed]:duration-fast min-w-42 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-xl",
+          "bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1 data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-base data-[state=closed]:duration-fast min-w-48 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-2xl",
           className,
         )}
         {...props}
       >
         <ScrollArea viewportClassName="max-h-[min(360px,var(--radix-dropdown-menu-content-available-height))]">
-          <div className={cn("p-1", contentClassName)}>{children}</div>
+          <div className={cn("p-1.5", contentClassName)}>{children}</div>
         </ScrollArea>
       </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
@@ -63,7 +63,7 @@ function DropdownMenuItem({
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       className={cn(
-        "caption-style text-foreground ease-power3-out duration-fast data-[highlighted]:bg-overlay-2 relative flex min-h-8 cursor-pointer items-center gap-2 rounded-lg px-2 py-2 transition-colors outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 pointer-coarse:min-h-11",
+        "text-foreground ease-out duration-base data-[highlighted]:duration-[120ms] data-[highlighted]:bg-well relative flex min-h-9 cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm leading-none transition-colors outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 pointer-coarse:min-h-11",
         className,
       )}
       {...props}
@@ -98,7 +98,7 @@ function DropdownMenuRadioItem({
     >
       <span className="absolute left-2 flex size-2 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
-          <span className="bg-selected block size-1.5 rounded-full" />
+          <span className="bg-foreground block size-1.5 rounded-full" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -113,7 +113,7 @@ function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
-      className={cn("caption-style text-fg-tertiary px-2 py-1.5", className)}
+      className={cn("text-fg-tertiary px-2.5 pt-2 pb-1 text-xs", className)}
       {...props}
     />
   );

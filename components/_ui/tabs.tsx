@@ -32,7 +32,7 @@ function TabsList({
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
-      className={cn("flex items-center gap-4", className)}
+      className={cn("flex items-center gap-6", className)}
       {...props}
     />
   );
@@ -49,7 +49,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "group caption-style text-fg-tertiary duration-fast ease-power3-out hover:text-fg-secondary focus-visible:text-foreground focus-visible:decoration-ring data-[state=active]:text-foreground relative grid cursor-pointer py-4 text-center transition-[color] outline-none select-none focus-visible:underline focus-visible:underline-offset-4",
+        "group text-body text-fg-tertiary duration-base ease-out hover:text-foreground focus-visible:text-foreground focus-visible:decoration-ring data-[state=active]:text-foreground relative grid cursor-pointer py-3 text-center leading-5 transition-[color] outline-none select-none focus-visible:underline focus-visible:underline-offset-4",
         className,
       )}
       value={value}
@@ -59,8 +59,8 @@ function TabsTrigger({
         <motion.span
           aria-hidden
           layoutId={`${tabs.id}-indicator`}
-          transition={{ type: "spring", duration: 0.3, bounce: 0 }}
-          className="bg-foreground absolute inset-x-0 bottom-0 h-px"
+          transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+          className="bg-foreground absolute inset-x-0 -bottom-px h-0.5 rounded-full"
         />
       )}
       <span

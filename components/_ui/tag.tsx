@@ -15,7 +15,7 @@ export type TagTone =
   | "neutral";
 
 export const tagVariants = cva(
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full text-xs leading-none tabular-nums",
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full text-xs leading-none font-medium tabular-nums",
   {
     variants: {
       tone: {
@@ -31,8 +31,8 @@ export const tagVariants = cva(
         neutral: "bg-(--tag-neutral-bg) text-(--tag-neutral-text)",
       },
       size: {
-        md: "h-5.5 px-2",
-        sm: "h-5.5 px-1.5",
+        md: "h-6 px-2.5",
+        sm: "h-5.5 px-2",
         xs: "h-5 gap-1 px-1.5",
       },
     },
