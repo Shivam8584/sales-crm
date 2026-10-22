@@ -165,6 +165,8 @@ export function PageHeader({
   lead,
 }: PageHeaderProps) {
   const slots = useContext(SlotsContext);
+  const setHeadSlot = slots?.setHead;
+  const setRecordSlot = slots?.setRecord;
   const parent = [...crumbs].reverse().find((crumb) => crumb.href);
   return (
     <header data-slot="page-header" className="shrink-0">
@@ -223,7 +225,7 @@ export function PageHeader({
               </nav>
             )}
             {slots?.hasRecord ? (
-              <div ref={slots.setRecord} className="min-w-0" />
+              <div ref={setRecordSlot} className="min-w-0" />
             ) : (
               <h1
                 title={typeof title === "string" ? title : undefined}
@@ -241,7 +243,7 @@ export function PageHeader({
         </div>
         <div className="flex shrink-0 items-center gap-2 pb-0.5 max-[359px]:gap-1">
           {actions}
-          <span ref={slots?.setHead} className="contents" />
+          <span ref={setHeadSlot} className="contents" />
         </div>
       </div>
     </header>
@@ -551,6 +553,7 @@ export function PageToolbar({
   className?: string;
 }) {
   const slots = useContext(SlotsContext);
+  const setToolbarSlot = slots?.setToolbar;
   const { belowSm } = useMobileBreakpoints();
   const sheet = Boolean(children) && activeFilters !== undefined;
   return (
@@ -561,7 +564,7 @@ export function PageToolbar({
         className,
       )}
     >
-      <span ref={slots?.setToolbar} className="contents" />
+      <span ref={setToolbarSlot} className="contents" />
       {search && (
         <div className="flex min-w-28 flex-1 sm:flex-none">{search}</div>
       )}
