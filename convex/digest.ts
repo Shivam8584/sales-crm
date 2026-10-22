@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { istToday } from "../lib/domain/day";
 import { deliver, emailProvider } from "./lib/automations/delivery";
 import { siteUrl } from "./lib/http";
+import { routes } from "../lib/routes";
 
 const LISTED = 5;
 const SCAN = 100;
@@ -57,7 +58,7 @@ export const gather = internalQuery({
         unread: unread.length,
         titles: unread
           .slice(0, LISTED)
-          .map((item) => ({ title: item.title, href: item.href ?? "/inbox" })),
+          .map((item) => ({ title: item.title, href: item.href ?? routes.inbox })),
         tasks,
         leads,
       });
@@ -86,14 +87,14 @@ export const sendDigests = internalAction({
         if (digest.tasks > 0) {
           lines.push(
             `${plural(digest.tasks, "task", "tasks")} due today or overdue`,
-            siteUrl("/tasks?view=list"),
+            siteUrl(`${routes.tasks}?view=list`),
             "",
           );
         }
         if (digest.leads > 0) {
           lines.push(
             `${plural(digest.leads, "new lead", "new leads")} waiting for a first touch`,
-            siteUrl("/pipeline/leads?owner=mine"),
+            siteUrl(`${routes.leads}?owner=mine`),
             "",
           );
         }

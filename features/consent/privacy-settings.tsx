@@ -18,6 +18,7 @@ import { dateTime, relativeTime, shortDate } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import ConsentEventDialog from "./consent-event-dialog";
 import EraseDialog, { type EraseTarget } from "./erase-dialog";
+import { routes } from "@/lib/routes";
 
 type Privacy = FunctionReturnType<typeof api.consents.privacy>;
 type Stale = Privacy["stale"][number];
@@ -66,7 +67,7 @@ export default function PrivacySettings() {
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <Link
-                    href={`/records/people/${request.personId}`}
+                    href={routes.person(request.personId)}
                     className="lead-style focus-visible:ring-ring truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
                   >
                     {request.name}
@@ -325,8 +326,8 @@ function ReviewSection({
                   <Link
                     href={
                       row.kind === "person"
-                        ? `/records/people/${row.id}`
-                        : `/pipeline/leads/${row.id}`
+                        ? routes.person(row.id)
+                        : routes.lead(row.id)
                     }
                     className="lead-style focus-visible:ring-ring truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
                   >

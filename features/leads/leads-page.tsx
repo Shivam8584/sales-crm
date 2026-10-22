@@ -62,6 +62,7 @@ import {
 import LeadStatusMenu from "./lead-status-menu";
 import { SlaCell, slaState, useNow } from "./sla";
 import { useBulkLeadActions, useLeadActions } from "./use-lead-actions";
+import { routes } from "@/lib/routes";
 
 type LeadRow = FunctionReturnType<typeof api.leads.page>["page"][number];
 type ListArgs = Omit<FunctionArgs<typeof api.leads.page>, "paginationOpts">;
@@ -428,7 +429,7 @@ export default function LeadsPage() {
           columns={columns}
           rows={rows}
           getId={(row) => row._id}
-          getHref={(row) => `/pipeline/leads/${row._id}`}
+          getHref={(row) => routes.lead(row._id)}
           getLabel={(row) => `${row.name}, ${row.companyName}`}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}

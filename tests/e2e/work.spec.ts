@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { open, session, undoToast } from "./helpers";
+import { routes } from "../../lib/routes";
 
 test.describe.configure({ mode: "serial" });
 
@@ -25,7 +26,7 @@ const cursor = () =>
 
 test.describe("Today", () => {
   test("j and k move the cursor, x completes a task and Ctrl+Z brings it back", async () => {
-    await open(page, "/today");
+    await open(page, routes.today);
     await expect(page.locator("[data-today-row]").first()).toBeVisible();
     await page.locator("body").click({ position: { x: 640, y: 5 } });
 
@@ -59,7 +60,7 @@ test.describe("Today", () => {
 
 test.describe("deals board", () => {
   test("dragging a card to another column moves it, and dragging it back restores the board", async () => {
-    await open(page, "/pipeline/deals");
+    await open(page, routes.deals);
     const column = (id: string) => page.locator(`[data-column-id="${id}"]`);
     const cards = (id: string) => column(id).locator("[data-board-card]");
     await expect(cards("discovery").first()).toBeVisible();
@@ -98,7 +99,7 @@ test.describe("deals board", () => {
 test.describe("tasks", () => {
   test("pasted lines become tasks with priority and due date, and undo removes them", async () => {
     const marker = `e2e-${Date.now()}`;
-    await open(page, "/tasks");
+    await open(page, routes.tasks);
     await page
       .getByRole("button", { name: "Task list actions" })
       .first()
@@ -125,9 +126,9 @@ test.describe("tasks", () => {
 
 test.describe("sequences", () => {
   test("a sequence exports as JSON: preview, then download", async () => {
-    await open(page, "/automation/sequences");
-    await page.locator("[role=row] a[href^='/automation/sequences/']").first().click();
-    await expect(page).toHaveURL(/\/automation\/sequences\/\w+/);
+    await open(page, routes.sequences);
+    await page.locator(`[role=row] a[href^='${routes.sequences}/']`).first().click();
+    await expect(page).toHaveURL(new RegExp(`${routes.sequences}/\\w+`));
     await page
       .getByRole("button", { name: "Automation actions" })
       .first()

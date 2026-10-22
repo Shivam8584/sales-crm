@@ -40,6 +40,7 @@ import PlusIcon from "@/public/assets/icons/plus.svg";
 import XIcon from "@/public/assets/icons/x.svg";
 import FunnelStrip from "./funnel-strip";
 import { firstSentence, stuckFor } from "./stall";
+import { routes } from "@/lib/routes";
 
 export type Desk = FunctionReturnType<typeof api.activation.desk>;
 type Rule = Desk["rules"][number];
@@ -387,7 +388,7 @@ export default function StuckView({ desk }: { desk: Desk | undefined }) {
           columns={COLUMNS}
           rows={rows}
           getId={(row) => row._id}
-          getHref={(row) => `/records/accounts/${row._id}`}
+          getHref={(row) => routes.account(row._id)}
           getLabel={(row) => row.account.name}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -502,7 +503,7 @@ export default function StuckView({ desk }: { desk: Desk | undefined }) {
                       : `None of the ${desk.linked} brands on Hypedrive is stuck on a step.`
                 }
                 action={
-                  <Button variant="secondary" size="sm" href="/records/accounts">
+                  <Button variant="secondary" size="sm" href={routes.accounts}>
                     View accounts
                   </Button>
                 }

@@ -12,6 +12,7 @@ import { leaveDeals } from "./deals";
 import { fail, invalid } from "./errors";
 import { diff, logChanges, logSystem } from "./timeline";
 import { personSearchText, requireActiveMember } from "./records";
+import { routes } from "../../lib/routes";
 
 /** Rows moved per table in one step, which keeps a step well inside a transaction's limits. */
 export const STEP = 200;
@@ -632,7 +633,7 @@ export async function finishAccounts(
     kind: "merge",
     title: `Merged ${loser.name} into ${winner.name}`,
     body: `Moved ${movedPhrase(moved)}.`,
-    href: `/records/accounts/${winner._id}`,
+    href: routes.account(winner._id),
   });
 }
 
@@ -662,6 +663,6 @@ export async function finishPeople(
     kind: "merge",
     title: `Merged ${personName(loser)} into ${personName(winner)}`,
     body: `Moved ${movedPhrase(moved)}.`,
-    href: `/records/people/${winner._id}`,
+    href: routes.person(winner._id),
   });
 }

@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import XIcon from "@/public/assets/icons/x.svg";
+import { routes } from "@/lib/routes";
 
 type Person = NonNullable<FunctionReturnType<typeof api.people.get>>;
 
@@ -61,7 +62,7 @@ export default function PersonPeek({
             <Button
               variant="ghost"
               size="xs"
-              href={`/records/people/${person._id}`}
+              href={routes.person(person._id)}
               onClick={onClose}
             >
               Open page
@@ -111,7 +112,7 @@ function PeekBody({
         )}
         {person.account && (
           <Link
-            href={`/records/accounts/${person.account._id}`}
+            href={routes.account(person.account._id)}
             onClick={onClose}
             className={cn(
               tagVariants({ tone: "neutral", size: "sm" }),

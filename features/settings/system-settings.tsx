@@ -17,6 +17,7 @@ import {
   SettingsSection,
   SettingsSkeleton,
 } from "./settings-ui";
+import { routes } from "@/lib/routes";
 
 type Overview = FunctionReturnType<typeof api.system.overview>;
 type Table = "accounts" | "people" | "leads";
@@ -157,7 +158,7 @@ function FailuresSection({ failures }: { failures: Overview["failures"] }) {
           label="Platform events"
           description={`${failures.platformEvents} parked with an error.`}
         >
-          <Button variant="secondary" size="xs" href="/settings/integrations">
+          <Button variant="secondary" size="xs" href={routes.integrations}>
             Review
           </Button>
         </SettingsRow>

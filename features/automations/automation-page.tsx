@@ -56,8 +56,12 @@ import ExportDialog from "./export-dialog";
 import SequenceView from "./sequence-view";
 import AutomationAnalytics from "./automation-analytics";
 import AutomationRuns from "./automation-runs";
+import { routes } from "@/lib/routes";
 
-const CRUMBS = [{ label: "Sequences", href: "/automation/sequences" }];
+const CRUMBS = [
+  { label: "Automation" },
+  { label: "Sequences", href: routes.sequences },
+];
 const SAVE_DELAY = 600;
 const RULE_FIELDS = new Set([
   "goal",
@@ -89,7 +93,7 @@ export default function AutomationPage({ id }: { id: Id<"automations"> }) {
           title="This sequence doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/automation/sequences">
+            <Button variant="secondary" size="sm" href={routes.sequences}>
               Back to sequences
             </Button>
           }
@@ -371,7 +375,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
     try {
       await flush();
       const copy = await duplicate({ id });
-      router.push(`/automation/sequences/${copy}`);
+      router.push(routes.sequence(copy));
       toast("Duplicated as a draft");
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
@@ -382,7 +386,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
     try {
       await flush();
       const { ended } = await remove({ id });
-      router.push("/automation/sequences");
+      router.push(routes.sequences);
       toast(
         `${automation.name} deleted${ended ? ` · ${ended} live ${ended === 1 ? "run" : "runs"} ended` : ""}`,
         () => void restore({ id }),

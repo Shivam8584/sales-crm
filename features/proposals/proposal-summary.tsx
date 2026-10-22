@@ -7,6 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { formatMoney } from "@/lib/domain/money";
 import { rateLabel } from "@/lib/domain/pricing";
 import { ProposalStatusTag } from "./status";
+import { routes } from "@/lib/routes";
 
 /** One line on the deal's proposal for the peek: status, take and margin. */
 export default function ProposalSummary({
@@ -17,7 +18,7 @@ export default function ProposalSummary({
   onNavigate?: () => void;
 }) {
   const proposal = useQuery(api.proposals.current, { dealId });
-  const href = `/pipeline/deals/${dealId}?tab=proposal`;
+  const href = routes.deal(dealId, "proposal");
 
   if (proposal === undefined) {
     return <span className="text-fg-tertiary text-sm">…</span>;

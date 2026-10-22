@@ -59,6 +59,7 @@ import {
   type StuckRow,
   type WaitingLead,
 } from "./today-rows";
+import { routes } from "@/lib/routes";
 
 const RECENT_ACCOUNTS = 6;
 const CARD_SECTION =
@@ -178,7 +179,7 @@ export default function TodayPage() {
           : undefined,
         empty:
           "No new leads waiting on you. Fresh inbound leads land here with their SLA clock.",
-        href: { label: "All leads", to: "/pipeline/leads?owner=mine" },
+        href: { label: "All leads", to: `${routes.leads}?owner=mine` },
       },
       {
         id: "overdue",
@@ -210,7 +211,7 @@ export default function TodayPage() {
           ),
         ),
         empty: "Nothing scheduled this week yet.",
-        href: { label: "All tasks", to: "/tasks?view=list" },
+        href: { label: "All tasks", to: `${routes.tasks}?view=list` },
       },
       {
         id: "stuck",
@@ -224,7 +225,7 @@ export default function TodayPage() {
         href:
           viewer.role === "rep"
             ? undefined
-            : { label: "Activation", to: "/pipeline/activation?owner=mine" },
+            : { label: "Activation", to: `${routes.activation}?owner=mine` },
       },
       {
         id: "deals",
@@ -234,7 +235,7 @@ export default function TodayPage() {
         aside: true,
         items: deals?.map((deal) => ({ kind: "deal", id: deal._id, deal })),
         empty: "No deals of yours are due to close this week.",
-        href: { label: "Pipeline", to: "/pipeline/deals?owner=mine" },
+        href: { label: "Pipeline", to: `${routes.deals}?owner=mine` },
       },
     ];
   }, [tasks, waiting, stuck, deals, viewer, today, weekAhead]);
@@ -273,11 +274,11 @@ export default function TodayPage() {
       case "task":
         return setEdit({ type: "task", id: item.id });
       case "lead":
-        return router.push(`/pipeline/leads/${item.id}`);
+        return router.push(routes.lead(item.id));
       case "stuck":
-        return router.push(`/records/accounts/${item.id}`);
+        return router.push(routes.account(item.id));
       case "deal":
-        return router.push(`/pipeline/deals/${item.id}`);
+        return router.push(routes.deal(item.id));
     }
   }
 
@@ -572,7 +573,7 @@ function RecentAccounts({
         className={CARD_SECTION}
         action={
           <Link
-            href="/records/accounts?view=mine"
+            href={`${routes.accounts}?view=mine`}
             className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
           >
             My accounts
@@ -585,7 +586,7 @@ function RecentAccounts({
           <p className="caption-style text-fg-tertiary px-4 pb-4 leading-snug sm:px-5">
             Accounts you own show up here.{" "}
             <Link
-              href="/records/accounts"
+              href={routes.accounts}
               className="text-fg-secondary hover:text-foreground underline underline-offset-2"
             >
               Browse accounts
@@ -598,7 +599,7 @@ function RecentAccounts({
               return (
                 <li key={account._id}>
                   <Link
-                    href={`/records/accounts/${account._id}`}
+                    href={routes.account(account._id)}
                     className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
                   >
                     <AccountLogo account={account} size="sm" />

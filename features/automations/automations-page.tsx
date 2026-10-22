@@ -35,6 +35,7 @@ import TrashIcon from "@/public/assets/icons/trash.svg";
 import { StatusTag, StepIcons, StoppedStatus } from "./automation-parts";
 import NewAutomationDialog from "./new-automation-dialog";
 import TemplatesGallery from "./templates-gallery";
+import { routes } from "@/lib/routes";
 
 type Row = FunctionReturnType<typeof api.automations.list>[number];
 
@@ -283,7 +284,7 @@ export default function AutomationsPage() {
   async function copy(row: Row) {
     try {
       const id = await duplicate({ id: row._id });
-      router.push(`/automation/sequences/${id}`);
+      router.push(routes.sequence(id));
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }
@@ -495,7 +496,7 @@ export default function AutomationsPage() {
                 columns={COLUMNS}
                 rows={sortedRows}
                 getId={(row) => row._id}
-                getHref={(row) => `/automation/sequences/${row._id}`}
+                getHref={(row) => routes.sequence(row._id)}
                 getLabel={(row) => row.name}
                 sort={sort}
                 onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -610,7 +611,7 @@ function AutomationsGrid({
       {rows.map((row) => (
         <li key={row._id}>
           <Link
-            href={`/automation/sequences/${row._id}`}
+            href={routes.sequence(row._id)}
             className="bg-card shadow-card focus-visible:ring-ring hover:bg-raised duration-base ease-power3-out group flex h-full flex-col gap-4 rounded-2xl p-5 transition-[background-color,translate] outline-none hover:-translate-y-px focus-visible:ring-2 motion-reduce:hover:translate-y-0"
           >
             <span className="flex items-start justify-between gap-3">

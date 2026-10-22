@@ -23,7 +23,7 @@ export default function SidebarPins({
   onNavigate,
 }: {
   collapsed: boolean;
-  onNavigate: () => void;
+  onNavigate?: () => void;
 }) {
   const pathname = usePathname();
   const pins = useQuery(api.pins.mine, {});

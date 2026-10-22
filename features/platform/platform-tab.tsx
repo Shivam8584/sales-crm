@@ -35,6 +35,7 @@ import { toast } from "@/stores/toast-store";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
 import { HEALTH_TONE, HealthRing } from "./health-badge";
+import { routes } from "@/lib/routes";
 
 type Data = FunctionReturnType<typeof api.account360.platform>;
 type Linked = Extract<Data, { linked: true }>;
@@ -863,7 +864,7 @@ function Team({ members }: { members: Linked["members"] }) {
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   {member.person ? (
                     <Link
-                      href={`/records/people/${member.person._id}`}
+                      href={routes.person(member.person._id)}
                       className="lead-style focus-visible:ring-ring truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
                     >
                       {name}

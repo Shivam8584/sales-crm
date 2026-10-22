@@ -1,4 +1,5 @@
 import { DEAL_STAGE_LABEL } from "./labels";
+import { parseRecordPath, recordPath } from "../routes";
 
 const MINUTE = 60_000;
 
@@ -121,12 +122,12 @@ export function parseRecordKey(key: string) {
 
 /** The record an in-app link points at, e.g. `/pipeline/deals/abc?tab=proposal` → `deals:abc`. */
 export function recordFromHref(href: string | undefined | null) {
-  const match = href?.match(/^\/(accounts|deals|leads|people)\/([a-z0-9]+)/);
-  return match ? recordKey(match[1] as RecordType, match[2]) : undefined;
+  const record = parseRecordPath(href);
+  return record ? recordKey(record.type, record.id) : undefined;
 }
 
 export const ENTRY_ANCHOR = "entry-";
 
 export function entryHref(type: RecordType, id: string, entryId: string) {
-  return `/${type}/${id}#${ENTRY_ANCHOR}${entryId}`;
+  return `${recordPath(type, id)}#${ENTRY_ANCHOR}${entryId}`;
 }

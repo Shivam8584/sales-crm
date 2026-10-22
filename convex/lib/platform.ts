@@ -54,6 +54,7 @@ import { firstLive } from "./merged";
 import { personSearchText } from "./records";
 import { logSystem, type RecordRefs } from "./timeline";
 import { notify, notifyMany, leadershipIds } from "../notifications";
+import { routes } from "../../lib/routes";
 
 export const UNKNOWN_TYPE = "unknown type";
 export const DEMO_ORG = "demo organisation";
@@ -1011,7 +1012,7 @@ async function onOrgCreated(
         kind: "platform_org",
         title: `New on Hypedrive: ${data.name}`,
         body: "Organisation created with a verified GSTIN",
-        href: `/records/accounts/${accountId}`,
+        href: routes.account(accountId),
       });
     }
   }
@@ -1103,9 +1104,9 @@ async function onUserGstFailed(
     title: `${who} couldn't verify GST on Hypedrive`,
     body: data.reason,
     href: account
-      ? `/records/accounts/${account._id}`
+      ? routes.account(account._id)
       : person
-        ? `/records/people/${person._id}`
+        ? routes.person(person._id)
         : leadHref(lead!._id),
   };
   if (recipient) await notify(ctx, recipient, input);
@@ -1161,7 +1162,7 @@ async function alertOwner(
       type === "campaign.slots_filled"
         ? "Every slot is taken: a good moment to talk about the next one."
         : "They need to top up, and paused campaigns must be resumed by hand.",
-    href: `/records/accounts/${account._id}`,
+    href: routes.account(account._id),
   });
 }
 

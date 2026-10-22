@@ -4,6 +4,7 @@ import { memberMutation, memberQuery } from "./lib/functions";
 import { fail, notFound } from "./lib/errors";
 import { personName } from "../lib/domain/labels";
 import { recordKey } from "../lib/domain/notifications";
+import { recordPath, type RecordPathType } from "../lib/routes";
 
 const MAX_PINS = 12;
 
@@ -49,7 +50,7 @@ export const mine = memberQuery({
           table === "people"
             ? personName(row as { firstName: string; lastName: string })
             : String(row.name ?? row.title);
-        return { _id, record, title, href: `/${table}/${id}` };
+        return { _id, record, title, href: recordPath(table as RecordPathType, id) };
       }),
     );
     return resolved.filter((pin) => pin !== null);

@@ -1,5 +1,7 @@
 import BrandPage from "@/features/prospecting/brand-page";
 
+export const metadata = { title: "Brand" };
+
 export default async function Page({
   params,
 }: {

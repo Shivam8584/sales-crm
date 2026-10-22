@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { routes } from "@/lib/routes";
 
 export default function Home() {
-  redirect("/today");
+  redirect(routes.today);
 }

@@ -56,6 +56,7 @@ import type { RecordRefs } from "./lib/timeline";
 import { notify } from "./notifications";
 import { touch } from "./timeline";
 import { internalMutation } from "./lib/functions";
+import { routes } from "../lib/routes";
 
 const BODY_LIMIT = 512 * 1024;
 const MAX_TEXT = 10_000;
@@ -166,7 +167,7 @@ function groupContacts(found: Awaited<ReturnType<typeof findContacts>>) {
       },
       name: personName(person),
       ownerId: person.ownerId,
-      href: `/records/people/${person._id}`,
+      href: routes.person(person._id),
       lead,
       person,
     });
@@ -182,7 +183,7 @@ function groupContacts(found: Awaited<ReturnType<typeof findContacts>>) {
       },
       name: lead.name,
       ownerId: lead.ownerId ?? null,
-      href: `/pipeline/leads/${lead._id}`,
+      href: routes.lead(lead._id),
       lead,
       person: null,
     });
@@ -192,7 +193,7 @@ function groupContacts(found: Awaited<ReturnType<typeof findContacts>>) {
       refs: { accountId: found.account._id },
       name: found.account.name,
       ownerId: found.account.ownerId,
-      href: `/records/accounts/${found.account._id}`,
+      href: routes.account(found.account._id),
       lead: null,
       person: null,
     });

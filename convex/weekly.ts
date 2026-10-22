@@ -15,6 +15,7 @@ import {
 } from "./lib/reports";
 import { weeklyReport, type WeeklyReportData } from "./lib/weeklyReport";
 import { dealsSince, overviewReport, teamData } from "./reports";
+import { routes } from "../lib/routes";
 
 const TOP_REPS = 3;
 const CONVERTED = FUNNEL_STEPS.findIndex((step) => step.key === "converted");
@@ -156,8 +157,8 @@ async function gather(ctx: ActionCtx): Promise<Omit<WeeklyReportData, "name">> {
     ...lead,
     ...team,
     ...deal,
-    reportsUrl: siteUrl("/insights/reports"),
-    activityUrl: siteUrl("/insights/activity"),
+    reportsUrl: siteUrl(routes.reports),
+    activityUrl: siteUrl(routes.activity),
   };
 }
 

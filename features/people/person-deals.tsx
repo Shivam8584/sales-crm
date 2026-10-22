@@ -17,6 +17,7 @@ import { formatMoney } from "@/lib/domain/money";
 import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import { routes } from "@/lib/routes";
 
 /** Deals the person is a contact on, across accounts. */
 export default function PersonDeals({
@@ -77,7 +78,7 @@ export default function PersonDeals({
             return (
               <li key={deal._id}>
                 <Link
-                  href={`/pipeline/deals/${deal._id}`}
+                  href={routes.deal(deal._id)}
                   className="hover:bg-overlay-1 focus-visible:ring-ring flex w-full items-center gap-3 px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-inset"
                 >
                   <span className="flex min-w-0 flex-1 flex-col gap-1">

@@ -10,6 +10,7 @@ import {
   parseRecordKey,
   recordFromHref,
 } from "../lib/domain/notifications";
+import { recordPath, routes } from "../lib/routes";
 
 const LIMIT = 50;
 const MAX_PAGE = 500;
@@ -41,7 +42,7 @@ export async function notify(
     await schedulePush(ctx, recipientId, {
       title: input.title,
       body: input.body ?? "",
-      href: input.href ?? "/inbox",
+      href: input.href ?? routes.inbox,
     });
   }
   return id;
@@ -154,7 +155,7 @@ export const listMine = memberQuery({
 async function recordInfo(ctx: QueryCtx, key: string) {
   const parsed = parseRecordKey(key);
   if (!parsed) return null;
-  const href = `/${parsed.type}/${parsed.id}`;
+  const href = recordPath(parsed.type, parsed.id);
   if (parsed.type === "accounts") {
     const id = ctx.db.normalizeId("accounts", parsed.id);
     const doc = id ? await ctx.db.get(id) : null;

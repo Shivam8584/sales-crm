@@ -52,6 +52,7 @@ import PinIcon from "@/public/assets/icons/pin.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SidebarIcon from "@/public/assets/icons/sidebar.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
+import { routes } from "@/lib/routes";
 import { toggleSidebarCollapsed } from "@/lib/sidebar-collapse";
 import {
   useRegisteredCommandActions,
@@ -59,11 +60,11 @@ import {
 } from "./command-actions";
 import { navItems } from "./navigation";
 
-const RECORD_HREF: Record<RecentRecord["type"], string> = {
-  account: "/records/accounts",
-  person: "/records/people",
-  lead: "/pipeline/leads",
-  deal: "/pipeline/deals",
+const RECORD_HREF: Record<RecentRecord["type"], (id: string) => string> = {
+  account: routes.account,
+  person: routes.person,
+  lead: routes.lead,
+  deal: routes.deal,
 };
 
 const PIN_FIELD = {
@@ -363,7 +364,7 @@ function Palette({
                 <CommandItem
                   key={`${item.type}:${item.id}`}
                   value={`recent:${item.type}:${item.id}`}
-                  onSelect={() => go(`${RECORD_HREF[item.type]}/${item.id}`)}
+                  onSelect={() => go(RECORD_HREF[item.type](item.id))}
                 >
                   {item.account ? (
                     <AccountLogo account={item.account} size="xs" />
@@ -391,7 +392,7 @@ function Palette({
                 <CommandItem
                   key={account._id}
                   value={`account:${account._id}`}
-                  onSelect={() => go(`/records/accounts/${account._id}`)}
+                  onSelect={() => go(routes.account(account._id))}
                 >
                   <AccountLogo account={account} size="xs" />
                   <span className="truncate">{account.name}</span>
@@ -407,7 +408,7 @@ function Palette({
                 <CommandItem
                   key={person._id}
                   value={`person:${person._id}`}
-                  onSelect={() => go(`/records/people/${person._id}`)}
+                  onSelect={() => go(routes.person(person._id))}
                 >
                   <Avatar name={personName(person)} />
                   <span className="truncate">{personName(person)}</span>
@@ -423,7 +424,7 @@ function Palette({
                 <CommandItem
                   key={lead._id}
                   value={`lead:${lead._id}`}
-                  onSelect={() => go(`/pipeline/leads/${lead._id}`)}
+                  onSelect={() => go(routes.lead(lead._id))}
                 >
                   <ItemIcon>
                     <TargetIcon aria-hidden className="size-3" />
@@ -443,7 +444,7 @@ function Palette({
                 <CommandItem
                   key={deal._id}
                   value={`deal:${deal._id}`}
-                  onSelect={() => go(`/pipeline/deals/${deal._id}`)}
+                  onSelect={() => go(routes.deal(deal._id))}
                 >
                   <ItemIcon>
                     <ClipboardIcon aria-hidden className="size-3" />

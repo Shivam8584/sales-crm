@@ -14,7 +14,8 @@ import { personName } from "@/lib/domain/labels";
 import { relativeTime } from "@/lib/time";
 import { useUiStore } from "@/stores/ui-store";
 import EyeIcon from "@/public/assets/icons/eye.svg";
-import MailIcon from "@/public/assets/icons/mail-04.svg";
+import MailIcon from "@/public/assets/icons/mail-03.svg";
+import { routes } from "@/lib/routes";
 
 /** Compact list of an account's people, used on the account page and peek. */
 export default function PeopleList({
@@ -72,7 +73,7 @@ export default function PeopleList({
             <Avatar name={name} size="md" />
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <Link
-                href={`/records/people/${person._id}`}
+                href={routes.person(person._id)}
                 className="lead-style focus-visible:after:ring-ring truncate font-medium outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-inset"
               >
                 {name}

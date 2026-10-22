@@ -101,6 +101,7 @@ import {
   vUtm,
 } from "./lib/validators";
 import { leadershipIds, notify, notifyMany } from "./notifications";
+import { routes } from "../lib/routes";
 
 const FORM_SOURCE = "demo_form";
 const MIN_FILL_MS = 2000;
@@ -859,7 +860,7 @@ export const assignMany = memberMutation({
                 .slice(0, 3)
                 .map((lead) => lead.name)
                 .join(", ") + (moved.length > 3 ? "…" : ""),
-        href: moved.length === 1 ? leadHref(first._id) : "/pipeline/leads?owner=mine",
+        href: moved.length === 1 ? leadHref(first._id) : `${routes.leads}?owner=mine`,
       });
     }
     return previous;

@@ -58,6 +58,7 @@ import {
   useUpdateTask,
   type TaskPatch,
 } from "./use-task-actions";
+import { routes } from "@/lib/routes";
 
 type Draft = {
   title: string;
@@ -379,7 +380,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
               <>
                 For the deal
                 <Link
-                  href={`/pipeline/deals/${task.deal._id}`}
+                  href={routes.deal(task.deal._id)}
                   onClick={onClose}
                   className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
                 >
@@ -391,7 +392,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
               <>
                 For the lead
                 <Link
-                  href={`/pipeline/leads/${task.lead._id}`}
+                  href={routes.lead(task.lead._id)}
                   onClick={onClose}
                   className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
                 >

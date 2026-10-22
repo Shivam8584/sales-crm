@@ -34,6 +34,7 @@ import {
 } from "./account-insights";
 import { StageAndTags } from "./record-cells";
 import { STAGE_OPTIONS } from "./stage";
+import { routes } from "@/lib/routes";
 
 type Account = NonNullable<FunctionReturnType<typeof api.accounts.get>>;
 
@@ -62,7 +63,7 @@ export default function AccountPeek({
             <Button
               variant="ghost"
               size="xs"
-              href={`/records/accounts/${account._id}`}
+              href={routes.account(account._id)}
               onClick={onClose}
             >
               Open page

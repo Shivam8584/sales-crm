@@ -23,6 +23,7 @@ import {
   resolveNotifications,
 } from "../notifications";
 import { emitAutomationTrigger } from "./automations/engine";
+import { routes } from "../../lib/routes";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const CLOSED_STATUSES: LeadStatus[] = ["disqualified", "converted"];
@@ -53,7 +54,7 @@ export async function leadSlaPolicy(ctx: QueryCtx) {
 }
 
 export function leadHref(id: Id<"leads">) {
-  return `/pipeline/leads/${id}`;
+  return routes.lead(id);
 }
 
 /** Clears the "no first touch" alerts once the lead is touched or closed. */

@@ -27,6 +27,7 @@ import {
   useDealSave,
 } from "./deal-fields";
 import type { DealRow } from "./use-deal-actions";
+import { routes } from "@/lib/routes";
 
 /** Quick look at a deal from the board: stage, amount, owner and its timeline. */
 export default function DealPeek({
@@ -50,7 +51,7 @@ export default function DealPeek({
             <Button
               variant="ghost"
               size="xs"
-              href={`/pipeline/deals/${deal._id}`}
+              href={routes.deal(deal._id)}
               onClick={onClose}
             >
               Open page
@@ -102,7 +103,7 @@ function PeekBody({ deal, onClose }: { deal: DealRow; onClose: () => void }) {
           </h2>
           {deal.account && (
             <Link
-              href={`/records/accounts/${deal.account._id}`}
+              href={routes.account(deal.account._id)}
               onClick={onClose}
               className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring w-fit max-w-full truncate rounded-sm outline-none focus-visible:ring-2"
             >

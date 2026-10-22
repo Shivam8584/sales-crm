@@ -27,6 +27,7 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import ActivityIcon from "@/public/assets/icons/activity.svg";
+import { routes } from "@/lib/routes";
 
 export type HealthRow = FunctionReturnType<
   typeof api.activation.health
@@ -259,7 +260,7 @@ export default function HealthView({
           columns={COLUMNS}
           rows={visible}
           getId={(row) => row._id}
-          getHref={(row) => `/records/accounts/${row._id}`}
+          getHref={(row) => routes.account(row._id)}
           getLabel={(row) => row.account.name}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -334,7 +335,7 @@ export default function HealthView({
                 title="No brands on Hypedrive yet"
                 description="Health shows up once a brand creates its organisation on Hypedrive."
                 action={
-                  <Button variant="secondary" size="sm" href="/records/accounts">
+                  <Button variant="secondary" size="sm" href={routes.accounts}>
                     View accounts
                   </Button>
                 }

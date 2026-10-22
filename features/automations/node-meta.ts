@@ -9,7 +9,7 @@ import {
 import BellIcon from "@/public/assets/icons/bell.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import LogOutIcon from "@/public/assets/icons/log-out.svg";
-import MessageIcon from "@/public/assets/icons/message.svg";
+import WhatsAppIcon from "@/public/assets/icons/whatsapp.svg";
 import BoltIcon from "@/public/assets/icons/automations/bolt.svg";
 import BranchIcon from "@/public/assets/icons/automations/git-branch.svg";
 import HistoryIcon from "@/public/assets/icons/automations/history.svg";
@@ -61,7 +61,7 @@ export const NODE_META: Record<NodeKind, NodeMeta> = {
     label: NODE_LABEL.send_whatsapp,
     hint: "An approved Meta template",
     tone: "green",
-    Icon: MessageIcon,
+    Icon: WhatsAppIcon,
   },
   notify: {
     label: NODE_LABEL.notify,

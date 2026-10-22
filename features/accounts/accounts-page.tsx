@@ -66,6 +66,7 @@ import {
   dash,
   rankTotals,
 } from "./record-cells";
+import { routes } from "@/lib/routes";
 
 type PageRow = FunctionReturnType<typeof api.accounts.page>["page"][number];
 export type AccountRow = PageRow & { activation: number | null };
@@ -555,7 +556,7 @@ export default function AccountsPage() {
           columns={columns}
           rows={rows}
           getId={(row) => row._id}
-          getHref={(row) => `/records/accounts/${row._id}`}
+          getHref={(row) => routes.account(row._id)}
           getLabel={(row) => row.name}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}

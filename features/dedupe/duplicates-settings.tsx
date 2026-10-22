@@ -23,6 +23,7 @@ import {
   type DedupeType,
   type ScanPair,
 } from "./use-duplicate-scan";
+import { routes } from "@/lib/routes";
 
 const TYPES = [
   { value: "accounts", label: "Accounts" },
@@ -39,7 +40,7 @@ function ManagerOnly({ children }: { children: ReactNode }) {
         title="Only managers can merge records"
         description="Ask a manager or admin on your team to review duplicates."
         action={
-          <Button variant="secondary" size="sm" href="/settings/profile">
+          <Button variant="secondary" size="sm" href={routes.profile}>
             Back to your profile
           </Button>
         }

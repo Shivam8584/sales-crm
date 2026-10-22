@@ -28,6 +28,7 @@ import { toast } from "@/stores/toast-store";
 import AccountLogo from "./account-logo";
 import { STAGE_OPTIONS } from "./stage";
 import { useLogoPick, useLogoUpload } from "./use-logo";
+import { routes } from "@/lib/routes";
 
 type Errors = Partial<Record<"name" | "domain" | "form", string>>;
 
@@ -88,7 +89,7 @@ export default function CreateAccountDialog({
           });
         }
       }
-      router.push(`/records/accounts/${id}`);
+      router.push(routes.account(id));
     } catch (error) {
       const { message, field } = readError(
         error,

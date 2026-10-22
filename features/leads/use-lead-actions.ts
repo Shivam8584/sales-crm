@@ -13,6 +13,7 @@ import {
 } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
+import { routes } from "@/lib/routes";
 
 type LeadRef = { _id: Id<"leads">; name: string };
 
@@ -94,7 +95,7 @@ export function useLeadActions() {
             ? `Converted ${lead.name} into ${result.accountName}`
             : `Converted ${lead.name}: created ${result.accountName}`,
         );
-        router.push(`/records/accounts/${result.accountId}`);
+        router.push(routes.account(result.accountId));
         return true;
       } catch (error) {
         fail(error, "Couldn't convert the lead");

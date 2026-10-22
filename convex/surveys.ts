@@ -37,6 +37,7 @@ import { rateLimiter } from "./lib/rateLimiter";
 import { upsertAutomatedTask } from "./lib/tasks";
 import { logSystem } from "./lib/timeline";
 import { leadershipIds, notify } from "./notifications";
+import { routes } from "../lib/routes";
 
 const BODY_LIMIT = 4 * 1024;
 const MAX_NPS_ROWS = 5000;
@@ -195,7 +196,7 @@ export const respond = internalMutation({
           body: detractor
             ? "A rescue task is due today"
             : "A referral task is due in 2 days",
-          href: `/records/accounts/${account._id}`,
+          href: routes.account(account._id),
         });
       }
     }

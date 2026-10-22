@@ -23,32 +23,33 @@ import LinkIcon from "@/public/assets/icons/link.svg";
 import ActivityIcon from "@/public/assets/icons/activity.svg";
 import ListIcon from "@/public/assets/icons/list.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
+import { routes } from "@/lib/routes";
 
 type SettingsHref = (typeof SETTINGS_PAGES)[number]["href"];
 
 const ICONS: Record<SettingsHref, ComponentType<SVGProps<SVGSVGElement>>> = {
-  "/settings/profile": UserIcon,
-  "/settings/team": UsersIcon,
-  "/settings/workspace": BuildingIcon,
-  "/settings/fields": ListIcon,
-  "/settings/targets": TargetIcon,
-  "/settings/duplicates": UsersIcon,
-  "/settings/integrations": LinkIcon,
-  "/settings/system": ActivityIcon,
+  [routes.profile]: UserIcon,
+  [routes.team]: UsersIcon,
+  [routes.workspace]: BuildingIcon,
+  [routes.fields]: ListIcon,
+  [routes.targets]: TargetIcon,
+  [routes.duplicates]: UsersIcon,
+  [routes.integrations]: LinkIcon,
+  [routes.system]: ActivityIcon,
 };
 
 const GROUPS: { title: string; hrefs: SettingsHref[] }[] = [
-  { title: "Personal", hrefs: ["/settings/profile"] },
+  { title: "Personal", hrefs: [routes.profile] },
   {
     title: "Workspace",
     hrefs: [
-      "/settings/team",
-      "/settings/workspace",
-      "/settings/fields",
-      "/settings/targets",
-      "/settings/duplicates",
-      "/settings/integrations",
-      "/settings/system",
+      routes.team,
+      routes.workspace,
+      routes.fields,
+      routes.targets,
+      routes.duplicates,
+      routes.integrations,
+      routes.system,
     ],
   },
 ];
@@ -64,10 +65,10 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   const current = SETTINGS_PAGES.find((page) => isActive(pathname, page.href));
   const activeMembers = team?.filter((member) => member.status === "active");
   const counts: Partial<Record<SettingsHref, number>> = {
-    "/settings/team": activeMembers?.length,
+    [routes.team]: activeMembers?.length,
   };
   // The members table fills the content area like every other list.
-  const fullBleed = isActive(pathname, "/settings/team");
+  const fullBleed = isActive(pathname, routes.team);
 
   return (
     <Page>

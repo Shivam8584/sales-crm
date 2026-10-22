@@ -202,7 +202,7 @@ export default function Toaster() {
         "z-toast duration-base ease-power3-out pointer-events-none fixed inset-x-3 flex flex-col items-end gap-2 transition-[right] sm:inset-x-auto sm:right-4",
         placement.edge === "top"
           ? "top-3 sm:top-4"
-          : "short:top-3 short:bottom-auto bottom-3 sm:bottom-4",
+          : "short:top-3 short:bottom-auto bottom-[calc(3.75rem+env(safe-area-inset-bottom))] lg:bottom-4",
       )}
     >
       <AnimatePresence initial={false}>

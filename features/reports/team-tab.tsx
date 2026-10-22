@@ -42,6 +42,7 @@ import {
 } from "./section";
 import { KpisSkeleton } from "./kpis";
 import { useLatest } from "./use-report";
+import { routes } from "@/lib/routes";
 
 type TeamData = FunctionReturnType<typeof api.reports.team>;
 export type TeamRow = TeamData["rows"][number];
@@ -397,7 +398,7 @@ export default function TeamTab({ period }: { period: Period }) {
               columns={cols}
               rows={data.rows}
               getId={(row) => row.ownerId}
-              getHref={(row) => `/pipeline/leads?owner=${repQuery(row)}`}
+              getHref={(row) => `${routes.leads}?owner=${repQuery(row)}`}
               getLabel={(row) => `Open ${row.ownerName ?? "unassigned"} leads`}
               sort={sort}
               onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -410,27 +411,27 @@ export default function TeamTab({ period }: { period: Period }) {
                         icon: CheckSquareIcon,
                         onSelect: () =>
                           router.push(
-                            `/tasks?scope=all&assignee=${row.ownerId}&overdue=1`,
+                            `${routes.tasks}?scope=all&assignee=${row.ownerId}&overdue=1`,
                           ),
                       },
                       {
                         label: "Open deals",
                         icon: WalletIcon,
                         onSelect: () =>
-                          router.push(`/pipeline/deals?owner=${row.ownerId}`),
+                          router.push(`${routes.deals}?owner=${row.ownerId}`),
                       },
                       {
                         label: "Open accounts",
                         icon: UsersIcon,
                         onSelect: () =>
-                          router.push(`/records/accounts?owner=${row.ownerId}`),
+                          router.push(`${routes.accounts}?owner=${row.ownerId}`),
                       },
                       {
                         label: "Show their funnel",
                         icon: ActivityIcon,
                         onSelect: () =>
                           router.push(
-                            `/insights/reports?tab=funnel&period=${period}&owner=${row.ownerId}`,
+                            `${routes.reports}?tab=funnel&period=${period}&owner=${row.ownerId}`,
                           ),
                       },
                     ]
@@ -512,7 +513,7 @@ export default function TeamTab({ period }: { period: Period }) {
                   title="No teammates yet"
                   description="Invite reps to see their leads, speed to lead, tasks, calls and deals side by side."
                   action={
-                    <Button variant="secondary" size="sm" href="/settings/team">
+                    <Button variant="secondary" size="sm" href={routes.team}>
                       Invite teammates
                     </Button>
                   }

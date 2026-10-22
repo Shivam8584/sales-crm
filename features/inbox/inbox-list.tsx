@@ -29,6 +29,7 @@ import MailIcon from "@/public/assets/icons/mail.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import WalletIcon from "@/public/assets/icons/wallet.svg";
+import { routes } from "@/lib/routes";
 
 type Result = FunctionReturnType<typeof api.notifications.inbox>;
 export type InboxItem = Result["items"][number];
@@ -157,7 +158,7 @@ export function InboxRow({
   selecting: boolean;
   actions: RowActions;
 }) {
-  const href = item.href ?? "/inbox";
+  const href = item.href ?? routes.inbox;
   const archived = item.archived;
 
   return (

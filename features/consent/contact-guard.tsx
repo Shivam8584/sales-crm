@@ -22,7 +22,7 @@ import { readError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
-import MailIcon from "@/public/assets/icons/mail-04.svg";
+import MailIcon from "@/public/assets/icons/mail-03.svg";
 import WhatsAppIcon from "@/public/assets/icons/whatsapp.svg";
 import PhoneIcon from "@/public/assets/icons/phone.svg";
 

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { recordPath } from "@/lib/routes";
 import { toast } from "@/stores/toast-store";
 
 /** A merged-away record's page sends you to the record it became part of. */
@@ -14,7 +15,7 @@ export function useMergedRedirect(
   const name = mergedInto?.name;
   useEffect(() => {
     if (!id) return;
-    router.replace(`/${table}/${id}`);
+    router.replace(recordPath(table, id));
     toast(`Merged into ${name}`);
   }, [id, name, table, router]);
 }

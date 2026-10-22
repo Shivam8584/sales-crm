@@ -21,6 +21,7 @@ import { PERIOD_LABEL } from "./periods";
 import PipelineChart from "./pipeline-chart";
 import { ChartSkeleton, Panel, Reloading, ReportSection } from "./section";
 import SourceTable from "./source-table";
+import { routes } from "@/lib/routes";
 
 type ReportData = FunctionReturnType<typeof api.reports.overview>;
 
@@ -42,15 +43,15 @@ const STAGE_ODDS = Object.entries(STAGE_PROBABILITY_BPS)
   .join(", ");
 
 const STEP_LIST: Record<FunnelStepKey, string> = {
-  lead: "/pipeline/leads",
-  contacted: "/pipeline/leads?status=contacted",
-  demo: "/pipeline/leads?kind=demo",
-  converted: "/pipeline/leads?status=converted",
-  signed_up: "/records/accounts?stage=signed_up",
-  org_created: "/records/accounts?stage=org_created",
-  funded: "/records/accounts?stage=funded",
-  live: "/records/accounts?stage=live",
-  activated: "/records/accounts?stage=activated",
+  lead: routes.leads,
+  contacted: `${routes.leads}?status=contacted`,
+  demo: `${routes.leads}?kind=demo`,
+  converted: `${routes.leads}?status=converted`,
+  signed_up: `${routes.accounts}?stage=signed_up`,
+  org_created: `${routes.accounts}?stage=org_created`,
+  funded: `${routes.accounts}?stage=funded`,
+  live: `${routes.accounts}?stage=live`,
+  activated: `${routes.accounts}?stage=activated`,
 };
 
 function NoLeads({
@@ -81,7 +82,7 @@ function NoLeads({
             Show last 90 days
           </Button>
         ) : (
-          <Button variant="secondary" size="sm" href="/pipeline/leads">
+          <Button variant="secondary" size="sm" href={routes.leads}>
             Open leads
           </Button>
         )
@@ -131,7 +132,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
                 title="No deals in play"
                 description="Open deals appear here by stage, with won and lost deals for the period. Create a deal from an account to start the pipeline."
                 action={
-                  <Button variant="secondary" size="sm" href="/pipeline/deals">
+                  <Button variant="secondary" size="sm" href={routes.deals}>
                     Open deals
                   </Button>
                 }
@@ -172,7 +173,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
                   <Button
                     variant="secondary"
                     size="sm"
-                    href="/settings/integrations"
+                    href={routes.integrations}
                   >
                     Check the platform connection
                   </Button>
@@ -195,7 +196,7 @@ export function FunnelTab(props: LeadTabProps) {
   const sourceHref = (key: string) => {
     const query = new URLSearchParams(params.toString());
     query.set("source", key);
-    return `/insights/reports?${query}`;
+    return `${routes.reports}?${query}`;
   };
   const hrefFor = (key: FunnelStepKey) => {
     const href = STEP_LIST[key];

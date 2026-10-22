@@ -19,6 +19,7 @@ import type {
 } from "@/lib/domain/custom-fields";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
+import { routes } from "@/lib/routes";
 
 type Field = FunctionReturnType<typeof api.customFields.list>[number];
 type Target =
@@ -55,7 +56,7 @@ export default function CustomFields({
         divider={divider}
       >
         <Link
-          href="/settings/fields"
+          href={routes.fields}
           className="text-fg-tertiary hover:text-foreground focus-visible:ring-ring -mt-2 w-fit rounded-sm text-sm underline underline-offset-2 outline-none focus-visible:ring-2"
         >
           Add a custom field

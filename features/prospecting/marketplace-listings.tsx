@@ -8,6 +8,7 @@ import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
 import { DetailSection } from "@/components/record/detail";
 import ListingList from "./listing-list";
+import { routes } from "@/lib/routes";
 
 const SHOWN = 4;
 
@@ -36,7 +37,7 @@ export default function MarketplaceListings({
           <Button
             variant="ghost"
             size="xs"
-            href={`/pipeline/prospecting/${encodeURIComponent(brandKey)}`}
+            href={routes.prospect(encodeURIComponent(brandKey))}
           >
             View all
           </Button>
@@ -52,7 +53,7 @@ export default function MarketplaceListings({
         <p className="caption-style text-fg-tertiary leading-snug">
           No watched products for this brand.{" "}
           <Link
-            href="/pipeline/prospecting"
+            href={routes.prospecting}
             className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2"
           >
             Watch its listings

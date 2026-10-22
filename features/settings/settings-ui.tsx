@@ -17,6 +17,7 @@ import { useViewer } from "@/hooks/use-viewer";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import SettingsIcon from "@/public/assets/icons/settings.svg";
+import { routes } from "@/lib/routes";
 
 /** One-paragraph context under the page header of a settings page. */
 export function SettingsIntro({ children }: { children: ReactNode }) {
@@ -266,7 +267,7 @@ export function AdminOnly({ children }: { children: ReactNode }) {
         title="Only admins can change this"
         description="Ask an admin on your team if something here needs to change."
         action={
-          <Button variant="secondary" size="sm" href="/settings/profile">
+          <Button variant="secondary" size="sm" href={routes.profile}>
             Back to your profile
           </Button>
         }

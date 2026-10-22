@@ -24,6 +24,7 @@ import { fail } from "./errors";
 import { resolveMerged } from "./merged";
 import { logSystem } from "./timeline";
 import { literals } from "./validators";
+import { routes } from "../../lib/routes";
 
 export const vConsentEvent = literals(CONSENT_EVENTS);
 export const vLawfulBasis = literals(LAWFUL_BASES);
@@ -406,7 +407,7 @@ async function redactAround(
   for (const fact of unique(facts)) await ctx.db.delete(fact._id);
 
   const hrefs = [
-    ...(person ? [`/records/people/${person._id}`] : []),
+    ...(person ? [routes.person(person._id)] : []),
     ...leads.map((lead) => lead._id as string),
   ];
   for (const notification of await ctx.db.query("notifications").collect()) {

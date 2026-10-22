@@ -18,6 +18,7 @@ import PlusIcon from "@/public/assets/icons/plus.svg";
 import { formatDay, formatTotals, today as todayDay } from "./format";
 import { DealStageTag, isOpenStage } from "./stage";
 import { isPlainClick } from "./use-deal-actions";
+import { routes } from "@/lib/routes";
 
 /** Deals section on an account page; a click peeks, a modified click opens the page. */
 export default function RecordDeals({
@@ -94,7 +95,7 @@ export default function RecordDeals({
             return (
               <li key={deal._id}>
                 <Link
-                  href={`/pipeline/deals/${deal._id}`}
+                  href={routes.deal(deal._id)}
                   onClick={(event) => {
                     if (isPlainClick(event)) {
                       event.preventDefault();

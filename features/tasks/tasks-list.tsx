@@ -25,6 +25,7 @@ import {
   type DueGroup,
   type TaskRow,
 } from "./task-meta";
+import { routes } from "@/lib/routes";
 
 export const LIST_COLUMNS: Column<TaskRow>[] = [
   {
@@ -194,7 +195,7 @@ export default function TasksList({
   const href = (row: TaskRow) => {
     const query = new URLSearchParams(params.toString());
     query.set("task", row._id);
-    return `/tasks?${query.toString()}`;
+    return `${routes.tasks}?${query.toString()}`;
   };
 
   const groups = useMemo((): RowGroup<TaskRow>[] | undefined => {

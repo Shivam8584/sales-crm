@@ -7,7 +7,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Avatar from "@/components/_ui/avatar";
-import Button from "@/components/_ui/button";
+import Button, { buttonVariants } from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
@@ -59,6 +59,7 @@ import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
+import LinkedInIcon from "@/public/assets/icons/linkedin.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
@@ -66,10 +67,11 @@ import { ErasedNotice, ErasedTag } from "@/features/consent/erased";
 import ConsentRecords from "./consent-records";
 import GuardedContactActions from "@/features/consent/contact-guard";
 import PersonDeals from "./person-deals";
+import { routes } from "@/lib/routes";
 
 type Person = NonNullable<FunctionReturnType<typeof api.people.get>>;
 
-const CRUMBS = [{ label: "People", href: "/records/people" }];
+const CRUMBS = [{ label: "Records" }, { label: "People", href: routes.people }];
 
 export default function PersonPage({ id }: { id: Id<"people"> }) {
   const person = useQuery(api.people.get, { id });
@@ -112,7 +114,7 @@ export default function PersonPage({ id }: { id: Id<"people"> }) {
           title="This person doesn't exist"
           description="They may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/records/people">
+            <Button variant="secondary" size="sm" href={routes.people}>
               Back to people
             </Button>
           }
@@ -212,7 +214,7 @@ function PersonView({ person }: { person: Person }) {
         `${name} archived`,
         () => void setArchived({ ids: [person._id], archived: false }),
       );
-      router.push("/records/people");
+      router.push(routes.people);
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }
@@ -317,7 +319,7 @@ function PersonView({ person }: { person: Person }) {
                   )}
                   {person.account && (
                     <Link
-                      href={`/records/accounts/${person.account._id}`}
+                      href={routes.account(person.account._id)}
                       className={cn(
                         tagVariants({ tone: "neutral", size: "sm" }),
                         "hover:text-foreground focus-visible:ring-ring min-w-0 gap-1 pl-0.5 outline-none focus-visible:ring-2",
@@ -371,7 +373,27 @@ function PersonView({ person }: { person: Person }) {
                     onSave={(phone) => save({ phone: phone || null }, "Phone")}
                   />
                 </Property>
-                <Property label="LinkedIn">
+                <Property
+                  label="LinkedIn"
+                  action={
+                    person.linkedinUrl && (
+                      <Tooltip content="Open profile">
+                        <a
+                          href={person.linkedinUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label="Open LinkedIn profile"
+                          className={buttonVariants({
+                            variant: "ghost",
+                            size: "icon-xs",
+                          })}
+                        >
+                          <LinkedInIcon aria-hidden className="size-3" />
+                        </a>
+                      </Tooltip>
+                    )
+                  }
+                >
                   <InlineText
                     value={person.linkedinUrl}
                     type="url"

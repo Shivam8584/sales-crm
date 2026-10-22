@@ -252,9 +252,10 @@ export const list = memberQuery({
 });
 
 export const get = memberQuery({
-  args: { id: v.id("automations") },
-  handler: async (ctx, { id }) => {
-    const automation = await ctx.db.get(id);
+  args: { id: v.string() },
+  handler: async (ctx, args) => {
+    const id = ctx.db.normalizeId("automations", args.id);
+    const automation = id && (await ctx.db.get(id));
     if (!automation || automation.deletedAt) return null;
     const issues = validateAutomation(
       draftOf(automation),

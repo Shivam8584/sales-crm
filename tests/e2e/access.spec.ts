@@ -3,6 +3,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { clientFor } from "./convex";
 import { open, session } from "./helpers";
+import { routes } from "../../lib/routes";
 
 test.describe.configure({ mode: "serial" });
 
@@ -14,7 +15,7 @@ test.describe("as a rep", () => {
   test.afterAll(() => page.context().close());
 
   test("sees no Export button on the record lists", async () => {
-    for (const route of ["/records/accounts", "/records/people", "/pipeline/leads", "/pipeline/deals"]) {
+    for (const route of [routes.accounts, routes.people, routes.leads, routes.deals]) {
       await open(page, route);
       await page.waitForLoadState("networkidle");
       await expect(
@@ -25,7 +26,7 @@ test.describe("as a rep", () => {
   });
 
   test("is kept out of the system page", async () => {
-    await page.goto("/settings/system");
+    await page.goto(routes.system);
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { name: "Services" })).toHaveCount(
       0,
@@ -33,10 +34,10 @@ test.describe("as a rep", () => {
   });
 
   test("gets a plain step list, not the canvas, from a sequence template", async () => {
-    await open(page, "/automation/sequences");
+    await open(page, routes.sequences);
     await page.getByRole("tab", { name: "Templates" }).click();
     await page.getByRole("button", { name: "Use template" }).first().click();
-    await expect(page).toHaveURL(/\/automation\/sequences\/\w+/);
+    await expect(page).toHaveURL(new RegExp(`${routes.sequences}/\\w+`));
     const id = page.url().split("/").pop()!;
     try {
       await expect(page.getByRole("tab", { name: "Steps" })).toBeVisible();
@@ -60,12 +61,12 @@ test.describe("as an admin", () => {
   test.afterAll(() => page.context().close());
 
   test("sees Export on the accounts list", async () => {
-    await open(page, "/records/accounts");
+    await open(page, routes.accounts);
     await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
   });
 
   test("sees the system page", async () => {
-    await open(page, "/settings/system");
+    await open(page, routes.system);
     await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
   });
 });
@@ -73,7 +74,7 @@ test.describe("as an admin", () => {
 test.describe("public files and headers", () => {
   test("the web manifest points installs at Today", async ({ request }) => {
     const manifest = await (await request.get("/manifest.webmanifest")).json();
-    expect(manifest.start_url).toBe("/today");
+    expect(manifest.start_url).toBe(routes.today);
     expect(manifest.icons.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -91,7 +92,7 @@ test.describe("public files and headers", () => {
   test("the app refuses framing but the demo embed allows it", async ({
     request,
   }) => {
-    const app = await request.get("/today");
+    const app = await request.get(routes.today);
     const embed = await request.get("/demo?embed=1");
     expect(app.headers()["x-frame-options"]).toBe("DENY");
     expect(embed.headers()["x-frame-options"]).toBeUndefined();

@@ -14,6 +14,7 @@ import {
 } from "@/lib/domain/automations";
 import { cn } from "@/lib/utils";
 import { NODE_META, STATUS_TONE, toneVars } from "./node-meta";
+import { routes } from "@/lib/routes";
 
 export function StatusTag({
   status,
@@ -39,7 +40,7 @@ export function StoppedStatus() {
       content={`${safety.killSwitch.by} stopped all sequences. Runs hold and nothing sends until it's turned off in Settings → Workspace.`}
     >
       <Link
-        href="/settings/workspace"
+        href={routes.workspace}
         className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
       >
         <PageStatus tone="danger">All sequences stopped</PageStatus>

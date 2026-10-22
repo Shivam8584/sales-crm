@@ -54,8 +54,9 @@ import {
 } from "./lead-sections";
 import { useLeadActions } from "./use-lead-actions";
 import FollowButton from "@/features/notifications/follow-button";
+import { routes } from "@/lib/routes";
 
-const CRUMBS = [{ label: "Leads", href: "/pipeline/leads" }];
+const CRUMBS = [{ label: "Pipeline" }, { label: "Leads", href: routes.leads }];
 
 /** A lead's full record: contact, triage controls, timeline, attribution and consent. */
 export default function LeadPage({ id }: { id: Id<"leads"> }) {
@@ -78,7 +79,7 @@ function LeadPageContent({ id }: { id: Id<"leads"> }) {
           title="This lead doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/pipeline/leads">
+            <Button variant="secondary" size="sm" href={routes.leads}>
               Back to leads
             </Button>
           }
@@ -121,7 +122,7 @@ function LeadView({ lead }: { lead: Lead }) {
       <Button
         variant="primary"
         size="sm"
-        href={`/records/accounts/${lead.account._id}`}
+        href={routes.account(lead.account._id)}
         className="max-w-48"
       >
         <span className="truncate">Open {lead.account.name}</span>
@@ -187,7 +188,7 @@ function LeadView({ lead }: { lead: Lead }) {
                   ? lead.account && {
                       label: `Open ${lead.account.name}`,
                       icon: BuildingIcon,
-                      href: `/records/accounts/${lead.account._id}`,
+                      href: routes.account(lead.account._id),
                     }
                   : {
                       label: "Convert",

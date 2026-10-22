@@ -59,6 +59,7 @@ import {
   VelocityCell,
 } from "./prospect-cells";
 import WatchlistDialog, { type WatchlistDraft } from "./watchlist-dialog";
+import { routes } from "@/lib/routes";
 
 type Overview = FunctionReturnType<typeof api.prospecting.overview>;
 type ProductRow = Overview["products"][number];
@@ -818,7 +819,7 @@ export default function ProspectingPage() {
             columns={PROSPECT_COLUMNS}
             rows={prospects}
             getId={(row) => row.key}
-            getHref={(row) => `/pipeline/prospecting/${encodeURIComponent(row.key)}`}
+            getHref={(row) => routes.prospect(encodeURIComponent(row.key))}
             getLabel={(row) => row.brand}
             sort={sort}
             onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -827,7 +828,7 @@ export default function ProspectingPage() {
                 ? {
                     label: "Open lead",
                     icon: TargetIcon,
-                    onSelect: () => router.push(`/pipeline/leads/${row.lead!._id}`),
+                    onSelect: () => router.push(routes.lead(row.lead!._id)),
                   }
                 : {
                     label: "Create lead",
@@ -891,7 +892,7 @@ export default function ProspectingPage() {
               getId={(row) => row._id}
               getHref={(row) =>
                 row.brandKey
-                  ? `/pipeline/prospecting/${encodeURIComponent(row.brandKey)}`
+                  ? routes.prospect(encodeURIComponent(row.brandKey))
                   : row.url
               }
               getLabel={(row) => row.title ?? row.identifier}

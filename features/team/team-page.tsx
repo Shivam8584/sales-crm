@@ -22,6 +22,7 @@ import InvitesSection from "./invites-section";
 import MemberDialog from "./member-dialog";
 import MembersTable from "./members-table";
 import type { TeamMember } from "./use-member-actions";
+import { routes } from "@/lib/routes";
 
 const ANY = "any";
 const DEFAULT_SORT: SortState = { id: "name", dir: "asc" };
@@ -200,7 +201,7 @@ export default function TeamPage() {
               memberHref={(member) => {
                 const query = new URLSearchParams(params);
                 query.set("member", member._id);
-                return `/settings/team?${query}`;
+                return `${routes.team}?${query}`;
               }}
               footer={footer}
               empty={

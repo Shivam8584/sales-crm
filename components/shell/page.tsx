@@ -43,7 +43,6 @@ import ActiveDot from "@/public/assets/icons/active-dot.svg";
 import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
 import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
 import FilterIcon from "@/public/assets/icons/filter.svg";
-import MenuIcon from "@/public/assets/icons/menu.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
 import ShareIcon from "@/public/assets/icons/share.svg";
@@ -72,15 +71,13 @@ export function Page({
 type Crumb = { label: string; href?: string };
 
 type PageHeaderProps = {
-  /** Trail before the current page, e.g. `[{ label: "Accounts", href: "/records/accounts" }]`. */
+  /** Trail before the current page, e.g. `[{ label: "Accounts", href: routes.accounts }]`. */
   crumbs?: Crumb[];
   title: ReactNode;
   /** Next to the title: a `PageStatus`, a count or a short note. */
   meta?: ReactNode;
   /** Page actions, placed before the search, notifications and account buttons. */
   actions?: ReactNode;
-  /** Hide the mobile navigation button, e.g. outside the app shell. */
-  navToggle?: boolean;
   /** Search, notifications and the account menu; they need a signed-in member. */
   globalActions?: boolean;
 };
@@ -95,7 +92,6 @@ export function PageHeader({
   title,
   meta,
   actions,
-  navToggle = true,
   globalActions = true,
 }: PageHeaderProps) {
   const parent = [...crumbs].reverse().find((crumb) => crumb.href);
@@ -104,7 +100,6 @@ export function PageHeader({
       data-slot="page-header"
       className="border-border short:h-12 flex h-14.5 shrink-0 items-center gap-2 border-b px-4 [&:has(+[data-slot=page-toolbar])]:border-b-0 [&:has(+[data-slot=page-views])]:border-b-0"
     >
-      {navToggle && <MobileNavButton />}
       {parent?.href && (
         <Link
           href={parent.href}
@@ -190,21 +185,6 @@ function SearchButton() {
         <SearchIcon aria-hidden className="size-3.5" />
       </Button>
     </Tooltip>
-  );
-}
-
-function MobileNavButton() {
-  const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
-  return (
-    <Button
-      variant="secondary"
-      size="icon"
-      className="lg:hidden"
-      aria-label="Open navigation"
-      onClick={() => setSidebarOpen(true)}
-    >
-      <MenuIcon aria-hidden className="size-3.5" />
-    </Button>
   );
 }
 

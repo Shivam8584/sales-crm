@@ -11,7 +11,7 @@ import { formatPhone } from "@/lib/domain/normalize";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import BuildingIcon from "@/public/assets/icons/building-sm.svg";
-import MailIcon from "@/public/assets/icons/mail-04.svg";
+import MailIcon from "@/public/assets/icons/mail-03.svg";
 import PhoneIcon from "@/public/assets/icons/phone.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import LeadContactButtons from "./lead-contact";
@@ -26,6 +26,7 @@ import {
 } from "./lead-fields";
 import { compactSpan } from "./lead-meta";
 import { countdown, isSlaOpen, slaMeter, slaState, useNow } from "./sla";
+import { routes } from "@/lib/routes";
 
 type SectionProps = { className?: string; divider?: boolean };
 
@@ -377,7 +378,7 @@ export function LeadConversion({
             <ConvertRow
               icon={BuildingIcon}
               name={lead.account.name}
-              href={`/records/accounts/${lead.account._id}`}
+              href={routes.account(lead.account._id)}
               existing={null}
               onNavigate={onNavigate}
             />
@@ -386,7 +387,7 @@ export function LeadConversion({
             <ConvertRow
               icon={UsersIcon}
               name={lead.person.name}
-              href={`/records/people/${lead.person._id}`}
+              href={routes.person(lead.person._id)}
               existing={null}
               onNavigate={onNavigate}
             />
@@ -406,14 +407,14 @@ export function LeadConversion({
         <ConvertRow
           icon={BuildingIcon}
           name={account?.name ?? lead.companyName}
-          href={account ? `/records/accounts/${account._id}` : undefined}
+          href={account ? routes.account(account._id) : undefined}
           existing={Boolean(account)}
           onNavigate={onNavigate}
         />
         <ConvertRow
           icon={UsersIcon}
           name={person?.name ?? lead.name}
-          href={person ? `/records/people/${person._id}` : undefined}
+          href={person ? routes.person(person._id) : undefined}
           existing={Boolean(person)}
           onNavigate={onNavigate}
         />

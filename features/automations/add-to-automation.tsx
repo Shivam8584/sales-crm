@@ -17,6 +17,7 @@ import { readError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import AutomationIcon from "@/public/assets/icons/automation.svg";
+import { routes } from "@/lib/routes";
 
 type EnrolResult = FunctionReturnType<typeof api.automations.enrolMany>;
 
@@ -147,7 +148,7 @@ export default function AddToAutomation({
                   No active sequence runs on {noun[1]}
                 </span>
                 <Link
-                  href="/automation/sequences"
+                  href={routes.sequences}
                   className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
                   onClick={() => setOpen(false)}
                 >

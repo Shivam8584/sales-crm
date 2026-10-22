@@ -23,6 +23,7 @@ import {
   type ThemePreference,
 } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 import { useUiStore } from "@/stores/ui-store";
 import SunIcon from "@/public/assets/icons/sun.svg";
 import MoonIcon from "@/public/assets/icons/moon.svg";
@@ -98,14 +99,14 @@ export default function UserMenu() {
         <div className="flex flex-col gap-0.5 p-2">
           <DropdownMenuItem
             className={cn(ITEM, "group/item")}
-            onSelect={() => router.push("/settings/profile")}
+            onSelect={() => router.push(routes.profile)}
           >
             <MenuIcon icon={SettingsIcon} />
             <span className="flex-1">Profile settings</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             className={cn(ITEM, "group/item")}
-            onSelect={() => router.push("/settings/team")}
+            onSelect={() => router.push(routes.team)}
           >
             <MenuIcon icon={UsersIcon} />
             <span className="flex-1">Team</span>

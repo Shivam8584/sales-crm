@@ -23,13 +23,11 @@ export type CreateDialog =
 export type EditDialog = { type: "deal" | "task"; id: string } | null;
 
 type UiState = {
-  sidebarOpen: boolean;
   commandOpen: boolean;
   shortcutsOpen: boolean;
   peek: Peek;
   create: CreateDialog;
   edit: EditDialog;
-  setSidebarOpen: (open: boolean) => void;
   setCommandOpen: (open: boolean) => void;
   setShortcutsOpen: (open: boolean) => void;
   setPeek: (peek: Peek) => void;
@@ -39,13 +37,11 @@ type UiState = {
 
 /** Client-only UI state. Server data never lives here; read it with Convex hooks. */
 export const useUiStore = create<UiState>((set) => ({
-  sidebarOpen: false,
   commandOpen: false,
   shortcutsOpen: false,
   peek: null,
   create: null,
   edit: null,
-  setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setCommandOpen: (commandOpen) => set({ commandOpen }),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   setPeek: (peek) => set({ peek }),

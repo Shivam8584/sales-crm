@@ -28,6 +28,7 @@ import { simulateAccount, type Scenario } from "./platform";
 import { accountCounts, leadCounts, peopleCounts } from "./lib/counts";
 import { internalMutation } from "./lib/functions";
 import { insertStarter } from "./lib/playbookStarter";
+import { routes } from "../lib/routes";
 
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -700,7 +701,7 @@ async function seedWorkspace(ctx: MutationCtx) {
       kind: "proposal_approval",
       title: "Pricing on Nykaa launch pilot needs approval",
       body: "Blended margin is under 15%.",
-      href: `/pipeline/deals/${kesar}?tab=proposal`,
+      href: routes.deal(kesar, "proposal"),
     });
   }
 
@@ -796,7 +797,7 @@ async function seedWorkspace(ctx: MutationCtx) {
       kind: "lead_assigned",
       title: `${admin.name} assigned you Rahul Jain`,
       body: "Ayurveda Co · linkedin / social",
-      href: "/pipeline/leads",
+      href: routes.leads,
     });
   }
   await newBrandSignsUp(ctx, now);

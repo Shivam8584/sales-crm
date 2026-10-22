@@ -65,6 +65,7 @@ import {
   isOpenStage,
 } from "./stage";
 import { positionBefore, useMoveDeal, type DealRow } from "./use-deal-actions";
+import { routes } from "@/lib/routes";
 
 const ZERO = formatMoney({ amount: 0, currency: DEFAULT_CURRENCY });
 const ALL = "all";
@@ -279,7 +280,7 @@ export default function DealsPage() {
   }
 
   const openPage = useCallback(
-    (id: string) => router.push(`/pipeline/deals/${id}`),
+    (id: string) => router.push(routes.deal(id)),
     [router],
   );
   const peek = useCallback(
@@ -717,7 +718,7 @@ function DealsList({
       columns={columns}
       rows={rows}
       getId={(row) => row._id}
-      getHref={(row) => `/pipeline/deals/${row._id}`}
+      getHref={(row) => routes.deal(row._id)}
       getLabel={(row) =>
         `${row.title}${row.account ? `, ${row.account.name}` : ""}`
       }

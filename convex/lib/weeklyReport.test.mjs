@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { routes } from "../../lib/routes.ts";
 import { weeklyReport } from "./weeklyReport.ts";
 
 const IST_DAY = 24 * 60 * 60_000;
@@ -38,8 +39,8 @@ const data = {
   stuck: 3,
   overdue: 7,
   live: { current: 2, previous: 1 },
-  reportsUrl: "https://crm.example/reports",
-  activityUrl: "https://crm.example/activity",
+  reportsUrl: `https://crm.example${routes.reports}`,
+  activityUrl: `https://crm.example${routes.activity}`,
 };
 
 test("compares each figure with the week before", () => {

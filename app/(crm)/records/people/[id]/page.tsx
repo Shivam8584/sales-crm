@@ -1,6 +1,8 @@
 import type { Id } from "@/convex/_generated/dataModel";
 import PersonPage from "@/features/people/person-page";
 
+export const metadata = { title: "Person" };
+
 export default async function Page({
   params,
 }: {

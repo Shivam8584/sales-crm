@@ -20,6 +20,7 @@ import {
   SettingsSkeleton,
   type Health,
 } from "./settings-ui";
+import { routes } from "@/lib/routes";
 
 type Overview = FunctionReturnType<typeof api.account360.syncOverview>;
 type Issue = Overview["failures"][number];
@@ -165,7 +166,7 @@ function IssueRow({ issue }: { issue: Issue }) {
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span className="flex min-w-0 items-center gap-2">
           <Link
-            href={`/records/accounts/${issue.accountId}?tab=platform`}
+            href={`${routes.account(issue.accountId)}?tab=platform`}
             className="lead-style focus-visible:ring-ring truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
           >
             {issue.name}

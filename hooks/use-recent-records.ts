@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { parseRecordPath } from "@/lib/routes";
 
 export type RecentRecord = {
   type: "account" | "person" | "lead" | "deal";
@@ -10,12 +11,12 @@ export type RecentRecord = {
 const KEY = "recent-records";
 const LIMIT = 8;
 const EMPTY: RecentRecord[] = [];
-const TYPES: Record<string, RecentRecord["type"]> = {
+const TYPES = {
   accounts: "account",
   people: "person",
   leads: "lead",
   deals: "deal",
-};
+} as const;
 const listeners = new Set<() => void>();
 let cached: { raw: string | null; list: RecentRecord[] } = {
   raw: null,
@@ -45,8 +46,8 @@ function subscribe(listener: () => void) {
 
 /** The record a path like `/records/accounts/<id>` shows, if any. */
 export function recordAt(pathname: string): RecentRecord | null {
-  const match = /^\/(accounts|people|leads|deals)\/([^/]+)$/.exec(pathname);
-  return match ? { type: TYPES[match[1]], id: match[2] } : null;
+  const record = parseRecordPath(pathname);
+  return record ? { type: TYPES[record.type], id: record.id } : null;
 }
 
 export function rememberRecord(record: RecentRecord) {

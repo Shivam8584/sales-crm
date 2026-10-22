@@ -17,6 +17,7 @@ import HealthView from "./health-view";
 import RunChecksButton from "./run-checks-button";
 import StuckView from "./stuck-view";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
+import { routes } from "@/lib/routes";
 
 const VIEWS = ["stuck", "health", "expansion"] as const;
 type View = (typeof VIEWS)[number];
@@ -33,7 +34,7 @@ export default function ActivationPage() {
           title="Your stuck brands are on Today"
           description="The activation desk is for managers. Brands you own that stall on Hypedrive show up on Today, with the task to move them on."
           action={
-            <Button variant="secondary" size="sm" href="/today">
+            <Button variant="secondary" size="sm" href={routes.today}>
               Open Today
             </Button>
           }

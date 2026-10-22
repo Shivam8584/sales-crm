@@ -18,6 +18,7 @@ import { toast } from "@/stores/toast-store";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import AddToAutomation from "./add-to-automation";
 import { RunStatus } from "./automation-runs";
+import { routes } from "@/lib/routes";
 
 export type AutomationTarget =
   | { accountId: Id<"accounts"> }
@@ -115,7 +116,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
               : ` No active sequence runs on ${SUBJECT_LABEL[subject.kind][1]} yet.`}
           </span>
           {data.available.length === 0 && (
-            <Button variant="secondary" size="xs" href="/automation/sequences">
+            <Button variant="secondary" size="xs" href={routes.sequences}>
               Open sequences
             </Button>
           )}
@@ -142,7 +143,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <Link
-                      href={`/automation/sequences/${item.automationId}`}
+                      href={routes.sequence(item.automationId)}
                       className="hover:text-foreground focus-visible:ring-ring truncate rounded-sm text-sm font-medium outline-none hover:underline focus-visible:ring-2"
                     >
                       {item.automation}

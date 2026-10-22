@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { horizontalOverflow, open, session } from "./helpers";
+import { routes } from "../../lib/routes";
 
 let page: Page;
 test.beforeAll(async ({ browser }) => {
@@ -12,13 +13,13 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(() => page.context().close());
 
 for (const route of [
-  "/records/accounts",
-  "/records/people",
-  "/pipeline/leads",
-  "/pipeline/deals",
-  "/tasks",
-  "/pipeline/prospecting",
-  "/automation/sequences",
+  routes.accounts,
+  routes.people,
+  routes.leads,
+  routes.deals,
+  routes.tasks,
+  routes.prospecting,
+  routes.sequences,
 ]) {
   test(`${route} keeps its filters in one sheet at 390px`, async () => {
     await open(page, route);
@@ -37,14 +38,10 @@ for (const route of [
   });
 }
 
-test("the drawer opens from the header and closes after navigating", async () => {
-  await open(page, "/today");
-  await page.getByRole("button", { name: "Open navigation" }).click();
-  const link = page.getByRole("link", { name: /Leads/ }).first();
-  await expect(link).toBeVisible();
-  await link.click();
-  await expect(page).toHaveURL(/\/pipeline\/leads/);
-  await expect(
-    page.getByRole("link", { name: /Playbook/ }).filter({ visible: true }),
-  ).toHaveCount(0);
+test("the tab bar reaches every section through More", async () => {
+  await open(page, routes.today);
+  await page.getByRole("button", { name: "More" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("link", { name: /Playbook/ }).click();
+  await expect(page).toHaveURL(new RegExp(routes.playbook));
 });

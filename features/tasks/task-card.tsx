@@ -12,6 +12,7 @@ import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import TaskChips, { CardSafe } from "./task-chips";
 import { StatusIcon, type TaskRow } from "./task-meta";
 import { useTaskActions } from "./use-task-actions";
+import { routes } from "@/lib/routes";
 
 export const TASK_CARD_FIELDS = [
   { id: "priority", label: "Priority" },
@@ -29,7 +30,7 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
   const { person, account, deal, lead } = task;
   if (person && hide !== "person") {
     return {
-      href: `/records/people/${person._id}`,
+      href: routes.person(person._id),
       label: person.name,
       icon: <Avatar name={person.name} size="xs" />,
       context: !hide && account ? account.name : null,
@@ -37,7 +38,7 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
   }
   if (account && !hide) {
     return {
-      href: `/records/accounts/${account._id}`,
+      href: routes.account(account._id),
       label: account.name,
       icon: <AccountLogo account={account} size="xs" className="size-4" />,
       context: null,
@@ -45,7 +46,7 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
   }
   if (deal && hide !== "deal") {
     return {
-      href: `/pipeline/deals/${deal._id}`,
+      href: routes.deal(deal._id),
       label: deal.title,
       icon: <TargetIcon aria-hidden className="text-fg-tertiary size-3.5" />,
       context: null,
@@ -53,7 +54,7 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
   }
   if (lead && hide !== "lead") {
     return {
-      href: `/pipeline/leads/${lead._id}`,
+      href: routes.lead(lead._id),
       label: lead.name,
       icon: <UserPlusIcon aria-hidden className="text-fg-tertiary size-3.5" />,
       context: null,

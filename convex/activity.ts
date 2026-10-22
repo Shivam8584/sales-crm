@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { bodyText } from "../lib/domain/mentions";
+import { recordPath } from "../lib/routes";
 import { memberQuery } from "./lib/functions";
 import { memberIndex, memberRef } from "./lib/records";
 import { literals } from "./lib/validators";
@@ -148,7 +149,7 @@ export const feed = memberQuery({
                   type,
                   id,
                   name: nameOf(type, doc) || "Unnamed",
-                  href: `/${type}/${id}`,
+                  href: recordPath(type, id),
                   archived: "archivedAt" in doc && doc.archivedAt !== undefined,
                 }
               : null,

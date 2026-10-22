@@ -9,6 +9,7 @@ import UserIcon from "@/public/assets/icons/kanban/user-03.svg";
 import { formatDay } from "./format";
 import { DEAL_STAGE_BADGE, isOpenStage } from "./stage";
 import type { DealRow } from "./use-deal-actions";
+import { routes } from "@/lib/routes";
 
 const CHIP =
   "text-fg-secondary shadow-hairline inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] leading-none whitespace-nowrap";
@@ -54,7 +55,7 @@ export default function DealCard({
             <>
               {deal.account ? (
                 <Link
-                  href={`/records/accounts/${deal.account._id}`}
+                  href={routes.account(deal.account._id)}
                   onClick={(event) => event.stopPropagation()}
                   onKeyDown={(event) => event.stopPropagation()}
                   className="hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex min-w-0 items-center gap-1.5 rounded-sm px-1 transition-colors outline-none focus-visible:ring-2"

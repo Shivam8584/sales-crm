@@ -29,6 +29,7 @@ import {
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
+import { routes } from "@/lib/routes";
 
 type FieldName =
   | "name"
@@ -133,7 +134,7 @@ export default function CreateLeadDialog() {
       });
       setCreate(null);
       toast(`${values.name.trim()} added to leads`);
-      router.push(`/pipeline/leads/${id}`);
+      router.push(routes.lead(id));
     } catch (error) {
       const { message, field } = readError(error, "Couldn't add the lead");
       setErrors({

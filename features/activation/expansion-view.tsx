@@ -19,6 +19,7 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { useUiStore } from "@/stores/ui-store";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import type { HealthRow } from "./health-view";
+import { routes } from "@/lib/routes";
 
 const ALL = "all";
 const MINE = "mine";
@@ -213,7 +214,7 @@ export default function ExpansionView({
           columns={COLUMNS}
           rows={visible}
           getId={(row) => row._id}
-          getHref={(row) => `/records/accounts/${row._id}`}
+          getHref={(row) => routes.account(row._id)}
           getLabel={(row) => row.account.name}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -261,7 +262,7 @@ export default function ExpansionView({
                 <Button
                   variant="secondary"
                   size="sm"
-                  href="/pipeline/activation?view=health"
+                  href={`${routes.activation}?view=health`}
                 >
                   View health
                 </Button>

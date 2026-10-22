@@ -27,6 +27,7 @@ import TimelineComposer from "./timeline-composer";
 import EntryBody from "./entry-body";
 import MentionTextarea, { useMentionDraft } from "./mention-textarea";
 import { useTimelineEntries, type TimelineEntry } from "./use-timeline-entries";
+import { routes } from "@/lib/routes";
 
 type Entry = TimelineEntry;
 
@@ -525,7 +526,7 @@ function LoggedItem({
                 {" "}
                 with{" "}
                 <Link
-                  href={`/records/people/${entry.person._id}`}
+                  href={routes.person(entry.person._id)}
                   className="text-foreground hover:underline"
                 >
                   {entry.person.name}
@@ -537,7 +538,7 @@ function LoggedItem({
                 {" "}
                 on{" "}
                 <Link
-                  href={`/pipeline/deals/${entry.deal._id}`}
+                  href={routes.deal(entry.deal._id)}
                   className="text-foreground hover:underline"
                 >
                   {entry.deal.title}

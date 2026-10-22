@@ -1,6 +1,8 @@
 import type { Id } from "@/convex/_generated/dataModel";
 import LeadPage from "@/features/leads/lead-page";
 
+export const metadata = { title: "Lead" };
+
 export default async function Page({
   params,
 }: {

@@ -25,6 +25,7 @@ import {
   type TriggerKind,
 } from "@/lib/domain/automations";
 import { readError } from "@/lib/errors";
+import { routes } from "@/lib/routes";
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -60,7 +61,7 @@ export default function NewAutomationDialog({
         triggerKind: trigger,
       });
       onOpenChange(false);
-      router.push(`/automation/sequences/${id}`);
+      router.push(routes.sequence(id));
     } catch (caught) {
       setError(readError(caught));
     } finally {

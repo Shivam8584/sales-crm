@@ -34,6 +34,7 @@ import {
 } from "./lead-sections";
 import LeadStatusMenu from "./lead-status-menu";
 import { useLeadActions } from "./use-lead-actions";
+import { routes } from "@/lib/routes";
 
 /** Quick look at a lead from the list: triage, contact and convert without leaving it. */
 export default function LeadPeek({
@@ -60,7 +61,7 @@ export default function LeadPeek({
             <Button
               variant="ghost"
               size="xs"
-              href={`/pipeline/leads/${lead._id}`}
+              href={routes.lead(lead._id)}
               onClick={onClose}
             >
               Open page
@@ -120,7 +121,7 @@ function PeekBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             <Button
               variant="primary"
               size="sm"
-              href={`/records/accounts/${lead.account._id}`}
+              href={routes.account(lead.account._id)}
               onClick={onClose}
               className="ml-auto max-w-full min-w-0"
             >

@@ -1,28 +1,29 @@
 import { expect, test, type Page } from "@playwright/test";
 import { horizontalOverflow, open, session, watchErrors } from "./helpers";
+import { routes } from "../../lib/routes";
 
 const ROUTES = [
-  "/today",
-  "/inbox",
-  "/tasks",
-  "/pipeline/prospecting",
-  "/pipeline/leads",
-  "/pipeline/deals",
-  "/pipeline/activation",
-  "/automation/sequences",
-  "/records/accounts",
-  "/records/people",
-  "/insights/activity",
-  "/insights/reports",
-  "/insights/playbook",
-  "/settings/profile",
-  "/settings/workspace",
-  "/settings/team",
-  "/settings/integrations",
-  "/settings/fields",
-  "/settings/duplicates",
-  "/settings/targets",
-  "/settings/system",
+  routes.today,
+  routes.inbox,
+  routes.tasks,
+  routes.prospecting,
+  routes.leads,
+  routes.deals,
+  routes.activation,
+  routes.sequences,
+  routes.accounts,
+  routes.people,
+  routes.activity,
+  routes.reports,
+  routes.playbook,
+  routes.profile,
+  routes.workspace,
+  routes.team,
+  routes.integrations,
+  routes.fields,
+  routes.duplicates,
+  routes.targets,
+  routes.system,
 ];
 
 const SIZES = [
@@ -32,7 +33,7 @@ const SIZES = [
 
 // The feed is ordered by creation time but grouped by occurrence day, so backdated seed rows can repeat a day group and React warns about its key.
 const tolerated = (route: string, error: string) =>
-  route === "/insights/activity" && error.includes("two children with the same key");
+  route === routes.activity && error.includes("two children with the same key");
 
 let page: Page;
 let errors: string[];

@@ -61,6 +61,7 @@ import UsersIcon from "@/public/assets/icons/users.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
+import { routes } from "@/lib/routes";
 
 type PersonRow = FunctionReturnType<typeof api.people.page>["page"][number];
 
@@ -115,7 +116,7 @@ const COLUMNS: Column<PersonRow>[] = [
     cell: (row) =>
       row.account ? (
         <Link
-          href={`/records/accounts/${row.account._id}`}
+          href={routes.account(row.account._id)}
           className="hover:bg-overlay-2 focus-visible:ring-ring -mx-1.5 flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 outline-none focus-visible:ring-2"
         >
           <AccountLogo account={row.account} size="xs" />
@@ -486,7 +487,7 @@ export default function PeoplePage() {
           columns={columns}
           rows={rows}
           getId={(row) => row._id}
-          getHref={(row) => `/records/people/${row._id}`}
+          getHref={(row) => routes.person(row._id)}
           getLabel={(row) => personName(row)}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}

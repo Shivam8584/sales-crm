@@ -1,6 +1,8 @@
 import type { Id } from "@/convex/_generated/dataModel";
 import DealPage from "@/features/deals/deal-page";
 
+export const metadata = { title: "Deal" };
+
 export default async function Page({
   params,
 }: {

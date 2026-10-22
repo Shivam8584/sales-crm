@@ -1,5 +1,6 @@
 import type { ComponentType, SVGProps } from "react";
 import { ROLE_RANK, type Role } from "@/lib/domain/enums";
+import { routes } from "@/lib/routes";
 import ActivityIcon from "@/public/assets/icons/activity.svg";
 import InboxIcon from "@/public/assets/icons/inbox.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
@@ -15,6 +16,14 @@ import AutomationIcon from "@/public/assets/icons/automation.svg";
 import EyeIcon from "@/public/assets/icons/eye.svg";
 import MessageQuestionIcon from "@/public/assets/icons/message-question.svg";
 
+export type NavCount = {
+  key: "accounts" | "leads" | "tasks" | "inbox";
+  /** Read after the number by screen readers. */
+  label: string;
+  /** Also flagged as a dot when the sidebar is collapsed. */
+  alert: boolean;
+};
+
 export type NavItem = {
   href: string;
   label: string;
@@ -23,39 +32,83 @@ export type NavItem = {
   shortcut: string;
   /** Hidden from roles below this one. */
   minRole?: Role;
+  /** Pinned to the phone tab bar; every other item sits behind "More". */
+  tab?: boolean;
+  count?: NavCount;
+  /** `data-tour` target for the product tour. */
+  tour?: string;
 };
 
-export type NavSection = { title?: string; items: NavItem[] };
+export type NavSection = { title: string; items: NavItem[] };
 
-/** Sidebar order: personal work, then pipeline, then records, then insight. */
 export const NAV_SECTIONS: NavSection[] = [
   {
+    title: "Work",
     items: [
-      { href: "/today", label: "Today", icon: ActivityIcon, shortcut: "T" },
-      { href: "/inbox", label: "Inbox", icon: InboxIcon, shortcut: "I" },
-      { href: "/tasks", label: "Tasks", icon: CheckSquareIcon, shortcut: "K" },
+      {
+        href: routes.today,
+        label: "Today",
+        icon: ActivityIcon,
+        shortcut: "T",
+        tab: true,
+        tour: "today",
+      },
+      {
+        href: routes.inbox,
+        label: "Inbox",
+        icon: InboxIcon,
+        shortcut: "I",
+        tab: true,
+        count: { key: "inbox", label: "unread", alert: true },
+        tour: "inbox",
+      },
+      {
+        href: routes.tasks,
+        label: "Tasks",
+        icon: CheckSquareIcon,
+        shortcut: "K",
+        tab: true,
+        count: { key: "tasks", label: "overdue", alert: true },
+      },
     ],
   },
   {
     title: "Pipeline",
     items: [
       {
-        href: "/pipeline/prospecting",
+        href: routes.prospecting,
         label: "Prospecting",
         icon: EyeIcon,
         shortcut: "O",
       },
-      { href: "/pipeline/leads", label: "Leads", icon: TargetIcon, shortcut: "L" },
-      { href: "/pipeline/deals", label: "Deals", icon: ClipboardIcon, shortcut: "D" },
       {
-        href: "/pipeline/activation",
+        href: routes.leads,
+        label: "Leads",
+        icon: TargetIcon,
+        shortcut: "L",
+        tab: true,
+        count: { key: "leads", label: "new", alert: true },
+      },
+      {
+        href: routes.deals,
+        label: "Deals",
+        icon: ClipboardIcon,
+        shortcut: "D",
+      },
+      {
+        href: routes.activation,
         label: "Activation",
         icon: AlertTriangleIcon,
         shortcut: "V",
         minRole: "manager",
       },
+    ],
+  },
+  {
+    title: "Automation",
+    items: [
       {
-        href: "/automation/sequences",
+        href: routes.sequences,
         label: "Sequences",
         icon: AutomationIcon,
         shortcut: "U",
@@ -66,21 +119,37 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Records",
     items: [
       {
-        href: "/records/accounts",
+        href: routes.accounts,
         label: "Accounts",
         icon: BuildingIcon,
         shortcut: "A",
+        count: { key: "accounts", label: "accounts", alert: false },
       },
-      { href: "/records/people", label: "People", icon: UsersIcon, shortcut: "P" },
+      {
+        href: routes.people,
+        label: "People",
+        icon: UsersIcon,
+        shortcut: "P",
+      },
     ],
   },
   {
     title: "Insights",
     items: [
-      { href: "/insights/reports", label: "Reports", icon: BarChartIcon, shortcut: "R" },
-      { href: "/insights/activity", label: "Activity", icon: ClockIcon, shortcut: "Y" },
       {
-        href: "/insights/playbook",
+        href: routes.reports,
+        label: "Reports",
+        icon: BarChartIcon,
+        shortcut: "R",
+      },
+      {
+        href: routes.activity,
+        label: "Activity",
+        icon: ClockIcon,
+        shortcut: "Y",
+      },
+      {
+        href: routes.playbook,
         label: "Playbook",
         icon: MessageQuestionIcon,
         shortcut: "B",
@@ -90,7 +159,7 @@ export const NAV_SECTIONS: NavSection[] = [
 ];
 
 export const SETTINGS_ITEM: NavItem = {
-  href: "/settings",
+  href: routes.settings,
   label: "Settings",
   icon: SettingsIcon,
   shortcut: "S",
@@ -116,19 +185,19 @@ export function navItems(role: Role): NavItem[] {
 }
 
 export const SETTINGS_PAGES = [
-  { href: "/settings/profile", label: "Profile", adminOnly: false },
-  { href: "/settings/team", label: "Team", adminOnly: false },
-  { href: "/settings/workspace", label: "Workspace", adminOnly: true },
-  { href: "/settings/fields", label: "Custom fields", adminOnly: true },
-  { href: "/settings/targets", label: "Targets", adminOnly: true },
+  { href: routes.profile, label: "Profile", adminOnly: false },
+  { href: routes.team, label: "Team", adminOnly: false },
+  { href: routes.workspace, label: "Workspace", adminOnly: true },
+  { href: routes.fields, label: "Custom fields", adminOnly: true },
+  { href: routes.targets, label: "Targets", adminOnly: true },
   {
-    href: "/settings/duplicates",
+    href: routes.duplicates,
     label: "Duplicates",
     adminOnly: false,
     minRole: "manager",
   },
-  { href: "/settings/integrations", label: "Integrations", adminOnly: true },
-  { href: "/settings/system", label: "System", adminOnly: true },
+  { href: routes.integrations, label: "Integrations", adminOnly: true },
+  { href: routes.system, label: "System", adminOnly: true },
 ] as const;
 
 export function canOpenSetting(

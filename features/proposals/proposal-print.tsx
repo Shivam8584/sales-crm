@@ -27,6 +27,7 @@ import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import { Amount, formatAmount } from "./amount";
 import { brandParts, productNote } from "./brand-view";
 import { ProposalStatusTag } from "./status";
+import { routes } from "@/lib/routes";
 
 const PAGE_CSS = `@page { size: A4; margin: 14mm; }`;
 
@@ -60,7 +61,7 @@ function PrintView({ id }: { id: string }) {
           title="This proposal doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/pipeline/deals">
+            <Button variant="secondary" size="sm" href={routes.deals}>
               Back to deals
             </Button>
           }
@@ -70,8 +71,8 @@ function PrintView({ id }: { id: string }) {
   }
 
   const backHref = proposal?.deal
-    ? `/pipeline/deals/${proposal.deal._id}?tab=proposal`
-    : "/pipeline/deals";
+    ? routes.deal(proposal.deal._id, "proposal")
+    : routes.deals;
 
   return (
     <main className="bg-background min-h-dvh print:bg-transparent">

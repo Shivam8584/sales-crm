@@ -26,6 +26,7 @@ import {
   ReportSection,
 } from "./section";
 import { useLatest } from "./use-report";
+import { routes } from "@/lib/routes";
 
 type Data = FunctionReturnType<typeof api.forecast.report>;
 type Forecast = Data["currencies"][number];
@@ -154,7 +155,7 @@ export default function ForecastTab({
   const currency = selected?.currency ?? DEFAULT_CURRENCY;
   const money = (value: number) =>
     formatMoney({ amount: value, currency }, { compact: true });
-  const inDeals = `/pipeline/deals?view=list&closed=hide${ownerParam === "all" ? "" : `&owner=${ownerParam}`}`;
+  const inDeals = `${routes.deals}?view=list&closed=hide${ownerParam === "all" ? "" : `&owner=${ownerParam}`}`;
 
   const goal = currency === DEFAULT_CURRENCY ? (data?.target ?? null) : null;
   const slipped =
@@ -199,7 +200,7 @@ export default function ForecastTab({
               title="No open deals"
               description="Open deals with an amount and a close date make up the forecast. Create a deal from an account to start one."
               action={
-                <Button variant="secondary" size="sm" href="/pipeline/deals">
+                <Button variant="secondary" size="sm" href={routes.deals}>
                   Open deals
                 </Button>
               }
@@ -307,7 +308,7 @@ export default function ForecastTab({
               columns={slippedColumns()}
               rows={slipped}
               getId={(row) => row._id}
-              getHref={(row) => `/pipeline/deals/${row._id}`}
+              getHref={(row) => routes.deal(row._id)}
               getLabel={(row) => `Open ${row.title}`}
               sort={{ id: "late", dir: "desc" }}
               onSortChange={() => {}}

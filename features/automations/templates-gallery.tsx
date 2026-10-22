@@ -11,6 +11,7 @@ import Skeleton from "@/components/_ui/skeleton";
 import { LANGUAGE_LABEL, type Language } from "@/lib/domain/automations";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
+import { routes } from "@/lib/routes";
 
 type Template = FunctionReturnType<
   typeof api.automations.catalog
@@ -46,7 +47,7 @@ export default function TemplatesGallery({
     setCreating(template.key);
     try {
       const id = await createFromTemplate({ key: template.key, language });
-      router.push(`/automation/sequences/${id}`);
+      router.push(routes.sequence(id));
       toast(`Created “${template.name}” as a draft`);
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });

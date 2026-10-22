@@ -7,7 +7,7 @@ import Tooltip from "@/components/_ui/tooltip";
 import { useDialer } from "@/features/calls/use-dialer";
 import { formatPhone } from "@/lib/domain/normalize";
 import { cn } from "@/lib/utils";
-import MailIcon from "@/public/assets/icons/mail-04.svg";
+import MailIcon from "@/public/assets/icons/mail-03.svg";
 import WhatsAppIcon from "@/public/assets/icons/whatsapp.svg";
 import PhoneIcon from "@/public/assets/icons/phone.svg";
 import { whatsappHref } from "./lead-meta";

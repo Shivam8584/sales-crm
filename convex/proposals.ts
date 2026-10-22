@@ -57,6 +57,7 @@ import { memberIndex, memberRef } from "./lib/records";
 import { pricingPolicy, storedPricingPolicy } from "./lib/settings";
 import { logChanges, logSystem } from "./lib/timeline";
 import { vCurrency, vDay, vMoney } from "./lib/validators";
+import { routes } from "../lib/routes";
 
 const MAX_KEY_LENGTH = 40;
 
@@ -488,7 +489,7 @@ export const requestApproval = memberMutation({
       kind: "proposal_approval",
       title: `${ctx.viewer.name} needs approval on ${deal.title}`,
       body: `${reasons}. ${summaryLine(pricing)}`,
-      href: `/pipeline/deals/${deal._id}?tab=proposal`,
+      href: routes.deal(deal._id, "proposal"),
     });
   },
 });
@@ -542,7 +543,7 @@ export const decide = managerMutation({
         kind: "proposal_decision",
         title: `${ctx.viewer.name} ${verb} the pricing on ${deal.title}`,
         body: reason,
-        href: `/pipeline/deals/${deal._id}?tab=proposal`,
+        href: routes.deal(deal._id, "proposal"),
       });
     }
   },

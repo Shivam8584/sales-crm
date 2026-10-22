@@ -12,6 +12,7 @@ import { formatMoney } from "@/lib/domain/money";
 import { cn } from "@/lib/utils";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import { HEALTH_TONE, HealthRing } from "./health-badge";
+import { routes } from "@/lib/routes";
 
 type Linked = Extract<
   FunctionReturnType<typeof api.platform.forAccount>,
@@ -82,7 +83,7 @@ export default function PlatformHealthLine({
         )}
       </span>
       <Link
-        href={`/records/accounts/${accountId}?tab=platform`}
+        href={`${routes.account(accountId)}?tab=platform`}
         onClick={onNavigate}
         className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring ml-auto flex shrink-0 items-center gap-1 rounded-sm outline-none focus-visible:ring-2"
       >

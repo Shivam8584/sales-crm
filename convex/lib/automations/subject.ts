@@ -6,6 +6,7 @@ import {
   type ContactReason,
 } from "../../../lib/domain/consent";
 import type { Channel } from "../../../lib/domain/enums";
+import { routes } from "../../../lib/routes";
 import {
   DEAL_STAGE_LABEL,
   LEAD_KIND_LABEL,
@@ -52,11 +53,11 @@ export type Subject = {
   gone: string | null;
 };
 
-const HREF: Record<SubjectKind, string> = {
-  lead: "/pipeline/leads/",
-  person: "/records/people/",
-  account: "/records/accounts/",
-  deal: "/pipeline/deals/",
+const HREF: Record<SubjectKind, (id: string) => string> = {
+  lead: routes.lead,
+  person: routes.person,
+  account: routes.account,
+  deal: (id) => routes.deal(id),
 };
 
 async function get<T extends "leads" | "people" | "accounts" | "deals">(
@@ -85,7 +86,7 @@ export async function loadSubject(
     kind,
     id,
     key: subjectKey(kind, id),
-    href: `${HREF[kind]}${id}`,
+    href: HREF[kind](id),
     lead: null,
     person: null,
     account: null,

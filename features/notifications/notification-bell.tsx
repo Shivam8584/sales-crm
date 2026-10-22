@@ -23,6 +23,7 @@ import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import BellIcon from "@/public/assets/icons/bell.svg";
 import { isUrgentKind, KindIcon } from "./kinds";
 import { useNotificationActions } from "./use-notification-actions";
+import { routes } from "@/lib/routes";
 
 type Item = FunctionReturnType<typeof api.notifications.listMine>[number];
 const PREVIEW = 20;
@@ -147,7 +148,7 @@ export default function NotificationBell() {
           )}
         </div>
         <Link
-          href="/inbox"
+          href={routes.inbox}
           onClick={() => setOpen(false)}
           className="border-line-strong text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:bg-overlay-2 duration-fast caption-style flex h-10 shrink-0 items-center justify-center gap-1.5 border-t font-medium transition-colors outline-none"
         >

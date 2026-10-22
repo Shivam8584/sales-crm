@@ -33,6 +33,7 @@ import LostReasonDialog from "./lost-reason-dialog";
 import MoneyInput from "./money-input";
 import { DEAL_STAGE_OPTIONS, DealStageTag, isOpenStage } from "./stage";
 import { useRemoveDeal, type DealRow } from "./use-deal-actions";
+import { routes } from "@/lib/routes";
 
 export type DealPatch = {
   title?: string;
@@ -392,7 +393,7 @@ export function useDeleteDeal() {
   const remove = useRemoveDeal();
   return useCallback(
     (deal: { _id: Id<"deals">; title: string }, leave: boolean) => {
-      if (leave) router.push("/pipeline/deals");
+      if (leave) router.push(routes.deals);
       void remove(deal);
     },
     [remove, router],

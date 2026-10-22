@@ -10,6 +10,7 @@ import Button from "@/components/_ui/button";
 import AccountLogo from "@/features/accounts/account-logo";
 import { StageTag } from "@/features/accounts/stage";
 import { aiError } from "./use-ai";
+import { routes } from "@/lib/routes";
 
 type Found = FunctionReturnType<typeof api.ai.similarAccounts>;
 
@@ -57,7 +58,7 @@ export default function SimilarAccounts({
           {found.map((item) => (
             <li key={item.accountId}>
               <Link
-                href={`/records/accounts/${item.accountId}`}
+                href={routes.account(item.accountId)}
                 className="hover:bg-overlay-1 focus-visible:ring-ring -mx-1.5 flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 outline-none focus-visible:ring-2"
               >
                 <AccountLogo account={item} size="sm" />

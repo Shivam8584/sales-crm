@@ -37,6 +37,29 @@ export const routes = {
   system: `${SETTINGS}/system`,
 } as const;
 
+const RECORD_PATH = {
+  accounts: routes.account,
+  people: routes.person,
+  leads: routes.lead,
+  deals: (id: string) => routes.deal(id),
+};
+
+export type RecordPathType = keyof typeof RECORD_PATH;
+
+export function recordPath(type: RecordPathType, id: string) {
+  return RECORD_PATH[type](id);
+}
+
+/** The record a path like `/pipeline/deals/abc?tab=proposal` shows, if any. */
+export function parseRecordPath(path: string | undefined | null) {
+  const match = path?.match(
+    /^\/(?:records\/(accounts|people)|pipeline\/(leads|deals))\/([a-z0-9]+)(?=[/?#]|$)/,
+  );
+  return match
+    ? { type: (match[1] ?? match[2]) as RecordPathType, id: match[3] }
+    : null;
+}
+
 const LEGACY: Record<string, string> = {
   leads: routes.leads,
   deals: routes.deals,

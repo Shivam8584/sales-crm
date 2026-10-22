@@ -46,6 +46,21 @@ hooks/                 use-viewer, use-url-state, use-record-update, use-mobile-
 stores/                ui-store (dialogs, sidebar, command menu), toast-store
 ```
 
+## Routes
+
+`lib/routes.ts` is the only place that spells an in-app path; pages, emails, push and notifications build links from it, and `lib/routes-usage.test.mjs` fails on a raw path literal anywhere else.
+
+| Area       | Paths                                                                    |
+| ---------- | ------------------------------------------------------------------------ |
+| Work       | `/today`, `/inbox`, `/tasks`                                             |
+| Pipeline   | `/pipeline/{prospecting,leads,deals,activation}`, detail at `…/<id>`     |
+| Automation | `/automation/sequences`, `/automation/sequences/<id>`                    |
+| Records    | `/records/{accounts,people}`, detail at `…/<id>`                         |
+| Insights   | `/insights/{reports,activity,playbook}`                                  |
+| Settings   | `/settings/{profile,team,workspace,fields,targets,duplicates,integrations,system}` |
+
+There are no redirects from the old paths. `npx convex run migrations:runAll` rewrites stored notification links and saved-view paths to the new ones (run it once per deployment). The lead-capture webhook stays `POST /leads` on the Convex site URL; it is not a page.
+
 ## Local setup
 
 ```bash

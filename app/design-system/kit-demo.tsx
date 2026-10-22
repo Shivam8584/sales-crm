@@ -368,7 +368,6 @@ function KitDemoContent() {
         </h3>
         <div className="border-border flex h-[34rem] flex-col overflow-hidden rounded-xl border">
           <PageHeader
-            navToggle={false}
             globalActions={false}
             title="Accounts"
             meta={<PageStatus>{ROWS.length} active</PageStatus>}

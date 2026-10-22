@@ -23,8 +23,7 @@ import { formatMoney } from "@/lib/domain/money";
 import { formatPhone } from "@/lib/domain/normalize";
 import { useUiStore } from "@/stores/ui-store";
 import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
-import MailIcon from "@/public/assets/icons/mail-04.svg";
-import MailOpenIcon from "@/public/assets/icons/mail-03.svg";
+import MailIcon from "@/public/assets/icons/mail-03.svg";
 import NoteIcon from "@/public/assets/icons/note.svg";
 import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 import PhoneIcon from "@/public/assets/icons/phone.svg";
@@ -288,7 +287,7 @@ export function ActivityTrend({
             }
           />
           <div className="grid grid-cols-2 gap-2 @sm:grid-cols-4">
-            <StatTile icon={MailOpenIcon} label="Emails" value={data.emails} />
+            <StatTile icon={MailIcon} label="Emails" value={data.emails} />
             <StatTile
               icon={CalendarIcon}
               label="Meetings"

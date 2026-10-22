@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
 import { SITE_DESCRIPTION } from "@/lib/seo";
+import { routes } from "@/lib/routes";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Hypedrive Sales CRM",
     short_name: "Hypedrive CRM",
     description: SITE_DESCRIPTION,
-    start_url: "/today",
+    start_url: routes.today,
     scope: "/",
     display: "standalone",
     background_color: "#161616",

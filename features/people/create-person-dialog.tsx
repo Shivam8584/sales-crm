@@ -21,6 +21,7 @@ import AccountPicker from "@/features/accounts/account-picker";
 import { normalizeEmail, normalizePhone } from "@/lib/domain/normalize";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
+import { routes } from "@/lib/routes";
 
 type FieldName = "firstName" | "email" | "phone";
 type Errors = Partial<Record<FieldName | "form", string>>;
@@ -83,7 +84,7 @@ export default function CreatePersonDialog({
       });
       onOpenChange(false);
       toast(`${firstName.trim()} added`, undefined);
-      if (!accountId) router.push(`/records/people/${id}`);
+      if (!accountId) router.push(routes.person(id));
     } catch (error) {
       const { message, field } = readError(error, "Couldn't add this person");
       const key = (["firstName", "email", "phone"] as string[]).includes(
