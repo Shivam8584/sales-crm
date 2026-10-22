@@ -5,6 +5,7 @@ import {
   CUSTOM_FIELD_ENTITIES,
   CUSTOM_FIELD_TYPES,
 } from "../lib/domain/custom-fields";
+import { TARGET_METRICS } from "../lib/domain/forecast";
 import { PLAYBOOK_KINDS } from "../lib/domain/playbook";
 import { EMBED_DIMS } from "./lib/aiEmbedText";
 import {
@@ -231,6 +232,7 @@ export default defineSchema({
     .index("list_owner_name", ["ownerId", "status", "name"])
     .index("list_score", ["status", "score"])
     .index("list_owner_score", ["ownerId", "status", "score"])
+    .index("by_converted", ["convertedAt"])
     .searchIndex("search_name", {
       searchField: "name",
       filterFields: ["status", "ownerId"],
@@ -485,7 +487,9 @@ export default defineSchema({
     leadId: v.optional(v.id("leads")),
     startedAt: v.number(),
     loggedAt: v.optional(v.number()),
-  }).index("by_sid", ["sid"]),
+  })
+    .index("by_sid", ["sid"])
+    .index("by_person", ["personId"]),
 
   /**
    * When an org first reached each activation stage, or a user signed up
@@ -553,6 +557,43 @@ export default defineSchema({
     bKey: v.string(),
     byId: v.id("members"),
   }).index("by_pair", ["type", "aKey", "bKey"]),
+
+  /** An emailed survey link; only the SHA-256 of the token is kept. */
+  surveyRequests: defineTable({
+    tokenHash: v.string(),
+    accountId: v.id("accounts"),
+    personId: v.optional(v.id("people")),
+    kind: v.literal("nps"),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    answeredAt: v.optional(v.number()),
+    createdById: v.optional(v.id("members")),
+    via: v.string(),
+  })
+    .index("by_hash", ["tokenHash"])
+    .index("by_account", ["accountId", "createdAt"]),
+
+  surveyResponses: defineTable({
+    requestId: v.id("surveyRequests"),
+    accountId: v.id("accounts"),
+    personId: v.optional(v.id("people")),
+    score: v.number(),
+    comment: v.optional(v.string()),
+    at: v.number(),
+    entryId: v.optional(v.id("timeline")),
+  })
+    .index("by_request", ["requestId"])
+    .index("by_account", ["accountId", "at"])
+    .index("by_person", ["personId", "at"])
+    .index("by_at", ["at"]),
+
+  /** Monthly goal for a member, or for the whole team; `won_take` is in minor units of the workspace currency. */
+  targets: defineTable({
+    period: v.string(),
+    scope: v.union(v.literal("team"), v.id("members")),
+    metric: literals(TARGET_METRICS),
+    value: v.number(),
+  }).index("by_period", ["period"]),
 
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({

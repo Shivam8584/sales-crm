@@ -11,6 +11,7 @@ import { vRole } from "./lib/validators";
 const DAY = 24 * 60 * 60_000;
 const INVITE_TTL = 7 * DAY;
 const HISTORY_WINDOW = 14 * DAY;
+const LIST_SCAN = 500;
 
 type InviteStatus = "pending" | "expired" | "accepted" | "revoked";
 
@@ -94,7 +95,7 @@ export const list = adminQuery({
   handler: async (ctx) => {
     const now = Date.now();
     const members = await memberIndex(ctx);
-    const invites = await ctx.db.query("invites").order("desc").collect();
+    const invites = await ctx.db.query("invites").order("desc").take(LIST_SCAN);
     return invites
       .map((invite) => ({ invite, status: statusOf(invite, now) }))
       .filter(

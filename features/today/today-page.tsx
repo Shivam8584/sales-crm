@@ -36,6 +36,7 @@ import {
   type TaskRow,
 } from "@/features/tasks/task-meta";
 import { useTaskActions } from "@/features/tasks/use-task-actions";
+import MonthStrip from "@/features/targets/month-strip";
 import { useViewer } from "@/hooks/use-viewer";
 import { isEditableTarget } from "@/lib/keyboard";
 import { relativeTime } from "@/lib/time";
@@ -432,6 +433,7 @@ export default function TodayPage() {
                     : `${doneToday} done today · ${completed} in the last ${TREND_DAYS} days`}
                 </p>
               )}
+              <MonthStrip />
             </div>
             <p className="caption-style text-fg-tertiary hidden items-center gap-1.5 lg:flex">
               <Kbd>J</Kbd>

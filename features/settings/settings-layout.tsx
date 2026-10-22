@@ -22,6 +22,7 @@ import BuildingIcon from "@/public/assets/icons/building.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
 import ActivityIcon from "@/public/assets/icons/activity.svg";
 import ListIcon from "@/public/assets/icons/list.svg";
+import TargetIcon from "@/public/assets/icons/target-05.svg";
 
 type SettingsHref = (typeof SETTINGS_PAGES)[number]["href"];
 
@@ -30,6 +31,7 @@ const ICONS: Record<SettingsHref, ComponentType<SVGProps<SVGSVGElement>>> = {
   "/settings/team": UsersIcon,
   "/settings/workspace": BuildingIcon,
   "/settings/fields": ListIcon,
+  "/settings/targets": TargetIcon,
   "/settings/duplicates": UsersIcon,
   "/settings/integrations": LinkIcon,
   "/settings/system": ActivityIcon,
@@ -43,6 +45,7 @@ const GROUPS: { title: string; hrefs: SettingsHref[] }[] = [
       "/settings/team",
       "/settings/workspace",
       "/settings/fields",
+      "/settings/targets",
       "/settings/duplicates",
       "/settings/integrations",
       "/settings/system",

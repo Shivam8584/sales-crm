@@ -396,6 +396,16 @@ export const NODE_CHANNEL: Partial<Record<NodeKind, Channel>> = {
   send_whatsapp: "whatsapp",
 };
 
+export const LANGUAGES = ["en", "hinglish", "hi"] as const;
+export type Language = (typeof LANGUAGES)[number];
+
+/** Each language's own name for itself, as a reader would look for it. */
+export const LANGUAGE_LABEL: Record<Language, string> = {
+  en: "English",
+  hinglish: "Hinglish",
+  hi: "हिन्दी",
+};
+
 export type AutomationSettings = {
   /** Outbound messages per India-time day across all enrollments. */
   dailyCap: number;
@@ -410,6 +420,8 @@ export type AutomationSettings = {
   senderName?: string;
   /** Where replies go instead of the workspace's reply address. */
   replyTo?: string;
+  /** What the emails are written in; picks the unsubscribe line. English when unset. */
+  language?: Language;
 };
 
 export const DEFAULT_SETTINGS: AutomationSettings = {
@@ -985,6 +997,13 @@ export const VARIABLES: readonly VariableDef[] = [
     group: "Record",
     subjects: SUBJECT_KINDS,
     example: "Kesar Foods",
+  },
+  {
+    key: "survey.link",
+    label: "NPS survey link",
+    group: "Record",
+    subjects: ["lead", "person", "account"],
+    example: "https://sales.hypedrive.app/survey/preview",
   },
 ];
 

@@ -27,6 +27,7 @@ import {
   healthInput,
   latestSnapshot,
   parseEnvelope,
+  personByPlatformUser,
   platformMetrics,
   receive,
   retry,
@@ -60,11 +61,7 @@ async function accountFor(
     if (account) return account._id;
   }
   if (event.userId) {
-    const userId = event.userId;
-    const person = await ctx.db
-      .query("people")
-      .withIndex("by_platform_user", (q) => q.eq("platformUserId", userId))
-      .first();
+    const person = await personByPlatformUser(ctx, event.userId);
     if (person?.accountId) return person.accountId;
   }
   return null;

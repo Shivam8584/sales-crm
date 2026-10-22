@@ -56,12 +56,19 @@ async function names(ctx: QueryCtx) {
       : (members.get(id as Id<"members">)?.name ?? "Former teammate");
 }
 
+/** Archived and merged-away records stay out of the reports. */
+const live = <T extends { archivedAt?: number; mergedIntoId?: unknown }>(
+  rows: T[],
+) => rows.filter((row) => !row.archivedAt && !row.mergedIntoId);
+
 /** Only people with a platform user feed the reports, through their signups. */
-function platformPeople(ctx: QueryCtx) {
-  return ctx.db
-    .query("people")
-    .withIndex("by_platform_user", (q) => q.gt("platformUserId", ""))
-    .collect();
+async function platformPeople(ctx: QueryCtx) {
+  return live(
+    await ctx.db
+      .query("people")
+      .withIndex("by_platform_user", (q) => q.gt("platformUserId", ""))
+      .collect(),
+  );
 }
 
 const leadsSince = (ctx: QueryCtx, since: number) =>
@@ -70,20 +77,24 @@ const leadsSince = (ctx: QueryCtx, since: number) =>
     .withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
     .collect();
 
-const accountsSince = (ctx: QueryCtx, since: number) =>
-  ctx.db
-    .query("accounts")
-    .withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
-    .collect();
+const accountsSince = async (ctx: QueryCtx, since: number) =>
+  live(
+    await ctx.db
+      .query("accounts")
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
+      .collect(),
+  );
 
-function platformAccounts(ctx: QueryCtx) {
-  return ctx.db
-    .query("accounts")
-    .withIndex("by_platform_org", (q) => q.gt("platformOrgId", ""))
-    .collect();
+export async function platformAccounts(ctx: QueryCtx) {
+  return live(
+    await ctx.db
+      .query("accounts")
+      .withIndex("by_platform_org", (q) => q.gt("platformOrgId", ""))
+      .collect(),
+  );
 }
 
-async function stageFacts(ctx: QueryCtx) {
+export async function stageFacts(ctx: QueryCtx) {
   return factsOfRows(await ctx.db.query("activationStages").collect());
 }
 

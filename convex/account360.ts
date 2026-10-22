@@ -29,6 +29,7 @@ import {
   isPlatformEvent,
   latestSnapshot,
   payloadOf,
+  personByPlatformUser,
   primaryRole,
   retry,
   stateEvents,
@@ -298,13 +299,8 @@ export const platform = memberQuery({
     }
     const members = await Promise.all(
       [...byUser.values()].map(async (member) => {
-        const person = await ctx.db
-          .query("people")
-          .withIndex("by_platform_user", (q) =>
-            q.eq("platformUserId", member.userId),
-          )
-          .first();
-        const visible = person && !person.archivedAt && !person.erasedAt;
+        const person = await personByPlatformUser(ctx, member.userId);
+        const visible = person && !person.erasedAt;
         return {
           userId: member.userId,
           name: member.name ?? null,
@@ -400,11 +396,13 @@ export const linkOrg = memberMutation({
           "That isn't a Hypedrive organisation ID. It starts with org_ and has 26 more letters and digits.",
         );
       }
-      const taken = await ctx.db
-        .query("accounts")
-        .withIndex("by_platform_org", (q) => q.eq("platformOrgId", orgId))
-        .first();
-      if (taken && taken._id !== accountId) {
+      const taken = (
+        await ctx.db
+          .query("accounts")
+          .withIndex("by_platform_org", (q) => q.eq("platformOrgId", orgId))
+          .take(5)
+      ).find((row) => row._id !== accountId && !row.archivedAt);
+      if (taken) {
         invalid(
           "orgId",
           `${taken.name} is already linked to this organisation`,

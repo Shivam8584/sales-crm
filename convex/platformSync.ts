@@ -21,6 +21,9 @@ import {
   type SandboxSource,
 } from "./lib/platformClient";
 
+/** Snapshots are large documents, one per linked account. */
+const SNAPSHOT_SCAN = 1000;
+
 const vSnapshotData = v.object({
   balancePaise: v.optional(v.number()),
   heldPaise: v.optional(v.number()),
@@ -77,7 +80,7 @@ export const target = internalQuery({
       fail("forbidden", "Your access has been removed");
     }
     const account = await ctx.db.get(accountId);
-    if (!account) notFound("Account");
+    if (!account || account.archivedAt) notFound("Account");
     if (!account.platformOrgId) {
       fail(
         "invalid",
@@ -160,7 +163,13 @@ export const store = internalMutation({
   },
   handler: async (ctx, args) => {
     const account = await ctx.db.get(args.accountId);
-    if (!account || account.platformOrgId !== args.orgId) return null;
+    if (
+      !account ||
+      account.archivedAt ||
+      account.platformOrgId !== args.orgId
+    ) {
+      return null;
+    }
     const existing = await ctx.db
       .query("platformSnapshots")
       .withIndex("by_account", (q) => q.eq("accountId", args.accountId))
@@ -287,7 +296,7 @@ export const syncAll = internalAction({
 export const status = memberQuery({
   args: {},
   handler: async (ctx) => {
-    const latest = await ctx.db.query("platformSnapshots").collect();
+    const latest = await ctx.db.query("platformSnapshots").take(SNAPSHOT_SCAN);
     const failing = latest.filter((snapshot) => snapshot.error);
     return {
       mode: platformMode(process.env),

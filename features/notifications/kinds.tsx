@@ -29,6 +29,8 @@ const KIND_ICON: Record<string, Icon> = {
   proposal_approval: ClipboardIcon,
   proposal_decision: ClipboardIcon,
   automation: AutomationIcon,
+  survey_detractor: AlertIcon,
+  survey_promoter: MessageIcon,
 };
 
 export function KindIcon({

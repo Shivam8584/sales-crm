@@ -37,6 +37,38 @@ export function isInteraction(entry: {
   );
 }
 
+/**
+ * The newest teammate interaction among entries sorted newest first. A hit in
+ * the list beats anything older that isn't in it, so a miss is only
+ * conclusive when the list held every entry.
+ */
+export function newestInteraction<
+  T extends {
+    kind: string;
+    occurredAt: number;
+    actorId?: unknown;
+    automated?: boolean;
+  },
+>(rows: (T | null)[]): T | null {
+  const byKind = new Map<string, T>();
+  for (const row of rows) {
+    if (
+      row &&
+      row.actorId !== undefined &&
+      !row.automated &&
+      !byKind.has(row.kind)
+    ) {
+      byKind.set(row.kind, row);
+    }
+  }
+  let last: T | null = null;
+  for (const kind of INTERACTION_KINDS) {
+    const entry = byKind.get(kind);
+    if (entry && (!last || entry.occurredAt > last.occurredAt)) last = entry;
+  }
+  return last;
+}
+
 function display(value: unknown): string | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   if (Array.isArray(value)) return value.join(", ") || undefined;

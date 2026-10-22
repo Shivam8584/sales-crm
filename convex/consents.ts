@@ -37,6 +37,7 @@ import {
   vConsentSource,
   vLawfulBasis,
 } from "./lib/consent";
+import { dealsWithPerson } from "./lib/deals";
 import { fail, invalid, notFound } from "./lib/errors";
 import {
   adminMutation,
@@ -414,7 +415,7 @@ export const privacy = adminQuery({
     }
     requests.sort((a, b) => a.requestedAt - b.requestedAt);
 
-    const [people, leads, deals, reviews] = await Promise.all([
+    const [people, leads, reviews] = await Promise.all([
       ctx.db
         .query("people")
         .withIndex("by_creation_time", (q) => q.lt("_creationTime", cutoff))
@@ -423,14 +424,11 @@ export const privacy = adminQuery({
         .query("leads")
         .withIndex("by_creation_time", (q) => q.lt("_creationTime", cutoff))
         .take(REVIEW_SCAN),
-      ctx.db.query("deals").collect(),
-      ctx.db.query("retentionReviews").collect(),
+      ctx.db
+        .query("retentionReviews")
+        .withIndex("by_creation_time", (q) => q.gte("_creationTime", cutoff))
+        .collect(),
     ]);
-    const engaged = new Set(
-      deals
-        .filter((deal) => deal.stage !== "lost")
-        .flatMap((deal) => deal.personIds),
-    );
     const kept = new Set(
       reviews
         .filter((review) => review.keptAt >= cutoff)
@@ -448,8 +446,9 @@ export const privacy = adminQuery({
     const stale: Stale[] = [];
     for (const person of people) {
       if (person.archivedAt || person.erasedAt) continue;
-      if (person._creationTime >= cutoff || engaged.has(person._id)) continue;
-      if (kept.has(person._id)) continue;
+      if (person._creationTime >= cutoff || kept.has(person._id)) continue;
+      const deals = await dealsWithPerson(ctx, person);
+      if (deals.some((deal) => deal.stage !== "lost")) continue;
       const account = person.accountId
         ? await ctx.db.get(person.accountId)
         : null;

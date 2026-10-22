@@ -56,8 +56,10 @@ function dayLabel(at: number) {
 }
 
 function groupByDay(entries: ActivityEntry[]) {
+  // The feed is ordered by creation time, so backdated rows can interleave days.
+  const sorted = entries.toSorted((a, b) => b.at - a.at);
   const groups: { key: string; label: string; entries: ActivityEntry[] }[] = [];
-  for (const entry of entries) {
+  for (const entry of sorted) {
     const key = istDay(entry.at);
     const last = groups.at(-1);
     if (last?.key === key) last.entries.push(entry);

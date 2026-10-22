@@ -100,7 +100,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
         description={`${PERIOD_LABEL[period].long}, each figure against the period before.`}
       >
         <Panel className="px-4 py-4 sm:px-5">
-          {report ? <Kpis report={report} /> : <KpisSkeleton />}
+          {report ? <Kpis report={report} /> : <KpisSkeleton tiles={7} />}
         </Panel>
       </ReportSection>
 

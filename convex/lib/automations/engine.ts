@@ -39,6 +39,7 @@ import {
   renderTemplate,
   sendTime,
   subjectKey,
+  templateVariables,
   waitTimeout,
   waitUntil,
   type ExitKind,
@@ -56,7 +57,15 @@ import { nextOwner } from "../assignment";
 import { upsertAutomatedTask } from "../tasks";
 import { logSystem, type RecordRefs } from "../timeline";
 import { notify } from "../../notifications";
-import { PROVIDER_LABEL, emailProvider, whatsappProvider } from "./delivery";
+import { issueSurveyToken } from "../../surveys";
+import { siteUrl } from "../http";
+import { SURVEY_TTL_DAYS, surveyPath } from "../../../lib/domain/surveys";
+import {
+  PROVIDER_LABEL,
+  emailProvider,
+  renderEmail,
+  whatsappProvider,
+} from "./delivery";
 import {
   contactDecision,
   loadSubject,
@@ -856,14 +865,16 @@ function waitStep({ node, enrollment, now }: StepContext): Outcome {
 
 const CHANNEL_NOUN = { email: "email", whatsapp: "WhatsApp message" } as const;
 
+const usesSurveyLink = (node: GraphNode) =>
+  nodeTexts(node).some((text) =>
+    templateVariables(text).includes("survey.link"),
+  );
+
 const STOPPED_FOR_GOOD = new Set<ContactReason>([
   "withdrawn",
   "erased",
   "erasure_requested",
 ]);
-
-export const UNSUBSCRIBE_LINE =
-  "--\nDon't want these emails? Reply \"unsubscribe\" and I'll stop.";
 
 async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
   const { node, subject, published, automation, enrollment, now, stepKey } =
@@ -976,6 +987,27 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
     };
   }
 
+  let sendVars = vars;
+  let surveyLink: string | undefined;
+  if (usesSurveyLink(node) && subject.account) {
+    const token = await issueSurveyToken(ctx, {
+      accountId: subject.account._id,
+      personId: recipient.personId,
+      createdById: automation.createdById,
+    });
+    if (!token) {
+      return {
+        type: "next",
+        port: "out",
+        level: "warning",
+        skipped: true,
+        message: `Skipped the ${CHANNEL_NOUN[channel]}: ${recipient.name} was already sent a survey in the last ${SURVEY_TTL_DAYS} days`,
+      };
+    }
+    surveyLink = siteUrl(surveyPath(token));
+    sendVars = { ...vars, "survey.link": surveyLink };
+  }
+
   const status = channel === "email" ? emailProvider() : whatsappProvider();
   const provider = status.provider;
   const outbox = provider === "outbox";
@@ -990,20 +1022,26 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
   let language: string | undefined;
   if (node.kind === "send_email") {
     const email = configOf(node, "send_email");
-    subjectLine = renderTemplate(email.subject, vars).text.trim();
-    body = `${renderTemplate(email.body, vars).text.trim()}\n\n${UNSUBSCRIBE_LINE}`;
+    ({ subject: subjectLine, body } = renderEmail(
+      email,
+      sendVars,
+      published.settings.language,
+    ));
   } else {
     const whatsapp = configOf(node, "send_whatsapp");
     template = whatsapp.template;
     language = whatsapp.language;
     params = whatsapp.params.map((param) =>
-      renderTemplate(param, vars).text.trim(),
+      renderTemplate(param, sendVars).text.trim(),
     );
   }
   const content =
     channel === "email"
       ? `Subject: ${subjectLine}\n\n${body}`
       : `Template ${template} (${language})${params?.length ? `\n${params.map((param, index) => `{{${index + 1}}} ${param}`).join("\n")}` : ""}`;
+  const logged = surveyLink
+    ? content.replaceAll(surveyLink, siteUrl("/survey/…"))
+    : content;
 
   const refs: RecordRefs = {
     ...subject.refs,
@@ -1017,7 +1055,7 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
     automated: true,
     direction: "outbound",
     subject: subjectLine ?? template,
-    body: `${statusLine}\n\n${content}`,
+    body: `${statusLine}\n\n${logged}`,
   });
   const messageId = await ctx.db.insert("automationMessages", {
     automationId: automation._id,
@@ -1395,22 +1433,31 @@ export type ReplyInput = {
 };
 
 const STOP_PHRASE =
-  /\b(unsubscribe|opt[\s-]?out|remove me|stop (emailing|sending|contacting)|band kar(o|do)|mat bhej(o|na))\b/i;
+  /\b(unsubscribe|opt[\s-]?out|remove me|stop (emailing|sending|contacting)|band kar(o|do|\s+do)|mat bhej(o|na))\b/i;
 const STOP_ALONE = /^\W*(please\s+)?stop\W*$/i;
 const NEGATED =
-  /\b(don['’]?t|do not|never|won['’]?t|not)\s+(\w+\s+){0,2}(unsubscribe|opt[\s-]?out|remove me|stop)/i;
+  /\b(don['’]?t|do not|never|won['’]?t|not)\s+(\w+\s+){0,2}(unsubscribe|opt[\s-]?out|remove me|stop)|\b(unsubscribe|band)\s+(\w+\s+)?(mat|nahi|na)\s+kar|\b(mat|na)\s+band\s+kar/i;
+/** JS word boundaries ignore Devanagari, so the end of a word is checked by hand. */
+const STOP_HINDI =
+  /(बंद\s+कर(ो|\s*दो|\s*दीजिए)|मत\s+भेज(ो|ना|िए|ें))(?![\p{L}\p{M}])/u;
+const NEGATED_HINDI =
+  /(मत|न)\s+बंद\s+कर|(बंद|unsubscribe)\s+(\S+\s+)?(मत|नहीं)\s+कर/iu;
 
 /** Only a short first line counts, so a long reply that merely mentions the word isn't an opt-out. */
 export function asksToStop(text: string) {
   const first =
     text
+      .normalize("NFC")
       .split("\n")
       .find((line) => line.trim() && !line.trimStart().startsWith(">"))
       ?.trim() ?? "";
   return (
     first.length <= 60 &&
     !NEGATED.test(first) &&
-    (STOP_PHRASE.test(first) || STOP_ALONE.test(first))
+    !NEGATED_HINDI.test(first) &&
+    (STOP_PHRASE.test(first) ||
+      STOP_HINDI.test(first) ||
+      STOP_ALONE.test(first))
   );
 }
 

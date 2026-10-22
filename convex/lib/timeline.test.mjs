@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diff, isInteraction } from "./timeline.ts";
+import { diff, isInteraction, newestInteraction } from "./timeline.ts";
 
 test("a teammate's call, email, meeting, WhatsApp or note is an interaction", () => {
   for (const kind of ["call", "email", "meeting", "whatsapp", "note"]) {
@@ -30,5 +30,38 @@ test("diff reports only labelled fields that changed", () => {
       { name: "Name", tags: "Tags", stage: "Stage" },
     ),
     [{ field: "Name", from: "A", to: "B" }],
+  );
+});
+
+const entry = (kind, occurredAt, extra = {}) => ({
+  kind,
+  occurredAt,
+  actorId: "m1",
+  ...extra,
+});
+
+test("newestInteraction picks the newest teammate entry across kinds", () => {
+  const rows = [
+    entry("system", 90),
+    entry("email", 80, { automated: true }),
+    entry("note", 70, { actorId: undefined }),
+    entry("call", 60),
+    entry("email", 50),
+  ];
+  assert.equal(newestInteraction(rows), rows[3]);
+});
+
+test("newestInteraction takes the first kind in kind order on a tie", () => {
+  const call = entry("call", 10);
+  const note = entry("note", 10);
+  assert.equal(newestInteraction([call, note]), note);
+});
+
+test("newestInteraction is null without a teammate interaction", () => {
+  assert.equal(newestInteraction([]), null);
+  assert.equal(newestInteraction([null, entry("change", 5)]), null);
+  assert.equal(
+    newestInteraction([entry("email", 5, { automated: true })]),
+    null,
   );
 });

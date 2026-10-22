@@ -120,6 +120,7 @@ export const SETTINGS_PAGES = [
   { href: "/settings/team", label: "Team", adminOnly: false },
   { href: "/settings/workspace", label: "Workspace", adminOnly: true },
   { href: "/settings/fields", label: "Custom fields", adminOnly: true },
+  { href: "/settings/targets", label: "Targets", adminOnly: true },
   {
     href: "/settings/duplicates",
     label: "Duplicates",

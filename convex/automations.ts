@@ -16,6 +16,7 @@ import {
   configOf,
   EXIT_KIND_LABEL,
   FREQUENCY_CAP,
+  LANGUAGES,
   TRIGGER_LABEL,
   isValidFrequencyCap,
   checkGraphShape,
@@ -39,7 +40,6 @@ import {
 import { STALL_RULES } from "./lib/activation";
 import { notify } from "./notifications";
 import {
-  UNSUBSCRIBE_LINE,
   enroll,
   finish,
   logStep,
@@ -60,6 +60,7 @@ import {
 import {
   deliver as deliverMessage,
   emailProvider,
+  renderEmail,
   repliesTracked,
   whatsappProvider,
 } from "./lib/automations/delivery";
@@ -70,9 +71,10 @@ import {
   subjectVars,
   type SubjectRef,
 } from "./lib/automations/subject";
-import { TEMPLATE, TEMPLATES } from "./lib/automations/templates";
+import { TEMPLATE, TEMPLATES, templateIn } from "./lib/automations/templates";
 import {
   vGraph,
+  vLanguage,
   vSettings,
   vSubjectKind,
   vTrigger,
@@ -309,10 +311,18 @@ export const catalog = memberQuery({
       templates: TEMPLATES.map((template) => ({
         key: template.key,
         name: template.name,
-        description: template.description,
         subjectKind: template.subjectKind,
         trigger: describeTrigger(template.trigger),
-        steps: stepKinds(template.graph),
+        copies: LANGUAGES.filter(
+          (language) => language === "en" || template.variants[language],
+        ).map((language) => {
+          const copy = templateIn(template, language);
+          return {
+            language,
+            description: copy.description,
+            steps: stepKinds(copy.graph),
+          };
+        }),
       })),
       providers: { email: emailProvider(), whatsapp: whatsappProvider() },
     };
@@ -682,20 +692,24 @@ export const create = managerMutation({
 });
 
 export const createFromTemplate = memberMutation({
-  args: { key: v.string() },
-  handler: async (ctx, { key }) => {
+  args: { key: v.string(), language: v.optional(vLanguage) },
+  handler: async (ctx, { key, language }) => {
     const template = TEMPLATE[key];
     if (!template) notFound("Template");
+    const copy = templateIn(template, language);
     return await insertAutomation(ctx, {
       name: template.name,
-      description: template.description,
+      description: copy.description,
       subjectKind: template.subjectKind,
       // An automatic trigger would run a rep's copy on everyone's records.
       trigger: can(ctx.viewer, "sequence.run")
         ? template.trigger
         : { kind: "manual" },
-      graph: template.graph,
-      settings: template.settings,
+      graph: copy.graph,
+      settings:
+        copy.language === "en"
+          ? template.settings
+          : { ...template.settings, language: copy.language },
       templateKey: template.key,
     });
   },
@@ -906,12 +920,16 @@ export const sendTest = memberMutation({
       VARIABLES.map((item) => [item.key, item.example]),
     );
     vars["owner.firstName"] = ctx.viewer.name.split(/\s+/)[0];
-    const config = configOf(node, "send_email");
+    const rendered = renderEmail(
+      configOf(node, "send_email"),
+      vars,
+      automation.settings.language,
+    );
     await ctx.scheduler.runAfter(0, internal.automations.deliverTest, {
       memberId: ctx.viewer._id,
       to: ctx.viewer.email,
-      subject: `[Test] ${renderTemplate(config.subject, vars).text}`,
-      body: `${renderTemplate(config.body, vars).text.trim()}\n\n${UNSUBSCRIBE_LINE}`,
+      subject: `[Test] ${rendered.subject}`,
+      body: rendered.body,
       senderName: automation.settings.senderName,
       replyTo: automation.settings.replyTo,
     });

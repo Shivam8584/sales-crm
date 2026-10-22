@@ -13,6 +13,7 @@ import { memberIndex, memberRef } from "./lib/records";
 import {
   INTERACTION_KINDS,
   isInteraction,
+  newestInteraction,
   type RecordRefs,
 } from "./lib/timeline";
 import { literals, vCallOutcome } from "./lib/validators";
@@ -87,38 +88,48 @@ export function bucketCounts(
   return buckets;
 }
 
-/** The newest logged interaction on an account or person: one indexed read per kind. */
+const RECENT_ENTRIES = 30;
+
+/**
+ * The newest logged interaction on an account or person, from its newest
+ * entries. Only a record whose newest entries are all system noise falls back
+ * to one indexed read per kind.
+ */
 export async function latestInteraction(
   ctx: QueryCtx,
   target: { accountId: Id<"accounts"> } | { personId: Id<"people"> },
 ) {
-  const latest = await Promise.all(
-    INTERACTION_KINDS.map((kind) =>
-      ("accountId" in target
-        ? ctx.db
-            .query("timeline")
-            .withIndex("by_account_kind", (q) =>
-              q.eq("accountId", target.accountId).eq("kind", kind),
+  const recent = await entriesFor(ctx, target)
+    .order("desc")
+    .take(RECENT_ENTRIES);
+  let last = newestInteraction(recent);
+  if (!last && recent.length === RECENT_ENTRIES) {
+    last = newestInteraction(
+      await Promise.all(
+        INTERACTION_KINDS.map((kind) =>
+          ("accountId" in target
+            ? ctx.db
+                .query("timeline")
+                .withIndex("by_account_kind", (q) =>
+                  q.eq("accountId", target.accountId).eq("kind", kind),
+                )
+            : ctx.db
+                .query("timeline")
+                .withIndex("by_person_kind", (q) =>
+                  q.eq("personId", target.personId).eq("kind", kind),
+                )
+          )
+            .order("desc")
+            .filter((q) =>
+              q.and(
+                q.neq(q.field("actorId"), undefined),
+                q.neq(q.field("automated"), true),
+              ),
             )
-        : ctx.db
-            .query("timeline")
-            .withIndex("by_person_kind", (q) =>
-              q.eq("personId", target.personId).eq("kind", kind),
-            )
-      )
-        .order("desc")
-        .filter((q) =>
-          q.and(
-            q.neq(q.field("actorId"), undefined),
-            q.neq(q.field("automated"), true),
-          ),
-        )
-        .first(),
-    ),
-  );
-  let last: Doc<"timeline"> | null = null;
-  for (const entry of latest) {
-    if (entry && (!last || entry.occurredAt > last.occurredAt)) last = entry;
+            .first(),
+        ),
+      ),
+    );
   }
   return last
     ? { at: last.occurredAt, kind: last.kind, subject: last.subject ?? null }

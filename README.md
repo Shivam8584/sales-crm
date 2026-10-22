@@ -282,4 +282,15 @@ BCC `log@replies.hypedrive.app` (or forward the mail to it) from your own CRM em
 
 ### Checks
 
-`npm run check` runs `next typegen`, the type check, lint and the pure-logic tests.
+`npm run check` is the production gate: `next typegen`, the type check, lint, the pure-logic tests (`npm test`) and the Convex function tests (`npm run test:convex`). It needs no browser, server or network.
+
+- **Convex function tests** (`tests/convex`, Vitest + `convex-test`) run the real functions against an in-memory Convex with the rate-limiter, aggregate and migrations components registered (`tests/convex/setup.ts`). They cover permissions by role, consent and erasure, lead scoring and routing, sequences, merge, MCP tokens, custom fields and attachments. Seed members with `seedMember`/`seedTeam`; sign in as one with its `as` client.
+- **End-to-end smoke tests** (`tests/e2e`, Playwright, `npm run e2e`) are not part of `check`. They drive a real browser against the local stack, so start it first (`npm run convex:up`, `npx convex dev`, `npm run dev`) and load the demo data once with `npx convex run seed:reset`. They sign in with the seeded logins, undo or delete what they change, and refuse to run against a non-local `E2E_BASE_URL`.
+
+| Variable | Default |
+| --- | --- |
+| `E2E_BASE_URL` | `http://localhost:3000` |
+| `E2E_CONVEX_URL` | `http://127.0.0.1:3210` |
+| `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` | `shivam@hypedrive.in` / `crm-ccb55666` |
+| `E2E_REP_EMAIL` / `E2E_REP_PASSWORD` | `rep1@example.com` / `crm-ccb55666` |
+| `E2E_CHROMIUM` | path to a Chromium binary; unset uses Playwright's own (`npx playwright install chromium`) |

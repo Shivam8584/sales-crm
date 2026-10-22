@@ -29,6 +29,8 @@ import {
   type SubjectKind,
 } from "../../../lib/domain/automations";
 import { canContact, canContactLead } from "../consent";
+import { resolveMerged } from "../merged";
+import { siteUrl } from "../http";
 import type { RecordRefs } from "../timeline";
 
 export type SubjectRef = { kind: SubjectKind; id: string };
@@ -67,6 +69,13 @@ async function get<T extends "leads" | "people" | "accounts" | "deals">(
   return normalized ? await ctx.db.get(normalized) : null;
 }
 
+/** A merged-away person or account reads as the record it was merged into. */
+const currentPerson = async (ctx: QueryCtx, id: string | undefined) =>
+  await resolveMerged(await get(ctx, "people", id), (to) => ctx.db.get(to));
+
+const currentAccount = async (ctx: QueryCtx, id: string | undefined) =>
+  await resolveMerged(await get(ctx, "accounts", id), (to) => ctx.db.get(to));
+
 /** The record an enrollment runs on, with the records around it. */
 export async function loadSubject(
   ctx: QueryCtx,
@@ -87,8 +96,8 @@ export async function loadSubject(
     case "lead": {
       const lead = await get(ctx, "leads", id);
       if (!lead) return null;
-      const person = await get(ctx, "people", lead.personId);
-      const account = await get(ctx, "accounts", lead.accountId);
+      const person = await currentPerson(ctx, lead.personId);
+      const account = await currentAccount(ctx, lead.accountId);
       return {
         ...base,
         lead,
@@ -103,7 +112,7 @@ export async function loadSubject(
     case "person": {
       const person = await get(ctx, "people", id);
       if (!person) return null;
-      const account = await get(ctx, "accounts", person.accountId);
+      const account = await currentAccount(ctx, person.accountId);
       return {
         ...base,
         person,
@@ -133,14 +142,14 @@ export async function loadSubject(
     case "deal": {
       const deal = await get(ctx, "deals", id);
       if (!deal) return null;
-      const account = await ctx.db.get(deal.accountId);
+      const account = await currentAccount(ctx, deal.accountId);
       return {
         ...base,
         deal,
         account,
         name: deal.title,
         ownerId: deal.ownerId,
-        refs: { dealId: deal._id, accountId: deal.accountId },
+        refs: { dealId: deal._id, accountId: account?._id ?? deal.accountId },
         gone: null,
       };
     }
@@ -397,6 +406,7 @@ export async function subjectVars(
       snapshot && live !== undefined ? String(live) : "",
     "platform.stage": "",
     "record.name": subject.name,
+    "survey.link": account ? siteUrl("/survey/preview") : "",
   };
   if (account) {
     const reached = pathIndex(account.stage);

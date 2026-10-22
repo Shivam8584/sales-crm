@@ -41,3 +41,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 deploy/**/node_modules
+
+# e2e
+/test-results/
+/playwright-report/

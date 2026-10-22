@@ -4,8 +4,10 @@ import {
   deliver,
   emailHeaders,
   emailProvider,
+  renderEmail,
   repliesTracked,
   smtpFailure,
+  unsubscribeLine,
 } from "./automations/delivery.ts";
 
 const SMTP_ENV = {
@@ -150,4 +152,33 @@ test("replies count as tracked only for the workspace address", () => {
   assert.equal(repliesTracked("asha@acme.com"), false);
   delete process.env.EMAIL_REPLY_TO;
   assert.equal(repliesTracked("asha@acme.com"), false);
+});
+
+test("the unsubscribe footer follows the sequence's language", () => {
+  assert.equal(
+    unsubscribeLine(),
+    "--\nDon't want these emails? Reply \"unsubscribe\" and I'll stop.",
+  );
+  assert.equal(
+    unsubscribeLine("hinglish"),
+    '--\nYe emails nahi chahiye? "unsubscribe" likh kar reply kar dijiye, hum band kar denge.',
+  );
+  assert.equal(
+    unsubscribeLine("hi"),
+    '--\nये ईमेल नहीं चाहिए? "unsubscribe" लिखकर जवाब दें, हम बंद कर देंगे।',
+  );
+  assert.equal(unsubscribeLine("fr"), unsubscribeLine("en"));
+});
+
+test("rendered emails are trimmed and end with the footer", () => {
+  const email = { subject: " Hi {{name}} ", body: "Hello {{name}}\n\n" };
+  assert.deepEqual(renderEmail(email, { name: "Asha" }), {
+    subject: "Hi Asha",
+    body: `Hello Asha\n\n${unsubscribeLine()}`,
+  });
+  assert.ok(
+    renderEmail(email, { name: "Asha" }, "hi").body.endsWith(
+      unsubscribeLine("hi"),
+    ),
+  );
 });

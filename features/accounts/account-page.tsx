@@ -41,6 +41,7 @@ import PeopleList from "@/features/people/people-list";
 import AccountPlatform from "@/features/platform/account-platform";
 import MarketplaceListings from "@/features/prospecting/marketplace-listings";
 import PlatformTab from "@/features/platform/platform-tab";
+import FeedbackSection from "@/features/surveys/feedback-section";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
 import { usePinAction } from "@/features/pins/use-pins";
@@ -342,6 +343,10 @@ function AccountView({ account }: { account: Account }) {
             />
             <AccountPlatform
               accountId={account._id}
+              className={ASIDE_SECTION}
+            />
+            <FeedbackSection
+              target={{ accountId: account._id }}
               className={ASIDE_SECTION}
             />
             <MarketplaceListings

@@ -4,6 +4,7 @@ import {
   CONDITION_OPS,
   ENROLLMENT_STATUSES,
   EXIT_KINDS,
+  LANGUAGES,
   NODE_KINDS,
   PORTS,
   SUBJECT_KINDS,
@@ -15,6 +16,7 @@ export const vAutomationStatus = literals(AUTOMATION_STATUSES);
 export const vEnrollmentStatus = literals(ENROLLMENT_STATUSES);
 export const vSubjectKind = literals(SUBJECT_KINDS);
 export const vExitKind = literals(EXIT_KINDS);
+export const vLanguage = literals(LANGUAGES);
 
 const list = v.optional(v.array(v.string()));
 
@@ -68,6 +70,7 @@ export const vSettings = v.object({
   allowReenroll: v.boolean(),
   senderName: v.optional(v.string()),
   replyTo: v.optional(v.string()),
+  language: v.optional(vLanguage),
 });
 
 export const vStats = v.object({

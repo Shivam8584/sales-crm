@@ -561,6 +561,13 @@ export async function stepPeople(
       .take(STEP),
     (row) => ctx.db.patch(row._id, { personId: to }),
   );
+  moved.calls = await each(
+    await ctx.db
+      .query("phoneCalls")
+      .withIndex("by_person", (q) => q.eq("personId", from))
+      .take(STEP),
+    (row) => ctx.db.patch(row._id, { personId: to }),
+  );
 
   const deals = loser.accountId
     ? (

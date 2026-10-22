@@ -50,6 +50,7 @@ import { nextOwner } from "./assignment";
 import { emitAutomationTrigger } from "./automations/engine";
 import { createLead, isOpen, leadHref, rescoreLead } from "./leads";
 import { findAccount, findPerson } from "./identity";
+import { firstLive } from "./merged";
 import { personSearchText } from "./records";
 import { logSystem, type RecordRefs } from "./timeline";
 import { notify, notifyMany, leadershipIds } from "../notifications";
@@ -603,18 +604,23 @@ async function log(
   }
 }
 
+const LINK_ROWS = 5;
+
+/** Archived accounts never receive platform data; a merged one hands it to its winner. */
 export async function accountForOrg(ctx: QueryCtx, orgId: string) {
-  return await ctx.db
+  const rows = await ctx.db
     .query("accounts")
     .withIndex("by_platform_org", (q) => q.eq("platformOrgId", orgId))
-    .first();
+    .take(LINK_ROWS);
+  return await firstLive(rows, (id) => ctx.db.get(id));
 }
 
 export async function personByPlatformUser(ctx: QueryCtx, userId: string) {
-  return await ctx.db
+  const rows = await ctx.db
     .query("people")
     .withIndex("by_platform_user", (q) => q.eq("platformUserId", userId))
-    .first();
+    .take(LINK_ROWS);
+  return await firstLive(rows, (id) => ctx.db.get(id));
 }
 
 async function personByEmail(ctx: QueryCtx, email: string) {

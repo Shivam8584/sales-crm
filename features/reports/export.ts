@@ -7,6 +7,7 @@ import { formatMoney, type Money } from "@/lib/domain/money";
 
 type OverviewData = FunctionReturnType<typeof api.reports.overview>;
 type TeamData = FunctionReturnType<typeof api.reports.team>;
+type ForecastData = FunctionReturnType<typeof api.forecast.report>;
 
 const pct = (rate: number | null | undefined) =>
   rate === null || rate === undefined ? "" : Math.round(rate * 1000) / 10;
@@ -150,5 +151,32 @@ export function teamCsv(data: TeamData): CsvCell[][] {
       row.activatedAccounts,
       row.current.activated,
     ]),
+  ];
+}
+
+export function forecastCsv(data: ForecastData): CsvCell[][] {
+  return [
+    ["Currency", "Line", "Deals", "Value", "Weighted"],
+    ...data.currencies.flatMap((item): CsvCell[][] => {
+      const m = (amount: number) =>
+        formatMoney({ amount, currency: item.currency });
+      const line = (label: string, slice: (typeof item)["commit"]) => [
+        item.currency,
+        label,
+        slice.count,
+        m(slice.amount),
+        m(slice.weighted),
+      ];
+      return [
+        ...item.stages.map((slice) =>
+          line(DEAL_STAGE_LABEL[slice.stage], slice),
+        ),
+        line("Commit (Proposal and later, closing this month)", item.commit),
+        line("Best case (closing this or next month)", item.bestCase),
+        line("Slipped (past close date)", item.slipped),
+        [item.currency, "Won this month", "", m(item.wonSoFar), ""],
+        [item.currency, "Expected landing", "", m(item.landing), ""],
+      ];
+    }),
   ];
 }

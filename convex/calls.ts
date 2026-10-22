@@ -7,6 +7,7 @@ import { normalizePhone } from "../lib/domain/normalize";
 import { fail } from "./lib/errors";
 import { getViewer, internalMutation, memberQuery } from "./lib/functions";
 import { json, readJson, timingSafeEqual } from "./lib/http";
+import { resolveMerged } from "./lib/merged";
 import { sha256Hex } from "./lib/crypto";
 import { rateLimiter } from "./lib/rateLimiter";
 import { touchRecords } from "./lib/tasks";
@@ -165,7 +166,10 @@ export const record = internalMutation({
     await ctx.db.patch(call._id, { loggedAt: Date.now() });
     if (!outcome) return "ignored" as const;
 
-    const person = call.personId ? await ctx.db.get(call.personId) : null;
+    const person = await resolveMerged(
+      call.personId ? await ctx.db.get(call.personId) : null,
+      (id) => ctx.db.get(id),
+    );
     const lead = call.leadId ? await ctx.db.get(call.leadId) : null;
     const subject = person ?? lead;
     if (!subject || subject.erasedAt) return "ignored" as const;

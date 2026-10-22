@@ -23,6 +23,7 @@ import { useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import {
   AUTOMATION_STATUS_LABEL,
+  LANGUAGE_LABEL,
   validateAutomation,
   type AutomationSettings,
   type GraphNode,
@@ -467,6 +468,12 @@ function Editor({ automation }: { automation: AutomationDoc }) {
                   <span className="opacity-70">v{automation.version}</span>
                 )}
               </Tag>
+              {automation.settings.language &&
+                automation.settings.language !== "en" && (
+                  <Tag size="xs">
+                    {LANGUAGE_LABEL[automation.settings.language]}
+                  </Tag>
+                )}
               {changed && (
                 <Tag tone="amber" size="xs">
                   Unpublished changes

@@ -1,7 +1,35 @@
 import type { ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { checkSender } from "../../../lib/domain/automations";
+import {
+  checkSender,
+  renderTemplate,
+  type Language,
+} from "../../../lib/domain/automations";
 import { normalizeEmail } from "../../../lib/domain/normalize";
+
+const UNSUBSCRIBE_LINES: Record<Language, string> = {
+  en: "Don't want these emails? Reply \"unsubscribe\" and I'll stop.",
+  hinglish:
+    'Ye emails nahi chahiye? "unsubscribe" likh kar reply kar dijiye, hum band kar denge.',
+  hi: 'ये ईमेल नहीं चाहिए? "unsubscribe" लिखकर जवाब दें, हम बंद कर देंगे।',
+};
+
+/** Always contains the word "unsubscribe", which is what replies are matched on. */
+export function unsubscribeLine(language: Language = "en") {
+  return `--\n${UNSUBSCRIBE_LINES[language] ?? UNSUBSCRIBE_LINES.en}`;
+}
+
+/** The subject and body exactly as sent, footer included. */
+export function renderEmail(
+  email: { subject: string; body: string },
+  vars: Partial<Record<string, string>>,
+  language?: Language,
+) {
+  return {
+    subject: renderTemplate(email.subject, vars).text.trim(),
+    body: `${renderTemplate(email.body, vars).text.trim()}\n\n${unsubscribeLine(language)}`,
+  };
+}
 
 /**
  * Outbound delivery. With no provider configured a message stays in the outbox

@@ -86,6 +86,7 @@ const ACTION_KINDS = new Set([
   "platform_wallet_negative",
   "platform_campaign_paused",
   "platform_campaign_status_changed",
+  "survey_detractor",
 ]);
 
 /** 0 needs a reply now, 1 needs doing, 2 is for information. */

@@ -1,4 +1,5 @@
 import Skeleton from "@/components/_ui/skeleton";
+import NpsTile from "@/features/surveys/nps-tile";
 import type { Report } from "@/convex/lib/reports";
 import ActivityIcon from "@/public/assets/icons/activity.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
@@ -18,6 +19,7 @@ import {
 import { Delta, MetricTile } from "./section";
 
 const GRID = "grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6";
+const GRID_WITH_NPS = "grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7";
 
 const pts = (current: number | null, previous: number | null) =>
   current === null || previous === null
@@ -40,7 +42,7 @@ export default function Kpis({ report }: { report: Report }) {
       : null;
 
   return (
-    <div className={GRID}>
+    <div className={GRID_WITH_NPS}>
       <MetricTile
         icon={UserPlusIcon}
         label="New leads"
@@ -116,14 +118,17 @@ export default function Kpis({ report }: { report: Report }) {
           />
         }
       />
+      <div className="max-sm:col-span-2">
+        <NpsTile />
+      </div>
     </div>
   );
 }
 
-export function KpisSkeleton() {
+export function KpisSkeleton({ tiles = 6 }: { tiles?: number }) {
   return (
-    <div className={GRID}>
-      {Array.from({ length: 6 }, (_, index) => (
+    <div className={tiles > 6 ? GRID_WITH_NPS : GRID}>
+      {Array.from({ length: tiles }, (_, index) => (
         <div
           key={index}
           className="border-line-strong flex flex-col gap-3 rounded-lg border p-2.75"

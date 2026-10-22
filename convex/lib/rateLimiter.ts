@@ -17,6 +17,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   mcp: { kind: "fixed window", rate: 60, period: MINUTE },
   /** Failed MCP authentications per client IP. */
   mcpAuthFail: { kind: "fixed window", rate: 20, period: MINUTE },
+  /** Public survey page requests per client IP. */
+  surveyIp: { kind: "fixed window", rate: 30, period: MINUTE },
+  /** Public survey requests per token hash. */
+  surveyToken: { kind: "fixed window", rate: 20, period: HOUR },
   /** Model calls per member per IST day. */
   ai: { kind: "fixed window", rate: 100, period: DAY, start: IST_MIDNIGHT },
   /** One token per message for 30 days: a second delivery of the same message is a duplicate. */

@@ -34,6 +34,7 @@ main() {
 
   cd "$ROOT"
   cmp -s "$SRC/deploy/compose.prod.yml" compose.yml || cp "$SRC/deploy/compose.prod.yml" compose.yml
+  cmp -s "$SRC/deploy/backup.sh" backup.sh || { cp "$SRC/deploy/backup.sh" backup.sh && chmod 700 backup.sh; }
   KEY=$(docker compose exec -T backend ./generate_admin_key.sh | tail -1)
   [ -n "$KEY" ] || fail "could not create a Convex admin key"
 

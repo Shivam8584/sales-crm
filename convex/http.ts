@@ -6,6 +6,7 @@ import { calcomWebhook, submit, submitPreflight } from "./leads";
 import { endpoint as mcpEndpoint, methodNotAllowed as mcpGet } from "./mcp";
 import { webhook as platformWebhook } from "./platform";
 import { reviewGap, reviewGapPreflight } from "./prospecting";
+import { surveyInfo, surveyPreflight, surveyRespond } from "./surveys";
 
 const http = httpRouter();
 
@@ -43,6 +44,13 @@ http.route({
   path: "/webhooks/exotel",
   method: "POST",
   handler: exotelWebhook,
+});
+http.route({ path: "/survey/info", method: "GET", handler: surveyInfo });
+http.route({ path: "/survey/respond", method: "POST", handler: surveyRespond });
+http.route({
+  path: "/survey/respond",
+  method: "OPTIONS",
+  handler: surveyPreflight,
 });
 http.route({ path: "/mcp", method: "POST", handler: mcpEndpoint });
 http.route({ path: "/mcp", method: "GET", handler: mcpGet });

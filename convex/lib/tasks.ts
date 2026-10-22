@@ -32,28 +32,37 @@ export async function positionBefore(
   taskId: Id<"tasks">,
   beforeId: Id<"tasks"> | null,
 ) {
-  const column = async () =>
-    (
+  const column = () =>
+    ctx.db
+      .query("tasks")
+      .withIndex("by_status_position", (q) => q.eq("status", status));
+  // Only the neighbours matter; the whole column is read just to re-space it.
+  const neighbours = async () => {
+    const found = beforeId ? await ctx.db.get(beforeId) : null;
+    const anchor =
+      found && found.status === status && found._id !== taskId ? found : null;
+    const previous = (
       await ctx.db
         .query("tasks")
-        .withIndex("by_status_position", (q) => q.eq("status", status))
-        .collect()
-    ).filter((task) => task._id !== taskId);
-  let tasks = await column();
-  const neighbours = () => {
-    const found = beforeId
-      ? tasks.findIndex((task) => task._id === beforeId)
-      : -1;
-    const index = found === -1 ? tasks.length : found;
-    return [tasks[index - 1]?.position, tasks[index]?.position] as const;
+        .withIndex("by_status_position", (q) =>
+          anchor
+            ? q.eq("status", status).lt("position", anchor.position)
+            : q.eq("status", status),
+        )
+        .order("desc")
+        .take(2)
+    ).find((task) => task._id !== taskId);
+    return [previous?.position, anchor?.position] as const;
   };
-  let [before, after] = neighbours();
+  let [before, after] = await neighbours();
   if (before !== undefined && after !== undefined && after - before < MIN_GAP) {
+    const tasks = (await column().collect()).filter(
+      (task) => task._id !== taskId,
+    );
     for (const [index, task] of tasks.entries()) {
       await ctx.db.patch(task._id, { position: (index + 1) * GAP });
     }
-    tasks = await column();
-    [before, after] = neighbours();
+    [before, after] = await neighbours();
   }
   return between(before, after);
 }

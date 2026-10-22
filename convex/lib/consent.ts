@@ -18,8 +18,10 @@ import {
   type LawfulBasis,
 } from "../../lib/domain/consent";
 import { CHANNELS } from "../../lib/domain/enums";
+import { eraseSurveyData } from "../surveys";
 import { deleteAttachments } from "./attachments";
 import { fail } from "./errors";
+import { resolveMerged } from "./merged";
 import { logSystem } from "./timeline";
 import { literals } from "./validators";
 
@@ -82,7 +84,9 @@ export async function canContact(
   channel: Channel,
   purpose: ConsentPurpose,
 ): Promise<ContactDecision> {
-  const person = await ctx.db.get(personId);
+  const person = await resolveMerged(await ctx.db.get(personId), (id) =>
+    ctx.db.get(id),
+  );
   if (!person) {
     return {
       allowed: false,
@@ -92,8 +96,14 @@ export async function canContact(
       since: null,
     };
   }
+  // Consent follows the person, not the record: a merge that hasn't moved every
+  // row yet still counts the other record's history.
+  const other = person.mergingFrom ?? person.mergingInto;
   return decideContact({
-    rows: await personLedger(ctx, personId),
+    rows: [
+      ...(await personLedger(ctx, person._id)),
+      ...(other ? await personLedger(ctx, other) : []),
+    ],
     channel,
     purpose,
     hasAddress: Boolean(channelAddress(person, channel)),
@@ -146,9 +156,15 @@ export type LedgerEntry = {
 export async function appendLedger(ctx: MutationCtx, entry: LedgerEntry) {
   const recordedAt = Date.now();
   const { channels, ...rest } = entry;
+  const owner = entry.personId
+    ? await resolveMerged(await ctx.db.get(entry.personId), (id) =>
+        ctx.db.get(id),
+      )
+    : null;
   for (const channel of channels) {
     await ctx.db.insert("consents", {
       ...rest,
+      personId: owner?._id ?? entry.personId,
       channel,
       granted: entry.event === "grant",
       recordedAt,
@@ -550,6 +566,7 @@ export async function erasePerson(
   await redactBeyond(ctx, { person, leads });
   await anonymiseLeads(ctx, leads, now);
   await deleteAttachments(ctx, { personId: person._id });
+  await eraseSurveyData(ctx, person._id);
   await ctx.db.patch(person._id, {
     firstName: ERASED_NAME,
     lastName: "",
