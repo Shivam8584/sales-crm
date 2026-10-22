@@ -38,6 +38,8 @@ import {
 } from "@/features/accounts/use-title-shortcut";
 import DinLookup from "@/features/enrichment/din-lookup";
 import { RecordAutomations } from "@/features/automations/record-automations";
+import CustomFields from "@/features/fields/custom-fields";
+import FilesSection from "@/features/files/files-section";
 import MemberPicker from "@/features/members/member-picker";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
@@ -440,6 +442,16 @@ function PersonView({ person }: { person: Person }) {
                 </Property>
               </Properties>
             </DetailSection>
+            <CustomFields
+              entity="person"
+              target={{ personId: person._id }}
+              values={person.custom}
+              className={cn(ASIDE_SECTION, "gap-2")}
+            />
+            <FilesSection
+              target={{ personId: person._id }}
+              className={cn(ASIDE_SECTION, "gap-2")}
+            />
             <ConsentRecords personId={person._id} className={ASIDE_SECTION} />
             <DinLookup personId={person._id} className={ASIDE_SECTION} />
             <DetailSection

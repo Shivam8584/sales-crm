@@ -20,6 +20,7 @@ import { ROLE_TONE } from "@/features/team/roles";
 import PrivacySettings from "@/features/consent/privacy-settings";
 import PricingPolicySettings from "@/features/proposals/pricing-policy-settings";
 import AutomationSafety from "@/features/automations/automation-safety";
+import { HotSlaRow, RoutingRules } from "./routing-rules";
 import {
   AdminOnly,
   SettingsIntro,
@@ -86,9 +87,12 @@ function WorkspaceForm() {
         ) : (
           <RowSkeleton />
         )}
+        <HotSlaRow />
       </SettingsSection>
 
       <RotationSection settings={settings} />
+
+      <RoutingRules />
 
       <SettingsSection
         title="Joining the workspace"

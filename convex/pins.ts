@@ -71,12 +71,19 @@ export const toggle = memberMutation({
       await ctx.db.delete(existing._id);
       return false;
     }
-    const count = (
-      await ctx.db
-        .query("pins")
-        .withIndex("by_member", (q) => q.eq("memberId", ctx.viewer._id))
-        .take(MAX_PINS)
-    ).length;
+    const pins = await ctx.db
+      .query("pins")
+      .withIndex("by_member", (q) => q.eq("memberId", ctx.viewer._id))
+      .take(MAX_PINS);
+    let count = pins.length;
+    if (count >= MAX_PINS) {
+      // Deleted records leave invisible pins behind that would block new ones.
+      for (const pin of pins) {
+        if (await ctx.db.get(pin.record.split(":")[1] as never)) continue;
+        await ctx.db.delete(pin._id);
+        count--;
+      }
+    }
     if (count >= MAX_PINS) fail("conflict", `You can pin ${MAX_PINS} records`);
     await ctx.db.insert("pins", { memberId: ctx.viewer._id, record });
     return true;

@@ -23,22 +23,26 @@ import {
 } from "@/features/accounts/use-title-shortcut";
 import Timeline from "@/features/timeline/timeline";
 import { RecordAutomations } from "@/features/automations/record-automations";
+import PlaybookPicker from "@/features/playbook/playbook-picker";
 import { useDraftAction } from "@/features/ai/use-draft-action";
 import { usePinAction } from "@/features/pins/use-pins";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { useViewer } from "@/hooks/use-viewer";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
+import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
+import MessageQuestionIcon from "@/public/assets/icons/message-question.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import { ASIDE_SECTION } from "@/features/accounts/account-insights";
+import FilesSection from "@/features/files/files-section";
 import LeadContactButtons from "./lead-contact";
 import { LeadMessage, LeadStatusControl, type Lead } from "./lead-fields";
-import { DemoTag, SourceTag } from "./lead-meta";
+import { DemoTag, ScoreTag, SourceTag } from "./lead-meta";
 import {
   LeadAttribution,
   LeadConsent,
@@ -97,6 +101,7 @@ function LeadView({ lead }: { lead: Lead }) {
   const draft = useDraftAction({ leadId: lead._id });
   const { convert, assign } = useLeadActions();
   const [converting, setConverting] = useState(false);
+  const [playbookOpen, setPlaybookOpen] = useState(false);
   const converted = lead.status === "converted";
 
   async function runConvert() {
@@ -193,6 +198,11 @@ function LeadView({ lead }: { lead: Lead }) {
               actions={[
                 pin,
                 draft.action,
+                {
+                  label: "Playbook",
+                  icon: MessageQuestionIcon,
+                  onSelect: () => setPlaybookOpen(true),
+                },
                 lead.owner?._id !== viewer._id && {
                   label: "Assign to me",
                   icon: UserPlusIcon,
@@ -202,6 +212,10 @@ function LeadView({ lead }: { lead: Lead }) {
               ]}
             />
             {draft.dialog}
+            <PlaybookPicker
+              open={playbookOpen}
+              onOpenChange={setPlaybookOpen}
+            />
           </>
         }
       />
@@ -223,6 +237,7 @@ function LeadView({ lead }: { lead: Lead }) {
               <>
                 <span className="flex min-w-0 flex-wrap items-center gap-0.75 gap-y-1">
                   <LeadStatusControl lead={lead} />
+                  <ScoreTag score={lead.score} reasons={lead.scoreReasons} />
                   <SourceTag utm={lead.utm} channel={lead.channel} />
                   {lead.demoAt && <DemoTag at={lead.demoAt} />}
                 </span>
@@ -249,6 +264,10 @@ function LeadView({ lead }: { lead: Lead }) {
             <LeadDetails lead={lead} className={ASIDE_SECTION} />
             <LeadConversion lead={lead} className={ASIDE_SECTION} />
             <LeadAttribution lead={lead} className={ASIDE_SECTION} />
+            <FilesSection
+              target={{ leadId: lead._id }}
+              className={cn(ASIDE_SECTION, "gap-2")}
+            />
             <LeadConsent
               lead={lead}
               className={ASIDE_SECTION}

@@ -12,6 +12,8 @@ type SlaLead = {
   status: LeadStatus;
   firstTouchedAt?: number | null;
   slaBreachedAt?: number | null;
+  /** This lead's own window (shorter for hot leads); overrides the shared one. */
+  slaMs?: number | null;
 };
 
 export type SlaState =
@@ -21,7 +23,12 @@ export type SlaState =
   | { kind: "none" };
 
 /** The clock starts at the next 09:00 India time for leads that land out of hours. */
-export function slaState(lead: SlaLead, slaMs: number, now: number): SlaState {
+export function slaState(
+  lead: SlaLead,
+  sharedMs: number,
+  now: number,
+): SlaState {
+  const slaMs = lead.slaMs ?? sharedMs;
   const start = slaClockStart(lead._creationTime);
   if (lead.firstTouchedAt) {
     const tookMs = Math.max(0, lead.firstTouchedAt - start);
@@ -88,7 +95,14 @@ export function slaMeter(
 }
 
 /** Table cell: a small meter of the SLA used, then the countdown, reply time or overrun. */
-export function SlaCell({ lead, slaMs }: { lead: SlaLead; slaMs: number }) {
+export function SlaCell({
+  lead,
+  slaMs: sharedMs,
+}: {
+  lead: SlaLead;
+  slaMs: number;
+}) {
+  const slaMs = lead.slaMs ?? sharedMs;
   const now = useNow(isSlaOpen(lead), 1000);
   const state = slaState(lead, slaMs, now);
   const meter = slaMeter(state, slaMs);

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
@@ -20,7 +20,7 @@ import { usePush } from "@/features/pwa/use-push";
 import { ROLE_DESCRIPTION, ROLE_TONE } from "@/features/team/roles";
 import { useViewer } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
-import { cleanText } from "@/lib/domain/normalize";
+import { cleanText, formatPhone, normalizePhone } from "@/lib/domain/normalize";
 import { readError } from "@/lib/errors";
 import { MOD_KEY } from "@/lib/keyboard";
 import { setThemePreference, useThemePreference } from "@/lib/theme";
@@ -154,6 +154,8 @@ export default function ProfileSettings() {
         <DigestSetting />
       </SettingsSection>
 
+      <CallingSection />
+
       <SettingsSection title="Session">
         <SettingsRow
           label="Sign out"
@@ -165,6 +167,77 @@ export default function ProfileSettings() {
         </SettingsRow>
       </SettingsSection>
     </>
+  );
+}
+
+function CallingSection() {
+  const configured = useQuery(api.calls.configured);
+  const viewer = useViewer();
+  const setPhone = useMutation(api.members.setPhone);
+  const saved = viewer.phone ? formatPhone(viewer.phone) : "";
+  const [value, setValue] = useState(saved);
+  const [error, setError] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  if (!configured) return null;
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError(undefined);
+    try {
+      await setPhone({ phone: value });
+      const phone = normalizePhone(value);
+      setValue(phone ? formatPhone(phone) : "");
+      toast(phone ? "Phone saved" : "Phone removed");
+    } catch (reason) {
+      setError(readError(reason, "Couldn't save your phone").message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <SettingsSection title="Calling">
+      <SettingsRow
+        label="Your phone"
+        htmlFor="profile-phone"
+        description={
+          error ? (
+            <span role="alert" className="text-danger">
+              {error}
+            </span>
+          ) : (
+            "Call from the CRM rings this number first, then connects the customer."
+          )
+        }
+      >
+        <form onSubmit={save} noValidate className="flex gap-2">
+          <Input
+            id="profile-phone"
+            type="tel"
+            autoComplete="tel"
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              setError(undefined);
+            }}
+            placeholder="98200 12345"
+            aria-invalid={error ? true : undefined}
+            className="aria-invalid:border-danger"
+          />
+          <Button
+            type="submit"
+            variant="secondary"
+            size="control"
+            className="h-9 px-4"
+            disabled={value.trim() === saved}
+            loading={saving}
+          >
+            Save
+          </Button>
+        </form>
+      </SettingsRow>
+    </SettingsSection>
   );
 }
 

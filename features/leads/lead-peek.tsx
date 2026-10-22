@@ -22,7 +22,7 @@ import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import XIcon from "@/public/assets/icons/x.svg";
 import { LeadStatusControl, type Lead } from "./lead-fields";
-import { DemoTag, SourceTag } from "./lead-meta";
+import { DemoTag, ScoreTag, SourceTag } from "./lead-meta";
 import {
   LeadAttribution,
   LeadConsent,
@@ -179,6 +179,7 @@ function LeadHero({ lead }: { lead: Lead }) {
       title={lead.name}
     >
       <LeadStatusControl lead={lead} />
+      <ScoreTag score={lead.score} reasons={lead.scoreReasons} />
       <SourceTag utm={lead.utm} channel={lead.channel} />
       {lead.demoAt && <DemoTag at={lead.demoAt} />}
       <span className="caption-style text-fg-secondary basis-full truncate">

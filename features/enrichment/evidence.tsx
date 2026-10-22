@@ -8,7 +8,7 @@ function pretty(evidence: string) {
   }
 }
 
-/** Collapsed raw provider response behind a fact. */
+/** Collapsed text behind a fact or a lookup, such as the registry response. */
 export function Evidence({
   evidence,
   label = "Evidence",
@@ -39,7 +39,7 @@ export function Evidence({
       </summary>
       <pre
         tabIndex={0}
-        aria-label={`${label}, raw response`}
+        aria-label={label}
         className="bg-muted text-fg-secondary shadow-hairline focus-visible:ring-ring mt-1.5 max-h-72 overflow-auto rounded-lg p-3 font-mono text-[11px] leading-relaxed whitespace-pre outline-none focus-visible:ring-2"
       >
         {pretty(evidence)}

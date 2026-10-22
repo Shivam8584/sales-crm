@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/_ui/dialog";
 import Tooltip from "@/components/_ui/tooltip";
+import { useDialer } from "@/features/calls/use-dialer";
 import type { ContactDecision } from "@/lib/domain/consent";
 import type { Channel } from "@/lib/domain/enums";
 import { readError } from "@/lib/errors";
@@ -92,6 +93,7 @@ export default function GuardedContactActions({
 }) {
   const matrix = useQuery(api.consents.forPerson, { personId: person._id });
   const logOverride = useMutation(api.consents.logOverride);
+  const { dial, dialog } = useDialer();
   const [pending, setPending] = useState<{
     action: Action;
     decision: ContactDecision;
@@ -104,9 +106,18 @@ export default function GuardedContactActions({
     matrix?.channels.find((row) => row.channel === channel)?.decisions
       .sales_outreach;
 
+  function run(action: Action) {
+    if (action.channel !== "phone" || !person.phone) return open(action);
+    dial({
+      target: { personId: person._id },
+      name: matrix?.name ?? "them",
+      phone: person.phone,
+    });
+  }
+
   function confirm() {
     if (!pending) return;
-    open(pending.action);
+    run(pending.action);
     logOverride({
       personId: person._id,
       channel: pending.action.channel,
@@ -130,6 +141,14 @@ export default function GuardedContactActions({
               {...(action.external
                 ? { target: "_blank", rel: "noreferrer" }
                 : {})}
+              onClick={
+                action.channel === "phone"
+                  ? (event) => {
+                      event.preventDefault();
+                      run(action);
+                    }
+                  : undefined
+              }
               className={buttonVariants({ variant: "subtle", size: "xs" })}
             >
               <Icon aria-hidden className="size-3" />
@@ -168,6 +187,7 @@ export default function GuardedContactActions({
           </Tooltip>
         );
       })}
+      {dialog}
       <Dialog
         open={pending !== null}
         onOpenChange={(value) => !value && setPending(null)}

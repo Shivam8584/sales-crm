@@ -101,6 +101,7 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `KYC_API_TOKEN`                      | Convex | KYC provider API token                                                                                     |
 | `KYC_HMAC_SECRET`                    | Convex | Verifies signed KYC responses                                                                              |
 | `ENRICHMENT_SANDBOX`                 | Convex | Set to `1` to return test data instead of calling the KYC provider (local only)                            |
+| `ENRICHMENT_ORDER`                   | Convex | Order of the account lookup chain, e.g. `gst,platform,website`; leave out a source to turn it off          |
 | `PLATFORM_WEBHOOK_SECRET`            | Convex | Secret for platform events at `/webhooks/platform` (`X-Hypedrive-Signature`)                               |
 | `EMAIL_PROVIDER`                     | Convex | `smtp`, `resend` or `novu` for the notification digest and automation emails; unset = outbox               |
 | `SMTP_HOST`, `SMTP_PORT`             | Convex | SMTP server for `EMAIL_PROVIDER=smtp`; port 587 (STARTTLS) by default, 465 for TLS                         |
@@ -112,6 +113,11 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `VAPID_SUBJECT`                      | Convex | Browser push only. Contact for push services, e.g. `mailto:you@hypedrive.in`                               |
 | `WHATSAPP_PHONE_NUMBER_ID`           | Convex | Meta WhatsApp Cloud API number; with `WHATSAPP_ACCESS_TOKEN` automations send for real                     |
 | `OPENAI_API_KEY`                     | Convex | Turns on AI briefs, drafts, call summaries and quick capture; unset = AI is hidden                         |
+| `EXOTEL_SID`, `EXOTEL_API_KEY`       | Convex | Exotel account SID and API key for click-to-call; needs every Exotel variable here, else it is hidden        |
+| `EXOTEL_API_TOKEN`                   | Convex | Exotel API token                                                                                           |
+| `EXOTEL_SUBDOMAIN`                   | Convex | Exotel API host for your region: `api.exotel.com` (Singapore) or `api.in.exotel.com` (Mumbai)              |
+| `EXOTEL_CALLER_ID`                   | Convex | Your ExoPhone number, shown to the customer                                                                |
+| `EXOTEL_WEBHOOK_SECRET`              | Convex | Secret in the status callback `/webhooks/exotel?secret=…` that logs each call; unset rejects it            |
 | `AI_MODEL`                           | Convex | Model for briefs, drafts and call summaries; default `gpt-6.1-sol`                                         |
 | `AI_MODEL_FAST`                      | Convex | Model for quick capture and next actions; default `gpt-6-luna`                                             |
 | `NEXT_PUBLIC_CONVEX_URL`             | Next   | Required. Convex API URL (`CONVEX_CLOUD_ORIGIN`)                                                           |

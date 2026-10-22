@@ -1,4 +1,5 @@
-import { sourceFamily } from "@/convex/lib/enrichment";
+import { sourceFamily } from "@/convex/lib/enrichment/kyc";
+import { confidenceBand } from "@/convex/lib/enrichment/waterfall";
 
 const FACT_LABEL: Record<string, string> = {
   gstin: "GSTIN",
@@ -15,6 +16,7 @@ const FACT_LABEL: Record<string, string> = {
   pinCode: "PIN code",
   phone: "Phone",
   email: "Email",
+  siteDescription: "Website description",
 };
 
 export function factLabel(field: string) {
@@ -31,9 +33,46 @@ export function sourceLabel(source: string) {
       return "GST registry";
     case "din":
       return "MCA director registry";
+    case "platform":
+      return "Hypedrive platform";
+    case "website":
+      return "Company website";
     default:
       return source;
   }
+}
+
+/** "From the GST registry · high confidence"; the confidence is absent on older facts. */
+export function sourceNote(source: string, confidence: number | null) {
+  const name = sourceLabel(source);
+  const from = sourceFamily(source) === "website" ? name.toLowerCase() : name;
+  return [
+    `From the ${from}`,
+    confidence === null ? null : bandLabel(confidence),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function bandLabel(confidence: number) {
+  return `${confidenceBand(confidence)} confidence`;
+}
+
+/** One line per provider a lookup tried, in the order it tried them. */
+export function attemptLines(
+  attempts: { provider: string; status: string; ms: number; note?: string }[],
+) {
+  return attempts
+    .map((item) =>
+      [
+        `${sourceLabel(item.provider)}: ${item.status}`,
+        item.note,
+        item.status === "skipped" ? null : `${item.ms} ms`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    )
+    .join("\n");
 }
 
 export function isInactiveGstStatus(status: string) {

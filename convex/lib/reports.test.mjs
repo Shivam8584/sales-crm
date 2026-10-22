@@ -5,6 +5,7 @@ import {
   FUNNEL_STEPS,
   UNASSIGNED,
   bySource,
+  factsOfRows,
   sourceOf,
   funnel,
   istDay,
@@ -13,6 +14,8 @@ import {
   percentile,
   periodWindows,
   pipeline,
+  stageFacts,
+  stageRows,
   teamReport,
   timeToActivate,
 } from "./reports.ts";
@@ -59,17 +62,24 @@ test("the platform funnel has five steps and reads v2 events", () => {
     processedAt: processed ? at : undefined,
   });
   const { orgs } = orgTimelines(
-    [
-      event("user.signed_up", 1, { user_id: "u1" }),
-      event("organization.created", 2, { org_id: "org_1", created_by: "u1" }),
-      event("wallet.deposit_received", 3, { org_id: "org_1" }),
-      event("campaign.status_changed", 4, {
-        campaign_id: "c",
-        to: "pending_review",
-      }),
-      event("campaign.status_changed", 5, { campaign_id: "c", to: "live" }),
-      event("enrollment.approved", 6, { campaign_id: "c" }, false),
-    ],
+    factsOfRows(
+      stageRows(
+        stageFacts([
+          event("user.signed_up", 1, { user_id: "u1" }),
+          event("organization.created", 2, {
+            org_id: "org_1",
+            created_by: "u1",
+          }),
+          event("wallet.deposit_received", 3, { org_id: "org_1" }),
+          event("campaign.status_changed", 4, {
+            campaign_id: "c",
+            to: "pending_review",
+          }),
+          event("campaign.status_changed", 5, { campaign_id: "c", to: "live" }),
+          event("enrollment.approved", 6, { campaign_id: "c" }, false),
+        ]),
+      ),
+    ),
     [],
     [],
   );
@@ -224,7 +234,7 @@ test("team leaderboard: per-rep period figures, previous period and snapshots", 
       { _id: "acc3", _creationTime: 0, stage: "activated", ownerId: "b" },
     ],
     people: [],
-    events: [
+    facts: stageFacts([
       event("user.signed_up", undefined, NOW - 20 * DAY, { user_id: "u1" }),
       event("organization.created", "org1", NOW - 19 * DAY, {
         org_id: "org1",
@@ -234,7 +244,7 @@ test("team leaderboard: per-rep period figures, previous period and snapshots", 
         org_id: "org1",
         campaign_id: "c",
       }),
-    ],
+    ]),
     memberIds: ["a", "b", "c"],
     slaMs: 5 * MIN,
     now: NOW,

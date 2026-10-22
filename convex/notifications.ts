@@ -14,7 +14,7 @@ import {
 const LIMIT = 50;
 const MAX_PAGE = 500;
 const MAX_UNREAD = 99;
-const MAX_BULK = 200;
+const MAX_BULK = MAX_PAGE;
 
 export type NotificationInput = {
   kind: string;
@@ -302,7 +302,7 @@ export const markAllRead = memberMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    const items = await unread(ctx, ctx.viewer._id).collect();
+    const items = await unread(ctx, ctx.viewer._id).take(MAX_BULK);
     for (const item of items) await ctx.db.patch(item._id, { readAt: now });
     return items.map(stateOf);
   },

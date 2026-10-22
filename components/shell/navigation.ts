@@ -12,6 +12,7 @@ import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
 import SettingsIcon from "@/public/assets/icons/settings.svg";
 import AutomationIcon from "@/public/assets/icons/automation.svg";
 import EyeIcon from "@/public/assets/icons/eye.svg";
+import MessageQuestionIcon from "@/public/assets/icons/message-question.svg";
 
 export type NavItem = {
   href: string;
@@ -76,6 +77,12 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Insights",
     items: [
       { href: "/reports", label: "Reports", icon: BarChartIcon, shortcut: "R" },
+      {
+        href: "/playbook",
+        label: "Playbook",
+        icon: MessageQuestionIcon,
+        shortcut: "B",
+      },
     ],
   },
 ];
@@ -110,6 +117,7 @@ export const SETTINGS_PAGES = [
   { href: "/settings/profile", label: "Profile", adminOnly: false },
   { href: "/settings/team", label: "Team", adminOnly: false },
   { href: "/settings/workspace", label: "Workspace", adminOnly: true },
+  { href: "/settings/fields", label: "Custom fields", adminOnly: true },
   { href: "/settings/integrations", label: "Integrations", adminOnly: true },
   { href: "/settings/system", label: "System", adminOnly: true },
 ] as const;

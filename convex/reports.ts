@@ -2,24 +2,29 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import type { DealStage } from "../lib/domain/enums";
+import { ACTIVATION_STAGES } from "../lib/domain/platform";
 import { memberQuery } from "./lib/functions";
+import { uniqueById } from "./lib/lists";
 import { memberIndex } from "./lib/records";
 import { leadSlaSeconds } from "./lib/leads";
 import {
   PERIODS,
   UNASSIGNED,
   buildReport,
+  factsOfRows,
   istDay,
   periodWindows,
+  sourceOf,
   teamReport,
 } from "./lib/reports";
 import { literals } from "./lib/validators";
 
 const vPeriod = literals(PERIODS);
 
-// Reports still read whole accounts, leads and platform-events tables: the
-// funnel needs every org's first event per stage and every lead's account link.
-// Move those to aggregates past ~10k rows per table.
+// Reads are bounded by the two periods compared (leads, accounts and deals
+// created in them) and by platform size (platform accounts, people and the
+// `activationStages` rows), never by the size of the leads, accounts or
+// platform-events tables.
 
 const OPEN_STAGES = ["discovery", "demo", "proposal", "onboarding"] as const;
 const CLOSED_STAGES = ["won", "lost"] as const;
@@ -58,6 +63,52 @@ function platformPeople(ctx: QueryCtx) {
     .collect();
 }
 
+const leadsSince = (ctx: QueryCtx, since: number) =>
+  ctx.db
+    .query("leads")
+    .withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
+    .collect();
+
+const accountsSince = (ctx: QueryCtx, since: number) =>
+  ctx.db
+    .query("accounts")
+    .withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
+    .collect();
+
+function platformAccounts(ctx: QueryCtx) {
+  return ctx.db
+    .query("accounts")
+    .withIndex("by_platform_org", (q) => q.gt("platformOrgId", ""))
+    .collect();
+}
+
+async function stageFacts(ctx: QueryCtx) {
+  return factsOfRows(await ctx.db.query("activationStages").collect());
+}
+
+/**
+ * The source of each converted account's first lead. One range read: reading
+ * per account would exceed the per-query read-call limit.
+ */
+async function firstLeadSources(ctx: QueryCtx) {
+  const leads = await ctx.db
+    .query("leads")
+    .withIndex("by_account", (q) => q.gt("accountId", "" as Id<"accounts">))
+    .collect();
+  const sources = new Map<string, string>();
+  for (const lead of leads) {
+    if (lead.accountId && !sources.has(lead.accountId)) {
+      sources.set(lead.accountId, sourceOf(lead).key);
+    }
+  }
+  return sources;
+}
+
+async function accountsById(ctx: QueryCtx, ids: Id<"accounts">[]) {
+  const found = await Promise.all(ids.map((id) => ctx.db.get(id)));
+  return found.filter((account) => account !== null);
+}
+
 /** Overview, funnel, sources and speed to lead. */
 export const overview = memberQuery({
   args: {
@@ -67,19 +118,42 @@ export const overview = memberQuery({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const [leads, accounts, people, events, deals, owner] = await Promise.all([
-      ctx.db.query("leads").collect(),
-      ctx.db.query("accounts").collect(),
+    const since = periodWindows(args.period, now).previous.start;
+    const [
+      leads,
+      created,
+      onPlatform,
+      people,
+      facts,
+      accountSource,
+      deals,
+      owner,
+    ] = await Promise.all([
+      leadsSince(ctx, since),
+      accountsSince(ctx, since),
+      platformAccounts(ctx),
       platformPeople(ctx),
-      ctx.db.query("platformEvents").collect(),
-      dealsSince(ctx, periodWindows(args.period, now).previous.start, true),
+      stageFacts(ctx),
+      firstLeadSources(ctx),
+      dealsSince(ctx, since, true),
       names(ctx),
     ]);
+    const known = uniqueById([...created, ...onPlatform]);
+    const seen = new Set<string>(known.map((account) => account._id));
+    const linked = [...new Set(leads.flatMap((lead) => lead.accountId ?? []))];
+    const accounts = [
+      ...known,
+      ...(await accountsById(
+        ctx,
+        linked.filter((id) => !seen.has(id)),
+      )),
+    ];
     const report = buildReport({
       leads,
       accounts,
       people,
-      events,
+      facts,
+      accountSource,
       deals,
       slaMs: (await leadSlaSeconds(ctx)) * 1000,
       now,
@@ -105,6 +179,31 @@ function interaction(entry: Doc<"timeline">) {
   };
 }
 
+/**
+ * Accounts that can sit past "converted" on the funnel: those in a platform
+ * stage, with a platform org, or with a platform user.
+ */
+async function platformReached(
+  ctx: QueryCtx,
+  onPlatform: Doc<"accounts">[],
+  people: Doc<"people">[],
+) {
+  const byStage = await Promise.all(
+    [...ACTIVATION_STAGES, "expanding" as const].map((stage) =>
+      ctx.db
+        .query("accounts")
+        .withIndex("by_stage", (q) => q.eq("stage", stage))
+        .collect(),
+    ),
+  );
+  const known = uniqueById([...onPlatform, ...byStage.flat()]);
+  const seen = new Set<string>(known.map((account) => account._id));
+  const missing = people.flatMap((person) =>
+    person.accountId && !seen.has(person.accountId) ? person.accountId : [],
+  );
+  return [...known, ...(await accountsById(ctx, [...new Set(missing)]))];
+}
+
 /** Rep leaderboard for the period and the one before it. */
 export const team = memberQuery({
   args: { period: vPeriod },
@@ -112,12 +211,9 @@ export const team = memberQuery({
     const now = Date.now();
     const since = periodWindows(args.period, now).previous.start;
     const today = istDay(now);
-    const [leads, tasks, timeline, deals, accounts, people, events, members] =
+    const [leads, tasks, timeline, deals, onPlatform, people, facts, members] =
       await Promise.all([
-        ctx.db
-          .query("leads")
-          .withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
-          .collect(),
+        leadsSince(ctx, since),
         Promise.all([
           ...(["todo", "in_progress"] as const).map((status) =>
             ctx.db
@@ -145,15 +241,16 @@ export const team = memberQuery({
           ),
         ).then((rows) => rows.flat()),
         dealsSince(ctx, since, false),
-        ctx.db.query("accounts").collect(),
+        platformAccounts(ctx),
         platformPeople(ctx),
-        ctx.db.query("platformEvents").collect(),
+        stageFacts(ctx),
         ctx.db
           .query("members")
           .withIndex("by_status", (q) => q.eq("status", "active"))
           .collect(),
       ]);
     const owner = await names(ctx);
+    const accounts = await platformReached(ctx, onPlatform, people);
     const report = teamReport({
       leads,
       tasks,
@@ -161,7 +258,7 @@ export const team = memberQuery({
       deals,
       accounts,
       people,
-      events,
+      facts,
       memberIds: members.map((member) => member._id),
       slaMs: (await leadSlaSeconds(ctx)) * 1000,
       now,

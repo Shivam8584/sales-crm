@@ -173,7 +173,7 @@ const ACCOUNT_SOURCE_LABEL = "Added as account";
 
 type Timeline = Partial<Record<ActivationStage, number>>;
 
-function readPayload(payload: string): Record<string, unknown> {
+export function readPayload(payload: string): Record<string, unknown> {
   try {
     const data: unknown = JSON.parse(payload);
     return data && typeof data === "object" && !Array.isArray(data)
@@ -184,20 +184,26 @@ function readPayload(payload: string): Record<string, unknown> {
   }
 }
 
-/** First time each org reached each activation stage, from platform events. */
-export function orgTimelines(
-  events: EventInput[],
-  accounts: AccountInput[],
-  people: PersonInput[],
-) {
+/** What platform events say about activation, before orgs are matched to accounts. */
+export type StageFacts = {
+  /** Per org, when it first reached each stage after signing up. */
+  orgs: Map<string, Timeline>;
+  /** Per user, when they signed up. */
+  signups: Map<string, number>;
+  /** Per org, the user who created it. */
+  creators: Map<string, string>;
+};
+
+const earliest = (timeline: Timeline, stage: ActivationStage, at: number) => {
+  const current = timeline[stage];
+  if (current === undefined || at < current) timeline[stage] = at;
+};
+
+/** First time each org reached each activation stage, and each user's signup, from platform events. */
+export function stageFacts(events: EventInput[]): StageFacts {
   const orgs = new Map<string, Timeline>();
   const signups = new Map<string, number>();
   const creators = new Map<string, string>();
-  const earliest = (timeline: Timeline, stage: ActivationStage, at: number) => {
-    const current = timeline[stage];
-    if (current === undefined || at < current) timeline[stage] = at;
-  };
-
   for (const event of events) {
     if (event.ignored || event.processedAt === undefined) continue;
     const data = readPayload(event.payload);
@@ -220,7 +226,52 @@ export function orgTimelines(
       if (typeof creator === "string") creators.set(event.orgId, creator);
     }
   }
+  return { orgs, signups, creators };
+}
 
+/** The stored form of stage facts: one row per org, and one per user for their signup. */
+export type StageRow = {
+  orgId?: string;
+  userId?: string;
+  stages: Timeline;
+  creator?: string;
+};
+
+export function stageRows(facts: StageFacts): StageRow[] {
+  const rows: StageRow[] = [];
+  for (const [orgId, stages] of facts.orgs) {
+    const creator = facts.creators.get(orgId);
+    rows.push({ orgId, stages, ...(creator ? { creator } : {}) });
+  }
+  for (const [userId, at] of facts.signups) {
+    rows.push({ userId, stages: { signed_up: at } });
+  }
+  return rows;
+}
+
+export function factsOfRows(rows: StageRow[]): StageFacts {
+  const orgs = new Map<string, Timeline>();
+  const signups = new Map<string, number>();
+  const creators = new Map<string, string>();
+  for (const row of rows) {
+    if (row.userId) {
+      const at = row.stages.signed_up;
+      if (at !== undefined) signups.set(row.userId, at);
+    } else if (row.orgId) {
+      orgs.set(row.orgId, { ...row.stages });
+      if (row.creator) creators.set(row.orgId, row.creator);
+    }
+  }
+  return { orgs, signups, creators };
+}
+
+/** Each org's timeline, with signups added from the org's creator and the platform users on its account. */
+export function orgTimelines(
+  facts: StageFacts,
+  accounts: AccountInput[],
+  people: PersonInput[],
+) {
+  const { orgs, signups, creators } = facts;
   const usersByAccount = new Map<string, string[]>();
   for (const person of people) {
     if (!person.accountId || !person.platformUserId) continue;
@@ -307,8 +358,8 @@ export function buildUnits(
   leads: LeadInput[],
   accounts: AccountInput[],
   accountStep: Map<string, number>,
+  fromLeads: ReadonlySet<string>,
 ): Unit[] {
-  const fromLeads = new Set(leads.flatMap((lead) => lead.accountId ?? []));
   const units: Unit[] = leads.map((lead) => {
     const source = sourceOf(lead);
     return {
@@ -620,10 +671,15 @@ export function pipeline(
 }
 
 export type ReportInput = {
+  /** Leads created in the selected period or the one before it. */
   leads: LeadInput[];
+  /** Accounts added in those periods, accounts on the platform, and accounts of those leads. */
   accounts: AccountInput[];
+  /** People with a platform user. */
   people: PersonInput[];
-  events: EventInput[];
+  facts: StageFacts;
+  /** Source key of the first lead of every account that came from one. */
+  accountSource: ReadonlyMap<string, string>;
   deals: DealInput[];
   slaMs: number;
   now: number;
@@ -634,9 +690,13 @@ export type ReportInput = {
 /** Everything the reports page shows, for the selected period and the one before it. */
 export function buildReport(input: ReportInput) {
   const windows = periodWindows(input.period, input.now);
-  const timelines = orgTimelines(input.events, input.accounts, input.people);
+  const timelines = orgTimelines(input.facts, input.accounts, input.people);
   const steps = accountSteps(input.accounts, timelines);
-  const allUnits = buildUnits(input.leads, input.accounts, steps);
+  const fromLeads = new Set([
+    ...input.leads.flatMap((lead) => lead.accountId ?? []),
+    ...input.accountSource.keys(),
+  ]);
+  const allUnits = buildUnits(input.leads, input.accounts, steps, fromLeads);
   const units = filterUnits(allUnits, input.filters);
 
   const sources = new Map<string, string>();
@@ -644,14 +704,6 @@ export function buildReport(input: ReportInput) {
     if (unit.lead) sources.set(unit.sourceKey, unit.sourceLabel);
   }
 
-  const accountSource = new Map<string, string>();
-  for (const lead of [...input.leads].sort(
-    (a, b) => a._creationTime - b._creationTime,
-  )) {
-    if (lead.accountId && !accountSource.has(lead.accountId)) {
-      accountSource.set(lead.accountId, sourceOf(lead).key);
-    }
-  }
   const accountById = new Map(input.accounts.map((item) => [item._id, item]));
   const filtered = Boolean(input.filters.source || input.filters.owner);
   const orgs = new Map<string, Timeline>();
@@ -663,7 +715,7 @@ export function buildReport(input: ReportInput) {
     const accountId = timelines.orgAccount.get(orgId);
     const account = accountId ? accountById.get(accountId) : undefined;
     if (!account) continue;
-    const source = accountSource.get(account._id) ?? ACCOUNT_SOURCE;
+    const source = input.accountSource.get(account._id) ?? ACCOUNT_SOURCE;
     if (input.filters.source && source !== input.filters.source) continue;
     if (!matchesOwner(account.ownerId, input.filters.owner)) continue;
     orgs.set(orgId, timeline);
@@ -765,7 +817,7 @@ export type TeamInput = {
   deals: DealInput[];
   accounts: AccountInput[];
   people: PersonInput[];
-  events: EventInput[];
+  facts: StageFacts;
   /** Active teammates, listed even when they have nothing in the period. */
   memberIds: string[];
   slaMs: number;
@@ -780,7 +832,7 @@ const isInteraction = (entry: InteractionInput) =>
 export function teamReport(input: TeamInput) {
   const windows = periodWindows(input.period, input.now);
   const today = istDay(input.now);
-  const timelines = orgTimelines(input.events, input.accounts, input.people);
+  const timelines = orgTimelines(input.facts, input.accounts, input.people);
   const steps = accountSteps(input.accounts, timelines);
   const accounts = input.accounts.filter((a) => a.archivedAt === undefined);
   const activatedAt = new Map<string, number>();

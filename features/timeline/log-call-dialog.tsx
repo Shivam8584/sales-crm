@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
@@ -16,9 +16,11 @@ import {
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
+import Tag from "@/components/_ui/tag";
 import OptionPicker from "@/components/fields/option-picker";
 import { aiError, useAiEnabled } from "@/features/ai/use-ai";
 import { formatDay } from "@/features/tasks/task-meta";
+import { callMinutes } from "@/lib/domain/calls";
 import { CALL_OUTCOMES, type CallOutcome } from "@/lib/domain/enums";
 import { CALL_OUTCOME_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
@@ -32,12 +34,23 @@ type ActionItem = { title: string; dueDate: string | null; on: boolean };
 
 const SUMMARY_MIN = 60;
 
-/** Logs a call against a record without opening it, e.g. from a list row. */
+const clock = (seconds: number) =>
+  `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+
+/**
+ * Logs a call against a record without opening it, e.g. from a list row. With
+ * `startedAt` and no `durationSeconds` a timer runs until the rep stops it.
+ */
 export default function LogCallDialog({
   call,
   onClose,
 }: {
-  call: { target: TimelineTarget; name: string } | null;
+  call: {
+    target: TimelineTarget;
+    name: string;
+    startedAt?: number;
+    durationSeconds?: number;
+  } | null;
   onClose: () => void;
 }) {
   const log = useMutation(api.timeline.log);
@@ -48,7 +61,30 @@ export default function LogCallDialog({
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [summarizing, setSummarizing] = useState(false);
   const [outcome, setOutcome] = useState<CallOutcome>("connected");
-  const [duration, setDuration] = useState("");
+  const [duration, setDuration] = useState(() =>
+    String(callMinutes(call?.durationSeconds ?? 0) || ""),
+  );
+  const [stopped, setStopped] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const startedAt = call?.startedAt;
+  const timed = startedAt !== undefined && call?.durationSeconds === undefined;
+  const running = timed && stopped === null;
+  const seconds =
+    stopped ??
+    (timed && startedAt !== undefined
+      ? Math.max(0, Math.floor((now - startedAt) / 1000))
+      : 0);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  function stop() {
+    setStopped(seconds);
+    setDuration(String(callMinutes(seconds) || ""));
+  }
   const draft = useMentionDraft();
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
@@ -84,11 +120,16 @@ export default function LogCallDialog({
     if (!call || saving) return;
     setSaving(true);
     try {
+      const minutes =
+        duration || !running || startedAt === undefined
+          ? duration
+          : String(callMinutes(Math.floor((Date.now() - startedAt) / 1000)));
       await log({
         target: call.target,
         kind: "call",
         outcome,
-        durationMin: duration ? Number(duration) : undefined,
+        occurredAt: startedAt,
+        durationMin: minutes ? Number(minutes) : undefined,
         body: draft.encoded() || undefined,
       });
       const picked = actions.filter((item) => item.on);
@@ -130,6 +171,18 @@ export default function LogCallDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 px-6 py-5">
+            {timed && (
+              <div className="flex items-center gap-3">
+                <Tag size="sm" aria-label={`${seconds} seconds`}>
+                  {clock(seconds)}
+                </Tag>
+                {running && (
+                  <Button variant="subtle" size="xs" onClick={stop}>
+                    Stop
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-4">
               <div className="flex flex-col gap-2">
                 <span className="caption-style text-fg-secondary">Outcome</span>

@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Avatar from "@/components/_ui/avatar";
@@ -27,8 +28,11 @@ import {
 } from "@/features/accounts/use-title-shortcut";
 import AccountLogo from "@/features/accounts/account-logo";
 import AccountPicker from "@/features/accounts/account-picker";
+import CustomFields from "@/features/fields/custom-fields";
+import FilesSection from "@/features/files/files-section";
 import MemberPicker from "@/features/members/member-picker";
 import { useDraftAction } from "@/features/ai/use-draft-action";
+import PlaybookPicker from "@/features/playbook/playbook-picker";
 import { usePinAction } from "@/features/pins/use-pins";
 import RecordTasks from "@/features/tasks/record-tasks";
 import { TaskChecklistSkeleton } from "@/features/tasks/task-checklist";
@@ -43,6 +47,7 @@ import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
+import MessageQuestionIcon from "@/public/assets/icons/message-question.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import XIcon from "@/public/assets/icons/x.svg";
@@ -94,13 +99,18 @@ function DealPageContent({ id }: { id: Id<"deals"> }) {
   return <DealView key={deal._id} deal={deal} />;
 }
 
-function DealView({ deal }: { deal: DealRow }) {
+function DealView({
+  deal,
+}: {
+  deal: NonNullable<FunctionReturnType<typeof api.deals.get>>;
+}) {
   const save = useDealSave(deal);
   const remove = useDeleteDeal();
   const setCreate = useUiStore((state) => state.setCreate);
   const tasks = useQuery(api.tasks.list, { dealId: deal._id, done: "none" });
   const pin = usePinAction({ dealId: deal._id });
   const draft = useDraftAction({ dealId: deal._id });
+  const [playbookOpen, setPlaybookOpen] = useState(false);
   const open = isOpenStage(deal.stage);
 
   const addTask = () =>
@@ -170,6 +180,11 @@ function DealView({ deal }: { deal: DealRow }) {
               actions={[
                 pin,
                 draft.action,
+                {
+                  label: "Playbook",
+                  icon: MessageQuestionIcon,
+                  onSelect: () => setPlaybookOpen(true),
+                },
                 { label: "Add task", icon: PlusIcon, onSelect: addTask },
                 deal.account && {
                   label: "Open account",
@@ -186,6 +201,10 @@ function DealView({ deal }: { deal: DealRow }) {
               ]}
             />
             {draft.dialog}
+            <PlaybookPicker
+              open={playbookOpen}
+              onOpenChange={setPlaybookOpen}
+            />
           </>
         }
       />
@@ -274,6 +293,18 @@ function DealView({ deal }: { deal: DealRow }) {
                 </Property>
               )}
             </Properties>
+            <CustomFields
+              entity="deal"
+              target={{ dealId: deal._id }}
+              values={deal.custom}
+              className="gap-2 p-0"
+              divider={false}
+            />
+            <FilesSection
+              target={{ dealId: deal._id }}
+              className="gap-2 p-0"
+              divider={false}
+            />
             <Properties title="Activity">
               <Property label="Created">
                 <span className="text-sm" title={dateTime(deal._creationTime)}>

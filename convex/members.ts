@@ -3,7 +3,11 @@ import { v } from "convex/values";
 import { query, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import type { Role } from "../lib/domain/enums";
-import { cleanText, normalizeEmail } from "../lib/domain/normalize";
+import {
+  cleanText,
+  normalizeEmail,
+  normalizePhone,
+} from "../lib/domain/normalize";
 import { sha256Hex } from "./lib/crypto";
 import { fail, invalid, notFound } from "./lib/errors";
 import {
@@ -37,7 +41,12 @@ export const viewer = query({
   },
 });
 
-/** Admits the signed-in user: first user is admin, then invites, then the domain allowlist. */
+/**
+ * Admits the signed-in user: first user is admin, then invites, then the domain
+ * allowlist. Password sign-up doesn't verify the address, so matching an invite
+ * or the allowlist by email alone needs a verified (SSO) email; an invite link
+ * token proves ownership on its own.
+ */
 export const join = mutation({
   args: { inviteToken: v.optional(v.string()) },
   handler: async (ctx, { inviteToken }) => {
@@ -61,6 +70,7 @@ export const join = mutation({
     }
 
     const now = Date.now();
+    const verified = user.emailVerificationTime !== undefined;
     const anyMember = await ctx.db.query("members").first();
     let role: Role | null = anyMember ? null : "admin";
 
@@ -75,7 +85,7 @@ export const join = mutation({
           !item.acceptedAt &&
           !item.revokedAt &&
           item.expiresAt > now &&
-          (hash === null || item.tokenHash === hash),
+          (hash === null ? verified : item.tokenHash === hash),
       );
       if (invite) {
         role = invite.role;
@@ -83,7 +93,7 @@ export const join = mutation({
       }
     }
 
-    if (!role && domainAllowed(email)) role = "rep";
+    if (!role && verified && domainAllowed(email)) role = "rep";
     if (!role)
       fail("forbidden", "Ask an admin to invite you to this workspace");
 
@@ -144,6 +154,18 @@ export const updateProfile = memberMutation({
     const previous = ctx.viewer.name;
     if (name !== previous) await ctx.db.patch(ctx.viewer._id, { name });
     return { name: previous };
+  },
+});
+
+export const setPhone = memberMutation({
+  args: { phone: v.string() },
+  handler: async (ctx, args) => {
+    const raw = args.phone.trim();
+    const phone = raw ? normalizePhone(raw) : undefined;
+    if (raw && !phone) {
+      invalid("phone", "Enter a mobile number, or include the country code");
+    }
+    await ctx.db.patch(ctx.viewer._id, { phone: phone ?? undefined });
   },
 });
 

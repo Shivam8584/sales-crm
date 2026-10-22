@@ -5,6 +5,8 @@ import { accountHealth, weakestFactors } from "../lib/domain/health";
 import { ACTIVATION_STAGES } from "../lib/domain/platform";
 import { PRIORITIES } from "../lib/domain/enums";
 import { fail } from "./lib/errors";
+import { literals } from "./lib/validators";
+import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import {
@@ -25,6 +27,7 @@ import {
   journey,
   platformAccounts,
   runActivationChecks,
+  runActivationStep,
   stallAccount,
   STALL_RULES,
   STALL_THRESHOLDS,
@@ -258,13 +261,12 @@ export const runNow = managerMutation({
 });
 
 export const check = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const result = await runActivationChecks(ctx, Date.now());
-    return {
-      checked: result.checked,
-      stuck: result.stuck,
-      changes: result.changes.length,
-    };
+  args: {
+    phase: v.optional(literals(["linked", "signed_up", "stale"])),
+    cursor: v.optional(v.string()),
+  },
+  handler: async (ctx, { phase = "linked", cursor }): Promise<void> => {
+    const next = await runActivationStep(ctx, Date.now(), { phase, cursor });
+    if (next) await ctx.scheduler.runAfter(0, internal.activation.check, next);
   },
 });

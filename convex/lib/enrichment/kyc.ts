@@ -1,5 +1,5 @@
-import { panRoot } from "../../lib/domain/gstin";
-import { normalizePhone } from "../../lib/domain/normalize";
+import { panRoot } from "../../../lib/domain/gstin";
+import { normalizePhone } from "../../../lib/domain/normalize";
 
 /**
  * Provider calls and response shaping for enrichment. Nothing here touches the
@@ -37,6 +37,8 @@ export type Candidate = {
   field: string;
   value: string;
   strength: "authoritative" | "signal";
+  confidence?: number;
+  url?: string;
 };
 
 export type ProviderReply<T> =

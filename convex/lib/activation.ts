@@ -27,6 +27,7 @@ import { logSystem } from "./timeline";
 export type { ActivationStage };
 
 const HOUR = 60 * 60_000;
+const ORG_EVENT_LIMIT = 5000;
 const DAY = 24 * HOUR;
 
 /** How long a brand may sit in each situation before a rep gets a task. */
@@ -449,12 +450,12 @@ export async function accountEvents(
   const orgId = account.platformOrgId;
   const rows: Doc<"platformEvents">[] = [];
   if (orgId) {
-    rows.push(
-      ...(await ctx.db
-        .query("platformEvents")
-        .withIndex("by_org", (q) => q.eq("orgId", orgId))
-        .collect()),
-    );
+    const latest = await ctx.db
+      .query("platformEvents")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .order("desc")
+      .take(ORG_EVENT_LIMIT);
+    rows.push(...latest.reverse());
   } else {
     const people = await ctx.db
       .query("people")
@@ -670,6 +671,35 @@ export async function syncAccountActivation(
   return await syncAccount(ctx, account, events, now, { fallback: null });
 }
 
+async function checkAccounts(
+  ctx: MutationCtx,
+  accounts: Doc<"accounts">[],
+  now: number,
+) {
+  const assignees: Assignees = { fallback: null };
+  const changes: CheckChange[] = [];
+  let stuck = 0;
+  for (const account of accounts) {
+    const events = await accountEvents(ctx, account);
+    const result = await syncAccount(ctx, account, events, now, assignees);
+    if (result.key) stuck++;
+    changes.push(...result.changes);
+  }
+  return { stuck, changes };
+}
+
+/** Closes open activation tasks whose account has left the platform path. */
+async function closeStaleTasks(ctx: MutationCtx) {
+  const changes: CheckChange[] = [];
+  for (const task of await openActivationTasks(ctx)) {
+    const account = task.accountId ? await ctx.db.get(task.accountId) : null;
+    if (account && isOnPlatform(account)) continue;
+    const events = account ? await accountEvents(ctx, account) : [];
+    changes.push(await closeStale(ctx, task, account, events));
+  }
+  return changes;
+}
+
 /**
  * Opens a task for every stalled brand and closes the ones whose brand moved on.
  * Safe to run any number of times: tasks are keyed by rule and account.
@@ -679,27 +709,45 @@ export async function runActivationChecks(
   now: number,
 ): Promise<CheckResult> {
   const accounts = await platformAccounts(ctx);
-  const checked = new Set<Id<"accounts">>();
-  const assignees: Assignees = { fallback: null };
-  const changes: CheckChange[] = [];
-  let stuck = 0;
-
-  for (const account of accounts) {
-    checked.add(account._id);
-    const events = await accountEvents(ctx, account);
-    const result = await syncAccount(ctx, account, events, now, assignees);
-    if (result.key) stuck++;
-    changes.push(...result.changes);
-  }
-
-  for (const task of await openActivationTasks(ctx)) {
-    if (task.accountId && checked.has(task.accountId)) continue;
-    const account = task.accountId ? await ctx.db.get(task.accountId) : null;
-    const events = account ? await accountEvents(ctx, account) : [];
-    changes.push(await closeStale(ctx, task, account, events));
-  }
-
+  const { stuck, changes } = await checkAccounts(ctx, accounts, now);
+  changes.push(...(await closeStaleTasks(ctx)));
   return { checked: accounts.length, stuck, changes };
+}
+
+const CHECK_BATCH = 50;
+export type CheckPhase = "linked" | "signed_up" | "stale";
+export type CheckStep = { phase: CheckPhase; cursor?: string };
+
+/**
+ * The hourly check in bounded steps, one transaction each: a page of linked
+ * accounts at a time, then of accounts that signed up without an org, then the
+ * sweep of stale tasks. Returns the next step, or null when done.
+ */
+export async function runActivationStep(
+  ctx: MutationCtx,
+  now: number,
+  { phase, cursor }: CheckStep,
+): Promise<CheckStep | null> {
+  if (phase === "stale") {
+    await closeStaleTasks(ctx);
+    return null;
+  }
+  const accounts = ctx.db.query("accounts");
+  const page = await (
+    phase === "linked"
+      ? accounts.withIndex("by_platform_org", (q) => q.gt("platformOrgId", ""))
+      : accounts.withIndex("by_stage", (q) => q.eq("stage", "signed_up"))
+  ).paginate({ numItems: CHECK_BATCH, cursor: cursor ?? null });
+  await checkAccounts(
+    ctx,
+    page.page.filter(
+      (account) =>
+        isOnPlatform(account) && (phase === "linked" || !account.platformOrgId),
+    ),
+    now,
+  );
+  if (!page.isDone) return { phase, cursor: page.continueCursor };
+  return { phase: phase === "linked" ? "signed_up" : "stale" };
 }
 
 async function openActivationTasks(ctx: QueryCtx) {

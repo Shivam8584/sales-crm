@@ -48,7 +48,7 @@ import {
 import type { HealthCampaign, HealthInput } from "../../lib/domain/health";
 import { nextOwner } from "./assignment";
 import { emitAutomationTrigger } from "./automations/engine";
-import { createLead, isOpen, leadHref } from "./leads";
+import { createLead, isOpen, leadHref, rescoreLead } from "./leads";
 import { findAccount, findPerson } from "./identity";
 import { personSearchText } from "./records";
 import { logSystem, type RecordRefs } from "./timeline";
@@ -925,6 +925,7 @@ async function onSignedUp(
     leadId = created.id;
     if (domainAccount)
       await ctx.db.patch(leadId, { accountId: domainAccount._id });
+      await rescoreLead(ctx, leadId);
   }
   const change = domainAccount
     ? await touchAccount(ctx, domainAccount, event, data)
@@ -1019,6 +1020,7 @@ async function onOrgCreated(
   }
   if (lead && !lead.accountId) {
     await ctx.db.patch(lead._id, { accountId: account._id });
+    await rescoreLead(ctx, lead._id);
   }
   if (created) {
     const entry = await logSystem(

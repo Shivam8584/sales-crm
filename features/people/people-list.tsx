@@ -8,13 +8,13 @@ import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
+import CallButton from "@/features/calls/call-button";
 import { formatPhone } from "@/lib/domain/normalize";
 import { personName } from "@/lib/domain/labels";
 import { relativeTime } from "@/lib/time";
 import { useUiStore } from "@/stores/ui-store";
 import EyeIcon from "@/public/assets/icons/eye.svg";
 import MailIcon from "@/public/assets/icons/mail-04.svg";
-import PhoneIcon from "@/public/assets/icons/phone.svg";
 
 /** Compact list of an account's people, used on the account page and peek. */
 export default function PeopleList({
@@ -94,16 +94,11 @@ export default function PeopleList({
             )}
             <span className="relative flex shrink-0 gap-0.5 opacity-0 group-focus-within/person:opacity-100 group-hover/person:opacity-100 pointer-coarse:opacity-100">
               {person.phone && (
-                <Tooltip content={`Call ${formatPhone(person.phone)}`}>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    href={`tel:${person.phone}`}
-                    aria-label={`Call ${name}`}
-                  >
-                    <PhoneIcon aria-hidden className="size-3" />
-                  </Button>
-                </Tooltip>
+                <CallButton
+                  target={{ personId: person._id }}
+                  name={name}
+                  phone={person.phone}
+                />
               )}
               {person.email && (
                 <Tooltip content={`Email ${person.email}`}>

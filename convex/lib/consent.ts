@@ -18,6 +18,7 @@ import {
   type LawfulBasis,
 } from "../../lib/domain/consent";
 import { CHANNELS } from "../../lib/domain/enums";
+import { deleteAttachments } from "./attachments";
 import { fail } from "./errors";
 import { logSystem } from "./timeline";
 import { literals } from "./validators";
@@ -517,6 +518,7 @@ async function anonymiseLeads(
   now: number,
 ) {
   for (const lead of leads) {
+    await deleteAttachments(ctx, { leadId: lead._id });
     await ctx.db.patch(lead._id, {
       name: ERASED_NAME,
       email: undefined,
@@ -547,6 +549,7 @@ export async function erasePerson(
   await redactAround(ctx, { person, leads }, scrub, now);
   await redactBeyond(ctx, { person, leads });
   await anonymiseLeads(ctx, leads, now);
+  await deleteAttachments(ctx, { personId: person._id });
   await ctx.db.patch(person._id, {
     firstName: ERASED_NAME,
     lastName: "",
@@ -557,6 +560,7 @@ export async function erasePerson(
     platformUserId: undefined,
     accountId: undefined,
     tags: [],
+    custom: undefined,
     searchText: "",
     archivedAt: person.archivedAt ?? now,
     erasedAt: now,

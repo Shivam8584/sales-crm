@@ -306,12 +306,20 @@ export default function TodayPage() {
         case "ArrowUp":
           return move(-1);
         case "Enter":
-          if (!item) return;
+          if (
+            !item ||
+            (event.target instanceof Element &&
+              event.target.closest("a, button, [role=checkbox]"))
+          )
+            return;
           event.preventDefault();
           return openItem(item);
         case "x":
           if (item?.kind !== "task") return;
           event.preventDefault();
+          setCursor(
+            navigable[index + 1]?.id ?? navigable[index - 1]?.id ?? null,
+          );
           return void setDone(item.task, item.task.status !== "done");
         case "Escape":
           if (focus) return setFocus(null);

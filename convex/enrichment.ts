@@ -1,5 +1,11 @@
 import { v } from "convex/values";
-import { action, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  action,
+  internalQuery,
+  type ActionCtx,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { checkGstin, gstinError, panRoot } from "../lib/domain/gstin";
@@ -12,6 +18,8 @@ import {
   memberMutation,
   memberQuery,
 } from "./lib/functions";
+import { payloadOf } from "./lib/platform";
+import { rescoreAccountLeads } from "./lib/leads";
 import { accountName, personSearchText } from "./lib/records";
 import { logChanges, logSystem } from "./lib/timeline";
 import { vFactStatus } from "./lib/validators";
@@ -21,19 +29,25 @@ import {
   MAX_EVIDENCE,
   REGISTRY_FIELDS,
   SOURCES,
-  callKyc,
-  clean,
-  gstCandidates,
-  isRegistryRecord,
   providerMode,
   sameValue,
-  sandboxDin,
-  sandboxGst,
   sourceFamily,
   type Candidate,
-  type DinResult,
-  type GstResult,
-} from "./lib/enrichment";
+} from "./lib/enrichment/kyc";
+import {
+  ACCOUNT_WANTED,
+  PROVIDERS,
+  accountChain,
+} from "./lib/enrichment/providers";
+import { vAttempt } from "./lib/enrichment/validators";
+import {
+  needsConfirmation,
+  runWaterfall,
+  type Attempt,
+  type Field,
+  type LookupInput,
+  type Provider,
+} from "./lib/enrichment/waterfall";
 import { rateLimiter } from "./lib/rateLimiter";
 
 const STALE_RUN_MS = 2 * 60_000;
@@ -44,11 +58,19 @@ const vTarget = v.object({
 });
 type Target = typeof vTarget.type;
 
-const vCandidate = v.object({
+const vValue = v.object({
   field: v.string(),
   value: v.string(),
-  strength: v.union(v.literal("authoritative"), v.literal("signal")),
+  confidence: v.number(),
 });
+
+const vGroup = v.object({
+  source: v.string(),
+  evidence: v.string(),
+  url: v.optional(v.string()),
+  values: v.array(vValue),
+});
+type Group = typeof vGroup.type;
 
 const FIELD_LABEL: Record<string, string> = {
   name: "Name",
@@ -89,7 +111,15 @@ function modes() {
 
 export const config = memberQuery({
   args: {},
-  handler: async () => ({ ...modes(), envHint: KYC_ENV_HINT }),
+  handler: async () => ({
+    ...modes(),
+    envHint: KYC_ENV_HINT,
+    providers: accountChain(process.env).map((provider) => ({
+      id: provider.id,
+      label: provider.label,
+      configured: provider.isConfigured(process.env),
+    })),
+  }),
 });
 
 async function summarize(
@@ -115,6 +145,8 @@ async function summarize(
         value: fact.value,
         source: fact.source,
         evidence: fact.evidence,
+        confidence: fact.confidence ?? null,
+        url: fact.url ?? null,
         observedAt: fact.observedAt,
         status: fact.status,
         decidedBy: fact.decidedById
@@ -129,6 +161,7 @@ async function summarize(
         provider: run.provider,
         status: run.status,
         error: run.error ?? null,
+        attempts: run.attempts ?? [],
         startedAt: run._creationTime,
         finishedAt: run.finishedAt ?? null,
         requestedBy: names.get(run.requestedById) ?? null,
@@ -154,6 +187,7 @@ export const forAccount = memberQuery({
     return {
       account: {
         name: account.name,
+        domain: account.domain ?? null,
         gstin: account.gstin ?? null,
         panRoot: account.panRoot ?? null,
       },
@@ -211,11 +245,8 @@ export const startRun = internalMutation({
     }
 
     const now = Date.now();
-    const family = sourceFamily(provider);
     for (const run of await runsFor(ctx, target)) {
-      if (run.status !== "running" || sourceFamily(run.provider) !== family) {
-        continue;
-      }
+      if (run.status !== "running") continue;
       if (now - run._creationTime < STALE_RUN_MS) {
         fail("conflict", "A lookup is already running for this record");
       }
@@ -238,26 +269,39 @@ export const startRun = internalMutation({
 export const finishRun = internalMutation({
   args: {
     runId: v.id("enrichmentRuns"),
+    attempts: v.array(vAttempt),
+    groups: v.array(vGroup),
     error: v.optional(v.string()),
-    evidence: v.optional(v.string()),
-    candidates: v.optional(v.array(vCandidate)),
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
     if (!run) return;
-    const failed = args.error !== undefined || !args.candidates;
+    const failed = args.error !== undefined;
     await ctx.db.patch(run._id, {
       status: failed ? "failed" : "succeeded",
       error: args.error,
+      attempts: args.attempts,
       finishedAt: Date.now(),
     });
     if (failed) return;
-    const evidence = (args.evidence ?? "").slice(0, MAX_EVIDENCE);
-    if (run.accountId) {
-      await recordGst(ctx, run, evidence, args.candidates!);
-    } else if (run.personId) {
-      await recordDin(ctx, run, evidence, args.candidates!);
+    for (const group of args.groups) {
+      const evidence = group.evidence.slice(0, MAX_EVIDENCE);
+      const candidates: Candidate[] = group.values.map((item) => ({
+        ...item,
+        url: group.url,
+        strength: needsConfirmation(item.field, item.confidence)
+          ? "signal"
+          : "authoritative",
+      }));
+      if (run.personId) {
+        await recordDin(ctx, run, group.source, evidence, candidates);
+      } else if (sourceFamily(group.source) === "gst") {
+        await recordGst(ctx, run, group.source, evidence, candidates);
+      } else {
+        await recordFound(ctx, run, group.source, evidence, candidates);
+      }
     }
+    if (run.accountId) await rescoreAccountLeads(ctx, run.accountId);
   },
 });
 
@@ -284,8 +328,7 @@ async function supersede(ctx: MutationCtx, facts: Doc<"facts">[]) {
  */
 async function observe(
   ledger: Ledger,
-  field: string,
-  value: string,
+  { field, value, confidence, url }: Candidate,
   status: "applied" | "suggested",
 ) {
   const { ctx, active } = ledger;
@@ -308,6 +351,8 @@ async function observe(
       observedAt: ledger.observedAt,
       evidence: ledger.evidence,
       source: ledger.source,
+      confidence,
+      url,
       ...(promote ? { status } : {}),
     });
     return;
@@ -320,6 +365,8 @@ async function observe(
     evidence: ledger.evidence,
     observedAt: ledger.observedAt,
     status,
+    confidence,
+    url,
   });
   active.push((await ctx.db.get(id))!);
 }
@@ -327,12 +374,13 @@ async function observe(
 async function recordGst(
   ctx: MutationCtx,
   run: Doc<"enrichmentRuns">,
+  source: string,
   evidence: string,
   candidates: Candidate[],
 ) {
   const account = await ctx.db.get(run.accountId!);
-  if (!account) return;
-  const gstin = candidates.find((item) => item.field === "gstin")!.value;
+  const gstin = candidates.find((item) => item.field === "gstin")?.value;
+  if (!account || !gstin) return;
   const target = { accountId: account._id };
   const active = (await factsFor(ctx, target)).filter(
     (fact) =>
@@ -363,7 +411,7 @@ async function recordGst(
   const ledger: Ledger = {
     ctx,
     target,
-    source: run.provider,
+    source,
     evidence,
     observedAt: Date.now(),
     active: active.filter((fact) => fact.status !== "superseded"),
@@ -385,8 +433,7 @@ async function recordGst(
     }
     await observe(
       ledger,
-      candidate.field,
-      candidate.value,
+      candidate,
       candidate.strength === "authoritative" ? "applied" : "suggested",
     );
   }
@@ -406,7 +453,7 @@ async function recordGst(
   await logSystem(
     ctx,
     target,
-    run.provider === SOURCES.gstSandbox
+    source === SOURCES.gstSandbox
       ? "verified the GSTIN against the enrichment sandbox"
       : "verified the GSTIN with the GST registry",
     [gstin, status].filter(Boolean).join(" · "),
@@ -414,9 +461,57 @@ async function recordGst(
   );
 }
 
+async function recordFound(
+  ctx: MutationCtx,
+  run: Doc<"enrichmentRuns">,
+  source: string,
+  evidence: string,
+  candidates: Candidate[],
+) {
+  const account = await ctx.db.get(run.accountId!);
+  if (!account) return;
+  const target = { accountId: account._id };
+  const family = sourceFamily(source);
+  const ledger: Ledger = {
+    ctx,
+    target,
+    source,
+    evidence,
+    observedAt: Date.now(),
+    active: (await factsFor(ctx, target)).filter(
+      (fact) =>
+        fact.status !== "superseded" && sourceFamily(fact.source) === family,
+    ),
+  };
+  for (const candidate of candidates) {
+    const known =
+      candidate.field === "name"
+        ? account.name
+        : candidate.field === "gstin"
+          ? account.gstin
+          : undefined;
+    if (sameValue(known, candidate.value)) {
+      await supersede(
+        ctx,
+        ledger.active.filter(
+          (fact) =>
+            fact.field === candidate.field && fact.status === "suggested",
+        ),
+      );
+      continue;
+    }
+    await observe(
+      ledger,
+      candidate,
+      candidate.strength === "authoritative" ? "applied" : "suggested",
+    );
+  }
+}
+
 async function recordDin(
   ctx: MutationCtx,
   run: Doc<"enrichmentRuns">,
+  source: string,
   evidence: string,
   candidates: Candidate[],
 ) {
@@ -430,7 +525,7 @@ async function recordDin(
   const ledger: Ledger = {
     ctx,
     target,
-    source: run.provider,
+    source,
     evidence,
     observedAt: Date.now(),
     active,
@@ -438,110 +533,173 @@ async function recordDin(
   for (const candidate of candidates) {
     const matches =
       candidate.field === "phone" && sameValue(person.phone, candidate.value);
-    await observe(
-      ledger,
-      candidate.field,
-      candidate.value,
-      matches ? "applied" : "suggested",
-    );
+    await observe(ledger, candidate, matches ? "applied" : "suggested");
   }
 }
 
-type GstOutcome = { ok: true } | { ok: false; error: string };
+type Outcome = { ok: true; found: number } | { ok: false; error: string };
+
+/** The facts a lookup starts from: what the account has, and what the platform told us. */
+export const accountInput = internalQuery({
+  args: { accountId: v.id("accounts") },
+  handler: async (ctx, { accountId }): Promise<LookupInput> => {
+    const account = await ctx.db.get(accountId);
+    if (!account) return {};
+    const check = account.gstin ? checkGstin(account.gstin) : null;
+    let legalName: string | undefined;
+    if (account.platformOrgId) {
+      const orgId = account.platformOrgId;
+      const events = await ctx.db
+        .query("platformEvents")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .take(30);
+      for (const event of events) {
+        if (
+          event.type !== "organization.created" &&
+          event.type !== "organization.gst_verified"
+        ) {
+          continue;
+        }
+        const name = payloadOf(event).legal_name;
+        if (typeof name === "string" && name.trim()) legalName = name.trim();
+      }
+    }
+    return {
+      gstin: check?.ok ? check.gstin : undefined,
+      domain: account.domain ?? undefined,
+      platform: legalName ? { legalName } : undefined,
+    };
+  },
+});
+
+/** Runs a provider chain under one run row and records what it found. */
+async function execute(
+  ctx: ActionCtx,
+  args: {
+    target: Target;
+    provider: string;
+    providers: readonly Provider[];
+    wanted: readonly Field[];
+    input: () => Promise<LookupInput> | LookupInput;
+    failure: string;
+  },
+): Promise<Outcome> {
+  const runId: Id<"enrichmentRuns"> = await ctx.runMutation(
+    internal.enrichment.startRun,
+    { target: args.target, provider: args.provider },
+  );
+  const close = (attempts: Attempt[], groups: Group[], error?: string) =>
+    ctx.runMutation(internal.enrichment.finishRun, {
+      runId,
+      attempts,
+      groups,
+      error,
+    });
+  try {
+    const { attempts, winners } = await runWaterfall({
+      providers: args.providers,
+      input: await args.input(),
+      wanted: args.wanted,
+      context: {
+        env: process.env,
+        homepage: (url) =>
+          ctx.runAction(internal.enrichmentWeb.homepage, { url }),
+      },
+    });
+    const groups = new Map<string, Group>();
+    for (const [field, win] of Object.entries(winners)) {
+      const group = groups.get(win.source) ?? {
+        source: win.source,
+        evidence: win.evidence,
+        url: win.url,
+        values: [],
+      };
+      group.values.push({
+        field,
+        value: win.value,
+        confidence: win.confidence,
+      });
+      groups.set(win.source, group);
+    }
+    if (groups.size === 0) {
+      const reason = (
+        attempts.find((item) => item.status === "failed") ??
+        attempts.find((item) => item.status === "skipped")
+      )?.note;
+      const nothing = attempts.some((item) => item.status === "ok");
+      if (reason && !nothing) {
+        await close(attempts, [], reason);
+        return { ok: false, error: reason };
+      }
+    }
+    await close(attempts, [...groups.values()]);
+    return { ok: true, found: Object.keys(winners).length };
+  } catch (error) {
+    console.error("Enrichment run failed", error);
+    await close([], [], args.failure);
+    return { ok: false, error: args.failure };
+  }
+}
 
 export const verifyGst = action({
   args: { accountId: v.id("accounts"), gstin: v.string() },
-  handler: async (ctx, args): Promise<GstOutcome> => {
+  handler: async (ctx, args): Promise<Outcome> => {
     const check = checkGstin(args.gstin);
     if (!check.ok) invalid("gstin", gstinError(check) ?? "Enter a GSTIN");
     const mode = providerMode(process.env);
     if (!mode)
       fail("forbidden", `GST lookup isn't configured. ${KYC_ENV_HINT}`);
-    const runId: Id<"enrichmentRuns"> = await ctx.runMutation(
-      internal.enrichment.startRun,
-      {
-        target: { accountId: args.accountId },
-        provider: mode === "sandbox" ? SOURCES.gstSandbox : SOURCES.gst,
-      },
-    );
-    const failRun = async (error: string): Promise<GstOutcome> => {
-      await ctx.runMutation(internal.enrichment.finishRun, { runId, error });
-      return { ok: false, error };
-    };
-    try {
-      const reply =
-        mode === "sandbox"
-          ? sandboxGst(check.gstin)
-          : await callKyc<GstResult>(process.env, "/v1/verify/gst", {
-              gstin: check.gstin,
-            });
-      if (!reply.ok) return await failRun(reply.error);
-      if (!isRegistryRecord(reply.data))
-        return await failRun("GSTIN not found");
-      await ctx.runMutation(internal.enrichment.finishRun, {
-        runId,
-        evidence: reply.evidence,
-        candidates: gstCandidates(check.gstin, reply.data),
-      });
-      return { ok: true };
-    } catch (error) {
-      console.error("GST lookup failed", error);
-      return await failRun("The GST lookup failed unexpectedly. Try again.");
-    }
+    return await execute(ctx, {
+      target: { accountId: args.accountId },
+      provider: mode === "sandbox" ? SOURCES.gstSandbox : SOURCES.gst,
+      providers: [PROVIDERS.gst],
+      wanted: PROVIDERS.gst.fields,
+      input: () => ({ gstin: check.gstin }),
+      failure: "The GST lookup failed unexpectedly. Try again.",
+    });
   },
+});
+
+/** Fills in what the account is missing from the GST registry, the platform and its website. */
+export const enrichAccount = action({
+  args: { accountId: v.id("accounts") },
+  handler: async (ctx, { accountId }): Promise<Outcome> =>
+    await execute(ctx, {
+      target: { accountId },
+      provider: "waterfall",
+      providers: accountChain(process.env),
+      wanted: ACCOUNT_WANTED,
+      input: () =>
+        ctx.runQuery(internal.enrichment.accountInput, { accountId }),
+      failure: "The lookup failed unexpectedly. Try again.",
+    }),
 });
 
 export const lookupDin = action({
   args: { personId: v.id("people"), din: v.string() },
-  handler: async (ctx, args): Promise<GstOutcome> => {
+  handler: async (ctx, args): Promise<Outcome> => {
     const din = args.din.replace(/\s/g, "");
     if (!DIN_PATTERN.test(din)) invalid("din", "A DIN has 8 digits");
     const mode = providerMode(process.env);
     if (!mode)
       fail("forbidden", `DIN lookup isn't configured. ${KYC_ENV_HINT}`);
-    const runId: Id<"enrichmentRuns"> = await ctx.runMutation(
-      internal.enrichment.startRun,
-      {
-        target: { personId: args.personId },
-        provider: mode === "sandbox" ? SOURCES.dinSandbox : SOURCES.din,
-      },
-    );
-    const failRun = async (error: string): Promise<GstOutcome> => {
-      await ctx.runMutation(internal.enrichment.finishRun, { runId, error });
-      return { ok: false, error };
-    };
-    try {
-      const reply =
-        mode === "sandbox"
-          ? sandboxDin(din)
-          : await callKyc<DinResult>(process.env, "/v1/verify/din", { din });
-      if (!reply.ok) return await failRun(reply.error);
-      if (!reply.data?.isValid) return await failRun("DIN not found");
-      const raw = clean(reply.data.phoneNumber);
-      if (!raw)
-        return await failRun("No phone number is registered for this DIN");
-      await ctx.runMutation(internal.enrichment.finishRun, {
-        runId,
-        evidence: reply.evidence,
-        candidates: [
-          {
-            field: "phone",
-            value: normalizePhone(raw) ?? raw,
-            strength: "signal",
-          },
-        ],
-      });
-      return { ok: true };
-    } catch (error) {
-      console.error("DIN lookup failed", error);
-      return await failRun("The DIN lookup failed unexpectedly. Try again.");
-    }
+    return await execute(ctx, {
+      target: { personId: args.personId },
+      provider: mode === "sandbox" ? SOURCES.dinSandbox : SOURCES.din,
+      providers: [PROVIDERS.din],
+      wanted: PROVIDERS.din.fields,
+      input: () => ({ din }),
+      failure: "The DIN lookup failed unexpectedly. Try again.",
+    });
   },
 });
 
 async function recordValue(ctx: QueryCtx, fact: Doc<"facts">) {
   if (fact.accountId && fact.field === "name") {
     return (await ctx.db.get(fact.accountId))?.name;
+  }
+  if (fact.accountId && fact.field === "gstin") {
+    return (await ctx.db.get(fact.accountId))?.gstin;
   }
   if (fact.personId && fact.field === "phone") {
     return (await ctx.db.get(fact.personId))?.phone;
@@ -566,6 +724,24 @@ async function applyToRecord(
       { field: FIELD_LABEL.name, from: account.name, to: name },
     ]);
     return { previous: account.name };
+  }
+  if (fact.accountId && fact.field === "gstin") {
+    const account = await ctx.db.get(fact.accountId);
+    if (!account) notFound("Account");
+    const check = value === null ? null : checkGstin(value);
+    if (check && !check.ok)
+      invalid("gstin", gstinError(check) ?? "Enter a GSTIN");
+    const gstin = check?.gstin;
+    if (gstin === account.gstin) return { previous: account.gstin ?? null };
+    await ctx.db.patch(account._id, {
+      gstin,
+      panRoot: gstin ? (panRoot(gstin) ?? undefined) : undefined,
+      updatedAt: Date.now(),
+    });
+    await logChanges(ctx, { accountId: account._id }, actorId, [
+      { field: FIELD_LABEL.gstin, from: account.gstin, to: gstin },
+    ]);
+    return { previous: account.gstin ?? null };
   }
   if (fact.personId && fact.field === "phone") {
     const person = await ctx.db.get(fact.personId);
@@ -627,6 +803,7 @@ export const decide = memberMutation({
       status: decision === "accept" ? "accepted" : "rejected",
       decidedById: ctx.viewer._id,
     });
+    if (fact.accountId) await rescoreAccountLeads(ctx, fact.accountId);
     return { factId, record, replaced };
   },
 });

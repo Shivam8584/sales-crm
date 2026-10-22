@@ -54,6 +54,7 @@ import DisqualifyDialog from "./disqualify-dialog";
 import {
   DemoCell,
   OwnerCell,
+  ScoreTag,
   SourceTag,
   compactSpan,
   ownerOptions,
@@ -79,8 +80,12 @@ const SORT_OPTIONS = [
   { value: "age", label: "Newest" },
   { value: "demo", label: "Demo date" },
   { value: "lead", label: "Name" },
+  { value: "score", label: "Score" },
 ];
-const SORT_DIR: Record<string, "asc" | "desc"> = { demo: "desc" };
+const SORT_DIR: Record<string, "asc" | "desc"> = {
+  demo: "desc",
+  score: "desc",
+};
 
 function isClosed(row: LeadRow) {
   return row.status === "disqualified" || row.status === "converted";
@@ -186,6 +191,14 @@ export default function LeadsPage() {
           <OwnerCell owner={row.owner} />
         </OptionPicker>
       ),
+    },
+    {
+      id: "score",
+      header: "Score",
+      width: "6rem",
+      defaultDir: "desc",
+      sortable: true,
+      cell: (row) => <ScoreTag score={row.score} reasons={row.scoreReasons} />,
     },
     {
       id: "sla",
@@ -570,6 +583,7 @@ function LeadCard({
             {row.companyName} · {row.owner?.name ?? "Unassigned"}
           </span>
         </span>
+        <ScoreTag score={row.score} reasons={row.scoreReasons} />
         <span className="caption-style text-fg-tertiary shrink-0 tabular-nums">
           {compactSpan(now - row._creationTime)}
         </span>

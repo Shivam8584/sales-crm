@@ -4,6 +4,7 @@ import { components } from "../_generated/api";
 import type { DataModel, Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { LeadKind, LeadStatus } from "../../lib/domain/enums";
+import { syncStages } from "./stages";
 
 /**
  * Exact list counts (page views, footers, sidebar) without scanning tables.
@@ -13,6 +14,7 @@ import type { LeadKind, LeadStatus } from "../../lib/domain/enums";
  * write made through the builders in `./functions`, inside the same
  * transaction, so a mutation must never use the raw builders from
  * `_generated/server`. `counts:rebuild` resets an aggregate from its table.
+ * The same triggers keep `activationStages` in step with `platformEvents`.
  */
 
 const accountKey = (doc: Doc<"accounts">): [boolean, Id<"members">, string] => [
@@ -81,6 +83,7 @@ export const triggers = new Triggers<DataModel, MutationCtx>();
 triggers.register("accounts", sync(accountCounts, accountKey));
 triggers.register("people", sync(peopleCounts, personKey));
 triggers.register("leads", sync(leadCounts, leadKey));
+triggers.register("platformEvents", syncStages);
 
 async function memberIds(ctx: QueryCtx) {
   return (await ctx.db.query("members").collect()).map((member) => member._id);

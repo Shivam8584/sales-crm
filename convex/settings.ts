@@ -4,21 +4,44 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { invalid, notFound } from "./lib/errors";
 import { adminMutation, adminQuery, memberQuery } from "./lib/functions";
 import { retry } from "./lib/platform";
-import { providerMode } from "./lib/enrichment";
-import { literals } from "./lib/validators";
+import { providerMode } from "./lib/enrichment/kyc";
+import { requireActiveMember } from "./lib/records";
+import { literals, vLeadKind } from "./lib/validators";
+import { DEFAULT_HOT_SLA_FACTOR, HOT_SLA_PERCENT } from "../lib/domain/scoring";
+import { rulesProblem } from "../lib/domain/routing";
 import {
   LEAD_SLA_MINUTES,
   PRICING_KEY_LIST,
   SETTING_KEYS,
   checkPricingSetting,
   defaultLeadSlaMinutes,
+  hotSlaFactor,
+  isHotSlaFactor,
   roundRobinMemberIds,
+  routingRules,
+  storedHotSlaFactor,
   storedLeadSlaMinutes,
 } from "./lib/settings";
 
 const EVENT_SCAN = 2000;
 const EVENT_LIST = 20;
 const MAX_RETRY = 100;
+
+const vRule = v.object({
+  id: v.string(),
+  name: v.string(),
+  when: v.object({
+    kind: v.optional(vLeadKind),
+    source: v.optional(v.string()),
+    scoreMin: v.optional(v.number()),
+    hasGst: v.optional(v.boolean()),
+    emailType: v.optional(literals(["company", "free"])),
+  }),
+  assign: v.union(
+    v.object({ memberId: v.id("members") }),
+    v.object({ roundRobin: v.literal(true) }),
+  ),
+});
 
 /** Workspace settings with their defaults applied; `isDefault` marks values no admin has set. */
 export const get = memberQuery({
@@ -37,12 +60,16 @@ export const get = memberQuery({
     return {
       [SETTING_KEYS.leadSlaMinutes]: sla ?? defaultLeadSlaMinutes(),
       [SETTING_KEYS.roundRobinMemberIds]: ids.filter((id) => active.has(id)),
+      [SETTING_KEYS.routingRules]: await routingRules(ctx),
+      [SETTING_KEYS.hotSlaFactor]: await hotSlaFactor(ctx),
       defaults: {
         [SETTING_KEYS.leadSlaMinutes]: defaultLeadSlaMinutes(),
+        [SETTING_KEYS.hotSlaFactor]: DEFAULT_HOT_SLA_FACTOR,
       },
       isDefault: {
         [SETTING_KEYS.leadSlaMinutes]: sla === null,
         [SETTING_KEYS.roundRobinMemberIds]: ids.length === 0,
+        [SETTING_KEYS.hotSlaFactor]: (await storedHotSlaFactor(ctx)) === null,
       },
     };
   },
@@ -78,12 +105,58 @@ export const set = adminMutation({
         value: v.union(v.array(v.id("members")), v.null()),
       }),
       v.object({
+        key: v.literal(SETTING_KEYS.routingRules),
+        value: v.union(v.array(vRule), v.null()),
+      }),
+      v.object({
+        key: v.literal(SETTING_KEYS.hotSlaFactor),
+        value: v.union(v.number(), v.null()),
+      }),
+      v.object({
         key: literals(PRICING_KEY_LIST),
         value: v.union(v.number(), v.null()),
       }),
     ),
   },
   handler: async (ctx, { setting }) => {
+    if (setting.key === SETTING_KEYS.routingRules) {
+      const stored = await routingRules(ctx);
+      const rules = (setting.value ?? []).map((rule) => ({
+        ...rule,
+        name: rule.name.trim(),
+      }));
+      const problem = rulesProblem(rules);
+      if (problem) invalid("rules", problem);
+      const before = new Map(stored.map((rule) => [rule.id, rule.assign]));
+      for (const { id, assign } of rules) {
+        if (!("memberId" in assign)) continue;
+        const kept = before.get(id);
+        if (kept && "memberId" in kept && kept.memberId === assign.memberId) {
+          continue;
+        }
+        await requireActiveMember(ctx, assign.memberId, "rules");
+      }
+      await write(
+        ctx,
+        setting.key,
+        rules.length > 0 ? JSON.stringify(rules) : null,
+      );
+      return { key: setting.key, previous: stored.length > 0 ? stored : null };
+    }
+
+    if (setting.key === SETTING_KEYS.hotSlaFactor) {
+      const previous = await storedHotSlaFactor(ctx);
+      const { value } = setting;
+      if (value !== null && !isHotSlaFactor(value)) {
+        invalid(
+          "hotSlaFactor",
+          `Enter a whole percent between ${HOT_SLA_PERCENT.min} and ${HOT_SLA_PERCENT.max}`,
+        );
+      }
+      await write(ctx, setting.key, value === null ? null : String(value));
+      return { key: setting.key, previous };
+    }
+
     if (
       setting.key !== SETTING_KEYS.leadSlaMinutes &&
       setting.key !== SETTING_KEYS.roundRobinMemberIds

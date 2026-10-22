@@ -82,8 +82,9 @@ import {
   leadHref,
   leadSummary,
   recordConsents,
+  rescoreLead,
   resolveLeadSla,
-  leadSlaSeconds,
+  leadSlaPolicy,
 } from "./lib/leads";
 import {
   memberIndex,
@@ -122,6 +123,7 @@ async function requireLead(ctx: MutationCtx, id: Id<"leads">) {
 function toRow(
   lead: Doc<"leads">,
   members: Awaited<ReturnType<typeof memberIndex>>,
+  slaMs: number,
 ) {
   return {
     _id: lead._id,
@@ -138,7 +140,10 @@ function toRow(
     owner: memberRef(members, lead.ownerId),
     firstTouchedAt: lead.firstTouchedAt ?? null,
     slaBreachedAt: lead.slaBreachedAt ?? null,
+    slaMs,
     demoAt: lead.demoAt ?? null,
+    score: lead.score ?? null,
+    scoreReasons: lead.scoreReasons ?? [],
   };
 }
 
@@ -158,7 +163,7 @@ export const vListArgs = {
   kind: v.optional(vLeadKind),
   source: v.optional(v.string()),
   search: vSearch,
-  sort: v.optional(literals(["sla", "age", "demo", "lead"])),
+  sort: v.optional(literals(["sla", "age", "demo", "lead", "score"])),
   dir: v.optional(vDir),
 };
 type ListArgs = ObjectType<typeof vListArgs>;
@@ -208,7 +213,8 @@ async function listPage(
   }
 
   const sort = args.sort ?? "sla";
-  const dir = args.dir ?? (sort === "demo" ? "desc" : "asc");
+  const dir =
+    args.dir ?? (sort === "demo" || sort === "score" ? "desc" : "asc");
   if (sort === "age") {
     return await (
       owned
@@ -228,6 +234,18 @@ async function listPage(
             q.eq("ownerId", owner).eq("status", status),
           )
         : leads.withIndex("list_name", (q) => q.eq("status", status))
+    )
+      .filter((q) => narrow(q, args))
+      .order(dir)
+      .paginate(opts);
+  }
+  if (sort === "score") {
+    return await (
+      owned
+        ? leads.withIndex("list_owner_score", (q) =>
+            q.eq("ownerId", owner).eq("status", status),
+          )
+        : leads.withIndex("list_score", (q) => q.eq("status", status))
     )
       .filter((q) => narrow(q, args))
       .order(dir)
@@ -282,12 +300,13 @@ async function listPage(
 export const page = memberQuery({
   args: { paginationOpts: paginationOptsValidator, ...vListArgs },
   handler: async (ctx, { paginationOpts, ...args }) => {
-    const [result, members] = await Promise.all([
+    const [result, members, slaFor] = await Promise.all([
       listPage(ctx, args, paginationOpts),
       memberIndex(ctx),
+      leadSlaPolicy(ctx),
     ]);
     return await mapPage(result, (leads) =>
-      leads.map((lead) => toRow(lead, members)),
+      leads.map((lead) => toRow(lead, members, slaFor(lead.score))),
     );
   },
 });
@@ -306,7 +325,8 @@ export const counts = memberQuery({
     search: vSearch,
   },
   handler: async (ctx, args) => {
-    const slaMs = (await leadSlaSeconds(ctx)) * 1000;
+    const slaFor = await leadSlaPolicy(ctx);
+    const slaMs = slaFor(undefined);
     const now = Date.now();
     const [statuses, open, waiting] = await Promise.all([
       args.source || searchText(args.search)
@@ -331,7 +351,8 @@ export const counts = memberQuery({
       .flat()
       .filter(
         (lead) =>
-          lead.slaBreachedAt || slaDueAt(lead._creationTime, slaMs) <= now,
+          lead.slaBreachedAt ||
+          slaDueAt(lead._creationTime, slaFor(lead.score)) <= now,
       ).length;
     return {
       slaMs,
@@ -378,8 +399,9 @@ export const waiting = memberQuery({
         q.eq("ownerId", ctx.viewer._id).eq("status", "new"),
       )
       .take(100);
+    const slaFor = await leadSlaPolicy(ctx);
     return {
-      slaMs: (await leadSlaSeconds(ctx)) * 1000,
+      slaMs: slaFor(undefined),
       leads: leads
         .sort(
           (a, b) =>
@@ -396,6 +418,7 @@ export const waiting = memberQuery({
           status: lead.status,
           firstTouchedAt: lead.firstTouchedAt ?? null,
           slaBreachedAt: lead.slaBreachedAt ?? null,
+          slaMs: slaFor(lead.score),
           demoAt: lead.demoAt ?? null,
         })),
     };
@@ -425,7 +448,7 @@ export const get = memberQuery({
     return {
       ...lead,
       channel: leadChannel(lead),
-      slaMs: (await leadSlaSeconds(ctx)) * 1000,
+      slaMs: (await leadSlaPolicy(ctx))(lead.score),
       owner: memberRef(members, lead.ownerId),
       account: account ? { _id: account._id, name: account.name } : null,
       person: person
@@ -920,6 +943,7 @@ export const update = memberMutation({
     const changes = diff(lead, next, CONTACT_LABELS);
     if (changes.length > 0) {
       await ctx.db.patch(id, next);
+      await rescoreLead(ctx, id);
       await logChanges(ctx, { leadId: id }, ctx.viewer._id, changes);
     }
     return previous as typeof patch;
@@ -1143,8 +1167,10 @@ export const checkSla = internalMutation({
       return;
     }
     const now = Date.now();
-    const slaMs = (await leadSlaSeconds(ctx)) * 1000;
-    const due = slaDueAt(lead._creationTime, slaMs);
+    const due = slaDueAt(
+      lead._creationTime,
+      (await leadSlaPolicy(ctx))(lead.score),
+    );
     // The SLA may have been lengthened since this check was scheduled.
     if (due > now + 1000) {
       await ctx.scheduler.runAt(due, internal.leads.checkSla, { id });
@@ -1183,6 +1209,7 @@ const vSubmission = v.object({
 function appendMessage(existing: string | undefined, parts: string[]) {
   const fresh = parts.filter((part) => !existing?.includes(part));
   if (fresh.length === 0) return existing;
+  if ((existing?.length ?? 0) > LEAD_LIMITS.message * 5) return existing;
   return [existing, ...fresh].filter(Boolean).join("\n\n");
 }
 
@@ -1206,7 +1233,9 @@ export const ingest = internalMutation({
         website: existing.website ?? fields.website,
         gstin: existing.gstin ?? fields.gstin,
         message: appendMessage(existing.message, parts),
+        repeats: (existing.repeats ?? 0) + 1,
       });
+      await rescoreLead(ctx, existing._id);
       await recordConsents(ctx, existing._id, fields, consent);
       const input = {
         kind: "lead_repeat",
@@ -1300,6 +1329,7 @@ export const recordBooking = internalMutation({
       phone: lead.phone ?? args.phone,
       email: lead.email ?? email,
     });
+    await rescoreLead(ctx, lead._id);
     const when =
       args.startTime && args.event !== "cancelled"
         ? ` · ${IST.format(args.startTime)} IST`

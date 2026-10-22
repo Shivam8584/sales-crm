@@ -5,6 +5,7 @@ import { action } from "./_generated/server";
 import { vListArgs as accountArgs } from "./accounts";
 import { vListArgs as dealArgs } from "./deals";
 import { vListArgs as leadArgs } from "./leads";
+import { fail } from "./lib/errors";
 import { internalMutation } from "./lib/functions";
 import { vListArgs as peopleArgs } from "./people";
 import { HEALTH_BAND_LABEL } from "../lib/domain/health";
@@ -19,6 +20,9 @@ import { ACTIVATION_STAGES } from "../lib/domain/platform";
 import { toCsv, type CsvCell } from "../lib/csv";
 
 const BATCH = 100;
+const IDS_PAGE = 2000;
+const PARALLEL = 8;
+const MAX_ROWS = 50_000;
 const KEEP_FILE_MS = 15 * 60_000;
 
 type Row = CsvCell[];
@@ -27,8 +31,8 @@ type Page<T> = PaginationResult<T>;
 const iso = (at: number | null | undefined) =>
   at ? new Date(at).toISOString() : "";
 
-type AccountRow = FunctionReturnType<typeof api.accounts.page>["page"][number];
-type PersonRow = FunctionReturnType<typeof api.people.page>["page"][number];
+type AccountRow = FunctionReturnType<typeof api.accounts.exportRows>[number];
+type PersonRow = FunctionReturnType<typeof api.people.exportRows>[number];
 type LeadRow = FunctionReturnType<typeof api.leads.page>["page"][number];
 type DealRow = FunctionReturnType<typeof api.deals.page>["page"][number];
 
@@ -176,6 +180,13 @@ function dealCells(row: DealRow): Row {
   ];
 }
 
+function tooMany(): never {
+  return fail(
+    "invalid",
+    `This list has more than ${MAX_ROWS.toLocaleString("en-IN")} rows. Narrow the filters to export it.`,
+  );
+}
+
 async function collect<T>(
   fetch: (cursor: string | null) => Promise<Page<T>>,
   cells: (row: T) => Row,
@@ -185,15 +196,58 @@ async function collect<T>(
   for (;;) {
     const result: Page<T> = await fetch(cursor);
     rows.push(...result.page.map(cells));
+    if (rows.length > MAX_ROWS) tooMany();
     if (result.isDone) return rows;
     cursor = result.continueCursor;
   }
 }
 
+type IdsPage<I> = { ids: I[]; isDone: boolean; continueCursor: string };
+
 /**
- * The whole filtered list as a CSV file, built a batch of rows at a time with
- * the list's own query, so the export always matches what the list shows.
- * Returns a short-lived download URL.
+ * Lists with costly rows: the ids are listed a page at a time while their rows
+ * are already being built, a few batches in parallel.
+ */
+async function collectByIds<I, R>(
+  ids: (cursor: string | null) => Promise<IdsPage<I>>,
+  rows: (ids: I[]) => Promise<R[]>,
+  cells: (row: R) => Row,
+) {
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  const limited = async (batch: I[]) => {
+    if (active >= PARALLEL) await new Promise<void>((go) => waiting.push(go));
+    active++;
+    try {
+      return await rows(batch);
+    } finally {
+      active--;
+      waiting.shift()?.();
+    }
+  };
+  const built: Promise<R[]>[] = [];
+  let count = 0;
+  let cursor: string | null = null;
+  for (;;) {
+    const result: IdsPage<I> = await ids(cursor);
+    count += result.ids.length;
+    if (count > MAX_ROWS) tooMany();
+    for (let i = 0; i < result.ids.length; i += BATCH) {
+      const job = limited(result.ids.slice(i, i + BATCH));
+      job.catch(() => undefined);
+      built.push(job);
+    }
+    if (result.isDone) break;
+    cursor = result.continueCursor;
+  }
+  return (await Promise.all(built)).flat().map(cells);
+}
+
+/**
+ * The whole filtered list as a CSV file, built from the list's own filters and
+ * row builders so the export always matches what the list shows. Accounts and
+ * people have costly rows, so their ids are listed first and the rows are built
+ * in parallel. Returns a short-lived download URL.
  */
 export const csv = action({
   args: {
@@ -206,17 +260,22 @@ export const csv = action({
   },
   handler: async (ctx, { list }): Promise<{ url: string; count: number }> => {
     const opts = (cursor: string | null) => ({ numItems: BATCH, cursor });
+    const idsOpts = (cursor: string | null) => ({
+      numItems: IDS_PAGE,
+      cursor,
+    });
     let table: Row[];
     if (list.name === "accounts") {
       const { args } = list;
       table = [
         ACCOUNT_HEADER,
-        ...(await collect(
+        ...(await collectByIds(
           (cursor) =>
-            ctx.runQuery(api.accounts.page, {
+            ctx.runQuery(api.accounts.exportIds, {
               ...args,
-              paginationOpts: opts(cursor),
+              paginationOpts: idsOpts(cursor),
             }),
+          (ids) => ctx.runQuery(api.accounts.exportRows, { ids }),
           accountCells,
         )),
       ];
@@ -224,12 +283,13 @@ export const csv = action({
       const { args } = list;
       table = [
         PERSON_HEADER,
-        ...(await collect(
+        ...(await collectByIds(
           (cursor) =>
-            ctx.runQuery(api.people.page, {
+            ctx.runQuery(api.people.exportIds, {
               ...args,
-              paginationOpts: opts(cursor),
+              paginationOpts: idsOpts(cursor),
             }),
+          (ids) => ctx.runQuery(api.people.exportRows, { ids }),
           personCells,
         )),
       ];

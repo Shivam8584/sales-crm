@@ -4,9 +4,12 @@ import { internal } from "./_generated/api";
 import type { MutationCtx } from "./_generated/server";
 import { accountCounts, leadCounts, peopleCounts } from "./lib/counts";
 import { internalMutation } from "./lib/functions";
+import { refreshStages } from "./lib/stages";
 import { literals } from "./lib/validators";
 
 const BATCH = 400;
+const EVENT_BATCH = 100;
+const CLEAR = 2000;
 
 type Backfill<D> = {
   clear(ctx: MutationCtx): Promise<void>;
@@ -25,18 +28,40 @@ async function backfill<D>(
 }
 
 /**
- * Resets a count aggregate and backfills it from its table, one batch per
- * mutation. Run after deploying the aggregates, or to repair drift:
+ * Resets a count aggregate (or, for `platformEvents`, the `activationStages`
+ * rows reports read) and backfills it from its table, one batch per mutation.
+ * Run after deploying them, or to repair drift:
  * `npx convex run counts:rebuild '{"table":"accounts"}'`.
  */
 export const rebuild = internalMutation({
   args: {
-    table: literals(["accounts", "people", "leads"]),
+    table: literals(["accounts", "people", "leads", "platformEvents"]),
     cursor: v.optional(v.string()),
   },
   handler: async (ctx, { table, cursor }) => {
     const opts = { numItems: BATCH, cursor: cursor ?? null };
     const first = cursor === undefined;
+    if (table === "platformEvents") {
+      if (first) {
+        const stale = await ctx.db.query("activationStages").take(CLEAR);
+        for (const row of stale) await ctx.db.delete(row._id);
+        if (stale.length === CLEAR) {
+          await ctx.scheduler.runAfter(0, internal.counts.rebuild, { table });
+          return;
+        }
+      }
+      const page = await ctx.db
+        .query("platformEvents")
+        .paginate({ ...opts, numItems: EVENT_BATCH });
+      await refreshStages(ctx, page.page);
+      if (!page.isDone) {
+        await ctx.scheduler.runAfter(0, internal.counts.rebuild, {
+          table,
+          cursor: page.continueCursor,
+        });
+      }
+      return;
+    }
     const next =
       table === "accounts"
         ? await backfill(

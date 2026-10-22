@@ -16,7 +16,8 @@ import { cleanText, isValidDay } from "../lib/domain/normalize";
 import { PROPOSAL_CURRENCY } from "../lib/domain/pricing";
 import { dealStageEffects, isDealClosed } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
-import { invalid, notFound } from "./lib/errors";
+import { visibleCustom } from "./customFields";
+import { fail, invalid, notFound } from "./lib/errors";
 import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
 import {
   mapPage,
@@ -28,6 +29,7 @@ import {
 import { assertCanReassign } from "./lib/ownership";
 import { assertCan } from "./lib/permissions";
 import schema from "./schema";
+import { deleteAttachments } from "./lib/attachments";
 import { assertMoney } from "./lib/money";
 import {
   memberIndex,
@@ -507,7 +509,7 @@ export const get = memberQuery({
     const deal = id ? await ctx.db.get(id) : null;
     if (!deal) return null;
     const [row] = await toClient(ctx, [deal], await memberIndex(ctx));
-    return row;
+    return { ...row, custom: await visibleCustom(ctx, "deal", deal.custom) };
   },
 });
 
@@ -821,6 +823,7 @@ export const purgeProposals = internalMutation({
       .withIndex("by_deal", (q) => q.eq("dealId", dealId))
       .collect();
     for (const proposal of orphans) await ctx.db.delete(proposal._id);
+    await deleteAttachments(ctx, { dealId });
   },
 });
 
@@ -844,6 +847,9 @@ export const restore = memberMutation({
     taskIds: v.optional(v.array(v.id("tasks"))),
   },
   handler: async (ctx, { previousId, deal, taskIds = [] }) => {
+    if (await ctx.db.get(previousId)) {
+      fail("conflict", "That deal still exists");
+    }
     const account = await requireAccount(ctx, deal.accountId);
     const owner = await ctx.db.get(deal.ownerId);
     const effects = dealStageEffects(

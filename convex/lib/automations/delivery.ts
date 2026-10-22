@@ -125,6 +125,9 @@ function describe(json: Record<string, unknown> | null, status: number) {
     : `HTTP ${status}`;
 }
 
+/** Rejects what SMTP would read as several recipients, since stored emails only check for one `@`. */
+const SAFE_ADDRESS = /^[^\s@,;<>"()[\]\\:]+@[^\s@,;<>"()[\]\\:]+$/;
+
 /**
  * Email providers deduplicate on the step key, so a retry after a timeout can't
  * double-send; Meta has no idempotency key, so WhatsApp only retries on 429,
@@ -134,6 +137,19 @@ export async function deliver(
   ctx: Pick<ActionCtx, "runAction">,
   message: OutboundMessage,
 ): Promise<DeliveryResult> {
+  if (message.channel === "email") {
+    if (!SAFE_ADDRESS.test(message.to)) {
+      return {
+        ok: false,
+        error: "The recipient address isn't valid",
+        retryable: false,
+      };
+    }
+    message = {
+      ...message,
+      subject: message.subject?.replace(/[\r\n]+/g, " "),
+    };
+  }
   if (message.provider === "smtp") {
     return ctx.runAction(internal.smtp.send, {
       to: message.to,

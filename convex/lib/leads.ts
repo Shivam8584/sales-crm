@@ -8,9 +8,13 @@ import {
   type Utm,
 } from "../../lib/domain/leads";
 import { slaDueAt } from "../../lib/domain/day";
+import { routeLead } from "../../lib/domain/routing";
+import { emailType, leadSlaMs, scoreLead } from "../../lib/domain/scoring";
 import { isLeadOpen } from "../../lib/domain/transitions";
 import { nextOwner } from "./assignment";
-import { leadSlaSeconds } from "./settings";
+import { sourceFamily } from "./enrichment/kyc";
+import { findPerson } from "./identity";
+import { hotSlaFactor, leadSlaSeconds, routingRules } from "./settings";
 import { recordKey } from "../../lib/domain/notifications";
 import {
   leadershipIds,
@@ -37,6 +41,16 @@ export function slaSeconds() {
 }
 
 export { leadSlaSeconds };
+
+/** First-touch window for a lead given its score; hot leads get a shorter one. */
+export async function leadSlaPolicy(ctx: QueryCtx) {
+  const [seconds, factor] = await Promise.all([
+    leadSlaSeconds(ctx),
+    hotSlaFactor(ctx),
+  ]);
+  return (score: number | null | undefined) =>
+    leadSlaMs(seconds * 1000, score, factor);
+}
 
 export function leadHref(id: Id<"leads">) {
   return `/leads/${id}`;
@@ -105,6 +119,118 @@ export type NewLead = {
   demoAt?: number;
 };
 
+type Scorable = Pick<
+  NewLead,
+  | "kind"
+  | "name"
+  | "email"
+  | "phone"
+  | "companyName"
+  | "website"
+  | "gstin"
+  | "message"
+  | "source"
+  | "utm"
+  | "referrer"
+  | "landingPage"
+> & { _id?: Id<"leads">; accountId?: Id<"accounts">; repeats?: number };
+
+async function gstVerified(ctx: QueryCtx, lead: Scorable) {
+  if (!lead.gstin) return false;
+  const { _id, accountId } = lead;
+  const rows = [
+    ...(_id
+      ? await ctx.db
+          .query("facts")
+          .withIndex("by_lead", (q) => q.eq("leadId", _id))
+          .take(50)
+      : []),
+    ...(accountId
+      ? await ctx.db
+          .query("facts")
+          .withIndex("by_account", (q) => q.eq("accountId", accountId))
+          .take(50)
+      : []),
+  ];
+  return rows.some(
+    (fact) =>
+      fact.field === "gstin" &&
+      fact.value === lead.gstin &&
+      (fact.status === "applied" || fact.status === "accepted") &&
+      sourceFamily(fact.source) === "gst",
+  );
+}
+
+async function platformLink(ctx: QueryCtx, lead: Scorable) {
+  const person = await findPerson(ctx, {
+    email: lead.email,
+    phone: lead.phone,
+  });
+  const accountId = lead.accountId ?? person?.accountId;
+  const account = accountId ? await ctx.db.get(accountId) : null;
+  if (account?.platformOrgId) return "org" as const;
+  return person?.platformUserId ? ("user" as const) : null;
+}
+
+/** Scores a lead from what the CRM knows about it right now. */
+export async function scoreFor(ctx: QueryCtx, lead: Scorable) {
+  return scoreLead({
+    ...lead,
+    gstVerified: await gstVerified(ctx, lead),
+    platform: await platformLink(ctx, lead),
+  });
+}
+
+/** Recomputes a stored lead's score after any fact it depends on changed. */
+export async function rescoreLead(ctx: MutationCtx, id: Id<"leads">) {
+  const lead = await ctx.db.get(id);
+  if (!lead) return;
+  const { score, reasons } = await scoreFor(ctx, lead);
+  if (
+    score !== lead.score ||
+    reasons.join("|") !== lead.scoreReasons?.join("|")
+  ) {
+    await ctx.db.patch(id, { score, scoreReasons: reasons });
+  }
+}
+
+export async function rescoreAccountLeads(
+  ctx: MutationCtx,
+  accountId: Id<"accounts">,
+) {
+  const leads = await ctx.db
+    .query("leads")
+    .withIndex("by_account", (q) => q.eq("accountId", accountId))
+    .take(20);
+  for (const lead of leads) await rescoreLead(ctx, lead._id);
+}
+
+/** The member a routing rule picks, or null when none applies and round-robin should. */
+async function ruleOwner(ctx: QueryCtx, lead: Scorable, score: number) {
+  const rules = await routingRules(ctx);
+  if (rules.length === 0) return null;
+  const active = new Set<Id<"members">>(
+    (
+      await ctx.db
+        .query("members")
+        .withIndex("by_status", (q) => q.eq("status", "active"))
+        .collect()
+    ).map((member) => member._id),
+  );
+  const hit = routeLead(
+    rules,
+    {
+      kind: lead.kind,
+      source: lead.source,
+      score,
+      hasGst: Boolean(lead.gstin),
+      emailType: emailType(lead.email),
+    },
+    (id) => active.has(id),
+  );
+  return hit?.memberId ?? null;
+}
+
 /**
  * Inserts a lead, assigns an owner, tells them (or leadership when nobody owns
  * it), alerts the team channel and starts the speed-to-lead clock.
@@ -116,11 +242,16 @@ export async function createLead(
 ) {
   const now = Date.now();
   const { ownerId: requested, ...fields } = lead;
+  const { score, reasons } = await scoreFor(ctx, lead);
   const ownerId =
-    (requested === undefined ? await nextOwner(ctx) : requested) ?? undefined;
+    (requested === undefined
+      ? ((await ruleOwner(ctx, lead, score)) ?? (await nextOwner(ctx)))
+      : requested) ?? undefined;
   const id = await ctx.db.insert("leads", {
     ...fields,
     status: "new",
+    score,
+    scoreReasons: reasons,
     ownerId,
     assignedAt: ownerId ? now : undefined,
   });
@@ -142,7 +273,7 @@ export async function createLead(
   }
   if (!lead.firstTouchedAt) {
     await ctx.scheduler.runAt(
-      slaDueAt(now, (await leadSlaSeconds(ctx)) * 1000),
+      slaDueAt(now, (await leadSlaPolicy(ctx))(score)),
       internal.leads.checkSla,
       { id },
     );

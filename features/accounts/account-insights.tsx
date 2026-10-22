@@ -15,6 +15,7 @@ import {
   MeterRow,
   StatTile,
 } from "@/components/record/detail";
+import { useDialer, type Dial } from "@/features/calls/use-dialer";
 import type { TimelineTarget } from "@/features/timeline/kinds";
 import { DEAL_STAGES, type DealStage } from "@/lib/domain/enums";
 import { DEAL_STAGE_LABEL, personName } from "@/lib/domain/labels";
@@ -39,13 +40,24 @@ export const ASIDE_SECTION = "-mb-2 px-0 pt-0 pb-5";
 
 type SectionProps = { className?: string; divider?: boolean };
 
-function ContactLine({
-  email,
-  phone,
-}: {
-  email?: string | null;
-  phone?: string | null;
-}) {
+function PhoneLink({ call }: { call: Dial }) {
+  const { dial, dialog } = useDialer();
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => dial(call)}
+        className="hover:text-foreground text-fg-secondary focus-visible:ring-ring flex shrink-0 items-center gap-1 rounded-sm tabular-nums outline-none focus-visible:ring-2"
+      >
+        <PhoneIcon aria-hidden className="size-3 shrink-0" />
+        {formatPhone(call.phone)}
+      </button>
+      {dialog}
+    </>
+  );
+}
+
+function ContactLine({ email, call }: { email?: string | null; call?: Dial }) {
   return (
     <>
       {email && (
@@ -57,15 +69,7 @@ function ContactLine({
           <span className="truncate">{email}</span>
         </a>
       )}
-      {phone && (
-        <a
-          href={`tel:${phone}`}
-          className="hover:text-foreground text-fg-secondary focus-visible:ring-ring flex shrink-0 items-center gap-1 rounded-sm tabular-nums outline-none focus-visible:ring-2"
-        >
-          <PhoneIcon aria-hidden className="size-3 shrink-0" />
-          {formatPhone(phone)}
-        </a>
-      )}
+      {call && <PhoneLink call={call} />}
     </>
   );
 }
@@ -122,7 +126,18 @@ export function AccountSummary({
                 {contact.title ?? "Contact"}
               </span>
             </button>
-            <ContactLine email={contact.email} phone={contact.phone} />
+            <ContactLine
+              email={contact.email}
+              call={
+                contact.phone
+                  ? {
+                      target: { personId: contact._id },
+                      name: personName(contact),
+                      phone: contact.phone,
+                    }
+                  : undefined
+              }
+            />
           </div>
         ) : (
           <p className="caption-style text-fg-tertiary">

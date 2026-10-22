@@ -9,6 +9,8 @@ export const IST_MIDNIGHT = Date.UTC(2024, 0, 1) - 5.5 * HOUR;
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
   leadForm: { kind: "fixed window", rate: 5, period: MINUTE },
   enrichment: { kind: "fixed window", rate: 20, period: MINUTE },
+  fileUpload: { kind: "fixed window", rate: 30, period: MINUTE },
+  calls: { kind: "fixed window", rate: 20, period: MINUTE },
   productChecks: { kind: "fixed window", rate: 300, period: HOUR },
   /** Model calls per member per IST day. */
   ai: { kind: "fixed window", rate: 100, period: DAY, start: IST_MIDNIGHT },

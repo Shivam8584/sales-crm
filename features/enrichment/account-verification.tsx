@@ -13,7 +13,7 @@ import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { DetailSection } from "@/components/record/detail";
 import { Property } from "@/components/record/properties";
-import { sourceFamily } from "@/convex/lib/enrichment";
+import { sourceFamily } from "@/convex/lib/enrichment/kyc";
 import {
   GSTIN_LENGTH,
   GST_STATES,
@@ -29,15 +29,22 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
 import { Evidence } from "./evidence";
-import { formatRegistryDate, isInactiveGstStatus } from "./labels";
+import {
+  attemptLines,
+  factLabel,
+  formatRegistryDate,
+  isInactiveGstStatus,
+} from "./labels";
 import { RunNotice } from "./run-notice";
-import { SourceBadge } from "./source-badge";
+import { SourceBadge, SourceNote } from "./source-badge";
 import { Suggestions, type Fact } from "./suggestions";
 
 type Data = NonNullable<FunctionReturnType<typeof api.enrichment.forAccount>>;
 type Config = FunctionReturnType<typeof api.enrichment.config>;
 
-const SUGGESTION_ORDER = ["name", "phone", "email"];
+const SUGGESTION_ORDER = ["gstin", "name", "phone", "email"];
+
+const FOUND_FIELDS = ["legalName", "siteDescription"];
 
 const SANDBOX_HINT =
   "Sandbox: 10BSDPG0911J1ZG is active, 29AAACI4798L1ZU is cancelled.";
@@ -101,15 +108,20 @@ function Verification({
   const registry = registryFacts(data);
   const gstinFact = registry.get("gstin");
   const suggestions = data.facts
-    .filter(
-      (fact) =>
-        fact.status === "suggested" && sourceFamily(fact.source) === "gst",
-    )
+    .filter((fact) => fact.status === "suggested")
     .sort(
       (a, b) =>
         SUGGESTION_ORDER.indexOf(a.field) - SUGGESTION_ORDER.indexOf(b.field),
     );
-  const lastRun = data.runs.find((run) => sourceFamily(run.provider) === "gst");
+  const lastRun = data.runs[0];
+  const found = FOUND_FIELDS.flatMap((field) => {
+    const fact = data.facts.find(
+      (item) =>
+        item.field === field &&
+        (item.status === "applied" || item.status === "accepted"),
+    );
+    return fact && !registry.has(field) ? [fact] : [];
+  });
   const running = lastRun?.status === "running";
   const accountGstin = data.account.gstin;
   const current =
@@ -138,7 +150,7 @@ function Verification({
           onCancel={current ? () => setEditing(false) : undefined}
         />
       )}
-      <RunNotice run={lastRun} runningLabel="Checking the GST registry…" />
+      <RunNotice run={lastRun} runningLabel="Looking up details…" />
       {gstinFact && (
         <RegistryDetails
           registry={registry}
@@ -147,16 +159,87 @@ function Verification({
           showMeta={!current || editing}
         />
       )}
+      {found.length > 0 && (
+        <dl className="flex flex-col">
+          {found.map((fact) => (
+            <Property key={fact._id} label={factLabel(fact.field)}>
+              <span className="flex min-w-0 flex-col items-start pb-1.5">
+                <span className="py-1.5 text-sm leading-snug break-words">
+                  {fact.value}
+                </span>
+                <SourceNote
+                  source={fact.source}
+                  confidence={fact.confidence}
+                  url={fact.url}
+                />
+              </span>
+            </Property>
+          ))}
+        </dl>
+      )}
       <Suggestions
         facts={suggestions}
         currentValue={(field) =>
-          field === "name" ? data.account.name : undefined
+          field === "name"
+            ? data.account.name
+            : field === "gstin"
+              ? (data.account.gstin ?? undefined)
+              : undefined
         }
         display={(field, value) =>
           field === "phone" ? formatPhone(value) : value
         }
       />
+      {lastRun?.attempts.length ? (
+        <Evidence
+          evidence={attemptLines(lastRun.attempts)}
+          label="Last lookup"
+        />
+      ) : null}
+      <EnrichButton accountId={accountId} running={running} />
     </div>
+  );
+}
+
+function EnrichButton({
+  accountId,
+  running,
+}: {
+  accountId: Id<"accounts">;
+  running: boolean;
+}) {
+  const enrich = useAction(api.enrichment.enrichAccount);
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    setBusy(true);
+    try {
+      const outcome = await enrich({ accountId });
+      if (outcome.ok) {
+        toast(outcome.found > 0 ? "Details updated" : "Nothing new found");
+      }
+    } catch (caught) {
+      toast(readError(caught, "Couldn't start the lookup").message, {
+        tone: "danger",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Tooltip content="Checks the GST registry, the platform and the website, in that order, until the details are filled">
+      <Button
+        variant="ghost"
+        size="xs"
+        className="-ml-2 w-fit"
+        loading={busy}
+        disabled={running}
+        onClick={() => void run()}
+      >
+        Find more details
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -237,7 +320,11 @@ function VerifiedGstin({
         </Property>
       )}
       <Property label="Source">
-        <SourceBadge source={fact.source} observedAt={fact.observedAt} />
+        <SourceBadge
+          source={fact.source}
+          observedAt={fact.observedAt}
+          confidence={fact.confidence}
+        />
       </Property>
       {error && (
         <p role="alert" className="caption-style text-danger leading-snug">
@@ -468,6 +555,7 @@ function RegistryDetails({
         <SourceBadge
           source={gstinFact.source}
           observedAt={gstinFact.observedAt}
+          confidence={gstinFact.confidence}
         />
       ) : null,
     },
@@ -550,6 +638,7 @@ function RegistryDetails({
                     <SourceBadge
                       source={fact!.source}
                       observedAt={fact!.observedAt}
+                      confidence={fact!.confidence}
                     />
                   </span>
                 )}

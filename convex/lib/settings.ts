@@ -11,11 +11,18 @@ import {
   type PolicyField,
   type PricingPolicy,
 } from "../../lib/domain/pricing";
+import {
+  DEFAULT_HOT_SLA_FACTOR,
+  HOT_SLA_PERCENT,
+} from "../../lib/domain/scoring";
+import { parseRules } from "../../lib/domain/routing";
 import { invalid } from "./errors";
 
 export const SETTING_KEYS = {
   leadSlaMinutes: "leads.slaMinutes",
   roundRobinMemberIds: "leads.roundRobinMemberIds",
+  routingRules: "routing.rules",
+  hotSlaFactor: "routing.hotSlaFactor",
 } as const;
 
 export const LEAD_SLA_MINUTES = { min: 1, max: 120 } as const;
@@ -80,6 +87,33 @@ export async function roundRobinMemberIds(ctx: QueryCtx) {
   return (
     parseMemberIds(await readRaw(ctx, SETTING_KEYS.roundRobinMemberIds)) ?? []
   );
+}
+
+/** Admin-set routing rules in evaluation order. */
+export async function routingRules(ctx: QueryCtx) {
+  return parseRules<Id<"members">>(
+    await readRaw(ctx, SETTING_KEYS.routingRules),
+  );
+}
+
+export function isHotSlaFactor(value: number) {
+  const percent = Math.round(value * 100);
+  return (
+    percent >= HOT_SLA_PERCENT.min &&
+    percent <= HOT_SLA_PERCENT.max &&
+    Math.abs(value * 100 - percent) < 1e-6
+  );
+}
+
+/** The stored share of the normal SLA that hot leads get, or null when unset. */
+export async function storedHotSlaFactor(ctx: QueryCtx) {
+  const raw = await readRaw(ctx, SETTING_KEYS.hotSlaFactor);
+  const value = Number(raw);
+  return raw !== null && isHotSlaFactor(value) ? value : null;
+}
+
+export async function hotSlaFactor(ctx: QueryCtx) {
+  return (await storedHotSlaFactor(ctx)) ?? DEFAULT_HOT_SLA_FACTOR;
 }
 
 export const PRICING_KEYS = {

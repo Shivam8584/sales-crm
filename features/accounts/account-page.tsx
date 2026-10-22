@@ -32,6 +32,8 @@ import AccountStallBanner from "@/features/activation/account-stall-banner";
 import { RecordAutomations } from "@/features/automations/record-automations";
 import RecordDeals from "@/features/deals/record-deals";
 import AccountVerification from "@/features/enrichment/account-verification";
+import CustomFields from "@/features/fields/custom-fields";
+import FilesSection from "@/features/files/files-section";
 import MemberPicker from "@/features/members/member-picker";
 import PeopleList from "@/features/people/people-list";
 import AccountPlatform from "@/features/platform/account-platform";
@@ -316,6 +318,16 @@ function AccountView({ account }: { account: Account }) {
                 </Property>
               </Properties>
             </DetailSection>
+            <CustomFields
+              entity="account"
+              target={{ accountId: account._id }}
+              values={account.custom}
+              className={cn(ASIDE_SECTION, "gap-2")}
+            />
+            <FilesSection
+              target={{ accountId: account._id }}
+              className={cn(ASIDE_SECTION, "gap-2")}
+            />
             <AccountVerification
               accountId={account._id}
               className={ASIDE_SECTION}

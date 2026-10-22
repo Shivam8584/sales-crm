@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { emailProvider, smtpFailure } from "./automations/delivery.ts";
+import { deliver, emailProvider, smtpFailure } from "./automations/delivery.ts";
 
 const SMTP_ENV = {
   EMAIL_PROVIDER: "smtp",
@@ -43,4 +43,26 @@ test("smtp failures retry only when the server surely refused", () => {
     smtpFailure({ code: "ETIMEDOUT", message: "timed out" }).retryable,
     false,
   );
+});
+
+test("email to anything but one plain address is refused before sending", async () => {
+  for (const to of [
+    "a@x.com,b@evil.com",
+    "a@x.com;b@evil.com",
+    "a@x.com\r\nBcc: b@evil.com",
+    "Name <a@x.com>",
+  ]) {
+    const result = await deliver(
+      {},
+      {
+        channel: "email",
+        provider: "smtp",
+        stepKey: "k",
+        recipientId: "r",
+        to,
+      },
+    );
+    assert.equal(result.ok, false, to);
+    assert.equal(result.retryable, false);
+  }
 });

@@ -15,7 +15,8 @@ import { personSearchText } from "./lib/records";
 
 /**
  * Load-test data for local deployments: `npx convex run perf:seed` adds 5k
- * accounts, people and leads, 2k deals and 20k timeline entries in batches;
+ * accounts, people and leads, 2k deals, 20k timeline entries and a platform
+ * org with events for one account in five, in batches;
  * `npx convex run perf:wipe` empties the app tables a batch at a time, after
  * which `seed:reset` restores the demo.
  */
@@ -25,6 +26,7 @@ const PER_BATCH = 100;
 const DEALS_PER_BATCH = 40;
 const ENTRIES_PER_ACCOUNT = 3.6;
 const HOT_ENTRIES = 2_000;
+const PLATFORM_EVERY = 5;
 const DAY = 24 * 60 * 60_000;
 const WORDS = [
   "Amber",
@@ -66,10 +68,12 @@ export const seed = internalMutation({
       const owner = pick(members, i)._id;
       const name = `${pick(WORDS, i)} ${pick(WORDS, i * 7 + 3)} Perf ${i}`;
       const lastActivityAt = now - (i % 120) * DAY;
+      const onPlatform = i % PLATFORM_EVERY === 1;
       const accountId = await ctx.db.insert("accounts", {
         name,
         domain: `perf-${i}.example`,
         ownerId: owner,
+        platformOrgId: onPlatform ? `perf-org-${i}` : undefined,
         stage: pick(LIFECYCLE_STAGES, i),
         tags: ["perf"],
         lastActivityAt,
@@ -84,6 +88,7 @@ export const seed = internalMutation({
       await ctx.db.insert("people", {
         ...person,
         accountId: i % 5 === 0 ? undefined : accountId,
+        platformUserId: onPlatform ? `perf-user-${i}` : undefined,
         ownerId: owner,
         tags: ["perf"],
         lastActivityAt,
@@ -101,6 +106,36 @@ export const seed = internalMutation({
         ownerId: i % 4 === 0 ? undefined : owner,
         firstTouchedAt: i % 3 === 0 ? undefined : now - (i % 30) * DAY,
       });
+      if (onPlatform) {
+        const orgId = `perf-org-${i}`;
+        const userId = `perf-user-${i}`;
+        const at = now - (i % 100) * DAY;
+        const events: [string, number, Record<string, unknown>][] = [
+          ["user.signed_up", 0, { user_id: userId }],
+          ["organization.created", 1, { org_id: orgId, created_by: userId }],
+          ["wallet.deposit_received", 2, { org_id: orgId }],
+          [
+            "campaign.status_changed",
+            3,
+            { org_id: orgId, campaign_id: "c1", to: "live" },
+          ],
+          ["enrollment.approved", 4, { org_id: orgId, campaign_id: "c1" }],
+          ["enrollment.approved", 5, { org_id: orgId, campaign_id: "c1" }],
+          ["listing.created", 6, { org_id: orgId }],
+          ["member.joined", 7, { org_id: orgId }],
+        ];
+        for (const [type, n, data] of events) {
+          await ctx.db.insert("platformEvents", {
+            eventId: `perf-${i}-${n}`,
+            type,
+            orgId: type === "user.signed_up" ? undefined : orgId,
+            userId: type === "user.signed_up" ? userId : undefined,
+            occurredAt: at + n * 3_600_000,
+            payload: JSON.stringify(data),
+            processedAt: now,
+          });
+        }
+      }
       const taskStatus = pick(["todo", "in_progress", "done"] as const, i);
       await ctx.db.insert("tasks", {
         title: `Follow up with ${name}`,
@@ -154,6 +189,8 @@ export const seed = internalMutation({
 });
 
 const WIPE_TABLES = [
+  "platformEvents",
+  "activationStages",
   "timeline",
   "tasks",
   "deals",
@@ -161,7 +198,7 @@ const WIPE_TABLES = [
   "people",
   "accounts",
 ] as const;
-const WIPE_BATCH = 250;
+const WIPE_BATCH = 100;
 
 /** Deletes the perf-sized tables a batch at a time; then run `seed:reset`. */
 export const wipe = internalMutation({

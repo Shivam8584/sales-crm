@@ -208,6 +208,10 @@ export default function DataTable<T>({
         );
       };
       const row = activeCursor !== null ? rowsList[activeCursor] : undefined;
+      // Enter and Space belong to the focused button (pickers, checkboxes, menus).
+      const onControl =
+        event.target instanceof Element &&
+        event.target.closest("button, [role=checkbox]") !== null;
       switch (event.key) {
         case "j":
         case "ArrowDown":
@@ -216,11 +220,11 @@ export default function DataTable<T>({
         case "ArrowUp":
           return move(-1);
         case "Enter":
-          if (!row) return;
+          if (!row || onControl) return;
           event.preventDefault();
           return router.push(getHref(row));
         case " ":
-          if (!row || !onPeek) return;
+          if (!row || !onPeek || onControl) return;
           event.preventDefault();
           return onPeek(row);
         case "x":

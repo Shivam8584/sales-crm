@@ -1395,18 +1395,22 @@ export type ReplyInput = {
 };
 
 const STOP_PHRASE =
-  /\b(unsubscribe|opt[\s-]?out|remove me|stop (emailing|sending|contacting))\b/i;
+  /\b(unsubscribe|opt[\s-]?out|remove me|stop (emailing|sending|contacting)|band kar(o|do)|mat bhej(o|na))\b/i;
 const STOP_ALONE = /^\W*(please\s+)?stop\W*$/i;
+const NEGATED =
+  /\b(don['’]?t|do not|never|won['’]?t|not)\s+(\w+\s+){0,2}(unsubscribe|opt[\s-]?out|remove me|stop)/i;
 
 /** Only a short first line counts, so a long reply that merely mentions the word isn't an opt-out. */
 export function asksToStop(text: string) {
   const first =
     text
       .split("\n")
-      .find((line) => line.trim())
+      .find((line) => line.trim() && !line.trimStart().startsWith(">"))
       ?.trim() ?? "";
   return (
-    first.length <= 60 && (STOP_PHRASE.test(first) || STOP_ALONE.test(first))
+    first.length <= 60 &&
+    !NEGATED.test(first) &&
+    (STOP_PHRASE.test(first) || STOP_ALONE.test(first))
   );
 }
 

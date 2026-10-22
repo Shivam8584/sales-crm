@@ -1,5 +1,6 @@
 import { httpRouter } from "convex/server";
 import { auth } from "./auth";
+import { exotelWebhook } from "./calls";
 import { chatwootWebhook, emailInbound } from "./inbound";
 import { calcomWebhook, submit, submitPreflight } from "./leads";
 import { webhook as platformWebhook } from "./platform";
@@ -36,6 +37,11 @@ http.route({
   path: "/webhooks/chatwoot",
   method: "POST",
   handler: chatwootWebhook,
+});
+http.route({
+  path: "/webhooks/exotel",
+  method: "POST",
+  handler: exotelWebhook,
 });
 
 export default http;

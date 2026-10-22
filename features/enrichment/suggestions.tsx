@@ -6,10 +6,10 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import CountBadge from "@/components/_ui/count-badge";
-import { sourceFamily } from "@/convex/lib/enrichment";
+import { sourceFamily } from "@/convex/lib/enrichment/kyc";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
-import { factLabel, isSandboxSource, sourceLabel } from "./labels";
+import { factLabel, isSandboxSource, sourceNote } from "./labels";
 import { SandboxBadge } from "./source-badge";
 
 export type Fact = NonNullable<
@@ -23,6 +23,11 @@ function reason(fact: Fact, current: string | null | undefined) {
   }
   if (sourceFamily(fact.source) === "din") {
     return "Registered against the director's DIN";
+  }
+  if (sourceFamily(fact.source) === "website") {
+    return fact.field === "gstin"
+      ? "Printed on the company's website"
+      : "Taken from the company's website";
   }
   return "Needs a person to confirm";
 }
@@ -85,7 +90,7 @@ export function Suggestions({
             >
               <div className="flex min-w-0 flex-col gap-1.5">
                 <span className="caption-style text-fg-tertiary flex flex-wrap items-center gap-1.5">
-                  {label} · {sourceLabel(fact.source)}
+                  {label} · {sourceNote(fact.source, fact.confidence)}
                   {isSandboxSource(fact.source) && <SandboxBadge />}
                 </span>
                 <span className="text-foreground text-sm leading-snug font-medium break-words">

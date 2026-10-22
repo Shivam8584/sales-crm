@@ -16,6 +16,7 @@ import {
 } from "../lib/domain/normalize";
 import { personName } from "../lib/domain/labels";
 import { countPeople } from "./lib/counts";
+import { visibleCustom } from "./customFields";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import { findPerson } from "./lib/identity";
@@ -341,16 +342,23 @@ function listQuery(ctx: QueryCtx, args: ListArgs, now: number) {
     .order(args.dir ?? "desc");
 }
 
-async function personStats(ctx: QueryCtx, person: Doc<"people">, now: number) {
+async function personStats(
+  ctx: QueryCtx,
+  person: Doc<"people">,
+  now: number,
+  activity: boolean,
+) {
   const [recent, lastInteraction] = await Promise.all([
-    ctx.db
-      .query("timeline")
-      .withIndex("by_person", (q) =>
-        q
-          .eq("personId", person._id)
-          .gte("occurredAt", windowStart(TREND_DAYS, now)),
-      )
-      .collect(),
+    activity
+      ? ctx.db
+          .query("timeline")
+          .withIndex("by_person", (q) =>
+            q
+              .eq("personId", person._id)
+              .gte("occurredAt", windowStart(TREND_DAYS, now)),
+          )
+          .collect()
+      : [],
     latestInteraction(ctx, { personId: person._id }),
   ]);
   return {
@@ -363,23 +371,64 @@ async function personStats(ctx: QueryCtx, person: Doc<"people">, now: number) {
   };
 }
 
+/**
+ * The list's rows for these people: owner, account, activity trend and last
+ * interaction. Without `activity` the trend is left empty, which the CSV
+ * export doesn't show.
+ */
+async function rowsFor(
+  ctx: QueryCtx,
+  people: Doc<"people">[],
+  activity = true,
+) {
+  const now = Date.now();
+  const [members, accounts] = await Promise.all([
+    memberIndex(ctx),
+    accountsOf(ctx, people),
+  ]);
+  return await Promise.all(
+    people.map(async (person) => ({
+      ...toClient(person, members, accounts),
+      ...(await personStats(ctx, person, now, activity)),
+    })),
+  );
+}
+
 /** One page of the people list, with each row's activity trend and last interaction. */
 export const page = memberQuery({
   args: { paginationOpts: paginationOptsValidator, ...vListArgs },
   handler: async (ctx, { paginationOpts, ...args }) => {
-    const now = Date.now();
-    const [result, members] = await Promise.all([
-      listQuery(ctx, args, now).paginate(paginationOpts),
-      memberIndex(ctx),
-    ]);
-    const accounts = await accountsOf(ctx, result.page);
-    return await mapPage(result, (people) =>
-      Promise.all(
-        people.map(async (person) => ({
-          ...toClient(person, members, accounts),
-          ...(await personStats(ctx, person, now)),
-        })),
-      ),
+    const result = await listQuery(ctx, args, Date.now()).paginate(
+      paginationOpts,
+    );
+    return await mapPage(result, (people) => rowsFor(ctx, people));
+  },
+});
+
+/** CSV export, step 1: the ids the list would show, without building rows. */
+export const exportIds = memberQuery({
+  args: { paginationOpts: paginationOptsValidator, ...vListArgs },
+  handler: async (ctx, { paginationOpts, ...args }) => {
+    const result = await listQuery(ctx, args, Date.now()).paginate(
+      paginationOpts,
+    );
+    return {
+      ids: result.page.map((person) => person._id),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/** CSV export, step 2: list rows for ids from `exportIds`, in the same order. */
+export const exportRows = memberQuery({
+  args: { ids: v.array(v.id("people")) },
+  handler: async (ctx, { ids }) => {
+    const people = await Promise.all(ids.map((id) => ctx.db.get(id)));
+    return await rowsFor(
+      ctx,
+      people.filter((person) => person !== null),
+      false,
     );
   },
 });
@@ -481,11 +530,14 @@ export const get = memberQuery({
       ? await ctx.db.get(person.accountId)
       : null;
     const members = await memberIndex(ctx);
-    return toClient(
-      person,
-      members,
-      new Map(account ? [[account._id, account]] : []),
-    );
+    return {
+      ...toClient(
+        person,
+        members,
+        new Map(account ? [[account._id, account]] : []),
+      ),
+      custom: await visibleCustom(ctx, "person", person.custom),
+    };
   },
 });
 

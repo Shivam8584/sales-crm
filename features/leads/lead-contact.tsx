@@ -4,6 +4,7 @@ import type { ComponentType, SVGProps } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/_ui/button";
 import Tooltip from "@/components/_ui/tooltip";
+import { useDialer } from "@/features/calls/use-dialer";
 import { formatPhone } from "@/lib/domain/normalize";
 import { cn } from "@/lib/utils";
 import MailIcon from "@/public/assets/icons/mail-04.svg";
@@ -71,6 +72,7 @@ export default function LeadContactButtons({
   className?: string;
 }) {
   const { touch } = useLeadActions();
+  const { dial, dialog } = useDialer();
   const contacts = contactsOf(lead);
   if (contacts.length === 0) return null;
 
@@ -82,7 +84,16 @@ export default function LeadContactButtons({
             href={contact.href}
             target={contact.external ? "_blank" : undefined}
             rel={contact.external ? "noreferrer" : undefined}
-            onClick={() => touch(lead, contact.channel)}
+            onClick={(event) => {
+              touch(lead, contact.channel);
+              if (contact.channel !== "call" || !lead.phone) return;
+              event.preventDefault();
+              dial({
+                target: { leadId: lead._id },
+                name: lead.name,
+                phone: lead.phone,
+              });
+            }}
             aria-label={`${contact.label} ${lead.name}`}
             className={cn(
               buttonVariants({ variant: "secondary", size: "sm" }),
@@ -97,6 +108,7 @@ export default function LeadContactButtons({
           </a>
         </Tooltip>
       ))}
+      {dialog}
     </div>
   );
 }

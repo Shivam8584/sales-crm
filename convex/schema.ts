@@ -2,6 +2,12 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 import {
+  CUSTOM_FIELD_ENTITIES,
+  CUSTOM_FIELD_TYPES,
+} from "../lib/domain/custom-fields";
+import { PLAYBOOK_KINDS } from "../lib/domain/playbook";
+import {
+  literals,
   vCallOutcome,
   vChannel,
   vCurrency,
@@ -29,6 +35,7 @@ import {
   vProposalStatus,
 } from "./lib/pricing";
 import { vConsentEvent, vConsentPurpose, vLawfulBasis } from "./lib/consent";
+import { vAttempt } from "./lib/enrichment/validators";
 import {
   vAutomationStatus,
   vEnrollmentStatus,
@@ -44,6 +51,12 @@ import {
   vSubjectKind,
   vTrigger,
 } from "./lib/automations/validators";
+
+const vCustomFieldEntity = literals(CUSTOM_FIELD_ENTITIES);
+const vCustomFieldType = literals(CUSTOM_FIELD_TYPES);
+const vCustom = v.optional(
+  v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+);
 
 /**
  * Times are epoch milliseconds; calendar days are `YYYY-MM-DD` strings.
@@ -63,6 +76,8 @@ export default defineSchema({
     /** Set when the member finishes or skips the first-run tour. */
     tourCompletedAt: v.optional(v.number()),
     digestOff: v.optional(v.boolean()),
+    /** E.164; the number click-to-call rings first. */
+    phone: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_email", ["email"])
@@ -90,6 +105,7 @@ export default defineSchema({
     gstin: v.optional(v.string()),
     panRoot: v.optional(v.string()),
     platformOrgId: v.optional(v.string()),
+    custom: vCustom,
     archivedAt: v.optional(v.number()),
     lastActivityAt: v.optional(v.number()),
     updatedAt: v.number(),
@@ -122,6 +138,7 @@ export default defineSchema({
     ownerId: v.id("members"),
     tags: v.array(v.string()),
     platformUserId: v.optional(v.string()),
+    custom: vCustom,
     archivedAt: v.optional(v.number()),
     erasedAt: v.optional(v.number()),
     lastActivityAt: v.optional(v.number()),
@@ -183,18 +200,25 @@ export default defineSchema({
     personId: v.optional(v.id("people")),
     convertedAt: v.optional(v.number()),
     erasedAt: v.optional(v.number()),
+    score: v.optional(v.number()),
+    scoreReasons: v.optional(v.array(v.string())),
+    /** Form submissions folded into this lead after the first. */
+    repeats: v.optional(v.number()),
   })
     .index("by_status", ["status"])
     .index("by_owner_status", ["ownerId", "status"])
     .index("by_email", ["email"])
     .index("by_phone", ["phone"])
     .index("by_person", ["personId"])
+    .index("by_account", ["accountId"])
     .index("list_touched", ["status", "firstTouchedAt"])
     .index("list_demo", ["status", "demoAt"])
     .index("list_name", ["status", "name"])
     .index("list_owner_touched", ["ownerId", "status", "firstTouchedAt"])
     .index("list_owner_demo", ["ownerId", "status", "demoAt"])
     .index("list_owner_name", ["ownerId", "status", "name"])
+    .index("list_score", ["status", "score"])
+    .index("list_owner_score", ["ownerId", "status", "score"])
     .searchIndex("search_name", {
       searchField: "name",
       filterFields: ["status", "ownerId"],
@@ -222,7 +246,8 @@ export default defineSchema({
     redactedAt: v.optional(v.number()),
   })
     .index("by_person", ["personId"])
-    .index("by_lead", ["leadId"]),
+    .index("by_lead", ["leadId"])
+    .index("by_event", ["event"]),
 
   deals: defineTable({
     accountId: v.id("accounts"),
@@ -235,6 +260,7 @@ export default defineSchema({
     position: v.number(),
     lostReason: v.optional(v.string()),
     closedAt: v.optional(v.number()),
+    custom: vCustom,
     updatedAt: v.number(),
   })
     .index("by_account", ["accountId"])
@@ -393,6 +419,82 @@ export default defineSchema({
     .index("by_member", ["memberId"])
     .index("by_member_record", ["memberId", "record"]),
 
+  /** Admin-defined fields; values live in `custom` on the record, by `key`. */
+  customFields: defineTable({
+    entity: vCustomFieldEntity,
+    key: v.string(),
+    label: v.string(),
+    type: vCustomFieldType,
+    options: v.optional(v.array(v.string())),
+    order: v.number(),
+  })
+    .index("by_entity", ["entity", "order"])
+    .index("by_entity_key", ["entity", "key"]),
+
+  attachments: defineTable({
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    dealId: v.optional(v.id("deals")),
+    leadId: v.optional(v.id("leads")),
+    storageId: v.id("_storage"),
+    name: v.string(),
+    size: v.number(),
+    contentType: v.string(),
+    uploadedById: v.id("members"),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_person", ["personId"])
+    .index("by_deal", ["dealId"])
+    .index("by_lead", ["leadId"])
+    .index("by_storage", ["storageId"]),
+
+  /** Objection answers, battlecards, case studies and demo scripts reps copy into messages. */
+  playbook: defineTable({
+    kind: literals(PLAYBOOK_KINDS),
+    title: v.string(),
+    body: v.string(),
+    tags: v.array(v.string()),
+    /** `title` and `body` joined, since a search index covers one field. */
+    searchText: v.string(),
+    updatedAt: v.number(),
+    updatedById: v.id("members"),
+  })
+    .index("by_kind_title", ["kind", "title"])
+    .searchIndex("search_text", {
+      searchField: "searchText",
+      filterFields: ["kind"],
+    }),
+
+  /** Calls placed through the telephony provider, so its status callback can be matched and logged once. */
+  phoneCalls: defineTable({
+    sid: v.string(),
+    memberId: v.id("members"),
+    personId: v.optional(v.id("people")),
+    leadId: v.optional(v.id("leads")),
+    startedAt: v.number(),
+    loggedAt: v.optional(v.number()),
+  }).index("by_sid", ["sid"]),
+
+  /**
+   * When an org first reached each activation stage, or a user signed up
+   * (`signed_up`), kept in step with `platformEvents` by a trigger so reports
+   * don't scan events. `creator` is the user who created the org.
+   */
+  activationStages: defineTable({
+    orgId: v.optional(v.string()),
+    userId: v.optional(v.string()),
+    stages: v.object({
+      signed_up: v.optional(v.number()),
+      org_created: v.optional(v.number()),
+      funded: v.optional(v.number()),
+      live: v.optional(v.number()),
+      activated: v.optional(v.number()),
+    }),
+    creator: v.optional(v.string()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_user", ["userId"]),
+
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({
     accountId: v.optional(v.id("accounts")),
@@ -405,6 +507,9 @@ export default defineSchema({
     observedAt: v.number(),
     status: vFactStatus,
     decidedById: v.optional(v.id("members")),
+    /** 0 to 1; absent on facts recorded before provider chains. */
+    confidence: v.optional(v.number()),
+    url: v.optional(v.string()),
   })
     .index("by_account", ["accountId"])
     .index("by_person", ["personId"])
@@ -419,6 +524,7 @@ export default defineSchema({
     error: v.optional(v.string()),
     requestedById: v.id("members"),
     finishedAt: v.optional(v.number()),
+    attempts: v.optional(v.array(vAttempt)),
   })
     .index("by_account", ["accountId"])
     .index("by_person", ["personId"])

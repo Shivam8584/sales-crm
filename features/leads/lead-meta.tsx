@@ -1,8 +1,10 @@
 import Avatar from "@/components/_ui/avatar";
 import Tag, { type TagTone } from "@/components/_ui/tag";
+import Tooltip from "@/components/_ui/tooltip";
 import type { Option } from "@/components/fields/option-picker";
 import type { LeadStatus } from "@/lib/domain/enums";
 import { LEAD_STATUS_LABEL } from "@/lib/domain/labels";
+import { scoreBand, type LeadBand } from "@/lib/domain/scoring";
 import { cellDate, tagTone } from "@/features/accounts/record-cells";
 import { cn } from "@/lib/utils";
 import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
@@ -23,6 +25,46 @@ export function StatusTag({ status }: { status: LeadStatus }) {
     <Tag tone={STATUS_TONE[status]} size="sm">
       {LEAD_STATUS_LABEL[status]}
     </Tag>
+  );
+}
+
+const BAND_TONE: Record<LeadBand, TagTone> = {
+  hot: "red",
+  warm: "amber",
+  cold: "neutral",
+};
+const BAND_LABEL: Record<LeadBand, string> = {
+  hot: "Hot",
+  warm: "Warm",
+  cold: "Cold",
+};
+
+/** "Hot 82" with the reasons behind the score in a tooltip. */
+export function ScoreTag({
+  score,
+  reasons,
+}: {
+  score: number | null | undefined;
+  reasons?: string[];
+}) {
+  if (score === null || score === undefined) return null;
+  const band = scoreBand(score);
+  return (
+    <Tooltip
+      side="top"
+      disabled={!reasons?.length}
+      content={
+        <span className="flex flex-col gap-0.5">
+          {reasons?.map((reason) => (
+            <span key={reason}>{reason}</span>
+          ))}
+        </span>
+      }
+    >
+      <Tag tone={BAND_TONE[band]} size="sm">
+        {BAND_LABEL[band]} {score}
+      </Tag>
+    </Tooltip>
   );
 }
 

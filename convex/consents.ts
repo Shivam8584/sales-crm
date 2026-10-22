@@ -51,6 +51,8 @@ import { isInteraction } from "./lib/timeline";
 
 const DAY = 24 * 60 * 60_000;
 const MAX_REVIEW = 100;
+// Oldest people and leads past the cutoff that the review looks at; each costs a few reads.
+const REVIEW_SCAN = 800;
 
 function list(items: string[]) {
   if (items.length <= 1) return items.join("");
@@ -383,7 +385,7 @@ export const privacy = adminQuery({
 
     const requestRows = await ctx.db
       .query("consents")
-      .filter((q) => q.eq(q.field("event"), "erasure_requested"))
+      .withIndex("by_event", (q) => q.eq("event", "erasure_requested"))
       .collect();
     const requestedIds = [
       ...new Set(
@@ -412,11 +414,16 @@ export const privacy = adminQuery({
     }
     requests.sort((a, b) => a.requestedAt - b.requestedAt);
 
-    const [people, leads, deals, accounts, reviews] = await Promise.all([
-      ctx.db.query("people").collect(),
-      ctx.db.query("leads").collect(),
+    const [people, leads, deals, reviews] = await Promise.all([
+      ctx.db
+        .query("people")
+        .withIndex("by_creation_time", (q) => q.lt("_creationTime", cutoff))
+        .take(REVIEW_SCAN),
+      ctx.db
+        .query("leads")
+        .withIndex("by_creation_time", (q) => q.lt("_creationTime", cutoff))
+        .take(REVIEW_SCAN),
       ctx.db.query("deals").collect(),
-      ctx.db.query("accounts").collect(),
       ctx.db.query("retentionReviews").collect(),
     ]);
     const engaged = new Set(
@@ -424,7 +431,6 @@ export const privacy = adminQuery({
         .filter((deal) => deal.stage !== "lost")
         .flatMap((deal) => deal.personIds),
     );
-    const stageOf = new Map(accounts.map((account) => [account._id, account]));
     const kept = new Set(
       reviews
         .filter((review) => review.keptAt >= cutoff)
@@ -444,7 +450,9 @@ export const privacy = adminQuery({
       if (person.archivedAt || person.erasedAt) continue;
       if (person._creationTime >= cutoff || engaged.has(person._id)) continue;
       if (kept.has(person._id)) continue;
-      const account = person.accountId ? stageOf.get(person.accountId) : null;
+      const account = person.accountId
+        ? await ctx.db.get(person.accountId)
+        : null;
       if (account && !PROSPECT_STAGES.has(account.stage)) continue;
       const touched = await lastInteraction(ctx, { personId: person._id });
       if (touched !== null && touched >= cutoff) continue;

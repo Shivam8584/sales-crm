@@ -13,9 +13,10 @@ import { cleanTags, normalizeDomain } from "../lib/domain/normalize";
 import { accountHealth } from "../lib/domain/health";
 import { sumMoney } from "../lib/domain/money";
 import { accountStall, isOnPlatform } from "./lib/activation";
-import { sourceFamily } from "./lib/enrichment";
+import { sourceFamily } from "./lib/enrichment/kyc";
 import { emitAutomationTrigger } from "./lib/automations/engine";
 import { countAccounts } from "./lib/counts";
+import { visibleCustom } from "./customFields";
 import { fail, invalid } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import { findAccount } from "./lib/identity";
@@ -175,22 +176,25 @@ async function accountStats(
   ctx: QueryCtx,
   account: Doc<"accounts">,
   now: number,
+  activity: boolean,
 ) {
   const [deals, recent, lastInteraction, stall] = await Promise.all([
     ctx.db
       .query("deals")
       .withIndex("by_account", (q) => q.eq("accountId", account._id))
       .collect(),
-    ctx.db
-      .query("timeline")
-      .withIndex("by_account", (q) =>
-        q
-          .eq("accountId", account._id)
-          .gte("occurredAt", windowStart(TREND_DAYS, now)),
-      )
-      .collect(),
+    activity
+      ? ctx.db
+          .query("timeline")
+          .withIndex("by_account", (q) =>
+            q
+              .eq("accountId", account._id)
+              .gte("occurredAt", windowStart(TREND_DAYS, now)),
+          )
+          .collect()
+      : [],
     latestInteraction(ctx, { accountId: account._id }),
-    accountStall(ctx, account, now),
+    activity ? accountStall(ctx, account, now) : null,
   ]);
   const open = deals
     .filter((deal) => deal.stage !== "won" && deal.stage !== "lost")
@@ -233,11 +237,12 @@ async function healthOf(ctx: QueryCtx, account: Doc<"accounts">, now: number) {
   const events = await ctx.db
     .query("platformEvents")
     .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .order("desc")
     .take(ORG_EVENT_LIMIT);
   const health = accountHealth(
     healthInput(
       account,
-      stateEvents(events),
+      stateEvents(events.reverse()),
       await latestSnapshot(ctx, account._id),
       now,
     ),
@@ -369,26 +374,65 @@ function listQuery(ctx: QueryCtx, args: ListArgs, now: number) {
     .order(args.dir ?? "desc");
 }
 
+/**
+ * The list's rows for these accounts: rollups, health and owner. Without
+ * `activity` the trend and stalled flag are left empty, which the CSV export
+ * doesn't show.
+ */
+async function rowsFor(
+  ctx: QueryCtx,
+  accounts: Doc<"accounts">[],
+  activity = true,
+) {
+  const now = Date.now();
+  const members = await memberIndex(ctx);
+  return await Promise.all(
+    accounts.map(async (account) => {
+      const [peopleCount, stats, health] = await Promise.all([
+        countPeople(ctx, account._id),
+        accountStats(ctx, account, now, activity),
+        healthOf(ctx, account, now),
+      ]);
+      return { ...toRow(account, members, peopleCount), ...stats, health };
+    }),
+  );
+}
+
 /** One page of the accounts list, with each row's rollups and health. */
 export const page = memberQuery({
   args: { paginationOpts: paginationOptsValidator, ...vListArgs },
   handler: async (ctx, { paginationOpts, ...args }) => {
-    const now = Date.now();
-    const [result, members] = await Promise.all([
-      listQuery(ctx, args, now).paginate(paginationOpts),
-      memberIndex(ctx),
-    ]);
-    return await mapPage(result, (accounts) =>
-      Promise.all(
-        accounts.map(async (account) => {
-          const [peopleCount, stats, health] = await Promise.all([
-            countPeople(ctx, account._id),
-            accountStats(ctx, account, now),
-            healthOf(ctx, account, now),
-          ]);
-          return { ...toRow(account, members, peopleCount), ...stats, health };
-        }),
-      ),
+    const result = await listQuery(ctx, args, Date.now()).paginate(
+      paginationOpts,
+    );
+    return await mapPage(result, (accounts) => rowsFor(ctx, accounts));
+  },
+});
+
+/** CSV export, step 1: the ids the list would show, without building rows. */
+export const exportIds = memberQuery({
+  args: { paginationOpts: paginationOptsValidator, ...vListArgs },
+  handler: async (ctx, { paginationOpts, ...args }) => {
+    const result = await listQuery(ctx, args, Date.now()).paginate(
+      paginationOpts,
+    );
+    return {
+      ids: result.page.map((account) => account._id),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/** CSV export, step 2: list rows for ids from `exportIds`, in the same order. */
+export const exportRows = memberQuery({
+  args: { ids: v.array(v.id("accounts")) },
+  handler: async (ctx, { ids }) => {
+    const accounts = await Promise.all(ids.map((id) => ctx.db.get(id)));
+    return await rowsFor(
+      ctx,
+      accounts.filter((account) => account !== null),
+      false,
     );
   },
 });
@@ -478,6 +522,7 @@ export const get = memberQuery({
       ...account,
       domain: account.domain ?? null,
       gstin: account.gstin ?? null,
+      custom: await visibleCustom(ctx, "account", account.custom),
       owner: owner
         ? { _id: owner._id, name: owner.name, email: owner.email }
         : null,

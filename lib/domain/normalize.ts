@@ -3,7 +3,9 @@
  * (the authority). Each `normalize*` returns null for input that is not valid.
  */
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Characters that would add recipients or mailto parameters are not accepted.
+const EMAIL_PATTERN =
+  /^[^\s@,;<>"()?#%\\]+@[^\s@,;<>"()?#%\\]+\.[^\s@,;<>"()?#%\\]{2,}$/;
 const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 const INDIAN_MOBILE = /^[6-9]\d{9}$/;
 const LINKEDIN_HANDLE = /^[a-z0-9-]{3,100}$/i;

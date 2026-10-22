@@ -1,7 +1,9 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { invalid } from "./lib/errors";
 import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
+import { fetchableUrl, Refused } from "./lib/enrichment/safeFetch";
 import { internalQuery, type MutationCtx } from "./_generated/server";
 
 export type PushPayload = { title: string; body: string; href: string };
@@ -47,6 +49,17 @@ export const config = memberQuery({
 export const subscribe = memberMutation({
   args: { endpoint: v.string(), p256dh: v.string(), auth: v.string() },
   handler: async (ctx, { endpoint, p256dh, auth }) => {
+    // The server posts to this address, so it must be a public https push service.
+    try {
+      fetchableUrl(endpoint);
+    } catch (error) {
+      if (error instanceof Refused)
+        invalid("endpoint", "Not a valid push endpoint");
+      throw error;
+    }
+    if (endpoint.length > 1000 || p256dh.length > 200 || auth.length > 100) {
+      invalid("endpoint", "Not a valid push subscription");
+    }
     const existing = await ctx.db
       .query("pushSubscriptions")
       .withIndex("by_endpoint", (q) => q.eq("endpoint", endpoint))

@@ -27,6 +27,7 @@ import { receive } from "./lib/platform";
 import { simulateAccount, type Scenario } from "./platform";
 import { accountCounts, leadCounts, peopleCounts } from "./lib/counts";
 import { internalMutation } from "./lib/functions";
+import { insertStarter } from "./lib/playbookStarter";
 
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -552,6 +553,7 @@ async function seedWorkspace(ctx: MutationCtx) {
   }
   const member = (index: number) => members[index % members.length];
   const admin = members.find((item) => item.role === "admin") ?? members[0];
+  await insertStarter(ctx, admin._id);
   const now = Date.now();
   const dayKey = (days: number) => istToday(days, now);
 

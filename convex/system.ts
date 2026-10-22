@@ -4,7 +4,7 @@ import { adminMutation, adminQuery } from "./lib/functions";
 import { aiModels } from "./lib/ai";
 import { accountCounts, leadCounts, peopleCounts } from "./lib/counts";
 import { emailProvider, whatsappProvider } from "./lib/automations/delivery";
-import { providerMode } from "./lib/enrichment";
+import { providerMode } from "./lib/enrichment/kyc";
 import { platformMode } from "./lib/platformClient";
 import { scraperMode } from "./lib/scraper";
 import { literals } from "./lib/validators";

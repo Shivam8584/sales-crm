@@ -14,7 +14,7 @@ import {
   DIN_PATTERN,
   SANDBOX_DIN,
   sourceFamily,
-} from "@/convex/lib/enrichment";
+} from "@/convex/lib/enrichment/kyc";
 import { formatPhone } from "@/lib/domain/normalize";
 import { readError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
@@ -177,6 +177,7 @@ export default function DinLookup({
               <SourceBadge
                 source={confirmed.source}
                 observedAt={confirmed.observedAt}
+                confidence={confirmed.confidence}
                 note={
                   confirmed.decidedBy
                     ? `Accepted by ${confirmed.decidedBy}`
