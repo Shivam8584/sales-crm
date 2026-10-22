@@ -125,7 +125,7 @@ export default function TemplatePreview({ node }: { node: GraphNode }) {
               });
             }
           }}
-          className="border-input bg-secondary hover:border-fg-tertiary mx-0 h-9 w-full rounded-lg border px-3"
+          className="bg-well hover:bg-well-hover mx-0 h-10 w-full rounded-xl px-3"
         />
         {prospectKeys.map((key) => (
           <label key={key} className="flex flex-col gap-1">

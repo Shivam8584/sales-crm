@@ -306,7 +306,7 @@ export default function LeadsPage() {
         meta={
           counts && (
             <>
-              <span className="text-fg-tertiary text-sm tabular-nums">
+              <span className="tabular-nums">
                 {counts.open.toLocaleString("en-IN")} open
               </span>
               {counts.breached > 0 && (

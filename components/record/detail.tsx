@@ -10,7 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * A block of a detail sheet or record sidebar: uppercase eyebrow title, an
+ * A block of a detail sheet or record sidebar: section title, an
  * optional control on the right, and a divider underneath. `collapsible`
  * lets the title fold the block away.
  */
@@ -34,7 +34,7 @@ export function DetailSection({
 }) {
   const classes = cn(
     "flex min-w-0 flex-col gap-4 px-6 py-5",
-    divider && "shadow-divider",
+    divider && "shadow-[inset_0_-1px_0_var(--border)]",
     className,
   );
   if (collapsible) {
@@ -50,7 +50,7 @@ export function DetailSection({
         <section>
           <div className="min-h-control-md flex items-center justify-between gap-2">
             <h3 className="flex min-w-0 flex-1">
-              <CollapsibleTrigger className="eyebrow-style hover:text-fg-secondary focus-visible:ring-ring duration-fast -mx-1 flex max-w-full cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+              <CollapsibleTrigger className="title-style hover:text-fg-secondary focus-visible:ring-ring duration-fast -mx-1 flex max-w-full cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
                 <span className="truncate">{title}</span>
                 <CollapsibleChevron className="opacity-60" />
               </CollapsibleTrigger>
@@ -67,7 +67,7 @@ export function DetailSection({
   return (
     <section className={classes}>
       <div className="min-h-control-md flex items-center justify-between gap-2">
-        <h3 className="eyebrow-style font-normal">{title}</h3>
+        <h3 className="title-style">{title}</h3>
         {action}
       </div>
       {children}
@@ -89,12 +89,7 @@ export function DetailHero({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "shadow-divider flex items-start gap-3 px-6 py-5",
-        className,
-      )}
-    >
+    <div className={cn("flex items-start gap-3 px-6 py-5", className)}>
       <div className="shrink-0">{visual}</div>
       <div className="flex min-w-0 flex-1 flex-col gap-3 pt-1">
         <h2
@@ -128,15 +123,17 @@ export function StatTile({
   return (
     <div
       className={cn(
-        "border-line-strong flex min-w-0 flex-col gap-3 rounded-lg border p-2.75",
+        "bg-well flex min-w-0 flex-col gap-2 rounded-2xl px-4 py-3",
         className,
       )}
     >
-      <span className="caption-style text-fg-secondary flex min-w-0 items-center gap-1">
+      <span className="text-fg-secondary flex min-w-0 items-center gap-1.5 text-xs">
         {Icon && <Icon aria-hidden className="size-3 shrink-0" />}
         <span className="truncate">{label}</span>
       </span>
-      <span className="lead-style block truncate tabular-nums">{value}</span>
+      <span className="block truncate text-xl font-semibold tabular-nums">
+        {value}
+      </span>
     </div>
   );
 }
@@ -161,8 +158,8 @@ export function BigNumber({
         <span
           className={cn(
             "block leading-none",
-            "font-display font-medium",
-            size === "display" ? "text-display" : "text-2xl",
+            "font-semibold tracking-[-0.035em]",
+            size === "display" ? "text-4xl" : "text-2xl",
           )}
         >
           {value}

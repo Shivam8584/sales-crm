@@ -158,7 +158,7 @@ export default function ActivityPage() {
 
       <div
         ref={scroller}
-        className="scrollbar-none min-h-0 flex-1 overflow-y-auto"
+        className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-[calc(var(--page-x)-0.75rem)] pb-16"
       >
         {rows === undefined ? (
           <ActivitySkeleton />
@@ -180,7 +180,7 @@ export default function ActivityPage() {
           >
             {groups.map((group) => (
               <section key={group.key} aria-label={group.label}>
-                <h2 className="bg-background/95 caption-style text-fg-tertiary z-sticky sticky top-0 flex h-9 items-center px-4 backdrop-blur-sm">
+                <h2 className="bg-background/95 title-style z-sticky sticky top-0 flex h-11 items-center px-3 backdrop-blur-sm">
                   {group.label}
                 </h2>
                 <ul>

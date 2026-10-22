@@ -53,7 +53,7 @@ function ActivationDesk() {
         title="Activation"
         meta={
           desk && (
-            <span className="text-fg-tertiary text-sm tabular-nums">
+            <span className="tabular-nums">
               {desk.rows.length} stuck · {desk.linked} on Hypedrive
             </span>
           )

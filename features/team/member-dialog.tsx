@@ -96,7 +96,7 @@ export default function MemberDialog({
                             "focus-visible:ring-ring duration-fast ease-power3-out flex h-8 items-center rounded-full border px-3 text-xs leading-none font-medium transition-[background-color,border-color,color] outline-none focus-visible:ring-2",
                             checked
                               ? "border-selected bg-overlay-1 text-foreground"
-                              : "border-input text-fg-secondary hover:bg-overlay-1 hover:text-foreground",
+                              : "text-fg-secondary hover:bg-overlay-1 hover:text-foreground",
                           )}
                         >
                           {option.label}

@@ -213,7 +213,11 @@ export function DealAmountField({
             </span>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" variant="primary" size="sm" loading={saving}>

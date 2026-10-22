@@ -28,6 +28,10 @@ type Deal = FunctionReturnType<typeof api.deals.list>[number];
 /** Detail sections in a record page sidebar sit flush with the column. */
 export const ASIDE_SECTION = "-mb-2 px-0 pt-0 pb-5";
 
+/** The one lifted card in a record sidebar. */
+export const LIFTED_SECTION =
+  "bg-background shadow-card relative overflow-hidden rounded-4xl p-6";
+
 type SectionProps = { className?: string; divider?: boolean };
 
 function PhoneLink({ call }: { call: Dial }) {
@@ -162,33 +166,45 @@ export function PipelineHealth({
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <MoneyValue totals={totals} className="text-sm font-medium" />
-            <p className="caption-style text-fg-secondary">
+          <div className="flex flex-col gap-2">
+            <MoneyValue
+              totals={totals}
+              className="text-4xl leading-none font-semibold tracking-[-0.035em]"
+            />
+            <p className="text-fg-secondary text-sm">
               {open!.length} open {open!.length === 1 ? "deal" : "deals"}
               {won > 0 && ` · ${won} won`}
             </p>
           </div>
-          <dl className="flex flex-col gap-1.5">
+          <dl className="border-border mt-2 flex flex-col gap-3 border-t pt-4">
             {OPEN_STAGES.map((stage) => {
               const amount = inMain
                 .filter((deal) => deal.stage === stage)
                 .reduce((sum, deal) => sum + deal.amount.amount, 0);
               if (amount === 0) return null;
+              const share = Math.round((amount / main.amount) * 100);
               return (
                 <div
                   key={stage}
-                  className="caption-style flex items-center justify-between gap-2 tabular-nums"
+                  className="flex flex-col gap-1.5 text-sm tabular-nums"
                 >
-                  <dt className="text-fg-secondary">
-                    {DEAL_STAGE_LABEL[stage]}
-                  </dt>
-                  <dd>
-                    {formatMoney(
-                      { amount, currency: main.currency },
-                      { compact: true },
-                    )}
-                  </dd>
+                  <div className="flex items-center justify-between gap-2">
+                    <dt className="text-fg-secondary">
+                      {DEAL_STAGE_LABEL[stage]}
+                    </dt>
+                    <dd className="font-medium">
+                      {formatMoney(
+                        { amount, currency: main.currency },
+                        { compact: true },
+                      )}
+                    </dd>
+                  </div>
+                  <span aria-hidden className="bg-track block h-1 rounded-full">
+                    <span
+                      className="bg-foreground block h-full rounded-full"
+                      style={{ width: `${share}%` }}
+                    />
+                  </span>
                 </div>
               );
             })}

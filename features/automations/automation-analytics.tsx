@@ -358,7 +358,7 @@ export default function AutomationAnalytics({ id }: { id: Id<"automations"> }) {
   const data = useQuery(api.automations.analytics, { id });
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6">
+      <div className="flex w-full flex-col gap-8 px-(--page-x) pt-2 pb-16">
         {data === undefined ? (
           <AnalyticsSkeleton />
         ) : data === null ? null : (

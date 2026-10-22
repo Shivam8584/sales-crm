@@ -19,19 +19,23 @@ export default function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-2 px-6 py-10 text-center",
+        "bg-well flex flex-col items-center rounded-3xl px-8 py-12 text-center",
         className,
       )}
     >
-      {Icon && <Icon aria-hidden className="text-fg-tertiary mb-1 size-4" />}
-      <span className="lead-style block font-medium text-balance">{title}</span>
+      {Icon && (
+        <span className="bg-background text-fg-secondary shadow-tile mb-4 grid size-11 place-items-center rounded-full">
+          <Icon aria-hidden className="size-4" />
+        </span>
+      )}
+      <span className="title-style block text-balance">{title}</span>
       {description && (
-        <span className="caption-style text-fg-tertiary block max-w-sm leading-snug text-balance">
+        <span className="text-fg-secondary mt-1 block max-w-[40ch] text-sm text-pretty">
           {description}
         </span>
       )}
       {action && (
-        <div className="mt-2 flex flex-wrap justify-center gap-2">{action}</div>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>
       )}
     </div>
   );

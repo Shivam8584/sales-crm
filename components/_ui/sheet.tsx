@@ -71,13 +71,13 @@ function SheetContent({
           props.onInteractOutside?.(event);
         }}
         className={cn(
-          "bg-background text-foreground data-[state=closed]:animate-out data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:ease-power3-out z-overlay duration-panel data-[state=closed]:duration-slow fixed flex w-full flex-col outline-none",
+          "bg-background text-foreground data-[state=closed]:animate-out data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:ease-out-hd z-overlay data-[state=closed]:duration-slow fixed flex w-full flex-col overflow-hidden outline-none data-[state=open]:duration-[480ms]",
           side === "right" &&
-            "border-border data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-dvh border-l",
+            "shadow-overlay data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-dvh sm:inset-y-2 sm:right-2 sm:h-[calc(100dvh-1rem)] sm:max-w-[calc(100vw-1rem)] sm:rounded-4xl",
           side === "left" &&
-            "border-border data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-dvh border-r",
+            "shadow-overlay data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-dvh sm:inset-y-2 sm:left-2 sm:h-[calc(100dvh-1rem)] sm:rounded-4xl",
           side === "bottom" &&
-            "shadow-overlay data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 max-h-[85dvh] rounded-t-xl",
+            "shadow-overlay data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom rounded-t-5xl inset-x-0 bottom-0 max-h-[85dvh]",
           className,
         )}
       >
@@ -92,7 +92,7 @@ function SheetHeader({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="sheet-header"
       className={cn(
-        "border-border flex h-14 shrink-0 items-center justify-between gap-2 border-b px-6",
+        "flex h-16 shrink-0 items-center justify-between gap-2 px-6",
         className,
       )}
       {...props}
@@ -105,7 +105,7 @@ function SheetFooter({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="sheet-footer"
       className={cn(
-        "border-border flex h-15.5 shrink-0 items-center justify-between gap-2 border-t px-6",
+        "border-border flex h-17 shrink-0 items-center justify-between gap-2 border-t px-6",
         className,
       )}
       {...props}
@@ -126,7 +126,7 @@ function SheetTitle({
     <SheetPrimitive.Title
       data-slot="sheet-title"
       className={cn(
-        "lead-style min-w-0 truncate",
+        "title-style min-w-0 truncate",
         Icon && "flex items-center gap-2",
         className,
       )}
@@ -145,7 +145,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("caption-style text-fg-secondary leading-snug", className)}
+      className={cn("text-fg-secondary text-sm", className)}
       {...props}
     />
   );

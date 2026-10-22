@@ -45,7 +45,7 @@ export default function Tooltip({
           sideOffset={6}
           collisionPadding={8}
           className={cn(
-            "caption-style bg-popover text-foreground shadow-overlay data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-[0.97] data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0 z-overlay duration-fast flex origin-(--radix-tooltip-content-transform-origin) items-center gap-2 rounded-md px-2 py-1.5 select-none",
+            "bg-foreground text-background data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-[0.97] data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0 z-overlay duration-fast [&_[data-slot=kbd]]:bg-background/15 [&_[data-slot=kbd]]:text-background/70 flex origin-(--radix-tooltip-content-transform-origin) items-center gap-2 rounded-lg px-2 py-1.5 text-xs leading-none font-medium select-none [&_[data-slot=kbd]]:shadow-none",
             className,
           )}
         >

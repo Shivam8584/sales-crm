@@ -149,12 +149,12 @@ export default function TasksPage() {
     ) : undefined;
 
   return (
-    <Page>
+    <Page wide>
       <PageHeader
         title="Tasks"
         meta={
           rows && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
+            <span className="tabular-nums">
               {rows.filter((task) => task.status !== "done").length} open
             </span>
           )

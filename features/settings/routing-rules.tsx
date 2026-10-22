@@ -45,8 +45,7 @@ const RULES_KEY = "routing.rules";
 const HOT_KEY = "routing.hotSlaFactor";
 const ANY = "any";
 const ROUND_ROBIN = "round-robin";
-const PICKER_CLASS =
-  "border-input bg-secondary mx-0 h-9 w-full rounded-lg border px-3";
+const PICKER_CLASS = "bg-well mx-0 h-10 w-full rounded-xl px-3";
 
 type Settings = FunctionReturnType<typeof api.settings.get>;
 type Rule = Settings[typeof RULES_KEY][number];

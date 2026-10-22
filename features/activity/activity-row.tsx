@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
+import Avatar from "@/components/_ui/avatar";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
 import { dateTime, relativeTime } from "@/lib/time";
@@ -58,9 +59,10 @@ export function ActivityRow({ entry }: { entry: ActivityEntry }) {
       : entry.subject;
 
   return (
-    <li className="hover:bg-row-hover flex items-start gap-3 px-4 py-2.5">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex min-w-0 items-baseline gap-2 text-sm leading-5">
+    <li className="hover:bg-well duration-base flex items-start gap-3.5 rounded-2xl px-3 py-2.5 transition-colors hover:duration-[120ms]">
+      <Avatar name={actor} className="size-8 text-[11px]" />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-1">
+        <div className="text-body flex min-w-0 items-baseline gap-2 leading-6">
           <p className="text-fg-secondary min-w-0 flex-1 break-words">
             <span className="text-foreground font-medium">{actor}</span>
             {entry.via && (
@@ -119,11 +121,12 @@ export function ActivityRow({ entry }: { entry: ActivityEntry }) {
 export function ActivitySkeleton() {
   return (
     <div aria-busy className="flex flex-col">
-      <div className="flex h-9 items-center px-4">
+      <div className="flex h-11 items-center px-3">
         <Skeleton className="h-3 w-16" />
       </div>
       {Array.from({ length: 8 }, (_, index) => (
-        <div key={index} className="flex items-start gap-3 px-4 py-2.5">
+        <div key={index} className="flex items-start gap-3.5 px-3 py-2.5">
+          <Skeleton className="size-8 shrink-0 rounded-full" />
           <span className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3 w-3/5" />
             <Skeleton className="h-2.5 w-2/5" />

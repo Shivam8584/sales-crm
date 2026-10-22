@@ -18,6 +18,7 @@ import {
   CreateButton,
   Page,
   PageHeader,
+  PageStatus,
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
@@ -58,9 +59,14 @@ const COLUMNS: Column<Row>[] = [
     width: "minmax(14rem,2fr)",
     sortValue: (row) => row.name,
     cell: (row) => (
-      <span className="truncate" title={row.name}>
-        {row.name}
-      </span>
+      <>
+        <span className="bg-well text-fg-secondary grid size-8 shrink-0 place-items-center rounded-lg">
+          <AutomationIcon aria-hidden className="size-3.5" />
+        </span>
+        <span className="truncate" title={row.name}>
+          {row.name}
+        </span>
+      </>
     ),
   },
   {
@@ -336,7 +342,19 @@ export default function AutomationsPage() {
 
   return (
     <Page>
-      <PageHeader title="Sequences" meta={<StoppedStatus />} />
+      <PageHeader
+        title="Sequences"
+        meta={
+          <>
+            {counts && (
+              <PageStatus tone={counts.active ? "success" : "neutral"}>
+                {counts.active} live of {counts.all}
+              </PageStatus>
+            )}
+            <StoppedStatus />
+          </>
+        }
+      />
       <PageViews
         value={view}
         onChange={setView}
@@ -344,8 +362,8 @@ export default function AutomationsPage() {
       />
       {view === "templates" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex max-w-3xl flex-col gap-4 p-4 sm:p-6">
-            <p className="caption-style text-fg-tertiary">
+          <div className="flex max-w-180 flex-col gap-4 px-(--page-x) pt-1 pb-16">
+            <p className="text-fg-secondary text-sm">
               Each template opens as your own draft. Nothing is sent until you
               activate it.
             </p>
@@ -420,11 +438,11 @@ export default function AutomationsPage() {
             )}
           </PageToolbar>
           {grid ? (
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-(--page-x) pt-1 pb-16">
               <AutomationsGrid rows={sortedRows} empty={empty} />
             </div>
           ) : (
-            <div className="relative flex min-h-0 flex-1 flex-col sm:pt-4">
+            <div className="relative flex min-h-0 flex-1 flex-col">
               <DataTable
                 label="Sequences"
                 columns={COLUMNS}

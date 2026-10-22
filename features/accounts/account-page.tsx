@@ -62,6 +62,7 @@ import {
   ASIDE_SECTION,
   AccountSummary,
   ActivityTrend,
+  LIFTED_SECTION,
   PipelineHealth,
 } from "./account-insights";
 import ActivationPath from "./activation-path";
@@ -230,7 +231,7 @@ function AccountView({ account }: { account: Account }) {
                     value={account.name}
                     label="Account name"
                     onSave={(name) => save({ name }, "Name")}
-                    inputClassName="font-display h-9 text-2xl font-medium"
+                    inputClassName="text-display lg:text-hero h-auto py-0.5 font-semibold"
                   />
                 </span>
               }
@@ -269,13 +270,14 @@ function AccountView({ account }: { account: Account }) {
         }
         aside={
           <>
-            <AccountBrief accountId={account._id} />
-            <AccountSummary people={people} className={ASIDE_SECTION} />
             <PipelineHealth
               accountId={account._id}
               deals={deals}
-              className={ASIDE_SECTION}
+              className={LIFTED_SECTION}
+              divider={false}
             />
+            <AccountBrief accountId={account._id} />
+            <AccountSummary people={people} className={ASIDE_SECTION} />
             <ActivityTrend
               target={{ accountId: account._id }}
               className={ASIDE_SECTION}
@@ -433,7 +435,7 @@ function AccountPageSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:py-8 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
+        className="grid w-full gap-x-8 gap-y-6 px-(--page-x) pt-1 pb-8 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
       >
         <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-12 rounded-xl" />

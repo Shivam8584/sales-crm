@@ -86,7 +86,7 @@ function DialogContent({
           submitOnModEnter(event);
         }}
         className={cn(
-          "bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=open]:slide-in-from-bottom-2 data-[state=open]:ease-power4-out z-overlay shadow-overlay duration-slow data-[state=closed]:duration-fast fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-120 -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl outline-none",
+          "bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=open]:slide-in-from-bottom-4 data-[state=open]:ease-out-hd z-overlay shadow-overlay data-[state=closed]:duration-fast fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-120 -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl outline-none data-[state=open]:duration-[480ms]",
           className,
         )}
       >
@@ -97,7 +97,7 @@ function DialogContent({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="z-sticky-header absolute top-4 right-4"
+            className="z-sticky-header bg-well text-fg-secondary hover:bg-well-hover absolute top-5 right-5"
             aria-label="Close"
           >
             <XIcon className="size-4" />
@@ -113,7 +113,7 @@ function DialogHeader({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="dialog-header"
       className={cn(
-        "border-border bg-popover z-sticky sticky top-0 flex flex-col gap-2 border-b px-6 py-5",
+        "bg-popover z-sticky sticky top-0 flex flex-col gap-1.5 px-6 pt-6 pb-4",
         className,
       )}
       {...props}
@@ -126,7 +126,7 @@ function DialogFooter({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "border-border bg-popover z-sticky sticky bottom-0 flex items-center justify-end gap-2 border-t px-6 py-4",
+        "bg-popover z-sticky sticky bottom-0 flex items-center justify-end gap-2 px-6 pt-4 pb-6",
         className,
       )}
       {...props}
@@ -141,7 +141,10 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("h2-style", className)}
+      className={cn(
+        "pr-10 text-xl leading-7 font-semibold tracking-[-0.02em]",
+        className,
+      )}
       {...props}
     />
   );
@@ -154,7 +157,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("caption-style text-fg-secondary leading-snug", className)}
+      className={cn("text-fg-secondary text-sm text-pretty", className)}
       {...props}
     />
   );

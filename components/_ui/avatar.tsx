@@ -55,7 +55,7 @@ export default function Avatar({
     <span
       {...a11y}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full leading-none font-medium tracking-tight select-none",
+        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full leading-none font-semibold tracking-tight select-none",
         SIZES[size],
         tone(name),
         className,

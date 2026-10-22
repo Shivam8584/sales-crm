@@ -85,7 +85,7 @@ export default function AutomationPage({ id }: { id: Id<"automations"> }) {
   if (automation === undefined) return <EditorSkeleton />;
   if (automation === null) {
     return (
-      <Page>
+      <Page wide>
         <PageHeader crumbs={CRUMBS} title="Not found" />
         <EmptyState
           icon={AutomationIcon}
@@ -106,8 +106,11 @@ export default function AutomationPage({ id }: { id: Id<"automations"> }) {
 
 function EditorSkeleton() {
   return (
-    <Page>
-      <PageHeader crumbs={CRUMBS} title={<Skeleton className="h-4 w-48" />} />
+    <Page wide>
+      <PageHeader
+        crumbs={CRUMBS}
+        title={<Skeleton className="my-1 h-9 w-56 lg:h-11" />}
+      />
       <div className="flex flex-1 items-start justify-center pt-24">
         <div className="flex w-80 flex-col items-center gap-16">
           <Skeleton className="h-26 w-80 rounded-xl" />

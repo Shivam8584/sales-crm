@@ -203,7 +203,7 @@ function ExportBody({
           <pre
             tabIndex={0}
             aria-label="Preview"
-            className="border-input bg-secondary text-fg-secondary focus-visible:border-selected focus-visible:ring-selected/20 max-h-64 min-w-0 overflow-auto rounded-lg border px-3 py-2.5 font-mono text-xs leading-relaxed outline-none focus-visible:ring-3"
+            className="bg-well text-fg-secondary focus-visible:ring-foreground/15 max-h-64 min-w-0 overflow-auto rounded-xl px-3 py-2.5 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2"
           >
             {lines.slice(0, PREVIEW_LINES).join("\n")}
           </pre>

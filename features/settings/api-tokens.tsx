@@ -32,7 +32,7 @@ import {
 type Token = FunctionReturnType<typeof api.tokens.list>[number];
 
 const ENDPOINT = `${process.env.NEXT_PUBLIC_CONVEX_SITE_URL ?? ""}/mcp`;
-const PICKER_CLASS = "border-input bg-secondary mx-0 h-9 w-full border px-3";
+const PICKER_CLASS = "bg-well mx-0 h-10 w-full px-3";
 
 const ACCESS = [
   { value: "read", label: "Read only", hint: "Look things up" },

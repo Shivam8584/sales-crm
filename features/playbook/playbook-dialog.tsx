@@ -97,7 +97,7 @@ function EntryForm({
             options={KIND_OPTIONS}
             label="Kind"
             onChange={(value) => value && setKind(value as PlaybookKind)}
-            className="border-input bg-secondary mx-0 h-9 w-full border px-3"
+            className="bg-well mx-0 h-10 w-full px-3"
           />
         </div>
         <Field label="Title" htmlFor="playbook-title" error={errors.title}>
@@ -135,7 +135,7 @@ function EntryForm({
         </Field>
         <div className="flex flex-col gap-2">
           <span className="caption-style text-fg-secondary">Tags</span>
-          <div className="border-input bg-secondary rounded-lg border px-3 py-1.5">
+          <div className="bg-well rounded-xl px-3 py-1.5">
             <TagsField value={tags} onChange={setTags} label="Tags" />
           </div>
           {errors.tags && (

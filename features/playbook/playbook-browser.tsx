@@ -89,7 +89,7 @@ export default function PlaybookBrowser({
           </Button>
         )}
       </PageToolbar>
-      <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
+      <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-[calc(var(--page-x)-0.75rem)] pb-16">
         {rows && rows.length === 0 ? (
           <EntriesEmpty
             filtered={filtered}
@@ -103,7 +103,7 @@ export default function PlaybookBrowser({
                 <li
                   key={index}
                   aria-hidden
-                  className="flex flex-col gap-2 px-4 py-3"
+                  className="flex flex-col gap-2 px-3 py-3"
                 >
                   <Skeleton className="h-3.5 w-56" />
                   <Skeleton className="h-3 w-full max-w-md" />
@@ -114,10 +114,10 @@ export default function PlaybookBrowser({
                 <button
                   type="button"
                   onClick={() => onSelect(entry)}
-                  className="hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex w-full flex-col gap-1 px-4 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                  className="hover:bg-well focus-visible:ring-ring duration-base flex w-full flex-col gap-1 rounded-2xl px-3 py-3 text-left transition-[background-color,scale] outline-none hover:duration-[120ms] focus-visible:ring-2 focus-visible:ring-inset active:scale-[0.985]"
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm font-medium">
+                    <span className="text-body truncate font-medium">
                       {entry.title}
                     </span>
                     <span className="caption-style text-fg-tertiary shrink-0">

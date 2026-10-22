@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import Logo from "@/public/assets/images/_common/logo.svg";
+import Wordmark from "@/public/assets/images/_common/logo-wordmark.svg";
 
 /** The brand mark; its artwork carries its own tile and shadow, so it is sized by the tile. */
 export function LogoTile({ className }: { className?: string }) {
@@ -20,7 +21,13 @@ export default function AuthCard({
   description,
   children,
   footer,
-  visual = <LogoTile />,
+  visual = (
+    <Wordmark
+      role="img"
+      aria-label="Hypedrive"
+      className="text-foreground h-6 w-30"
+    />
+  ),
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -31,15 +38,15 @@ export default function AuthCard({
 }) {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-10">
-      <div className="flex w-full max-w-85 flex-col gap-8">
-        <div className="flex flex-col items-center gap-4 text-center">
+      <div className="rise flex w-full max-w-90 flex-col gap-8">
+        <div className="flex flex-col items-center gap-6 text-center">
           {visual}
           <div className="flex flex-col gap-2">
-            <h1 className="text-lg leading-tight font-medium tracking-[-0.01em] text-balance">
-              {title}
-            </h1>
+            <h1 className="text-display font-semibold text-balance">{title}</h1>
             {description && (
-              <p className="text-fg-tertiary text-balance">{description}</p>
+              <p className="text-body text-fg-secondary text-balance">
+                {description}
+              </p>
             )}
           </div>
         </div>

@@ -4,13 +4,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
-import Tag from "@/components/_ui/tag";
+import Avatar from "@/components/_ui/avatar";
+import AccountLogo from "@/features/accounts/account-logo";
 import { NextAction } from "@/features/ai/next-action";
-import {
-  ActivationCell,
-  MoneyValue,
-  activationSteps,
-} from "@/features/accounts/record-cells";
+import { MoneyValue } from "@/features/accounts/record-cells";
 import { DealStageTag } from "@/features/deals/stage";
 import { DemoTag } from "@/features/leads/lead-meta";
 import { SlaCell } from "@/features/leads/sla";
@@ -51,7 +48,7 @@ function RowShell({
       data-cursor={active}
       onMouseMove={() => !active && onHover(id)}
       className={cn(
-        "group/card animate-item-in data-[cursor=true]:bg-row-hover duration-fast before:bg-selected relative flex min-h-13 scroll-my-16 items-start gap-3 px-4 py-3 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:opacity-0 data-[cursor=true]:before:opacity-100 sm:items-center sm:px-5",
+        "group/card animate-item-in data-[cursor=true]:bg-well hover:bg-well duration-base relative -mx-3 flex min-h-17 scroll-my-16 items-start gap-4 rounded-2xl px-3 py-2.5 transition-colors hover:duration-[120ms] sm:items-center",
         className,
       )}
     >
@@ -61,9 +58,24 @@ function RowShell({
 }
 
 const TITLE_LINK =
-  "lead-style focus-visible:after:ring-ring min-w-0 truncate rounded-sm text-left leading-5 font-medium outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-inset";
+  "text-body focus-visible:after:ring-ring min-w-0 truncate rounded-sm text-left leading-5 font-medium outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-inset";
 
-const META = "caption-style text-fg-tertiary flex min-w-0 items-center gap-1.5";
+const META = "text-fg-tertiary flex min-w-0 items-center gap-1.5 text-sm";
+
+const LEAD =
+  "bg-well group-hover/card:bg-background group-data-[cursor=true]/card:bg-background grid size-11 shrink-0 place-items-center rounded-xl transition-colors";
+
+const StatusDot = ({ tone }: { tone: "warning" | "info" | "danger" }) => (
+  <span
+    aria-hidden
+    className={cn(
+      "size-1.5 shrink-0 rounded-full",
+      tone === "warning" && "bg-warning",
+      tone === "info" && "bg-info",
+      tone === "danger" && "bg-danger",
+    )}
+  />
+);
 
 const Dot = () => (
   <span
@@ -80,7 +92,9 @@ export function TaskItem({ task, ...row }: RowProps & { task: TaskRow }) {
   );
   return (
     <RowShell id={task._id} {...row}>
-      <DoneToggle task={task} className="z-sticky relative mt-0.75" />
+      <span className={LEAD}>
+        <DoneToggle task={task} className="z-sticky relative" />
+      </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <button
@@ -119,18 +133,20 @@ export function LeadItem({
 }: RowProps & { lead: WaitingLead; slaMs: number }) {
   return (
     <RowShell id={lead._id} {...row} className="max-sm:flex-wrap">
+      <Avatar name={lead.name} className="size-11 text-sm" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={routes.lead(lead._id)} className={TITLE_LINK}>
           {lead.name}
         </Link>
         <span className={META}>
+          <StatusDot tone={lead.slaBreachedAt ? "danger" : "warning"} />
           <span className="truncate">{lead.companyName}</span>
           <Dot />
           <span className="shrink-0">{LEAD_KIND_LABEL[lead.kind]}</span>
         </span>
         <NextAction type="leads" id={lead._id} />
       </span>
-      <span className="caption-style flex shrink-0 items-center gap-3 max-sm:basis-full max-sm:justify-between">
+      <span className="flex shrink-0 items-center gap-3 text-sm max-sm:basis-full max-sm:justify-between">
         {lead.demoAt && <DemoTag at={lead.demoAt} />}
         <span className="flex justify-end sm:w-36">
           <SlaCell lead={lead} slaMs={slaMs} />
@@ -145,40 +161,33 @@ export function StuckItem({ row: item, ...row }: RowProps & { row: StuckRow }) {
   const task = item.task;
   return (
     <RowShell id={item._id} {...row}>
-      <span className="flex min-w-0 flex-1 flex-col gap-2">
-        <span className="flex min-w-0 items-center justify-between gap-3">
-          <Link href={routes.account(item._id)} className={TITLE_LINK}>
-            {item.account.name}
-          </Link>
-          <span className="caption-style text-fg-tertiary shrink-0 tabular-nums">
-            {stuckFor(item.since)}
-          </span>
-        </span>
-        <span className="flex min-w-0 items-center justify-between gap-3">
-          <Tag
-            tone="amber"
-            size="xs"
-            title={firstSentence(item.playbook)}
-            className="min-w-0"
-          >
-            <span className="truncate">{item.label}</span>
-          </Tag>
-          <span className="caption-style z-sticky relative shrink-0">
-            <ActivationCell steps={activationSteps(true, item.stage)} />
-          </span>
+      <AccountLogo
+        account={item.account}
+        size="md"
+        className="size-10 rounded-xl text-sm"
+      />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <Link href={routes.account(item._id)} className={TITLE_LINK}>
+          {item.account.name}
+        </Link>
+        <span className={META} title={firstSentence(item.playbook)}>
+          <StatusDot tone="warning" />
+          <span className="truncate">{item.label}</span>
+          <Dot />
+          <span className="shrink-0 tabular-nums">{stuckFor(item.since)}</span>
         </span>
         <NextAction type="accounts" id={item._id} />
-        {task && (
-          <button
-            type="button"
-            onClick={() => setEdit({ type: "task", id: task._id })}
-            className={cn(chipClass(), "z-sticky relative w-fit")}
-          >
-            <StatusIcon status={task.status} />
-            {task.status === "done" ? "Followed up" : "Open task"}
-          </button>
-        )}
       </span>
+      {task && (
+        <button
+          type="button"
+          onClick={() => setEdit({ type: "task", id: task._id })}
+          className={cn(chipClass(), "z-sticky relative shrink-0")}
+        >
+          <StatusIcon status={task.status} />
+          {task.status === "done" ? "Followed up" : "Open task"}
+        </button>
+      )}
     </RowShell>
   );
 }
@@ -187,12 +196,21 @@ export function DealItem({ deal, ...row }: RowProps & { deal: DealRow }) {
   const late = deal.closeDate !== null && deal.closeDate < dayFromToday(0);
   return (
     <RowShell id={deal._id} {...row}>
-      <span className="flex min-w-0 flex-1 flex-col gap-2">
+      {deal.account ? (
+        <AccountLogo
+          account={deal.account}
+          size="md"
+          className="size-10 rounded-xl text-sm"
+        />
+      ) : (
+        <span className={LEAD} />
+      )}
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex min-w-0 items-center justify-between gap-3">
           <Link href={routes.deal(deal._id)} className={TITLE_LINK}>
             {deal.title}
           </Link>
-          <span className="lead-style shrink-0">
+          <span className="text-body shrink-0 font-semibold">
             <MoneyValue
               totals={deal.amount.amount > 0 ? [deal.amount] : []}
               compact
@@ -202,14 +220,14 @@ export function DealItem({ deal, ...row }: RowProps & { deal: DealRow }) {
         <span className="flex min-w-0 items-center justify-between gap-3">
           <span className="flex min-w-0 items-center gap-1.5">
             <DealStageTag stage={deal.stage} />
-            <span className="caption-style text-fg-tertiary truncate">
+            <span className="text-fg-tertiary truncate text-sm">
               {deal.account?.name ?? "No account"}
             </span>
           </span>
           {deal.closeDate && (
             <span
               className={cn(
-                "caption-style flex shrink-0 items-center gap-1 tabular-nums",
+                "flex shrink-0 items-center gap-1 text-sm tabular-nums",
                 late ? "text-danger" : "text-fg-tertiary",
               )}
             >

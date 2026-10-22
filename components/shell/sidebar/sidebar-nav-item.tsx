@@ -1,7 +1,8 @@
+"use client";
+
 import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
-import { buttonVariants } from "@/components/_ui/button";
-import CountBadge from "@/components/_ui/count-badge";
+import { motion } from "motion/react";
 import Tooltip from "@/components/_ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +22,15 @@ type SidebarNavItemProps = {
   countLabel?: string;
   /** Shows a dot on the collapsed icon while the count is above zero. */
   alert?: boolean;
-  tone?: "default" | "quiet";
+  /** Icon only, for the compact footer row. */
+  iconOnly?: boolean;
+  /** The active capsule slides between items sharing this id. */
+  indicator?: string;
   tour?: string;
 };
+
+export const NAV_ITEM =
+  "group relative flex h-9 min-w-9 items-center gap-3 overflow-hidden rounded-xl text-sm font-medium text-sidebar-foreground outline-none transition-[color,background-color,scale] duration-base ease-out select-none hover:text-foreground hover:duration-[120ms] active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[active=true]:text-foreground not-data-[active=true]:hover:bg-overlay-2 pointer-coarse:h-11";
 
 export default function SidebarNavItem({
   icon: Icon,
@@ -36,47 +43,55 @@ export default function SidebarNavItem({
   count,
   countLabel,
   alert = false,
-  tone = "default",
+  iconOnly = false,
+  indicator = "sidebar",
   tour,
 }: SidebarNavItemProps) {
   const showCount = count !== undefined && count > 0;
   const className = cn(
-    buttonVariants({ variant: "nav", size: "md" }),
-    "group relative h-8 gap-1.5 py-0 font-normal pointer-coarse:h-11",
-    "collapsed:size-8 collapsed:justify-center collapsed:gap-0 collapsed:px-0",
-    tone === "quiet" && "text-fg-tertiary",
+    NAV_ITEM,
+    iconOnly ? "justify-center px-0" : "w-full pr-3 pl-4",
   );
   const content = (
     <>
-      <Icon
-        aria-hidden
-        className="text-fg-tertiary ease-power3-out group-hover:text-icon group-data-[active=true]:text-icon duration-fast size-3.5 shrink-0 transition-colors"
-      />
-      <span className="collapsed:sr-only min-w-0 flex-1 truncate text-left">
-        {label}
+      {active && (
+        <motion.span
+          aria-hidden
+          layoutId={`${indicator}-indicator`}
+          transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+          className="bg-sidebar-primary shadow-capsule absolute inset-0 rounded-xl"
+        />
+      )}
+      <span className="relative shrink-0">
+        <Icon aria-hidden className="size-4" />
+        {showCount && alert && (
+          <span
+            aria-hidden
+            className="bg-foreground/40 collapsed:block absolute -top-0.5 -right-1 hidden size-1.5 rounded-full"
+          />
+        )}
       </span>
-      {showCount && (
-        <CountBadge className="collapsed:hidden">
+      {!iconOnly && (
+        <span className="collapsed:pointer-events-none collapsed:-translate-x-1 collapsed:opacity-0 collapsed:delay-0 relative min-w-0 flex-1 truncate text-left whitespace-nowrap transition-[opacity,translate] delay-80 duration-160 ease-out">
+          {label}
+        </span>
+      )}
+      {showCount && !iconOnly && (
+        <span className="text-fg-disabled collapsed:opacity-0 relative text-[13px] font-normal tabular-nums transition-opacity delay-80 duration-160">
           {alert && count > 99 ? "99+" : count}
           {countLabel && <span className="sr-only"> {countLabel}</span>}
-        </CountBadge>
-      )}
-      {showCount && alert && (
-        <span
-          aria-hidden
-          className="bg-danger ring-sidebar collapsed:block absolute top-1 right-1 hidden size-1.5 rounded-full ring-2"
-        />
+        </span>
       )}
     </>
   );
 
   return (
-    <li>
+    <li className="relative">
       <Tooltip
-        content={label}
+        content={count ? `${label} · ${count}` : label}
         shortcut={shortcut ? `G ${shortcut}` : undefined}
         side="right"
-        disabled={!collapsed}
+        disabled={!collapsed && !iconOnly}
       >
         {href ? (
           <Link
@@ -85,6 +100,7 @@ export default function SidebarNavItem({
             data-tour={tour}
             data-active={active}
             aria-current={active ? "page" : undefined}
+            aria-label={iconOnly ? label : undefined}
             className={className}
           >
             {content}
@@ -95,6 +111,7 @@ export default function SidebarNavItem({
             onClick={onClick}
             data-tour={tour}
             data-active={active}
+            aria-label={iconOnly ? label : undefined}
             className={className}
           >
             {content}

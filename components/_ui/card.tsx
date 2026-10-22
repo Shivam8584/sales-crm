@@ -1,13 +1,13 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Raised surface for a block of content: settings sections, dashboard panels. */
+/** A well: the filled surface for a block of content, in place of a bordered box. */
 export function Card({ className, ...props }: ComponentProps<"section">) {
   return (
     <section
       data-slot="card"
       className={cn(
-        "border-border flex min-w-0 flex-col overflow-hidden rounded-xl border",
+        "bg-well flex min-w-0 flex-col overflow-hidden rounded-3xl",
         className,
       )}
       {...props}
@@ -44,7 +44,7 @@ export function CardHeader({
     <header
       data-slot="card-header"
       className={cn(
-        "flex min-w-0 items-center gap-3 px-4 py-3.5 sm:px-6",
+        "flex min-w-0 items-center gap-3 px-5 pt-5 pb-3 sm:px-6",
         className,
       )}
     >
@@ -54,7 +54,7 @@ export function CardHeader({
           <h2
             id={id}
             className={cn(
-              "min-w-0 text-sm leading-5 font-medium",
+              "title-style min-w-0",
               tone === "danger" && "text-danger",
             )}
           >
@@ -63,9 +63,7 @@ export function CardHeader({
           {meta}
         </div>
         {description && (
-          <p className="caption-style text-fg-tertiary max-w-prose leading-snug">
-            {description}
-          </p>
+          <p className="text-fg-secondary max-w-prose text-sm">{description}</p>
         )}
       </div>
       {action && (

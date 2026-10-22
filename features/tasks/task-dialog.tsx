@@ -98,7 +98,7 @@ const FIELDS = new Set<FieldName>([
 
 const MAX_MEMBER_PILLS = 8;
 
-const PICKER_CLASS = "border-input bg-secondary mx-0 h-9 w-full border px-3";
+const PICKER_CLASS = "bg-well mx-0 h-10 w-full px-3";
 
 /** Create and edit dialog for tasks, driven by `useUiStore` create/edit state. */
 export default function TaskDialog() {

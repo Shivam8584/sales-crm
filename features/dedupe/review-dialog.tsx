@@ -52,7 +52,7 @@ const COUNT_LABEL: Record<string, string> = {
 };
 
 const OPTION =
-  "border-input has-focus-visible:ring-selected/20 has-focus-visible:border-selected duration-fast flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-[border-color,background-color,box-shadow] has-focus-visible:ring-3";
+  "has-focus-visible:ring-foreground/15 duration-fast flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 transition-[background-color,box-shadow] has-focus-visible:ring-2";
 
 const fieldsOf = (row: Row) =>
   row.fields as Record<string, string | null | undefined>;

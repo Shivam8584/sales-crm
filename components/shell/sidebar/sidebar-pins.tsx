@@ -8,7 +8,6 @@ import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import SidebarNavItem from "./sidebar-nav-item";
-import SidebarSection from "./sidebar-section";
 
 const ICON = {
   accounts: BuildingIcon,
@@ -21,26 +20,34 @@ const ICON = {
 export default function SidebarPins({
   collapsed,
   onNavigate,
+  indicator,
 }: {
   collapsed: boolean;
   onNavigate?: () => void;
+  indicator?: string;
 }) {
   const pathname = usePathname();
   const pins = useQuery(api.pins.mine, {});
   if (!pins?.length) return null;
   return (
-    <SidebarSection title="Pinned">
-      {pins.map((pin) => (
-        <SidebarNavItem
-          key={pin._id}
-          href={pin.href}
-          icon={ICON[pin.record.split(":")[0] as keyof typeof ICON]}
-          label={pin.title}
-          collapsed={collapsed}
-          active={pathname === pin.href}
-          onClick={onNavigate}
-        />
-      ))}
-    </SidebarSection>
+    <div className="pt-6">
+      <p className="text-fg-disabled collapsed:sr-only px-7 pb-1 text-xs">
+        Pinned
+      </p>
+      <ul aria-label="Pinned" className="flex flex-col gap-0.5 px-3">
+        {pins.map((pin) => (
+          <SidebarNavItem
+            key={pin._id}
+            href={pin.href}
+            icon={ICON[pin.record.split(":")[0] as keyof typeof ICON]}
+            label={pin.title}
+            collapsed={collapsed}
+            active={pathname === pin.href}
+            onClick={onNavigate}
+            indicator={`${indicator ?? "sidebar"}-pin`}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }

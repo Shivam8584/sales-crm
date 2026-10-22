@@ -14,7 +14,7 @@ export default function NpsTile() {
   const data = useQuery(api.surveys.nps, { days: DAYS });
   if (!data) {
     return (
-      <div aria-busy className="flex flex-col gap-2">
+      <div aria-busy className="flex flex-col gap-2 px-4 py-3.5">
         <Skeleton className="h-3 w-20" />
         <Skeleton className="h-6 w-10" />
         <Skeleton className="h-3 w-24" />

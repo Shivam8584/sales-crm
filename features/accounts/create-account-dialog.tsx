@@ -235,7 +235,7 @@ export default function CreateAccountDialog({
                         onChange={(value) =>
                           value && setStage(value as LifecycleStage)
                         }
-                        className="border-input bg-secondary mx-0 h-9 border px-3"
+                        className="bg-well mx-0 h-10 px-3"
                       />
                     </div>
                     <div className="flex flex-col gap-2">
@@ -245,7 +245,7 @@ export default function CreateAccountDialog({
                       <MemberPicker
                         value={ownerId}
                         onChange={setOwnerId}
-                        className="border-input bg-secondary mx-0 h-9 border px-3"
+                        className="bg-well mx-0 h-10 px-3"
                       />
                     </div>
                   </div>

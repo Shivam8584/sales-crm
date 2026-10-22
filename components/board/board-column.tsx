@@ -80,7 +80,7 @@ export default function BoardColumn<T extends { id: string }>({
       aria-hidden
       layout="position"
       transition={{ layout: { type: "spring", duration: 0.3, bounce: 0 } }}
-      className="border-line-strong bg-overlay-1 rounded-2xl border border-dashed"
+      className="bg-foreground/[0.04] ring-foreground/10 rounded-2xl ring-1 ring-inset"
     >
       <CardSurface invisible>{renderCard(activeItem)}</CardSurface>
     </motion.div>
@@ -136,16 +136,16 @@ export default function BoardColumn<T extends { id: string }>({
       ref={setNodeRef}
       data-column-id={column.id}
       aria-label={column.name}
-      className="scrollbar-none border-border flex h-full w-[85vw] max-w-85 shrink-0 snap-start flex-col overflow-y-auto overscroll-y-contain border-r sm:w-80 lg:w-auto lg:max-w-none lg:min-w-80 lg:flex-1"
+      className="scrollbar-none bg-well flex h-full w-[85vw] max-w-85 shrink-0 snap-start scroll-ml-(--page-x) flex-col overflow-y-auto overscroll-y-contain rounded-3xl sm:w-72 lg:w-auto lg:max-w-80 lg:min-w-68 lg:flex-1"
     >
-      <header className="z-sticky sticky top-0 flex flex-col gap-1 bg-[linear-gradient(to_bottom,var(--background)_calc(100%-16px),transparent)] px-4 pt-4 pb-5">
+      <header className="z-sticky bg-well sticky top-0 flex flex-col gap-0.5 rounded-t-3xl px-4.5 pt-3.5 pb-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <ColumnBadge column={column} />
-            <h2 className="lead-style truncate leading-5 font-medium">
+            <h2 className="truncate text-sm leading-5 font-semibold">
               {column.name}
             </h2>
-            <span className="lead-style text-fg-tertiary tabular-nums">
+            <span className="text-fg-disabled text-sm tabular-nums">
               {items.length}
             </span>
           </div>
@@ -157,7 +157,7 @@ export default function BoardColumn<T extends { id: string }>({
                   size="icon-sm"
                   aria-label={`${addLabel} to ${column.name}`}
                   onClick={() => onAdd(column.id)}
-                  className="rounded-md"
+                  className="hover:bg-background rounded-full"
                 >
                   <PlusIcon aria-hidden className="size-3" />
                 </Button>
@@ -169,7 +169,7 @@ export default function BoardColumn<T extends { id: string }>({
                   variant="ghost"
                   size="icon-sm"
                   aria-label={`${column.name} options`}
-                  className="data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground rounded-md"
+                  className="hover:bg-background data-[state=open]:bg-background data-[state=open]:text-foreground rounded-full"
                 >
                   <DotsIcon aria-hidden className="size-3.5" />
                 </Button>
@@ -214,17 +214,17 @@ export default function BoardColumn<T extends { id: string }>({
           </div>
         </div>
         {column.summary && (
-          <div className="caption-style text-fg-secondary pl-5.5 leading-4 tabular-nums">
+          <div className="text-fg-secondary pl-4 text-[13px] leading-4 font-medium tabular-nums">
             {column.summary}
           </div>
         )}
       </header>
-      <div className="flex flex-col gap-3 px-4">
+      <div className="flex flex-col gap-2 px-2">
         {top}
         {nodes}
         {items.length === 0 && slotIndex < 0 && !top && (
-          <div className="border-line-strong bg-overlay-1 flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed text-center">
-            <span className="caption-style text-fg-tertiary">{emptyLabel}</span>
+          <div className="bg-background/50 flex h-32 flex-col items-center justify-center gap-2 rounded-2xl text-center">
+            <span className="text-fg-tertiary text-sm">{emptyLabel}</span>
             {onAdd && (
               <Button
                 variant="ghost"
@@ -238,7 +238,7 @@ export default function BoardColumn<T extends { id: string }>({
           </div>
         )}
       </div>
-      <div className="min-h-14 flex-1" />
+      <div className="min-h-6 flex-1" />
     </motion.section>
   );
 }

@@ -27,9 +27,11 @@ import SearchInput from "@/components/data-table/search-input";
 import type { Column, SortState } from "@/components/data-table/types";
 import {
   CreateButton,
+  MetaSeparator,
   Page,
   PageActions,
   PageHeader,
+  PageStatus,
   PageToolbar,
 } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
@@ -364,16 +366,10 @@ export default function DealsPage() {
     deals && (deals.length === 0 || (visible.length === 0 && filtered));
 
   return (
-    <Page>
+    <Page wide>
       <PageHeader
         title="Deals"
-        meta={
-          deals && (
-            <span className="text-fg-tertiary text-sm tabular-nums">
-              {deals.filter((deal) => isOpenStage(deal.stage)).length} open
-            </span>
-          )
-        }
+        meta={<PipelineSummary deals={matching} />}
         actions={
           <PageActions
             label="Deal list actions"
@@ -487,8 +483,7 @@ export default function DealsPage() {
           </Button>
         )}
       </PageToolbar>
-      <PipelineSummary deals={matching} />
-      <div className="border-border relative flex min-h-0 flex-1 flex-col border-t">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {listView ? (
           <DealsList
             args={listArgs}
@@ -753,28 +748,19 @@ function PipelineSummary({ deals }: { deals: DealRow[] | undefined }) {
     };
   }, [deals]);
 
-  const items = [
-    { label: "Open pipeline", value: stats?.open, hint: "monthly take" },
-    { label: "Won this month", value: stats?.won, hint: "monthly take" },
-  ];
-
+  if (!stats || !deals) return <Skeleton className="h-4 w-64" />;
+  const open = deals.filter((deal) => isOpenStage(deal.stage)).length;
   return (
-    <dl
-      aria-label="Pipeline summary"
-      className="flex shrink-0 flex-wrap gap-x-6 gap-y-3 px-4 py-3 sm:gap-x-10"
-    >
-      {items.map((item) => (
-        <div key={item.label} className="flex min-w-0 flex-col gap-1">
-          <dt className="caption-style text-fg-tertiary truncate">
-            {item.label}
-            {item.hint && <span className="max-sm:hidden"> · {item.hint}</span>}
-          </dt>
-          <dd className="lead-style font-medium tabular-nums">
-            {item.value ?? <Skeleton className="my-1 h-3 w-14" />}
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <>
+      <PageStatus tone="info">{open} open</PageStatus>
+      <MetaSeparator />
+      <span>{stats.open} open pipeline</span>
+      <MetaSeparator />
+      <span>
+        <span className="text-rose font-medium">{stats.won}</span> won this
+        month
+      </span>
+    </>
   );
 }
 
@@ -788,11 +774,14 @@ function BoardMessage({ children }: { children: ReactNode }) {
 
 function BoardSkeleton({ columns }: { columns: number }) {
   return (
-    <div aria-busy className="flex min-h-0 flex-1 overflow-hidden">
+    <div
+      aria-busy
+      className="flex min-h-0 flex-1 gap-3 overflow-hidden px-(--page-x) pb-4"
+    >
       {Array.from({ length: columns }, (_, column) => (
         <div
           key={column}
-          className="border-border flex w-[85vw] max-w-85 shrink-0 flex-col gap-3 border-r px-4 pt-4 sm:w-80 lg:w-auto lg:max-w-none lg:min-w-80 lg:flex-1"
+          className="bg-well flex w-[85vw] max-w-85 shrink-0 flex-col gap-2 rounded-3xl px-2 pt-3.5 sm:w-72 lg:w-auto lg:max-w-80 lg:min-w-68 lg:flex-1"
         >
           <div className="flex flex-col gap-2 pb-5">
             <div className="flex h-5 items-center gap-2">

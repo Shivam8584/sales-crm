@@ -129,7 +129,7 @@ export default function PasteTasksDialog({
                   label="Assignee"
                   value={assigneeId}
                   onChange={setAssigneeId}
-                  className="border-input bg-secondary mx-0 h-9 border px-3"
+                  className="bg-well mx-0 h-10 px-3"
                 />
               </div>
             )}

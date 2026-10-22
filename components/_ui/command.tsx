@@ -31,7 +31,7 @@ function CommandDialog({
         <DialogPrimitive.Content
           onCloseAutoFocus={onCloseAutoFocus}
           className={cn(
-            "bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-base data-[state=closed]:duration-fast fixed top-[12dvh] left-1/2 w-[calc(100%-2rem)] max-w-140 -translate-x-1/2 overflow-hidden rounded-xl outline-none",
+            "bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-base data-[state=closed]:duration-fast fixed top-[12dvh] left-1/2 w-[calc(100%-2rem)] max-w-160 -translate-x-1/2 overflow-hidden rounded-3xl outline-none",
             className,
           )}
         >
@@ -70,13 +70,13 @@ function CommandInput({ className, trailing, ...props }: CommandInputProps) {
   return (
     <div
       data-slot="command-input-wrapper"
-      className="border-border flex h-12 items-center gap-2.5 border-b px-4"
+      className="border-border flex h-14 items-center gap-3 border-b px-5"
     >
-      <SearchIcon aria-hidden className="text-fg-tertiary size-3.5 shrink-0" />
+      <SearchIcon aria-hidden className="text-fg-tertiary size-4 shrink-0" />
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          "text-foreground placeholder:text-fg-tertiary h-full min-w-0 flex-1 bg-transparent text-sm leading-none outline-none",
+          "text-foreground placeholder:text-fg-tertiary text-body h-full min-w-0 flex-1 bg-transparent leading-none outline-none",
           className,
         )}
         {...props}
@@ -95,7 +95,7 @@ function CommandList({
     <ScrollArea viewportClassName="max-h-[min(360px,50dvh)]">
       <CommandPrimitive.List
         data-slot="command-list"
-        className={cn("p-1.5", className)}
+        className={cn("p-2", className)}
         {...props}
       >
         {children}
@@ -128,7 +128,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        "[&_[cmdk-group-heading]]:text-fg-tertiary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:leading-none [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:tracking-[1px] [&_[cmdk-group-heading]]:uppercase",
+        "[&_[cmdk-group-heading]]:text-fg-tertiary [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-2.5 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:leading-none",
         className,
       )}
       {...props}
@@ -144,7 +144,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "text-fg-secondary ease-power3-out data-[selected=true]:text-foreground duration-fast data-[selected=true]:bg-overlay-2 relative flex h-10 cursor-pointer items-center gap-3 rounded-md px-2.5 text-sm leading-none transition-colors outline-none select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
+        "text-foreground data-[selected=true]:text-foreground data-[selected=true]:bg-well text-body relative flex h-11 cursor-pointer items-center gap-3 rounded-xl px-3 leading-none transition-colors duration-[120ms] ease-out outline-none select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
         className,
       )}
       {...props}
@@ -170,7 +170,7 @@ function CommandFooter({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="command-footer"
       className={cn(
-        "caption-style border-border text-fg-tertiary flex h-10 items-center gap-4 border-t px-4",
+        "caption-style border-border text-fg-tertiary flex h-11 items-center gap-4 border-t px-5",
         className,
       )}
       {...props}

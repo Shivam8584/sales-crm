@@ -5,7 +5,7 @@ export default function Sidebar() {
   return (
     <aside
       data-sidebar="desktop"
-      className="border-sidebar-border bg-sidebar collapsed:w-12 relative hidden w-(--sidebar-width) shrink-0 border-r lg:flex lg:flex-col"
+      className="border-sidebar-border bg-sidebar collapsed:w-18 ease-out-hd relative hidden w-(--sidebar-width) shrink-0 border-r transition-[width] duration-280 lg:flex lg:flex-col [html[data-sidebar-resizing]_&]:transition-none"
     >
       <SidebarContent />
       <span className="collapsed:hidden contents">

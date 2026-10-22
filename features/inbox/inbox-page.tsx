@@ -292,7 +292,7 @@ export default function InboxPage() {
       </PageToolbar>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
+        <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-[calc(var(--page-x)-0.75rem)] pb-16">
           {items === undefined ? (
             <InboxSkeleton />
           ) : items.length === 0 ? (

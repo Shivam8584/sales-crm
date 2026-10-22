@@ -223,7 +223,7 @@ function DealView({
                   value={deal.title}
                   label="Deal title"
                   onSave={(title) => save({ title }, "Title", { inline: true })}
-                  inputClassName="font-display h-9 text-2xl font-medium"
+                  inputClassName="text-display lg:text-hero h-auto py-0.5 font-semibold"
                 />
               </span>
             }
@@ -444,7 +444,7 @@ function DealPageSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-10 gap-y-6 px-4 py-6 sm:px-6 lg:py-8 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
+        className="grid w-full gap-x-8 gap-y-6 px-(--page-x) pt-1 pb-8 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
       >
         <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-12 rounded-xl" />

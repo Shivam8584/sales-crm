@@ -1,19 +1,11 @@
 import SegmentBar from "@/components/_common/segment-bar";
 import type { Report } from "@/convex/lib/reports";
 import { DealStageTag } from "@/features/deals/stage";
-import type { DealStage } from "@/lib/domain/enums";
+import { cn } from "@/lib/utils";
 import { count, signed, totals, trend } from "./format";
 import { Delta, MetricTile } from "./section";
 
-const STAGE_TONE: Partial<Record<DealStage, "danger" | "warning" | "success">> =
-  {
-    discovery: "danger",
-    demo: "warning",
-    proposal: "warning",
-    onboarding: "success",
-  };
-
-/** Open deals per stage as segmented meters with one total per currency, then deals closed in the period. */
+/** Open deals per stage as meters with one total per currency, then deals closed in the period. */
 export default function PipelineChart({
   pipeline,
   previousWon,
@@ -51,7 +43,7 @@ export default function PipelineChart({
           <li key={stage.stage} className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
               <DealStageTag stage={stage.stage} />
-              <span className="lead-style flex min-w-0 items-baseline gap-2 tabular-nums">
+              <span className="flex min-w-0 items-baseline gap-2 text-sm font-medium tabular-nums">
                 <span className="text-fg-secondary truncate">
                   {totals(stage.totals, "")}
                 </span>
@@ -66,19 +58,23 @@ export default function PipelineChart({
             <SegmentBar
               percent={(stage.count / most) * 100}
               segments={48}
-              tone={STAGE_TONE[stage.stage] ?? "auto"}
-              className="border-overlay-1 h-3 w-full border px-px"
-              segmentClassName="h-2"
-              trackClassName="bg-overlay-3"
+              className="h-3 w-full"
+              trackClassName="bg-well h-2"
             />
           </li>
         ))}
       </ul>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="bg-well grid grid-cols-2 gap-1 rounded-3xl p-1">
         <MetricTile
           label="Won in period"
           value={count(pipeline.won.count)}
-          detail={totals(pipeline.won.totals, "No value")}
+          detail={
+            <span
+              className={cn(pipeline.won.count > 0 && "text-rose font-medium")}
+            >
+              {totals(pipeline.won.totals, "No value")}
+            </span>
+          }
           delta={
             <Delta
               value={signed(pipeline.won.count - previousWon.count)}
