@@ -24,6 +24,7 @@ const groups = (role: Role) => [
         label: `Go to ${item.label.toLowerCase()}`,
       })),
       { keys: ["C"], label: "Create a record" },
+      { keys: [MOD_KEY, "Z"], label: "Undo the last action" },
       { keys: ["["], label: "Collapse or expand the sidebar" },
       { keys: ["?"], label: "Show shortcuts" },
     ],

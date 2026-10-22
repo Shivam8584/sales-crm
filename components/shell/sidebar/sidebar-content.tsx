@@ -34,6 +34,8 @@ const COUNTS: Record<string, { key: CountKey; label: string; alert: boolean }> =
     "/inbox": { key: "inbox", label: "unread", alert: true },
   };
 
+const TOUR: Record<string, string> = { "/today": "today", "/inbox": "inbox" };
+
 const localDay = () => istToday();
 
 /** Sidebar body shared by the desktop rail and the mobile drawer. */
@@ -110,7 +112,7 @@ export default function SidebarContent({
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <nav aria-label="Primary">
+        <nav aria-label="Primary" data-tour="nav">
           {sections.map((section, index) => (
             <SidebarSection
               key={section.title ?? index}
@@ -134,6 +136,7 @@ export default function SidebarContent({
                     count={count && counts ? counts[count.key] : undefined}
                     countLabel={count?.label}
                     alert={count?.alert}
+                    tour={TOUR[item.href]}
                   />
                 );
               })}
@@ -173,6 +176,7 @@ export default function SidebarContent({
             setShortcutsOpen(true);
           }}
           tone="quiet"
+          tour="help"
         />
       </SidebarSection>
     </div>

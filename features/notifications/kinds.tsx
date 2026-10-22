@@ -27,6 +27,7 @@ const KIND_ICON: Record<string, Icon> = {
   platform_org: BuildingIcon,
   platform_gst_failed: AlertIcon,
   proposal_approval: ClipboardIcon,
+  proposal_decision: ClipboardIcon,
   automation: AutomationIcon,
 };
 

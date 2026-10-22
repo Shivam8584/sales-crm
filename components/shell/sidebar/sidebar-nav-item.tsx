@@ -22,6 +22,7 @@ type SidebarNavItemProps = {
   /** Shows a dot on the collapsed icon while the count is above zero. */
   alert?: boolean;
   tone?: "default" | "quiet";
+  tour?: string;
 };
 
 export default function SidebarNavItem({
@@ -36,6 +37,7 @@ export default function SidebarNavItem({
   countLabel,
   alert = false,
   tone = "default",
+  tour,
 }: SidebarNavItemProps) {
   const showCount = count !== undefined && count > 0;
   const className = cn(
@@ -80,6 +82,7 @@ export default function SidebarNavItem({
           <Link
             href={href}
             onClick={onClick}
+            data-tour={tour}
             data-active={active}
             aria-current={active ? "page" : undefined}
             className={className}
@@ -90,6 +93,7 @@ export default function SidebarNavItem({
           <button
             type="button"
             onClick={onClick}
+            data-tour={tour}
             data-active={active}
             className={className}
           >

@@ -29,7 +29,13 @@ import {
   type Viewer,
 } from "./lib/functions";
 import { assertMoney } from "./lib/money";
-import { leadershipIds, notify, notifyMany } from "./notifications";
+import { recordKey } from "../lib/domain/notifications";
+import {
+  leadershipIds,
+  notify,
+  notifyMany,
+  resolveNotifications,
+} from "./notifications";
 import {
   applyLinePatch,
   checkLineCount,
@@ -120,6 +126,13 @@ async function log(
     body,
     ctx.viewer._id,
   );
+}
+
+function resolveApprovalRequests(ctx: MutationCtx, dealId: Id<"deals">) {
+  return resolveNotifications(ctx, {
+    record: recordKey("deals", dealId),
+    kinds: ["proposal_approval"],
+  });
 }
 
 /** Pricing changes void a decision, so an approval always matches the numbers sent. */
@@ -522,10 +535,11 @@ export const decide = managerMutation({
       `${verb} the proposal's pricing at ${rateLabel(pricing.marginRate)} blended margin`,
       reason,
     );
+    await resolveApprovalRequests(ctx, deal._id);
     const requester = proposal.approval?.requestedById;
     if (requester && requester !== ctx.viewer._id) {
       await notify(ctx, requester, {
-        kind: "proposal_approval",
+        kind: "proposal_decision",
         title: `${ctx.viewer.name} ${verb} the pricing on ${deal.title}`,
         body: reason,
         href: `/deals/${deal._id}?tab=proposal`,
@@ -697,6 +711,7 @@ export const remove = memberMutation({
     requireDraft(proposal);
     const deal = await requireDeal(ctx, proposal.dealId);
     await ctx.db.delete(id);
+    await resolveApprovalRequests(ctx, deal._id);
     await log(ctx, deal, "deleted the draft proposal");
     const { _id, _creationTime, ...fields } = proposal;
     void _id;

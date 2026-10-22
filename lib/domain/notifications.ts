@@ -74,6 +74,35 @@ export function followEvent(entry: FollowEntry): string | null {
   return null;
 }
 
+const URGENT_KINDS = new Set(["lead_sla", "proposal_approval", "mention"]);
+const ACTION_KINDS = new Set([
+  "lead_assigned",
+  "lead_new",
+  "lead_repeat",
+  "demo_booked",
+  "demo_rescheduled",
+  "proposal_decision",
+  "platform_gst_failed",
+  "platform_wallet_negative",
+  "platform_campaign_paused",
+  "platform_campaign_status_changed",
+]);
+
+/** 0 needs a reply now, 1 needs doing, 2 is for information. */
+export function kindPriority(kind: string) {
+  return URGENT_KINDS.has(kind) ? 0 : ACTION_KINDS.has(kind) ? 1 : 2;
+}
+
+export const isActionKind = (kind: string) => kindPriority(kind) < 2;
+
+type Ranked = { kind: string; read: boolean; _creationTime: number };
+
+/** Unread action-needed first, urgent before the rest; everything else newest first. */
+export function byPriority(a: Ranked, b: Ranked) {
+  const rank = (item: Ranked) => (item.read ? 2 : kindPriority(item.kind));
+  return rank(a) - rank(b) || b._creationTime - a._creationTime;
+}
+
 export const RECORD_TYPES = ["accounts", "deals", "leads", "people"] as const;
 export type RecordType = (typeof RECORD_TYPES)[number];
 

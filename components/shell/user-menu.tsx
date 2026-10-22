@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/_ui/dropdown-menu";
 import Kbd from "@/components/_ui/kbd";
+import { useTour } from "@/features/onboarding/tour-store";
 import { useViewer } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import {
@@ -29,6 +30,7 @@ import MonitorIcon from "@/public/assets/icons/monitor.svg";
 import SettingsIcon from "@/public/assets/icons/settings.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import KeyboardIcon from "@/public/assets/icons/message-question.svg";
+import CursorClickIcon from "@/public/assets/icons/cursor-click.svg";
 import LogOutIcon from "@/public/assets/icons/log-out.svg";
 
 const THEMES = [
@@ -59,6 +61,7 @@ export default function UserMenu() {
   const theme = useThemePreference();
   const { signOut } = useAuthActions();
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen);
+  const replayTour = useTour((state) => state.replay);
   const themeLabel = useId();
 
   return (
@@ -114,6 +117,13 @@ export default function UserMenu() {
             <MenuIcon icon={KeyboardIcon} />
             <span className="flex-1">Keyboard shortcuts</span>
             <Kbd className="h-4 min-w-4 px-1">?</Kbd>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className={cn(ITEM, "group/item")}
+            onSelect={replayTour}
+          >
+            <MenuIcon icon={CursorClickIcon} />
+            <span className="flex-1">Replay product tour</span>
           </DropdownMenuItem>
         </div>
         <Divider />

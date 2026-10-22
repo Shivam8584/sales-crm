@@ -34,7 +34,7 @@ import {
   readBody,
   timingSafeEqual,
 } from "./lib/http";
-import { isOpen } from "./lib/leads";
+import { isOpen, resolveLeadSla } from "./lib/leads";
 import { rateLimiter } from "./lib/rateLimiter";
 import type { RecordRefs } from "./lib/timeline";
 import { notify } from "./notifications";
@@ -265,6 +265,7 @@ export const receive = internalMutation({
           firstTouchedAt: Math.max(lead._creationTime, at),
           ...(lead.status === "new" ? { status: "contacted" as const } : {}),
         });
+        await resolveLeadSla(ctx, lead._id);
       }
       if (group.ownerId) {
         await notify(ctx, group.ownerId, {

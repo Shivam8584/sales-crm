@@ -14,5 +14,6 @@ crons.daily(
   { hourUTC: 22, minuteUTC: 0 },
   internal.prospecting.refreshAll,
 );
+crons.cron("daily digest", "30 3 * * 1-5", internal.digest.sendDigests);
 
 export default crons;

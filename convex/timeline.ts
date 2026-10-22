@@ -5,7 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { startOfIstDay } from "../lib/domain/day";
 import { fail, invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
-import { isOpen } from "./lib/leads";
+import { isOpen, resolveLeadSla } from "./lib/leads";
 import { notifyFollowers } from "./lib/follows";
 import { notifyMentions, resolveMentions } from "./lib/mentions";
 import { assertCan } from "./lib/permissions";
@@ -302,6 +302,7 @@ export const log = memberMutation({
           ? { status: "contacted" as const }
           : {}),
       });
+      await resolveLeadSla(ctx, lead._id);
     }
     return { id, firstTouch };
   },

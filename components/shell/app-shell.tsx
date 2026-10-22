@@ -7,6 +7,7 @@ import CommandMenu from "./command-menu";
 import ShortcutsDialog from "./shortcuts-dialog";
 import GlobalShortcuts from "./global-shortcuts";
 import RecordOverlays from "./record-overlays";
+import ProductTour from "@/features/onboarding/product-tour";
 import { useUiStore } from "@/stores/ui-store";
 
 /** What `C` creates on each page; pages not listed have nothing to create. */
@@ -43,6 +44,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <ShortcutsDialog />
       <RecordOverlays />
       <GlobalShortcuts onCreate={createForPage} />
+      <ProductTour />
     </div>
   );
 }

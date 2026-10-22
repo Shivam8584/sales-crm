@@ -3,7 +3,13 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
 import { memberIndex } from "./lib/records";
-import { parseRecordKey, recordFromHref } from "../lib/domain/notifications";
+import { schedulePush } from "./push";
+import {
+  byPriority,
+  isActionKind,
+  parseRecordKey,
+  recordFromHref,
+} from "../lib/domain/notifications";
 
 const LIMIT = 50;
 const MAX_PAGE = 500;
@@ -26,11 +32,42 @@ export async function notify(
   recipientId: Id<"members">,
   input: NotificationInput,
 ) {
-  return await ctx.db.insert("notifications", {
+  const id = await ctx.db.insert("notifications", {
     recipientId,
     ...input,
     record: input.record ?? recordFromHref(input.href),
   });
+  if (isActionKind(input.kind)) {
+    await schedulePush(ctx, recipientId, {
+      title: input.title,
+      body: input.body ?? "",
+      href: input.href ?? "/inbox",
+    });
+  }
+  return id;
+}
+
+/** Archives (and so reads) everyone's open notifications of these kinds about a record once the cause is gone. */
+export async function resolveNotifications(
+  ctx: MutationCtx,
+  { record, kinds }: { record: string; kinds: string[] },
+) {
+  const now = Date.now();
+  for (const kind of kinds) {
+    const open = await ctx.db
+      .query("notifications")
+      .withIndex("by_record_kind", (q) =>
+        q.eq("record", record).eq("kind", kind),
+      )
+      .filter((q) => q.eq(q.field("archivedAt"), undefined))
+      .collect();
+    for (const item of open) {
+      await ctx.db.patch(item._id, {
+        archivedAt: now,
+        readAt: item.readAt ?? now,
+      });
+    }
+  }
 }
 
 /** Notifies each distinct recipient once. */
@@ -108,9 +145,9 @@ export const listMine = memberQuery({
   args: {},
   handler: async (ctx) => {
     const members = await memberIndex(ctx);
-    return (await inInbox(ctx, ctx.viewer._id).take(LIMIT)).map((item) =>
-      toClient(item, members),
-    );
+    return (await inInbox(ctx, ctx.viewer._id).take(LIMIT))
+      .map((item) => toClient(item, members))
+      .sort(byPriority);
   },
 });
 
@@ -147,7 +184,7 @@ async function recordInfo(ctx: QueryCtx, key: string) {
 }
 
 /**
- * The inbox, newest first. `inbox` holds everything not archived, `mentions`
+ * The inbox: unread action items first, then newest. `inbox` holds everything not archived, `mentions`
  * the @mentions among them, `archived` what was cleared. Grow `limit` to load
  * more; `records` names what each notification is about.
  */
@@ -184,7 +221,10 @@ export const inbox = memberQuery({
     }
     const rows = await query.take(limit + 1);
     const members = await memberIndex(ctx);
-    const items = rows.slice(0, limit).map((item) => toClient(item, members));
+    const items = rows
+      .slice(0, limit)
+      .map((item) => toClient(item, members))
+      .sort(byPriority);
     const records: Record<
       string,
       NonNullable<Awaited<ReturnType<typeof recordInfo>>>

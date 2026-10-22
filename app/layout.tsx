@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
@@ -7,6 +7,7 @@ import Toaster from "@/components/_common/toaster";
 import { TooltipProvider } from "@/components/_ui/tooltip";
 import MotionProvider from "@/components/_common/motion-provider";
 import ConvexProvider from "@/components/_common/convex-provider";
+import RegisterSw from "@/features/pwa/register-sw";
 import { THEME_SCRIPT } from "@/lib/theme-script";
 import { SIDEBAR_WIDTH_SCRIPT } from "@/lib/sidebar";
 import "./globals.css";
@@ -36,6 +37,13 @@ export const metadata: Metadata = {
   openGraph: { type: "website", siteName: SITE_NAME, locale: "en_IN" },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#161616" },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -62,6 +70,7 @@ export default function RootLayout({
               <ScrollToTop />
               {children}
               <Toaster />
+              <RegisterSw />
             </TooltipProvider>
           </MotionProvider>
         </ConvexProvider>

@@ -82,6 +82,7 @@ import {
   leadHref,
   leadSummary,
   recordConsents,
+  resolveLeadSla,
   leadSlaSeconds,
 } from "./lib/leads";
 import {
@@ -606,6 +607,7 @@ export const touch = memberMutation({
     const lead = await requireLead(ctx, id);
     const patch = touchPatch(lead, ctx.viewer._id);
     if (Object.keys(patch).length > 0) await ctx.db.patch(id, patch);
+    if (patch.firstTouchedAt !== undefined) await resolveLeadSla(ctx, id);
     return { firstTouch: patch.firstTouchedAt !== undefined };
   },
 });
@@ -652,6 +654,9 @@ async function applyStatus(
     status,
     disqualifyReason: nextReason,
   });
+  if (WORKED_STATUSES.includes(status) || !isOpen({ status })) {
+    await resolveLeadSla(ctx, lead._id);
+  }
   await logChanges(ctx, { leadId: lead._id }, ctx.viewer._id, [
     {
       field: "Status",
@@ -1094,6 +1099,7 @@ export const convert = memberMutation({
       personId: person._id,
       convertedAt: now,
     });
+    await resolveLeadSla(ctx, id);
     await emitAutomationTrigger(ctx, {
       kind: "lead_status_changed",
       refs: { leadId: id, personId: person._id, accountId: account._id },

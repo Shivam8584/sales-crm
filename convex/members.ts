@@ -156,6 +156,13 @@ export const completeTour = memberMutation({
   },
 });
 
+export const setDigest = memberMutation({
+  args: { off: v.boolean() },
+  handler: async (ctx, { off }) => {
+    await ctx.db.patch(ctx.viewer._id, { digestOff: off });
+  },
+});
+
 async function requireOtherMember(
   ctx: MutationCtx & { viewer: Doc<"members"> },
   id: Doc<"members">["_id"],

@@ -62,6 +62,7 @@ export default defineSchema({
     joinedAt: v.number(),
     /** Set when the member finishes or skips the first-run tour. */
     tourCompletedAt: v.optional(v.number()),
+    digestOff: v.optional(v.boolean()),
   })
     .index("by_user", ["userId"])
     .index("by_email", ["email"])
@@ -344,7 +345,8 @@ export default defineSchema({
     .index("by_recipient", ["recipientId", "readAt"])
     .index("by_recipient_time", ["recipientId"])
     .index("by_recipient_archived", ["recipientId", "archivedAt"])
-    .index("by_recipient_record", ["recipientId", "record"]),
+    .index("by_recipient_record", ["recipientId", "record"])
+    .index("by_record_kind", ["record", "kind"]),
 
   /** A member following a record hears about its stage changes, deals and notes. */
   follows: defineTable({

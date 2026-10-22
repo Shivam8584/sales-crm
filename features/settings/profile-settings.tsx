@@ -9,11 +9,14 @@ import Button from "@/components/_ui/button";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import Kbd from "@/components/_ui/kbd";
+import { Switch } from "@/components/_ui/switch";
 import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { Card, CardHeader } from "@/components/_ui/card";
 import { Properties, Property } from "@/components/record";
 import { PageStatus } from "@/components/shell/page";
+import { useInstallPrompt } from "@/features/pwa/use-install-prompt";
+import { usePush } from "@/features/pwa/use-push";
 import { ROLE_DESCRIPTION, ROLE_TONE } from "@/features/team/roles";
 import { useViewer } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
@@ -23,6 +26,7 @@ import { MOD_KEY } from "@/lib/keyboard";
 import { setThemePreference, useThemePreference } from "@/lib/theme";
 import { dateTime, shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { DigestSetting } from "@/features/notifications/digest-setting";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import MonitorIcon from "@/public/assets/icons/monitor.svg";
@@ -42,6 +46,7 @@ const SHORTCUTS = [
   { keys: [MOD_KEY, "K"], label: "Search and run commands" },
   { keys: ["G", "L"], label: "Go to a page, e.g. leads" },
   { keys: ["C"], label: "Create a record" },
+  { keys: [MOD_KEY, "Z"], label: "Undo the last action" },
   { keys: ["J", "K"], label: "Move through a list" },
   { keys: ["?"], label: "Show every shortcut" },
 ];
@@ -143,6 +148,12 @@ export default function ProfileSettings() {
         </ul>
       </SettingsSection>
 
+      <SettingsSection title="Notifications & app">
+        <PushRow />
+        <InstallRow />
+        <DigestSetting />
+      </SettingsSection>
+
       <SettingsSection title="Session">
         <SettingsRow
           label="Sign out"
@@ -154,6 +165,54 @@ export default function ProfileSettings() {
         </SettingsRow>
       </SettingsSection>
     </>
+  );
+}
+
+function PushRow() {
+  const push = usePush();
+  const description = !push.supported
+    ? "Not supported in this browser"
+    : push.permission === "denied"
+      ? "Blocked in browser settings"
+      : push.publicKey === null
+        ? "Not set up on this server"
+        : "Get alerts on this device when something needs you.";
+
+  return (
+    <SettingsRow
+      label="Push notifications"
+      htmlFor="push-notifications"
+      description={description}
+    >
+      <Switch
+        id="push-notifications"
+        checked={push.subscribed}
+        disabled={
+          !push.supported ||
+          push.permission === "denied" ||
+          !push.publicKey ||
+          push.pending
+        }
+        onCheckedChange={(checked) =>
+          void (checked ? push.enable() : push.disable())
+        }
+      />
+    </SettingsRow>
+  );
+}
+
+function InstallRow() {
+  const { canInstall, install } = useInstallPrompt();
+  if (!canInstall) return null;
+  return (
+    <SettingsRow
+      label="Install app"
+      description="Open Hypedrive CRM in its own window from your home screen or dock."
+    >
+      <Button variant="secondary" size="sm" onClick={() => void install()}>
+        Install
+      </Button>
+    </SettingsRow>
   );
 }
 

@@ -168,6 +168,7 @@ function SearchButton() {
         size="icon"
         aria-label="Search"
         aria-keyshortcuts="Meta+K Control+K"
+        data-tour="search"
         onClick={() => setCommandOpen(true)}
       >
         <SearchIcon aria-hidden className="size-3.5" />
@@ -475,6 +476,7 @@ export function CreateButton({
         variant="primary"
         size="sm"
         onClick={onClick}
+        data-tour="create"
         aria-label={typeof children === "string" ? children : undefined}
         className="h-control-md max-sm:w-control-md py-0 max-sm:px-0"
       >

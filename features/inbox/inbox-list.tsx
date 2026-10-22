@@ -65,7 +65,7 @@ export type Group = {
   items: InboxItem[];
 };
 
-/** Groups by record in order of each record's newest notification; unlinked ones go last. */
+/** Groups by record in order of each record's first notification; unlinked ones go last. */
 export function groupByRecord(
   items: InboxItem[],
   records: Result["records"],

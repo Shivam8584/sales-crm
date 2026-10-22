@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
+import type { FunctionArgs } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Avatar from "@/components/_ui/avatar";
 import Kbd from "@/components/_ui/kbd";
@@ -31,10 +32,18 @@ import {
   useRecentRecords,
   type RecentRecord,
 } from "@/hooks/use-recent-records";
-import { toast } from "@/stores/toast-store";
+import { readError } from "@/lib/errors";
+import {
+  selectUndoHistory,
+  toast,
+  undoEntry,
+  useToastStore,
+} from "@/stores/toast-store";
 import { useUiStore, type CreateDialog } from "@/stores/ui-store";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
+import ClockIcon from "@/public/assets/icons/clock.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
+import PinIcon from "@/public/assets/icons/pin.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SidebarIcon from "@/public/assets/icons/sidebar.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
@@ -51,6 +60,15 @@ const RECORD_HREF: Record<RecentRecord["type"], string> = {
   lead: "/leads",
   deal: "/deals",
 };
+
+const PIN_FIELD = {
+  account: "accountId",
+  person: "personId",
+  lead: "leadId",
+  deal: "dealId",
+} as const;
+
+const UNDO_LIMIT = 5;
 
 const CREATE: { label: string; dialog: NonNullable<CreateDialog> }[] = [
   { label: "New account", dialog: { type: "account" } },
@@ -106,6 +124,12 @@ export default function CommandMenu() {
   const { belowLg } = useMobileBreakpoints();
   const [search, setSearch] = useState("");
   const deferred = useRef<(() => void) | null>(null);
+  const history = useToastStore(selectUndoHistory);
+  const toggleHere = useMutation(api.pins.toggle);
+  const pins = useQuery(
+    api.pins.mine,
+    open && recordAt(pathname) ? {} : "skip",
+  );
 
   const recent = useRecentRecords();
   const query = useDebouncedValue(search.trim(), 150);
@@ -146,13 +170,42 @@ export default function CommandMenu() {
         },
       });
     }
+    const here = recordAt(pathname);
+    if (here && pins) {
+      const target = {
+        [PIN_FIELD[here.type]]: here.id,
+      } as FunctionArgs<typeof api.pins.toggle>["target"];
+      const pinned = pins.some((pin) => pin.href === pathname);
+      builtIn.push({
+        id: "pin-page",
+        label: pinned ? "Unpin this page" : "Pin this page",
+        icon: PinIcon,
+        keywords: "sidebar favorite",
+        perform: async () => {
+          try {
+            const now = await toggleHere({ target });
+            toast(now ? "Pinned to the sidebar" : "Unpinned", {
+              undo: () => void toggleHere({ target }),
+            });
+          } catch (error) {
+            toast(readError(error).message, { tone: "danger" });
+          }
+        },
+      });
+    }
     return [...registered, ...builtIn];
-  }, [registered, pathname]);
+  }, [registered, pathname, pins, toggleHere]);
 
   const actionResults = rank(contextual, terms, (action) => [
     action.label,
     action.keywords,
   ]);
+  const undoResults = rank(
+    history,
+    terms,
+    (entry) => [`Undo: ${entry.message}`, "undo"],
+    UNDO_LIMIT,
+  );
   const accountResults = results?.accounts ?? [];
   const peopleResults = results?.people ?? [];
   const leadResults = results?.leads ?? [];
@@ -239,6 +292,23 @@ export default function CommandMenu() {
                   {action.shortcut && (
                     <Kbd className="ml-auto">{action.shortcut}</Kbd>
                   )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {undoResults.length > 0 && (
+            <CommandGroup heading="Undo">
+              {undoResults.map((entry) => (
+                <CommandItem
+                  key={entry.id}
+                  value={`undo:${entry.id}`}
+                  onSelect={() => run(() => undoEntry(entry))}
+                >
+                  <ItemIcon>
+                    <ClockIcon aria-hidden className="size-3.5" />
+                  </ItemIcon>
+                  <span className="truncate">Undo: {entry.message}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

@@ -11,7 +11,13 @@ import { slaDueAt } from "../../lib/domain/day";
 import { isLeadOpen } from "../../lib/domain/transitions";
 import { nextOwner } from "./assignment";
 import { leadSlaSeconds } from "./settings";
-import { leadershipIds, notify, notifyMany } from "../notifications";
+import { recordKey } from "../../lib/domain/notifications";
+import {
+  leadershipIds,
+  notify,
+  notifyMany,
+  resolveNotifications,
+} from "../notifications";
 import { emitAutomationTrigger } from "./automations/engine";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -34,6 +40,14 @@ export { leadSlaSeconds };
 
 export function leadHref(id: Id<"leads">) {
   return `/leads/${id}`;
+}
+
+/** Clears the "no first touch" alerts once the lead is touched or closed. */
+export function resolveLeadSla(ctx: MutationCtx, id: Id<"leads">) {
+  return resolveNotifications(ctx, {
+    record: recordKey("leads", id),
+    kinds: ["lead_sla"],
+  });
 }
 
 export function isOpen(lead: Pick<Doc<"leads">, "status">) {
