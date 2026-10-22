@@ -700,7 +700,7 @@ async function seedWorkspace(ctx: MutationCtx) {
       kind: "proposal_approval",
       title: "Pricing on Nykaa launch pilot needs approval",
       body: "Blended margin is under 15%.",
-      href: `/deals/${kesar}?tab=proposal`,
+      href: `/pipeline/deals/${kesar}?tab=proposal`,
     });
   }
 
@@ -796,7 +796,7 @@ async function seedWorkspace(ctx: MutationCtx) {
       kind: "lead_assigned",
       title: `${admin.name} assigned you Rahul Jain`,
       body: "Ayurveda Co · linkedin / social",
-      href: "/leads",
+      href: "/pipeline/leads",
     });
   }
   await newBrandSignsUp(ctx, now);

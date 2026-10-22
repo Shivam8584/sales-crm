@@ -147,7 +147,7 @@ export default function AddToAutomation({
                   No active sequence runs on {noun[1]}
                 </span>
                 <Link
-                  href="/automations"
+                  href="/automation/sequences"
                   className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
                   onClick={() => setOpen(false)}
                 >

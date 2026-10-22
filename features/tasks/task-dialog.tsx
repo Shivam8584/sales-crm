@@ -379,7 +379,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
               <>
                 For the deal
                 <Link
-                  href={`/deals/${task.deal._id}`}
+                  href={`/pipeline/deals/${task.deal._id}`}
                   onClick={onClose}
                   className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
                 >
@@ -391,7 +391,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
               <>
                 For the lead
                 <Link
-                  href={`/leads/${task.lead._id}`}
+                  href={`/pipeline/leads/${task.lead._id}`}
                   onClick={onClose}
                   className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
                 >

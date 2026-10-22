@@ -259,7 +259,7 @@ export default function HealthView({
           columns={COLUMNS}
           rows={visible}
           getId={(row) => row._id}
-          getHref={(row) => `/accounts/${row._id}`}
+          getHref={(row) => `/records/accounts/${row._id}`}
           getLabel={(row) => row.account.name}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -334,7 +334,7 @@ export default function HealthView({
                 title="No brands on Hypedrive yet"
                 description="Health shows up once a brand creates its organisation on Hypedrive."
                 action={
-                  <Button variant="secondary" size="sm" href="/accounts">
+                  <Button variant="secondary" size="sm" href="/records/accounts">
                     View accounts
                   </Button>
                 }

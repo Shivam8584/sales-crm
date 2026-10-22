@@ -132,7 +132,7 @@ export function LeadItem({
     <RowShell id={lead._id} {...row} className="max-sm:flex-wrap">
       <Avatar name={lead.name} size="sm" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <Link href={`/leads/${lead._id}`} className={TITLE_LINK}>
+        <Link href={`/pipeline/leads/${lead._id}`} className={TITLE_LINK}>
           {lead.name}
         </Link>
         <span className={META}>
@@ -160,7 +160,7 @@ export function StuckItem({ row: item, ...row }: RowProps & { row: StuckRow }) {
       <AccountLogo account={item.account} size="sm" />
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <span className="flex min-w-0 items-center justify-between gap-3">
-          <Link href={`/accounts/${item._id}`} className={TITLE_LINK}>
+          <Link href={`/records/accounts/${item._id}`} className={TITLE_LINK}>
             {item.account.name}
           </Link>
           <span className="caption-style text-fg-tertiary shrink-0 tabular-nums">
@@ -207,7 +207,7 @@ export function DealItem({ deal, ...row }: RowProps & { deal: DealRow }) {
       )}
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <span className="flex min-w-0 items-center justify-between gap-3">
-          <Link href={`/deals/${deal._id}`} className={TITLE_LINK}>
+          <Link href={`/pipeline/deals/${deal._id}`} className={TITLE_LINK}>
             {deal.title}
           </Link>
           <span className="lead-style shrink-0">

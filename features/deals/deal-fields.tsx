@@ -392,7 +392,7 @@ export function useDeleteDeal() {
   const remove = useRemoveDeal();
   return useCallback(
     (deal: { _id: Id<"deals">; title: string }, leave: boolean) => {
-      if (leave) router.push("/deals");
+      if (leave) router.push("/pipeline/deals");
       void remove(deal);
     },
     [remove, router],

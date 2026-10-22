@@ -377,7 +377,7 @@ export function LeadConversion({
             <ConvertRow
               icon={BuildingIcon}
               name={lead.account.name}
-              href={`/accounts/${lead.account._id}`}
+              href={`/records/accounts/${lead.account._id}`}
               existing={null}
               onNavigate={onNavigate}
             />
@@ -386,7 +386,7 @@ export function LeadConversion({
             <ConvertRow
               icon={UsersIcon}
               name={lead.person.name}
-              href={`/people/${lead.person._id}`}
+              href={`/records/people/${lead.person._id}`}
               existing={null}
               onNavigate={onNavigate}
             />
@@ -406,14 +406,14 @@ export function LeadConversion({
         <ConvertRow
           icon={BuildingIcon}
           name={account?.name ?? lead.companyName}
-          href={account ? `/accounts/${account._id}` : undefined}
+          href={account ? `/records/accounts/${account._id}` : undefined}
           existing={Boolean(account)}
           onNavigate={onNavigate}
         />
         <ConvertRow
           icon={UsersIcon}
           name={person?.name ?? lead.name}
-          href={person ? `/people/${person._id}` : undefined}
+          href={person ? `/records/people/${person._id}` : undefined}
           existing={Boolean(person)}
           onNavigate={onNavigate}
         />

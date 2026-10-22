@@ -60,7 +60,7 @@ function PrintView({ id }: { id: string }) {
           title="This proposal doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/deals">
+            <Button variant="secondary" size="sm" href="/pipeline/deals">
               Back to deals
             </Button>
           }
@@ -70,8 +70,8 @@ function PrintView({ id }: { id: string }) {
   }
 
   const backHref = proposal?.deal
-    ? `/deals/${proposal.deal._id}?tab=proposal`
-    : "/deals";
+    ? `/pipeline/deals/${proposal.deal._id}?tab=proposal`
+    : "/pipeline/deals";
 
   return (
     <main className="bg-background min-h-dvh print:bg-transparent">

@@ -43,7 +43,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** The record a path like `/accounts/<id>` shows, if any. */
+/** The record a path like `/records/accounts/<id>` shows, if any. */
 export function recordAt(pathname: string): RecentRecord | null {
   const match = /^\/(accounts|people|leads|deals)\/([^/]+)$/.exec(pathname);
   return match ? { type: TYPES[match[1]], id: match[2] } : null;

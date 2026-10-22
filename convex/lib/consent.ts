@@ -406,7 +406,7 @@ async function redactAround(
   for (const fact of unique(facts)) await ctx.db.delete(fact._id);
 
   const hrefs = [
-    ...(person ? [`/people/${person._id}`] : []),
+    ...(person ? [`/records/people/${person._id}`] : []),
     ...leads.map((lead) => lead._id as string),
   ];
   for (const notification of await ctx.db.query("notifications").collect()) {

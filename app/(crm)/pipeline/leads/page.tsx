@@ -9,10 +9,10 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // Older notifications and alerts linked to `/leads?lead=<id>`.
+  // Older notifications and alerts linked to `/pipeline/leads?lead=<id>`.
   const { lead } = await searchParams;
   if (typeof lead === "string" && lead) {
-    redirect(`/leads/${encodeURIComponent(lead)}`);
+    redirect(`/pipeline/leads/${encodeURIComponent(lead)}`);
   }
   return (
     <Suspense>

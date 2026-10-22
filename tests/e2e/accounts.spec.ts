@@ -16,7 +16,7 @@ const stageTrigger = (row = 0) =>
 
 test.describe("accounts list", () => {
   test.beforeEach(async () => {
-    await open(page, "/accounts?sort=name:asc");
+    await open(page, "/records/accounts?sort=name:asc");
     await expect(rowAt(page, 1)).toBeVisible();
   });
 
@@ -35,12 +35,12 @@ test.describe("accounts list", () => {
       .locator("[role=cell]")
       .nth(1)
       .click({ position: { x: 4, y: 4 } });
-    await expect(page).toHaveURL(/\/accounts\/\w+/);
+    await expect(page).toHaveURL(/\/records\/accounts\/\w+/);
   });
 
   test("saved views can be saved and deleted", async () => {
     const name = "e2e view";
-    await open(page, "/accounts?stage=live");
+    await open(page, "/records/accounts?stage=live");
     await page.getByRole("button", { name: "Saved views" }).click();
     await page.locator('input[aria-label="View name"]').fill(name);
     await page.keyboard.press("Enter");
@@ -121,9 +121,9 @@ test.describe("accounts list", () => {
 
 test.describe("account page", () => {
   test("pinning shows it in the sidebar and Ctrl+Z unpins", async () => {
-    await open(page, "/accounts");
+    await open(page, "/records/accounts");
     const href = await page
-      .locator('[role=row] a[href^="/accounts/"]')
+      .locator('[role=row] a[href^="/records/accounts/"]')
       .first()
       .getAttribute("href");
     await open(page, href!);

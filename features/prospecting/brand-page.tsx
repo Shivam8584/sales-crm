@@ -41,7 +41,7 @@ import ListingList from "./listing-list";
 import { useProspectActions } from "./prospect-actions";
 import { MarketplaceChips, ScoreTag } from "./prospect-cells";
 
-const CRUMBS = [{ label: "Prospecting", href: "/prospecting" }];
+const CRUMBS = [{ label: "Prospecting", href: "/pipeline/prospecting" }];
 
 const BENCHMARK_SOURCE = {
   set: "Set on the source",
@@ -64,7 +64,7 @@ export default function BrandPage({ brandKey }: { brandKey: string }) {
           title="No watched products for this brand"
           description="Its products may have been removed from every source."
           action={
-            <Button variant="secondary" size="sm" href="/prospecting">
+            <Button variant="secondary" size="sm" href="/pipeline/prospecting">
               Back to prospecting
             </Button>
           }
@@ -110,7 +110,7 @@ function BrandView({ brand }: { brand: Brand }) {
   }
 
   const primary = openLead ? (
-    <Button variant="primary" size="sm" href={`/leads/${openLead._id}`}>
+    <Button variant="primary" size="sm" href={`/pipeline/leads/${openLead._id}`}>
       <TargetIcon aria-hidden className="size-3" />
       Open lead
     </Button>
@@ -144,7 +144,7 @@ function BrandView({ brand }: { brand: Brand }) {
                 ? {
                     label: "Open lead",
                     icon: TargetIcon,
-                    href: `/leads/${openLead._id}`,
+                    href: `/pipeline/leads/${openLead._id}`,
                   }
                 : {
                     label: "Create lead",
@@ -212,7 +212,7 @@ function BrandView({ brand }: { brand: Brand }) {
                 <Property label="Account">
                   {brand.account ? (
                     <Link
-                      href={`/accounts/${brand.account._id}`}
+                      href={`/records/accounts/${brand.account._id}`}
                       className="hover:text-foreground focus-visible:ring-ring flex min-w-0 items-center gap-1.5 rounded-sm text-sm outline-none focus-visible:ring-2"
                     >
                       <AccountLogo account={brand.account} size="xs" />
@@ -239,7 +239,7 @@ function BrandView({ brand }: { brand: Brand }) {
                 <Property label="Lead">
                   {brand.lead ? (
                     <Link
-                      href={`/leads/${brand.lead._id}`}
+                      href={`/pipeline/leads/${brand.lead._id}`}
                       className="hover:text-foreground focus-visible:ring-ring flex min-w-0 items-center gap-1.5 rounded-sm text-sm outline-none focus-visible:ring-2"
                     >
                       <span className="truncate">{brand.lead.name}</span>

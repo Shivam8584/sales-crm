@@ -54,7 +54,7 @@ export default function DealCard({
             <>
               {deal.account ? (
                 <Link
-                  href={`/accounts/${deal.account._id}`}
+                  href={`/records/accounts/${deal.account._id}`}
                   onClick={(event) => event.stopPropagation()}
                   onKeyDown={(event) => event.stopPropagation()}
                   className="hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex min-w-0 items-center gap-1.5 rounded-sm px-1 transition-colors outline-none focus-visible:ring-2"

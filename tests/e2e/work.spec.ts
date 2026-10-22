@@ -59,7 +59,7 @@ test.describe("Today", () => {
 
 test.describe("deals board", () => {
   test("dragging a card to another column moves it, and dragging it back restores the board", async () => {
-    await open(page, "/deals");
+    await open(page, "/pipeline/deals");
     const column = (id: string) => page.locator(`[data-column-id="${id}"]`);
     const cards = (id: string) => column(id).locator("[data-board-card]");
     await expect(cards("discovery").first()).toBeVisible();
@@ -125,9 +125,9 @@ test.describe("tasks", () => {
 
 test.describe("sequences", () => {
   test("a sequence exports as JSON: preview, then download", async () => {
-    await open(page, "/automations");
-    await page.locator("[role=row] a[href^='/automations/']").first().click();
-    await expect(page).toHaveURL(/\/automations\/\w+/);
+    await open(page, "/automation/sequences");
+    await page.locator("[role=row] a[href^='/automation/sequences/']").first().click();
+    await expect(page).toHaveURL(/\/automation\/sequences\/\w+/);
     await page
       .getByRole("button", { name: "Automation actions" })
       .first()

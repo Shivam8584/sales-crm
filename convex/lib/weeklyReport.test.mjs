@@ -69,8 +69,8 @@ test("lists the top reps and links to the report and the feed", () => {
   );
   assert.match(body, /Brands stuck in onboarding: 3/);
   assert.match(body, /Overdue tasks: 7/);
-  assert.match(body, /https:\/\/crm\.example\/reports/);
-  assert.match(body, /https:\/\/crm\.example\/activity/);
+  assert.match(body, /https:\/\/crm\.example\/insights\/reports/);
+  assert.match(body, /https:\/\/crm\.example\/insights\/activity/);
 });
 
 test("a quiet week still reads cleanly", () => {

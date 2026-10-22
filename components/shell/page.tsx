@@ -72,7 +72,7 @@ export function Page({
 type Crumb = { label: string; href?: string };
 
 type PageHeaderProps = {
-  /** Trail before the current page, e.g. `[{ label: "Accounts", href: "/accounts" }]`. */
+  /** Trail before the current page, e.g. `[{ label: "Accounts", href: "/records/accounts" }]`. */
   crumbs?: Crumb[];
   title: ReactNode;
   /** Next to the title: a `PageStatus`, a count or a short note. */

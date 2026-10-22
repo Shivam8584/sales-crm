@@ -195,7 +195,7 @@ export const respond = internalMutation({
           body: detractor
             ? "A rescue task is due today"
             : "A referral task is due in 2 days",
-          href: `/accounts/${account._id}`,
+          href: `/records/accounts/${account._id}`,
         });
       }
     }

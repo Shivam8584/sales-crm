@@ -93,7 +93,7 @@ export const sendDigests = internalAction({
         if (digest.leads > 0) {
           lines.push(
             `${plural(digest.leads, "new lead", "new leads")} waiting for a first touch`,
-            siteUrl("/leads?owner=mine"),
+            siteUrl("/pipeline/leads?owner=mine"),
             "",
           );
         }

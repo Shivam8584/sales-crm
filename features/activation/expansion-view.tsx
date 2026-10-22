@@ -213,7 +213,7 @@ export default function ExpansionView({
           columns={COLUMNS}
           rows={visible}
           getId={(row) => row._id}
-          getHref={(row) => `/accounts/${row._id}`}
+          getHref={(row) => `/records/accounts/${row._id}`}
           getLabel={(row) => row.account.name}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -261,7 +261,7 @@ export default function ExpansionView({
                 <Button
                   variant="secondary"
                   size="sm"
-                  href="/activation?view=health"
+                  href="/pipeline/activation?view=health"
                 >
                   View health
                 </Button>

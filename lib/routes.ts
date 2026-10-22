@@ -1,0 +1,58 @@
+/** Every in-app path lives here; pages, emails, push and notifications build links from these. */
+const PIPELINE = "/pipeline";
+const RECORDS = "/records";
+const INSIGHTS = "/insights";
+const AUTOMATION = "/automation";
+const SETTINGS = "/settings";
+
+export const routes = {
+  today: "/today",
+  inbox: "/inbox",
+  tasks: "/tasks",
+  prospecting: `${PIPELINE}/prospecting`,
+  prospect: (key: string) => `${PIPELINE}/prospecting/${key}`,
+  leads: `${PIPELINE}/leads`,
+  lead: (id: string) => `${PIPELINE}/leads/${id}`,
+  deals: `${PIPELINE}/deals`,
+  deal: (id: string, tab?: string) =>
+    `${PIPELINE}/deals/${id}${tab ? `?tab=${tab}` : ""}`,
+  activation: `${PIPELINE}/activation`,
+  sequences: `${AUTOMATION}/sequences`,
+  sequence: (id: string) => `${AUTOMATION}/sequences/${id}`,
+  accounts: `${RECORDS}/accounts`,
+  account: (id: string) => `${RECORDS}/accounts/${id}`,
+  people: `${RECORDS}/people`,
+  person: (id: string) => `${RECORDS}/people/${id}`,
+  reports: `${INSIGHTS}/reports`,
+  activity: `${INSIGHTS}/activity`,
+  playbook: `${INSIGHTS}/playbook`,
+  settings: SETTINGS,
+  profile: `${SETTINGS}/profile`,
+  team: `${SETTINGS}/team`,
+  workspace: `${SETTINGS}/workspace`,
+  fields: `${SETTINGS}/fields`,
+  targets: `${SETTINGS}/targets`,
+  duplicates: `${SETTINGS}/duplicates`,
+  integrations: `${SETTINGS}/integrations`,
+  system: `${SETTINGS}/system`,
+} as const;
+
+const LEGACY: Record<string, string> = {
+  leads: routes.leads,
+  deals: routes.deals,
+  prospecting: routes.prospecting,
+  activation: routes.activation,
+  automations: routes.sequences,
+  accounts: routes.accounts,
+  people: routes.people,
+  reports: routes.reports,
+  activity: routes.activity,
+  playbook: routes.playbook,
+};
+
+/** Maps a pre-restructure path (`/leads/abc?x=1`) onto the current one; other paths pass through. */
+export function fromLegacyPath(path: string) {
+  const match = /^\/([a-z]+)(?=[/?#]|$)/.exec(path);
+  const target = match && LEGACY[match[1]];
+  return target ? target + path.slice(match[0].length) : path;
+}

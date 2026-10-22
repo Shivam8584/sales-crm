@@ -12,10 +12,10 @@ import { useUiStore } from "@/stores/ui-store";
 
 /** What `C` creates on each page; pages not listed have nothing to create. */
 const CREATE_BY_PATH = [
-  ["/accounts", { type: "account" }],
-  ["/people", { type: "person" }],
-  ["/leads", { type: "lead" }],
-  ["/deals", { type: "deal" }],
+  ["/records/accounts", { type: "account" }],
+  ["/records/people", { type: "person" }],
+  ["/pipeline/leads", { type: "lead" }],
+  ["/pipeline/deals", { type: "deal" }],
   ["/tasks", { type: "task" }],
   ["/today", { type: "task" }],
 ] as const;

@@ -12,13 +12,13 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(() => page.context().close());
 
 for (const route of [
-  "/accounts",
-  "/people",
-  "/leads",
-  "/deals",
+  "/records/accounts",
+  "/records/people",
+  "/pipeline/leads",
+  "/pipeline/deals",
   "/tasks",
-  "/prospecting",
-  "/automations",
+  "/pipeline/prospecting",
+  "/automation/sequences",
 ]) {
   test(`${route} keeps its filters in one sheet at 390px`, async () => {
     await open(page, route);
@@ -43,7 +43,7 @@ test("the drawer opens from the header and closes after navigating", async () =>
   const link = page.getByRole("link", { name: /Leads/ }).first();
   await expect(link).toBeVisible();
   await link.click();
-  await expect(page).toHaveURL(/\/leads/);
+  await expect(page).toHaveURL(/\/pipeline\/leads/);
   await expect(
     page.getByRole("link", { name: /Playbook/ }).filter({ visible: true }),
   ).toHaveCount(0);

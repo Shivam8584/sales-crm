@@ -42,15 +42,15 @@ const STAGE_ODDS = Object.entries(STAGE_PROBABILITY_BPS)
   .join(", ");
 
 const STEP_LIST: Record<FunnelStepKey, string> = {
-  lead: "/leads",
-  contacted: "/leads?status=contacted",
-  demo: "/leads?kind=demo",
-  converted: "/leads?status=converted",
-  signed_up: "/accounts?stage=signed_up",
-  org_created: "/accounts?stage=org_created",
-  funded: "/accounts?stage=funded",
-  live: "/accounts?stage=live",
-  activated: "/accounts?stage=activated",
+  lead: "/pipeline/leads",
+  contacted: "/pipeline/leads?status=contacted",
+  demo: "/pipeline/leads?kind=demo",
+  converted: "/pipeline/leads?status=converted",
+  signed_up: "/records/accounts?stage=signed_up",
+  org_created: "/records/accounts?stage=org_created",
+  funded: "/records/accounts?stage=funded",
+  live: "/records/accounts?stage=live",
+  activated: "/records/accounts?stage=activated",
 };
 
 function NoLeads({
@@ -81,7 +81,7 @@ function NoLeads({
             Show last 90 days
           </Button>
         ) : (
-          <Button variant="secondary" size="sm" href="/leads">
+          <Button variant="secondary" size="sm" href="/pipeline/leads">
             Open leads
           </Button>
         )
@@ -131,7 +131,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
                 title="No deals in play"
                 description="Open deals appear here by stage, with won and lost deals for the period. Create a deal from an account to start the pipeline."
                 action={
-                  <Button variant="secondary" size="sm" href="/deals">
+                  <Button variant="secondary" size="sm" href="/pipeline/deals">
                     Open deals
                   </Button>
                 }
@@ -195,7 +195,7 @@ export function FunnelTab(props: LeadTabProps) {
   const sourceHref = (key: string) => {
     const query = new URLSearchParams(params.toString());
     query.set("source", key);
-    return `/reports?${query}`;
+    return `/insights/reports?${query}`;
   };
   const hrefFor = (key: FunnelStepKey) => {
     const href = STEP_LIST[key];

@@ -53,7 +53,7 @@ export async function leadSlaPolicy(ctx: QueryCtx) {
 }
 
 export function leadHref(id: Id<"leads">) {
-  return `/leads/${id}`;
+  return `/pipeline/leads/${id}`;
 }
 
 /** Clears the "no first touch" alerts once the lead is touched or closed. */

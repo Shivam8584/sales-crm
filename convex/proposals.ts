@@ -488,7 +488,7 @@ export const requestApproval = memberMutation({
       kind: "proposal_approval",
       title: `${ctx.viewer.name} needs approval on ${deal.title}`,
       body: `${reasons}. ${summaryLine(pricing)}`,
-      href: `/deals/${deal._id}?tab=proposal`,
+      href: `/pipeline/deals/${deal._id}?tab=proposal`,
     });
   },
 });
@@ -542,7 +542,7 @@ export const decide = managerMutation({
         kind: "proposal_decision",
         title: `${ctx.viewer.name} ${verb} the pricing on ${deal.title}`,
         body: reason,
-        href: `/deals/${deal._id}?tab=proposal`,
+        href: `/pipeline/deals/${deal._id}?tab=proposal`,
       });
     }
   },

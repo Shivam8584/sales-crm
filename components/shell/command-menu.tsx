@@ -60,10 +60,10 @@ import {
 import { navItems } from "./navigation";
 
 const RECORD_HREF: Record<RecentRecord["type"], string> = {
-  account: "/accounts",
-  person: "/people",
-  lead: "/leads",
-  deal: "/deals",
+  account: "/records/accounts",
+  person: "/records/people",
+  lead: "/pipeline/leads",
+  deal: "/pipeline/deals",
 };
 
 const PIN_FIELD = {
@@ -391,7 +391,7 @@ function Palette({
                 <CommandItem
                   key={account._id}
                   value={`account:${account._id}`}
-                  onSelect={() => go(`/accounts/${account._id}`)}
+                  onSelect={() => go(`/records/accounts/${account._id}`)}
                 >
                   <AccountLogo account={account} size="xs" />
                   <span className="truncate">{account.name}</span>
@@ -407,7 +407,7 @@ function Palette({
                 <CommandItem
                   key={person._id}
                   value={`person:${person._id}`}
-                  onSelect={() => go(`/people/${person._id}`)}
+                  onSelect={() => go(`/records/people/${person._id}`)}
                 >
                   <Avatar name={personName(person)} />
                   <span className="truncate">{personName(person)}</span>
@@ -423,7 +423,7 @@ function Palette({
                 <CommandItem
                   key={lead._id}
                   value={`lead:${lead._id}`}
-                  onSelect={() => go(`/leads/${lead._id}`)}
+                  onSelect={() => go(`/pipeline/leads/${lead._id}`)}
                 >
                   <ItemIcon>
                     <TargetIcon aria-hidden className="size-3" />
@@ -443,7 +443,7 @@ function Palette({
                 <CommandItem
                   key={deal._id}
                   value={`deal:${deal._id}`}
-                  onSelect={() => go(`/deals/${deal._id}`)}
+                  onSelect={() => go(`/pipeline/deals/${deal._id}`)}
                 >
                   <ItemIcon>
                     <ClipboardIcon aria-hidden className="size-3" />

@@ -525,7 +525,7 @@ function LoggedItem({
                 {" "}
                 with{" "}
                 <Link
-                  href={`/people/${entry.person._id}`}
+                  href={`/records/people/${entry.person._id}`}
                   className="text-foreground hover:underline"
                 >
                   {entry.person.name}
@@ -537,7 +537,7 @@ function LoggedItem({
                 {" "}
                 on{" "}
                 <Link
-                  href={`/deals/${entry.deal._id}`}
+                  href={`/pipeline/deals/${entry.deal._id}`}
                   className="text-foreground hover:underline"
                 >
                   {entry.deal.title}

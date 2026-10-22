@@ -29,7 +29,7 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
   const { person, account, deal, lead } = task;
   if (person && hide !== "person") {
     return {
-      href: `/people/${person._id}`,
+      href: `/records/people/${person._id}`,
       label: person.name,
       icon: <Avatar name={person.name} size="xs" />,
       context: !hide && account ? account.name : null,
@@ -37,7 +37,7 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
   }
   if (account && !hide) {
     return {
-      href: `/accounts/${account._id}`,
+      href: `/records/accounts/${account._id}`,
       label: account.name,
       icon: <AccountLogo account={account} size="xs" className="size-4" />,
       context: null,
@@ -45,7 +45,7 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
   }
   if (deal && hide !== "deal") {
     return {
-      href: `/deals/${deal._id}`,
+      href: `/pipeline/deals/${deal._id}`,
       label: deal.title,
       icon: <TargetIcon aria-hidden className="text-fg-tertiary size-3.5" />,
       context: null,
@@ -53,7 +53,7 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
   }
   if (lead && hide !== "lead") {
     return {
-      href: `/leads/${lead._id}`,
+      href: `/pipeline/leads/${lead._id}`,
       label: lead.name,
       icon: <UserPlusIcon aria-hidden className="text-fg-tertiary size-3.5" />,
       context: null,

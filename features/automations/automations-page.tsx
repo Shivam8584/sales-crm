@@ -283,7 +283,7 @@ export default function AutomationsPage() {
   async function copy(row: Row) {
     try {
       const id = await duplicate({ id: row._id });
-      router.push(`/automations/${id}`);
+      router.push(`/automation/sequences/${id}`);
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }
@@ -495,7 +495,7 @@ export default function AutomationsPage() {
                 columns={COLUMNS}
                 rows={sortedRows}
                 getId={(row) => row._id}
-                getHref={(row) => `/automations/${row._id}`}
+                getHref={(row) => `/automation/sequences/${row._id}`}
                 getLabel={(row) => row.name}
                 sort={sort}
                 onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -610,7 +610,7 @@ function AutomationsGrid({
       {rows.map((row) => (
         <li key={row._id}>
           <Link
-            href={`/automations/${row._id}`}
+            href={`/automation/sequences/${row._id}`}
             className="bg-card shadow-card focus-visible:ring-ring hover:bg-raised duration-base ease-power3-out group flex h-full flex-col gap-4 rounded-2xl p-5 transition-[background-color,translate] outline-none hover:-translate-y-px focus-visible:ring-2 motion-reduce:hover:translate-y-0"
           >
             <span className="flex items-start justify-between gap-3">

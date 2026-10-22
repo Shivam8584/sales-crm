@@ -65,7 +65,7 @@ import { isOpenStage } from "./stage";
 import type { DealRow } from "./use-deal-actions";
 import FollowButton from "@/features/notifications/follow-button";
 
-const CRUMBS = [{ label: "Deals", href: "/deals" }];
+const CRUMBS = [{ label: "Deals", href: "/pipeline/deals" }];
 
 /** A deal's full record: stage, amount and owner, its timeline, people and tasks. */
 export default function DealPage({ id }: { id: Id<"deals"> }) {
@@ -88,7 +88,7 @@ function DealPageContent({ id }: { id: Id<"deals"> }) {
           title="This deal doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/deals">
+            <Button variant="secondary" size="sm" href="/pipeline/deals">
               Back to deals
             </Button>
           }
@@ -190,7 +190,7 @@ function DealView({
                 deal.account && {
                   label: "Open account",
                   icon: BuildingIcon,
-                  href: `/accounts/${deal.account._id}`,
+                  href: `/records/accounts/${deal.account._id}`,
                 },
                 {
                   label: "Delete deal",
@@ -237,7 +237,7 @@ function DealView({
                 </span>
                 {deal.account && (
                   <Link
-                    href={`/accounts/${deal.account._id}`}
+                    href={`/records/accounts/${deal.account._id}`}
                     className="hover:text-foreground focus-visible:ring-ring truncate rounded-sm outline-none focus-visible:ring-2"
                   >
                     {deal.account.name}
@@ -413,7 +413,7 @@ function DealPeople({ deal, save }: { deal: DealRow; save: SaveDeal }) {
             >
               <Avatar name={personName(person)} size="md" />
               <Link
-                href={`/people/${person._id}`}
+                href={`/records/people/${person._id}`}
                 className="focus-visible:ring-ring flex min-w-0 flex-1 flex-col gap-1 rounded-sm outline-none focus-visible:ring-2"
               >
                 <span className="lead-style truncate font-medium hover:underline">

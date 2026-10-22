@@ -94,7 +94,7 @@ export function useLeadActions() {
             ? `Converted ${lead.name} into ${result.accountName}`
             : `Converted ${lead.name}: created ${result.accountName}`,
         );
-        router.push(`/accounts/${result.accountId}`);
+        router.push(`/records/accounts/${result.accountId}`);
         return true;
       } catch (error) {
         fail(error, "Couldn't convert the lead");

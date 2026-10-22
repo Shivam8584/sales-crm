@@ -40,22 +40,22 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Pipeline",
     items: [
       {
-        href: "/prospecting",
+        href: "/pipeline/prospecting",
         label: "Prospecting",
         icon: EyeIcon,
         shortcut: "O",
       },
-      { href: "/leads", label: "Leads", icon: TargetIcon, shortcut: "L" },
-      { href: "/deals", label: "Deals", icon: ClipboardIcon, shortcut: "D" },
+      { href: "/pipeline/leads", label: "Leads", icon: TargetIcon, shortcut: "L" },
+      { href: "/pipeline/deals", label: "Deals", icon: ClipboardIcon, shortcut: "D" },
       {
-        href: "/activation",
+        href: "/pipeline/activation",
         label: "Activation",
         icon: AlertTriangleIcon,
         shortcut: "V",
         minRole: "manager",
       },
       {
-        href: "/automations",
+        href: "/automation/sequences",
         label: "Sequences",
         icon: AutomationIcon,
         shortcut: "U",
@@ -66,21 +66,21 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Records",
     items: [
       {
-        href: "/accounts",
+        href: "/records/accounts",
         label: "Accounts",
         icon: BuildingIcon,
         shortcut: "A",
       },
-      { href: "/people", label: "People", icon: UsersIcon, shortcut: "P" },
+      { href: "/records/people", label: "People", icon: UsersIcon, shortcut: "P" },
     ],
   },
   {
     title: "Insights",
     items: [
-      { href: "/reports", label: "Reports", icon: BarChartIcon, shortcut: "R" },
-      { href: "/activity", label: "Activity", icon: ClockIcon, shortcut: "Y" },
+      { href: "/insights/reports", label: "Reports", icon: BarChartIcon, shortcut: "R" },
+      { href: "/insights/activity", label: "Activity", icon: ClockIcon, shortcut: "Y" },
       {
-        href: "/playbook",
+        href: "/insights/playbook",
         label: "Playbook",
         icon: MessageQuestionIcon,
         shortcut: "B",

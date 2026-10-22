@@ -72,7 +72,7 @@ export default function PeopleList({
             <Avatar name={name} size="md" />
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <Link
-                href={`/people/${person._id}`}
+                href={`/records/people/${person._id}`}
                 className="lead-style focus-visible:after:ring-ring truncate font-medium outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-inset"
               >
                 {name}

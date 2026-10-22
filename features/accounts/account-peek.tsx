@@ -62,7 +62,7 @@ export default function AccountPeek({
             <Button
               variant="ghost"
               size="xs"
-              href={`/accounts/${account._id}`}
+              href={`/records/accounts/${account._id}`}
               onClick={onClose}
             >
               Open page

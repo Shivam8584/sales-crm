@@ -83,7 +83,7 @@ export default function CreatePersonDialog({
       });
       onOpenChange(false);
       toast(`${firstName.trim()} added`, undefined);
-      if (!accountId) router.push(`/people/${id}`);
+      if (!accountId) router.push(`/records/people/${id}`);
     } catch (error) {
       const { message, field } = readError(error, "Couldn't add this person");
       const key = (["firstName", "email", "phone"] as string[]).includes(

@@ -46,7 +46,7 @@ export default function TemplatesGallery({
     setCreating(template.key);
     try {
       const id = await createFromTemplate({ key: template.key, language });
-      router.push(`/automations/${id}`);
+      router.push(`/automation/sequences/${id}`);
       toast(`Created “${template.name}” as a draft`);
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });

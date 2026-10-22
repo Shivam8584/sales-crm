@@ -66,7 +66,7 @@ export default function PrivacySettings() {
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <Link
-                    href={`/people/${request.personId}`}
+                    href={`/records/people/${request.personId}`}
                     className="lead-style focus-visible:ring-ring truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
                   >
                     {request.name}
@@ -325,8 +325,8 @@ function ReviewSection({
                   <Link
                     href={
                       row.kind === "person"
-                        ? `/people/${row.id}`
-                        : `/leads/${row.id}`
+                        ? `/records/people/${row.id}`
+                        : `/pipeline/leads/${row.id}`
                     }
                     className="lead-style focus-visible:ring-ring truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
                   >

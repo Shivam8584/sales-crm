@@ -88,7 +88,7 @@ export default function CreateAccountDialog({
           });
         }
       }
-      router.push(`/accounts/${id}`);
+      router.push(`/records/accounts/${id}`);
     } catch (error) {
       const { message, field } = readError(
         error,

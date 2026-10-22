@@ -61,7 +61,7 @@ export default function PersonPeek({
             <Button
               variant="ghost"
               size="xs"
-              href={`/people/${person._id}`}
+              href={`/records/people/${person._id}`}
               onClick={onClose}
             >
               Open page
@@ -111,7 +111,7 @@ function PeekBody({
         )}
         {person.account && (
           <Link
-            href={`/accounts/${person.account._id}`}
+            href={`/records/accounts/${person.account._id}`}
             onClick={onClose}
             className={cn(
               tagVariants({ tone: "neutral", size: "sm" }),

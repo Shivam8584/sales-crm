@@ -279,7 +279,7 @@ export default function DealsPage() {
   }
 
   const openPage = useCallback(
-    (id: string) => router.push(`/deals/${id}`),
+    (id: string) => router.push(`/pipeline/deals/${id}`),
     [router],
   );
   const peek = useCallback(
@@ -717,7 +717,7 @@ function DealsList({
       columns={columns}
       rows={rows}
       getId={(row) => row._id}
-      getHref={(row) => `/deals/${row._id}`}
+      getHref={(row) => `/pipeline/deals/${row._id}`}
       getLabel={(row) =>
         `${row.title}${row.account ? `, ${row.account.name}` : ""}`
       }

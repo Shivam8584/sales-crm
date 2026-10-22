@@ -60,7 +60,7 @@ export default function LeadPeek({
             <Button
               variant="ghost"
               size="xs"
-              href={`/leads/${lead._id}`}
+              href={`/pipeline/leads/${lead._id}`}
               onClick={onClose}
             >
               Open page
@@ -120,7 +120,7 @@ function PeekBody({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             <Button
               variant="primary"
               size="sm"
-              href={`/accounts/${lead.account._id}`}
+              href={`/records/accounts/${lead.account._id}`}
               onClick={onClose}
               className="ml-auto max-w-full min-w-0"
             >

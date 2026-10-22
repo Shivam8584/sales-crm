@@ -94,7 +94,7 @@ export default function RecordDeals({
             return (
               <li key={deal._id}>
                 <Link
-                  href={`/deals/${deal._id}`}
+                  href={`/pipeline/deals/${deal._id}`}
                   onClick={(event) => {
                     if (isPlainClick(event)) {
                       event.preventDefault();

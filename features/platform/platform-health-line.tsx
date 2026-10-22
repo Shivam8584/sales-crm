@@ -82,7 +82,7 @@ export default function PlatformHealthLine({
         )}
       </span>
       <Link
-        href={`/accounts/${accountId}?tab=platform`}
+        href={`/records/accounts/${accountId}?tab=platform`}
         onClick={onNavigate}
         className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring ml-auto flex shrink-0 items-center gap-1 rounded-sm outline-none focus-visible:ring-2"
       >

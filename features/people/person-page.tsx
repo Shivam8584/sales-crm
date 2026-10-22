@@ -69,7 +69,7 @@ import PersonDeals from "./person-deals";
 
 type Person = NonNullable<FunctionReturnType<typeof api.people.get>>;
 
-const CRUMBS = [{ label: "People", href: "/people" }];
+const CRUMBS = [{ label: "People", href: "/records/people" }];
 
 export default function PersonPage({ id }: { id: Id<"people"> }) {
   const person = useQuery(api.people.get, { id });
@@ -112,7 +112,7 @@ export default function PersonPage({ id }: { id: Id<"people"> }) {
           title="This person doesn't exist"
           description="They may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/people">
+            <Button variant="secondary" size="sm" href="/records/people">
               Back to people
             </Button>
           }
@@ -212,7 +212,7 @@ function PersonView({ person }: { person: Person }) {
         `${name} archived`,
         () => void setArchived({ ids: [person._id], archived: false }),
       );
-      router.push("/people");
+      router.push("/records/people");
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }
@@ -317,7 +317,7 @@ function PersonView({ person }: { person: Person }) {
                   )}
                   {person.account && (
                     <Link
-                      href={`/accounts/${person.account._id}`}
+                      href={`/records/accounts/${person.account._id}`}
                       className={cn(
                         tagVariants({ tone: "neutral", size: "sm" }),
                         "hover:text-foreground focus-visible:ring-ring min-w-0 gap-1 pl-0.5 outline-none focus-visible:ring-2",

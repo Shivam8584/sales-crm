@@ -133,7 +133,7 @@ export default function CreateLeadDialog() {
       });
       setCreate(null);
       toast(`${values.name.trim()} added to leads`);
-      router.push(`/leads/${id}`);
+      router.push(`/pipeline/leads/${id}`);
     } catch (error) {
       const { message, field } = readError(error, "Couldn't add the lead");
       setErrors({

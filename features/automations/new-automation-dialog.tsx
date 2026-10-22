@@ -60,7 +60,7 @@ export default function NewAutomationDialog({
         triggerKind: trigger,
       });
       onOpenChange(false);
-      router.push(`/automations/${id}`);
+      router.push(`/automation/sequences/${id}`);
     } catch (caught) {
       setError(readError(caught));
     } finally {

@@ -119,7 +119,7 @@ export function parseRecordKey(key: string) {
     : null;
 }
 
-/** The record an in-app link points at, e.g. `/deals/abc?tab=proposal` → `deals:abc`. */
+/** The record an in-app link points at, e.g. `/pipeline/deals/abc?tab=proposal` → `deals:abc`. */
 export function recordFromHref(href: string | undefined | null) {
   const match = href?.match(/^\/(accounts|deals|leads|people)\/([a-z0-9]+)/);
   return match ? recordKey(match[1] as RecordType, match[2]) : undefined;

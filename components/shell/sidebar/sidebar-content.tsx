@@ -28,8 +28,8 @@ type CountKey = "accounts" | "leads" | "tasks" | "inbox";
 
 const COUNTS: Record<string, { key: CountKey; label: string; alert: boolean }> =
   {
-    "/accounts": { key: "accounts", label: "accounts", alert: false },
-    "/leads": { key: "leads", label: "new", alert: true },
+    "/records/accounts": { key: "accounts", label: "accounts", alert: false },
+    "/pipeline/leads": { key: "leads", label: "new", alert: true },
     "/tasks": { key: "tasks", label: "overdue", alert: true },
     "/inbox": { key: "inbox", label: "unread", alert: true },
   };

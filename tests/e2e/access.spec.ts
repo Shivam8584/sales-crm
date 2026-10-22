@@ -14,7 +14,7 @@ test.describe("as a rep", () => {
   test.afterAll(() => page.context().close());
 
   test("sees no Export button on the record lists", async () => {
-    for (const route of ["/accounts", "/people", "/leads", "/deals"]) {
+    for (const route of ["/records/accounts", "/records/people", "/pipeline/leads", "/pipeline/deals"]) {
       await open(page, route);
       await page.waitForLoadState("networkidle");
       await expect(
@@ -33,10 +33,10 @@ test.describe("as a rep", () => {
   });
 
   test("gets a plain step list, not the canvas, from a sequence template", async () => {
-    await open(page, "/automations");
+    await open(page, "/automation/sequences");
     await page.getByRole("tab", { name: "Templates" }).click();
     await page.getByRole("button", { name: "Use template" }).first().click();
-    await expect(page).toHaveURL(/\/automations\/\w+/);
+    await expect(page).toHaveURL(/\/automation\/sequences\/\w+/);
     const id = page.url().split("/").pop()!;
     try {
       await expect(page.getByRole("tab", { name: "Steps" })).toBeVisible();
@@ -60,7 +60,7 @@ test.describe("as an admin", () => {
   test.afterAll(() => page.context().close());
 
   test("sees Export on the accounts list", async () => {
-    await open(page, "/accounts");
+    await open(page, "/records/accounts");
     await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
   });
 

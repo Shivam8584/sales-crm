@@ -115,7 +115,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
               : ` No active sequence runs on ${SUBJECT_LABEL[subject.kind][1]} yet.`}
           </span>
           {data.available.length === 0 && (
-            <Button variant="secondary" size="xs" href="/automations">
+            <Button variant="secondary" size="xs" href="/automation/sequences">
               Open sequences
             </Button>
           )}
@@ -142,7 +142,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <Link
-                      href={`/automations/${item.automationId}`}
+                      href={`/automation/sequences/${item.automationId}`}
                       className="hover:text-foreground focus-visible:ring-ring truncate rounded-sm text-sm font-medium outline-none hover:underline focus-visible:ring-2"
                     >
                       {item.automation}

@@ -387,7 +387,7 @@ export default function StuckView({ desk }: { desk: Desk | undefined }) {
           columns={COLUMNS}
           rows={rows}
           getId={(row) => row._id}
-          getHref={(row) => `/accounts/${row._id}`}
+          getHref={(row) => `/records/accounts/${row._id}`}
           getLabel={(row) => row.account.name}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -502,7 +502,7 @@ export default function StuckView({ desk }: { desk: Desk | undefined }) {
                       : `None of the ${desk.linked} brands on Hypedrive is stuck on a step.`
                 }
                 action={
-                  <Button variant="secondary" size="sm" href="/accounts">
+                  <Button variant="secondary" size="sm" href="/records/accounts">
                     View accounts
                   </Button>
                 }

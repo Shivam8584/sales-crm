@@ -5,16 +5,16 @@ const ROUTES = [
   "/today",
   "/inbox",
   "/tasks",
-  "/prospecting",
-  "/leads",
-  "/deals",
-  "/activation",
-  "/automations",
-  "/accounts",
-  "/people",
-  "/activity",
-  "/reports",
-  "/playbook",
+  "/pipeline/prospecting",
+  "/pipeline/leads",
+  "/pipeline/deals",
+  "/pipeline/activation",
+  "/automation/sequences",
+  "/records/accounts",
+  "/records/people",
+  "/insights/activity",
+  "/insights/reports",
+  "/insights/playbook",
   "/settings/profile",
   "/settings/workspace",
   "/settings/team",
@@ -32,7 +32,7 @@ const SIZES = [
 
 // The feed is ordered by creation time but grouped by occurrence day, so backdated seed rows can repeat a day group and React warns about its key.
 const tolerated = (route: string, error: string) =>
-  route === "/activity" && error.includes("two children with the same key");
+  route === "/insights/activity" && error.includes("two children with the same key");
 
 let page: Page;
 let errors: string[];

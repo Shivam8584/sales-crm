@@ -21,7 +21,7 @@ import type { AutomationDoc } from "./editor/editor-context";
 import ExportDialog from "./export-dialog";
 import { SendingSection } from "./sending-settings";
 
-const CRUMBS = [{ label: "Sequences", href: "/automations" }];
+const CRUMBS = [{ label: "Sequences", href: "/automation/sequences" }];
 
 /** What a rep sees instead of the canvas: the steps in order, with start, pause and test. */
 export default function SequenceView({

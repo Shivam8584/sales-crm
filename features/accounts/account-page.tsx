@@ -72,7 +72,7 @@ import { STAGE_OPTIONS, StageTag } from "./stage";
 import { editRecordTitle, useTitleShortcut } from "./use-title-shortcut";
 import FollowButton from "@/features/notifications/follow-button";
 
-const CRUMBS = [{ label: "Accounts", href: "/accounts" }];
+const CRUMBS = [{ label: "Accounts", href: "/records/accounts" }];
 
 export default function AccountPage({ id }: { id: Id<"accounts"> }) {
   const account = useQuery(api.accounts.get, { id });
@@ -90,7 +90,7 @@ export default function AccountPage({ id }: { id: Id<"accounts"> }) {
           title="This account doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/accounts">
+            <Button variant="secondary" size="sm" href="/records/accounts">
               Back to accounts
             </Button>
           }
@@ -137,7 +137,7 @@ function AccountView({ account }: { account: Account }) {
         `${account.name} archived`,
         () => void setArchived({ ids: [account._id], archived: false }),
       );
-      router.push("/accounts");
+      router.push("/records/accounts");
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }

@@ -55,7 +55,7 @@ import {
 import { useLeadActions } from "./use-lead-actions";
 import FollowButton from "@/features/notifications/follow-button";
 
-const CRUMBS = [{ label: "Leads", href: "/leads" }];
+const CRUMBS = [{ label: "Leads", href: "/pipeline/leads" }];
 
 /** A lead's full record: contact, triage controls, timeline, attribution and consent. */
 export default function LeadPage({ id }: { id: Id<"leads"> }) {
@@ -78,7 +78,7 @@ function LeadPageContent({ id }: { id: Id<"leads"> }) {
           title="This lead doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
-            <Button variant="secondary" size="sm" href="/leads">
+            <Button variant="secondary" size="sm" href="/pipeline/leads">
               Back to leads
             </Button>
           }
@@ -112,7 +112,7 @@ function LeadView({ lead }: { lead: Lead }) {
 
   function copyLink() {
     void navigator.clipboard
-      .writeText(`${window.location.origin}/leads/${lead._id}`)
+      .writeText(`${window.location.origin}/pipeline/leads/${lead._id}`)
       .then(() => toast("Link copied"));
   }
 
@@ -121,7 +121,7 @@ function LeadView({ lead }: { lead: Lead }) {
       <Button
         variant="primary"
         size="sm"
-        href={`/accounts/${lead.account._id}`}
+        href={`/records/accounts/${lead.account._id}`}
         className="max-w-48"
       >
         <span className="truncate">Open {lead.account.name}</span>
@@ -187,7 +187,7 @@ function LeadView({ lead }: { lead: Lead }) {
                   ? lead.account && {
                       label: `Open ${lead.account.name}`,
                       icon: BuildingIcon,
-                      href: `/accounts/${lead.account._id}`,
+                      href: `/records/accounts/${lead.account._id}`,
                     }
                   : {
                       label: "Convert",

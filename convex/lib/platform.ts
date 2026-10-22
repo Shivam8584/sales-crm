@@ -1011,7 +1011,7 @@ async function onOrgCreated(
         kind: "platform_org",
         title: `New on Hypedrive: ${data.name}`,
         body: "Organisation created with a verified GSTIN",
-        href: `/accounts/${accountId}`,
+        href: `/records/accounts/${accountId}`,
       });
     }
   }
@@ -1103,9 +1103,9 @@ async function onUserGstFailed(
     title: `${who} couldn't verify GST on Hypedrive`,
     body: data.reason,
     href: account
-      ? `/accounts/${account._id}`
+      ? `/records/accounts/${account._id}`
       : person
-        ? `/people/${person._id}`
+        ? `/records/people/${person._id}`
         : leadHref(lead!._id),
   };
   if (recipient) await notify(ctx, recipient, input);
@@ -1161,7 +1161,7 @@ async function alertOwner(
       type === "campaign.slots_filled"
         ? "Every slot is taken: a good moment to talk about the next one."
         : "They need to top up, and paused campaigns must be resumed by hand.",
-    href: `/accounts/${account._id}`,
+    href: `/records/accounts/${account._id}`,
   });
 }
 

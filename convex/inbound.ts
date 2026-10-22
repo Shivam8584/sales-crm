@@ -166,7 +166,7 @@ function groupContacts(found: Awaited<ReturnType<typeof findContacts>>) {
       },
       name: personName(person),
       ownerId: person.ownerId,
-      href: `/people/${person._id}`,
+      href: `/records/people/${person._id}`,
       lead,
       person,
     });
@@ -182,7 +182,7 @@ function groupContacts(found: Awaited<ReturnType<typeof findContacts>>) {
       },
       name: lead.name,
       ownerId: lead.ownerId ?? null,
-      href: `/leads/${lead._id}`,
+      href: `/pipeline/leads/${lead._id}`,
       lead,
       person: null,
     });
@@ -192,7 +192,7 @@ function groupContacts(found: Awaited<ReturnType<typeof findContacts>>) {
       refs: { accountId: found.account._id },
       name: found.account.name,
       ownerId: found.account.ownerId,
-      href: `/accounts/${found.account._id}`,
+      href: `/records/accounts/${found.account._id}`,
       lead: null,
       person: null,
     });

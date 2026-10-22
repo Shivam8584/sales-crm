@@ -17,7 +17,7 @@ export default function ProposalSummary({
   onNavigate?: () => void;
 }) {
   const proposal = useQuery(api.proposals.current, { dealId });
-  const href = `/deals/${dealId}?tab=proposal`;
+  const href = `/pipeline/deals/${dealId}?tab=proposal`;
 
   if (proposal === undefined) {
     return <span className="text-fg-tertiary text-sm">…</span>;

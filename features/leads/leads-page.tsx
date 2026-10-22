@@ -428,7 +428,7 @@ export default function LeadsPage() {
           columns={columns}
           rows={rows}
           getId={(row) => row._id}
-          getHref={(row) => `/leads/${row._id}`}
+          getHref={(row) => `/pipeline/leads/${row._id}`}
           getLabel={(row) => `${row.name}, ${row.companyName}`}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}

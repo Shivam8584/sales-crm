@@ -555,7 +555,7 @@ export default function AccountsPage() {
           columns={columns}
           rows={rows}
           getId={(row) => row._id}
-          getHref={(row) => `/accounts/${row._id}`}
+          getHref={(row) => `/records/accounts/${row._id}`}
           getLabel={(row) => row.name}
           sort={sort}
           onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}

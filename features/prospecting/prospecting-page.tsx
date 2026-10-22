@@ -818,7 +818,7 @@ export default function ProspectingPage() {
             columns={PROSPECT_COLUMNS}
             rows={prospects}
             getId={(row) => row.key}
-            getHref={(row) => `/prospecting/${encodeURIComponent(row.key)}`}
+            getHref={(row) => `/pipeline/prospecting/${encodeURIComponent(row.key)}`}
             getLabel={(row) => row.brand}
             sort={sort}
             onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -827,7 +827,7 @@ export default function ProspectingPage() {
                 ? {
                     label: "Open lead",
                     icon: TargetIcon,
-                    onSelect: () => router.push(`/leads/${row.lead!._id}`),
+                    onSelect: () => router.push(`/pipeline/leads/${row.lead!._id}`),
                   }
                 : {
                     label: "Create lead",
@@ -891,7 +891,7 @@ export default function ProspectingPage() {
               getId={(row) => row._id}
               getHref={(row) =>
                 row.brandKey
-                  ? `/prospecting/${encodeURIComponent(row.brandKey)}`
+                  ? `/pipeline/prospecting/${encodeURIComponent(row.brandKey)}`
                   : row.url
               }
               getLabel={(row) => row.title ?? row.identifier}

@@ -156,8 +156,8 @@ async function gather(ctx: ActionCtx): Promise<Omit<WeeklyReportData, "name">> {
     ...lead,
     ...team,
     ...deal,
-    reportsUrl: siteUrl("/reports"),
-    activityUrl: siteUrl("/activity"),
+    reportsUrl: siteUrl("/insights/reports"),
+    activityUrl: siteUrl("/insights/activity"),
   };
 }
 

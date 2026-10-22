@@ -53,10 +53,10 @@ export type Subject = {
 };
 
 const HREF: Record<SubjectKind, string> = {
-  lead: "/leads/",
-  person: "/people/",
-  account: "/accounts/",
-  deal: "/deals/",
+  lead: "/pipeline/leads/",
+  person: "/records/people/",
+  account: "/records/accounts/",
+  deal: "/pipeline/deals/",
 };
 
 async function get<T extends "leads" | "people" | "accounts" | "deals">(

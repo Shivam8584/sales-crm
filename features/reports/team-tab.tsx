@@ -397,7 +397,7 @@ export default function TeamTab({ period }: { period: Period }) {
               columns={cols}
               rows={data.rows}
               getId={(row) => row.ownerId}
-              getHref={(row) => `/leads?owner=${repQuery(row)}`}
+              getHref={(row) => `/pipeline/leads?owner=${repQuery(row)}`}
               getLabel={(row) => `Open ${row.ownerName ?? "unassigned"} leads`}
               sort={sort}
               onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
@@ -417,20 +417,20 @@ export default function TeamTab({ period }: { period: Period }) {
                         label: "Open deals",
                         icon: WalletIcon,
                         onSelect: () =>
-                          router.push(`/deals?owner=${row.ownerId}`),
+                          router.push(`/pipeline/deals?owner=${row.ownerId}`),
                       },
                       {
                         label: "Open accounts",
                         icon: UsersIcon,
                         onSelect: () =>
-                          router.push(`/accounts?owner=${row.ownerId}`),
+                          router.push(`/records/accounts?owner=${row.ownerId}`),
                       },
                       {
                         label: "Show their funnel",
                         icon: ActivityIcon,
                         onSelect: () =>
                           router.push(
-                            `/reports?tab=funnel&period=${period}&owner=${row.ownerId}`,
+                            `/insights/reports?tab=funnel&period=${period}&owner=${row.ownerId}`,
                           ),
                       },
                     ]

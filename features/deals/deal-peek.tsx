@@ -50,7 +50,7 @@ export default function DealPeek({
             <Button
               variant="ghost"
               size="xs"
-              href={`/deals/${deal._id}`}
+              href={`/pipeline/deals/${deal._id}`}
               onClick={onClose}
             >
               Open page
@@ -102,7 +102,7 @@ function PeekBody({ deal, onClose }: { deal: DealRow; onClose: () => void }) {
           </h2>
           {deal.account && (
             <Link
-              href={`/accounts/${deal.account._id}`}
+              href={`/records/accounts/${deal.account._id}`}
               onClick={onClose}
               className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring w-fit max-w-full truncate rounded-sm outline-none focus-visible:ring-2"
             >

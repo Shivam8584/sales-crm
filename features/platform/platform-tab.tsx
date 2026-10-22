@@ -863,7 +863,7 @@ function Team({ members }: { members: Linked["members"] }) {
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   {member.person ? (
                     <Link
-                      href={`/people/${member.person._id}`}
+                      href={`/records/people/${member.person._id}`}
                       className="lead-style focus-visible:ring-ring truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
                     >
                       {name}
