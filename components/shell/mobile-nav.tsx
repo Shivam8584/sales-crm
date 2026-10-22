@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, type ComponentType, type SVGProps } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Button from "@/components/_ui/button";
-import CountBadge from "@/components/_ui/count-badge";
 import {
   Sheet,
   SheetClose,
@@ -25,34 +24,13 @@ import SidebarPins from "./sidebar/sidebar-pins";
 import SidebarSection from "./sidebar/sidebar-section";
 import { useNavCounts } from "./use-nav-counts";
 
+const GLASS =
+  "bg-background/80 shadow-[0_8px_30px_-8px_rgb(10_11_13/0.22),0_0_0_1px_rgb(10_11_13/0.06)] backdrop-blur-xl dark:shadow-[0_8px_30px_-8px_rgb(0_0_0/0.6),0_0_0_1px_rgb(255_255_255/0.08)]";
+
 const TAB =
-  "text-fg-tertiary data-[active=true]:text-foreground hover:text-foreground focus-visible:ring-ring caption-style relative flex h-12 w-full flex-col items-center justify-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-inset";
+  "text-fg-tertiary data-[active=true]:bg-overlay-3 data-[active=true]:text-foreground focus-visible:ring-ring relative flex h-full w-full flex-col items-center justify-center gap-1 rounded-full text-[11px] leading-none font-medium outline-none transition-[background-color,color,scale] duration-base active:scale-[0.97] focus-visible:ring-2";
 
-function TabIcon({
-  icon: Icon,
-  count,
-  alert,
-}: {
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  count?: number;
-  alert?: boolean;
-}) {
-  return (
-    <span className="relative">
-      <Icon aria-hidden className="size-4" />
-      {alert && count !== undefined && count > 0 && (
-        <CountBadge
-          aria-hidden
-          className="ring-sidebar absolute -top-1.5 left-full -ml-1 h-3.5 min-w-3.5 px-0.5 text-[10px] ring-2"
-        >
-          {count > 99 ? "99+" : count}
-        </CountBadge>
-      )}
-    </span>
-  );
-}
-
-/** Phone and tablet navigation: the tab-bar items plus a sheet holding everything else. */
+/** Phone and tablet navigation: a floating tab bar plus a sheet holding everything else. */
 export default function MobileNav() {
   const pathname = usePathname();
   const { role } = useViewer();
@@ -75,9 +53,14 @@ export default function MobileNav() {
     <nav
       aria-label="Primary"
       data-tour="nav"
-      className="border-sidebar-border bg-sidebar shrink-0 border-t pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="flex shrink-0 items-center gap-2.5 px-4 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] lg:hidden"
     >
-      <ul className="flex">
+      <ul
+        className={cn(
+          "flex h-15 min-w-0 flex-1 gap-1 rounded-full p-1.5",
+          GLASS,
+        )}
+      >
         {tabs.map((item) => {
           const active = isActive(pathname, item.href);
           const count = item.count && counts?.[item.count.key];
@@ -90,12 +73,16 @@ export default function MobileNav() {
                 aria-current={active ? "page" : undefined}
                 className={TAB}
               >
-                <TabIcon
-                  icon={item.icon}
-                  count={count}
-                  alert={item.count?.alert}
-                />
-                <span className="truncate">{item.label}</span>
+                <span className="relative">
+                  <item.icon aria-hidden className="size-5" />
+                  {item.count?.alert && count ? (
+                    <span
+                      aria-hidden
+                      className="bg-foreground ring-background absolute -top-0.5 -right-1 size-2 rounded-full ring-2"
+                    />
+                  ) : null}
+                </span>
+                <span className="max-w-full truncate px-1">{item.label}</span>
                 {count ? (
                   <span className="sr-only">
                     {count} {item.count?.label}
@@ -105,66 +92,73 @@ export default function MobileNav() {
             </li>
           );
         })}
-        <li className="min-w-0 flex-1">
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <button
-                type="button"
-                data-active={moreActive}
-                className={cn(TAB, "cursor-pointer")}
-              >
-                <TabIcon icon={DotsIcon} />
-                <span>More</span>
-              </button>
-            </SheetTrigger>
-            <SheetContent
-              side="bottom"
-              className="border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)]"
-            >
-              <SheetHeader className="border-sidebar-border px-4">
-                <SheetTitle>More</SheetTitle>
-                <SheetDescription className="sr-only">
-                  Every section of the workspace
-                </SheetDescription>
-                <SheetClose asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="-mr-1"
-                    aria-label="Close"
-                  >
-                    <XIcon aria-hidden className="size-3.5" />
-                  </Button>
-                </SheetClose>
-              </SheetHeader>
-              <div className="min-h-0 flex-1 overflow-y-auto">
-                {more.map((section) => (
-                  <SidebarSection key={section.title} title={section.title}>
-                    {section.items.map((item) => (
-                      <SidebarNavItem
-                        key={item.href}
-                        href={item.href}
-                        icon={item.icon}
-                        label={item.label}
-                        active={isActive(pathname, item.href)}
-                        onClick={close}
-                        count={item.count && counts?.[item.count.key]}
-                        countLabel={item.count?.label}
-                        alert={item.count?.alert}
-                      />
-                    ))}
-                  </SidebarSection>
-                ))}
-                <SidebarPins collapsed={false} onNavigate={close} />
-                <SidebarFooter
-                  onNavigate={close}
-                  className="border-sidebar-border border-t"
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
-        </li>
       </ul>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <button
+            type="button"
+            aria-label="More"
+            data-active={moreActive}
+            className={cn(
+              "text-fg-secondary data-[active=true]:text-foreground focus-visible:ring-ring duration-base grid size-15 shrink-0 cursor-pointer place-items-center rounded-full transition-[scale,color] outline-none focus-visible:ring-2 active:scale-[0.97]",
+              GLASS,
+            )}
+          >
+            <DotsIcon aria-hidden className="size-5" />
+          </button>
+        </SheetTrigger>
+        <SheetContent
+          side="bottom"
+          className="pb-[max(env(safe-area-inset-bottom),1.5rem)]"
+        >
+          <span
+            aria-hidden
+            className="bg-foreground/15 mx-auto mt-2 block h-1 w-9 shrink-0 rounded-full"
+          />
+          <SheetHeader className="h-14">
+            <SheetTitle>More</SheetTitle>
+            <SheetDescription className="sr-only">
+              Every section of the workspace
+            </SheetDescription>
+            <SheetClose asChild>
+              <Button
+                variant="well"
+                size="icon-sm"
+                className="-mr-1"
+                aria-label="Close"
+              >
+                <XIcon aria-hidden className="size-3.5" />
+              </Button>
+            </SheetClose>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {more.map((section) => (
+              <SidebarSection key={section.title} title={section.title}>
+                {section.items.map((item) => (
+                  <SidebarNavItem
+                    key={item.href}
+                    href={item.href}
+                    icon={item.icon}
+                    label={item.label}
+                    active={isActive(pathname, item.href)}
+                    onClick={close}
+                    count={item.count && counts?.[item.count.key]}
+                    countLabel={item.count?.label}
+                    alert={item.count?.alert}
+                    indicator="more"
+                  />
+                ))}
+              </SidebarSection>
+            ))}
+            <SidebarFooter onNavigate={close} indicator="more" />
+            <SidebarPins
+              collapsed={false}
+              onNavigate={close}
+              indicator="more"
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </nav>
   );
 }

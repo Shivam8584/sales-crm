@@ -216,6 +216,19 @@
   --logo-tile-fg: #4b4c4e;
   --switch-thumb: #ffffff;
   --sidebar-width: 248px;
+  --page-x: 16px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --page-x: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --page-x: 40px;
+  }
 }
 
 /* Ink on white: muted text sits at 55–60% ink so captions still pass AA on the well. */

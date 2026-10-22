@@ -22,7 +22,7 @@ export default function SearchInput({
   return (
     <label
       className={cn(
-        "shadow-raised focus-within:border-selected focus-within:ring-selected/20 duration-fast h-control-md flex w-full min-w-0 items-center gap-2 rounded-lg border border-transparent px-2.75 transition-[border-color,box-shadow] focus-within:ring-3 sm:w-64",
+        "bg-well hover:bg-well-hover focus-within:bg-background focus-within:ring-foreground/15 duration-base flex h-10 w-full min-w-0 items-center gap-2.5 rounded-full pr-2 pl-4 transition-[background-color,box-shadow] focus-within:ring-2 sm:w-64",
         className,
       )}
     >
@@ -40,14 +40,14 @@ export default function SearchInput({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="placeholder:text-fg-tertiary min-w-0 flex-1 bg-transparent text-sm leading-none outline-none [&::-webkit-search-cancel-button]:hidden"
+        className="placeholder:text-fg-tertiary min-w-0 flex-1 bg-transparent text-sm leading-none outline-none pointer-coarse:text-base [&::-webkit-search-cancel-button]:hidden"
       />
       {value ? (
         <button
           type="button"
           aria-label="Clear search"
           onClick={() => onChange("")}
-          className="text-fg-tertiary hover:text-foreground -mr-1 rounded-sm p-1"
+          className="text-fg-tertiary hover:text-foreground hover:bg-overlay-3 grid size-6 place-items-center rounded-full"
         >
           <XIcon aria-hidden className="size-3" />
         </button>

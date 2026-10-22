@@ -33,6 +33,7 @@ import UsersIcon from "@/public/assets/icons/users.svg";
 import KeyboardIcon from "@/public/assets/icons/message-question.svg";
 import CursorClickIcon from "@/public/assets/icons/cursor-click.svg";
 import LogOutIcon from "@/public/assets/icons/log-out.svg";
+import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
 
 const THEMES = [
   { value: "system", label: "System", icon: MonitorIcon },
@@ -72,10 +73,14 @@ export default function UserMenu() {
           variant="ghost"
           size="avatar"
           aria-label={`Account menu for ${viewer.name}`}
-          className="text-foreground data-[state=open]:bg-overlay-2 max-sm:size-control-md max-sm:p-0"
+          className="text-foreground hover:bg-well data-[state=open]:bg-well -mr-1 max-sm:size-10 max-sm:p-0"
         >
-          <Avatar name={viewer.name} />
+          <Avatar name={viewer.name} className="size-9 text-xs max-sm:size-8" />
           <span className="max-w-32 truncate max-sm:hidden">{viewer.name}</span>
+          <ChevronDownIcon
+            aria-hidden
+            className="text-fg-disabled size-3 max-sm:hidden"
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -129,7 +134,7 @@ export default function UserMenu() {
         </div>
         <Divider />
         <div className="p-2">
-          <div className="bg-overlay-1 flex flex-col gap-1.5 rounded-xl p-1.5">
+          <div className="bg-well flex flex-col gap-1.5 rounded-2xl p-1">
             <span
               id={themeLabel}
               className="caption-style text-fg-tertiary px-1.5 pt-1 font-medium"
@@ -149,7 +154,7 @@ export default function UserMenu() {
                   key={option.value}
                   value={option.value}
                   onSelect={(event) => event.preventDefault()}
-                  className="caption-style text-fg-secondary data-[highlighted]:bg-overlay-2 data-[highlighted]:text-foreground data-[state=checked]:bg-background data-[state=checked]:text-foreground duration-fast flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg font-medium transition-colors outline-none select-none pointer-coarse:h-11"
+                  className="caption-style text-fg-secondary data-[highlighted]:text-foreground data-[state=checked]:bg-background data-[state=checked]:shadow-capsule data-[state=checked]:text-foreground duration-base flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full font-medium transition-colors outline-none select-none pointer-coarse:h-11"
                 >
                   <option.icon aria-hidden className="size-3.5" />
                   {option.label}

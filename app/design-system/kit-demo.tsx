@@ -342,18 +342,17 @@ function KitDemoContent() {
                 href="/design-system"
                 icon={SettingsIcon}
                 label="Settings"
-                tone="quiet"
               />
               <SidebarNavItem
                 href="/design-system"
                 icon={UserPlusIcon}
                 label="Invite teammates"
-                tone="quiet"
+                iconOnly
               />
               <SidebarNavItem
                 icon={HelpIcon}
                 label="Help & shortcuts"
-                tone="quiet"
+                iconOnly
                 onClick={() => toast("Opens the shortcuts dialog")}
               />
             </SidebarSection>

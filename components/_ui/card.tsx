@@ -63,9 +63,7 @@ export function CardHeader({
           {meta}
         </div>
         {description && (
-          <p className="text-fg-secondary max-w-prose text-sm">
-            {description}
-          </p>
+          <p className="text-fg-secondary max-w-prose text-sm">{description}</p>
         )}
       </div>
       {action && (

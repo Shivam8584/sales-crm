@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Button from "@/components/_ui/button";
 import { ScrollArea } from "@/components/_ui/scroll-area";
 import Tooltip from "@/components/_ui/tooltip";
 import { useViewer } from "@/hooks/use-viewer";
@@ -10,13 +9,14 @@ import {
   toggleSidebarCollapsed,
   useSidebarCollapsed,
 } from "@/lib/sidebar-collapse";
+import { cn } from "@/lib/utils";
 import { routes } from "@/lib/routes";
-import Logo from "@/public/assets/images/_common/logo.svg";
+import Wordmark from "@/public/assets/images/_common/logo-wordmark.svg";
 import SidebarIcon from "@/public/assets/icons/sidebar.svg";
 import { isActive, navSections } from "../navigation";
 import { useNavCounts } from "../use-nav-counts";
 import SidebarFooter from "./sidebar-footer";
-import SidebarNavItem from "./sidebar-nav-item";
+import SidebarNavItem, { NAV_ITEM } from "./sidebar-nav-item";
 import SidebarPins from "./sidebar-pins";
 import SidebarSection from "./sidebar-section";
 
@@ -29,56 +29,40 @@ export default function SidebarContent() {
   const counts = useNavCounts();
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="border-sidebar-border collapsed:justify-center collapsed:px-2 flex h-14.5 shrink-0 items-center gap-2 border-b px-3">
-        {collapsed ? (
-          <Tooltip content="Expand sidebar" shortcut="[" side="right">
-            <button
-              type="button"
-              aria-label="Expand sidebar"
-              aria-expanded={false}
-              onClick={toggleSidebarCollapsed}
-              className="group focus-visible:ring-ring hover:bg-overlay-2 relative flex size-8 items-center justify-center rounded-lg outline-none focus-visible:ring-2"
-            >
-              <Logo
-                aria-hidden
-                className="size-8 overflow-visible group-hover:opacity-0 group-focus-visible:opacity-0"
-              />
-              <SidebarIcon
-                aria-hidden
-                className="text-icon absolute size-3.5 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-              />
-            </button>
-          </Tooltip>
-        ) : (
-          <>
-            <Link
-              href={routes.today}
-              className="focus-visible:ring-ring -m-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg p-1 outline-none focus-visible:ring-2"
-            >
-              <Logo aria-hidden className="size-8 shrink-0 overflow-visible" />
-              <span className="lead-style block min-w-0 truncate font-medium">
-                Hypedrive
-              </span>
-            </Link>
-            <Tooltip content="Collapse sidebar" shortcut="[">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Collapse sidebar"
-                aria-expanded
-                onClick={toggleSidebarCollapsed}
-                className="-mr-0.5"
-              >
-                <SidebarIcon aria-hidden className="size-3.5" />
-              </Button>
-            </Tooltip>
-          </>
-        )}
+    <div className="group/rail flex h-full min-h-0 flex-col">
+      <div className="collapsed:pl-[30px] ease-out-hd relative flex h-16 shrink-0 items-center pl-7 transition-[padding] duration-280">
+        <Link
+          href={routes.today}
+          aria-label="Hypedrive, go to Today"
+          className="focus-visible:ring-ring collapsed:w-[13px] collapsed:group-hover/rail:opacity-0 ease-out-hd -m-1 block w-[102px] overflow-hidden rounded-md p-1 transition-[width,opacity] duration-280 outline-none focus-visible:ring-2"
+        >
+          <Wordmark
+            aria-hidden
+            className="text-foreground h-5 w-[100px] max-w-none"
+          />
+        </Link>
+        <Tooltip
+          content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          shortcut="["
+          side={collapsed ? "right" : "bottom"}
+        >
+          <button
+            type="button"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            onClick={toggleSidebarCollapsed}
+            className={cn(
+              NAV_ITEM,
+              "collapsed:right-5 collapsed:opacity-0 collapsed:group-hover/rail:opacity-100 collapsed:focus-visible:opacity-100 ease-out-hd absolute top-4 right-3 size-8 min-w-8 justify-center rounded-lg transition-[right,opacity,color,background-color] duration-280",
+            )}
+          >
+            <SidebarIcon aria-hidden className="size-4" />
+          </button>
+        </Tooltip>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <nav aria-label="Primary" data-tour="nav">
+        <nav aria-label="Primary" data-tour="nav" className="pt-2 pb-6">
           {sections.map((section) => (
             <SidebarSection key={section.title} title={section.title}>
               {section.items.map((item) => (
@@ -98,14 +82,10 @@ export default function SidebarContent() {
               ))}
             </SidebarSection>
           ))}
+          <SidebarFooter collapsed={collapsed} />
           <SidebarPins collapsed={collapsed} />
         </nav>
       </ScrollArea>
-
-      <SidebarFooter
-        collapsed={collapsed}
-        className="border-sidebar-border shrink-0 border-t"
-      />
     </div>
   );
 }

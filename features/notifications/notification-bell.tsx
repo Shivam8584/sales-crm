@@ -84,16 +84,16 @@ export default function NotificationBell() {
       <Tooltip content="Notifications">
         <PopoverTrigger asChild>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="icon"
             aria-label={label}
-            className="group data-[state=open]:bg-muted"
+            className="group data-[state=open]:bg-well data-[state=open]:text-foreground size-10"
           >
-            <BellIcon aria-hidden className="size-3.5" />
+            <BellIcon aria-hidden className="size-4" />
             {unread > 0 && (
               <span
                 aria-hidden
-                className="bg-danger ring-secondary group-hover:ring-muted group-data-[state=open]:ring-muted absolute top-1.75 right-1.75 size-1.5 rounded-full ring-2"
+                className="bg-foreground ring-background group-hover:ring-well group-data-[state=open]:ring-well absolute top-2 right-2 size-2 rounded-full ring-2"
               />
             )}
           </Button>

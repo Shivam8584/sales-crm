@@ -39,6 +39,7 @@ export type NavItem = {
   tour?: string;
 };
 
+/** The title is never drawn in the sidebar; it names the group for screen readers and the phone sheet. */
 export type NavSection = { title: string; items: NavItem[] };
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -102,11 +103,6 @@ export const NAV_SECTIONS: NavSection[] = [
         shortcut: "V",
         minRole: "manager",
       },
-    ],
-  },
-  {
-    title: "Automation",
-    items: [
       {
         href: routes.sequences,
         label: "Sequences",
@@ -116,7 +112,7 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: "Records",
+    title: "Records and insights",
     items: [
       {
         href: routes.accounts,
@@ -131,11 +127,6 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: UsersIcon,
         shortcut: "P",
       },
-    ],
-  },
-  {
-    title: "Insights",
-    items: [
       {
         href: routes.reports,
         label: "Reports",
