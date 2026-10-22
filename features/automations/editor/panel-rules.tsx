@@ -45,6 +45,7 @@ import {
   type Trigger,
   type TriggerKind,
 } from "@/lib/domain/automations";
+import { SendingFields } from "../sending-settings";
 import { useEditor } from "./editor-context";
 import { useEditorStore } from "./editor-store";
 import { ChoicePills, NumberInput, PanelSection, ToggleRow } from "./form-bits";
@@ -629,6 +630,17 @@ function AutomationRules() {
           )}
         />
       </PanelSection>
+      {!readOnly && (
+        <PanelSection
+          title="Sending"
+          description="Applies to the live version straight away."
+        >
+          <SendingFields
+            key={`${settings.senderName}|${settings.replyTo}`}
+            automation={automation}
+          />
+        </PanelSection>
+      )}
     </>
   );
 }

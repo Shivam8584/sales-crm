@@ -5,6 +5,10 @@ import schema from "./schema";
 import { TASK_STATUSES, type TaskStatus } from "../lib/domain/enums";
 import { personName } from "../lib/domain/labels";
 import { cleanText } from "../lib/domain/normalize";
+import {
+  MAX_TASK_LINES,
+  MAX_TASK_TITLE as MAX_TITLE,
+} from "../lib/domain/task-lines";
 import { taskCompletedAt } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
 import { invalid, notFound } from "./lib/errors";
@@ -29,7 +33,6 @@ import {
 import { logSystem } from "./lib/timeline";
 import { literals, vDay, vPriority, vTaskStatus } from "./lib/validators";
 
-const MAX_TITLE = 200;
 const UNDO_WINDOW_MS = 10 * 60_000;
 
 /** Assignees and managers reassign a task; whoever just handed it on may undo that. */
@@ -382,6 +385,50 @@ export const create = memberMutation({
     });
     await logStatus(ctx, (await ctx.db.get(id))!, null);
     return id;
+  },
+});
+
+/**
+ * Creates every task or none, for pasted lists. Reps can only create for
+ * themselves; assigning to a teammate is for managers.
+ */
+export const createMany = memberMutation({
+  args: {
+    tasks: v.array(
+      v.object({
+        title: v.string(),
+        priority: v.optional(vPriority),
+        dueDate: v.optional(v.string()),
+        assigneeId: v.optional(v.id("members")),
+      }),
+    ),
+  },
+  handler: async (ctx, { tasks }) => {
+    if (tasks.length > MAX_TASK_LINES) {
+      invalid("tasks", `Add at most ${MAX_TASK_LINES} tasks at a time`);
+    }
+    const ids: Id<"tasks">[] = [];
+    for (const task of tasks) {
+      const assigneeId = task.assigneeId ?? ctx.viewer._id;
+      if (assigneeId !== ctx.viewer._id) assertCan(ctx.viewer, "task.reassign");
+      const fields = await clean(ctx, {
+        title: task.title,
+        dueDate: task.dueDate,
+        assigneeId,
+      });
+      ids.push(
+        await ctx.db.insert("tasks", {
+          title: fields.title!,
+          status: "todo",
+          priority: task.priority ?? "normal",
+          assigneeId: fields.assigneeId!,
+          dueDate: fields.dueDate,
+          position: await endPosition(ctx, "todo"),
+          updatedAt: Date.now(),
+        }),
+      );
+    }
+    return ids;
   },
 });
 

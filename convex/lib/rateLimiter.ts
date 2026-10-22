@@ -13,6 +13,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   testEmail: { kind: "fixed window", rate: 10, period: HOUR },
   calls: { kind: "fixed window", rate: 20, period: MINUTE },
   productChecks: { kind: "fixed window", rate: 300, period: HOUR },
+  /** MCP requests per token. */
+  mcp: { kind: "fixed window", rate: 60, period: MINUTE },
+  /** Failed MCP authentications per client IP. */
+  mcpAuthFail: { kind: "fixed window", rate: 20, period: MINUTE },
   /** Model calls per member per IST day. */
   ai: { kind: "fixed window", rate: 100, period: DAY, start: IST_MIDNIGHT },
   /** One token per message for 30 days: a second delivery of the same message is a duplicate. */

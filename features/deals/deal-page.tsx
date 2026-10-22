@@ -31,6 +31,7 @@ import AccountPicker from "@/features/accounts/account-picker";
 import CustomFields from "@/features/fields/custom-fields";
 import FilesSection from "@/features/files/files-section";
 import MemberPicker from "@/features/members/member-picker";
+import AskRecord from "@/features/ai/ask-record";
 import { useDraftAction } from "@/features/ai/use-draft-action";
 import PlaybookPicker from "@/features/playbook/playbook-picker";
 import { usePinAction } from "@/features/pins/use-pins";
@@ -293,6 +294,12 @@ function DealView({
                 </Property>
               )}
             </Properties>
+            <AskRecord
+              target={{ dealId: deal._id }}
+              noun="deal"
+              className="gap-2 p-0"
+              divider={false}
+            />
             <CustomFields
               entity="deal"
               target={{ dealId: deal._id }}

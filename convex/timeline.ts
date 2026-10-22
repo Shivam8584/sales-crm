@@ -31,7 +31,7 @@ const vTarget = v.union(
   v.object({ leadId: v.id("leads") }),
 );
 
-async function touch(ctx: MutationCtx, refs: RecordRefs, at: number) {
+export async function touch(ctx: MutationCtx, refs: RecordRefs, at: number) {
   for (const id of [refs.accountId, refs.personId]) {
     if (!id) continue;
     const doc = await ctx.db.get(id);
@@ -213,6 +213,31 @@ export const page = memberQuery({
  * Returns whether this entry was the lead's first touch. Only the owner's own
  * activity stops the SLA clock, so a manager's note doesn't hide a slow reply.
  */
+export async function markFirstTouch(
+  ctx: MutationCtx,
+  lead: Doc<"leads"> | null,
+  actorId: Id<"members">,
+  kind: string,
+  occurredAt: number,
+) {
+  if (
+    !lead ||
+    lead.firstTouchedAt ||
+    lead.ownerId !== actorId ||
+    !isOpen(lead)
+  ) {
+    return false;
+  }
+  await ctx.db.patch(lead._id, {
+    firstTouchedAt: Math.max(lead._creationTime, occurredAt),
+    ...(kind !== "note" && lead.status === "new"
+      ? { status: "contacted" as const }
+      : {}),
+  });
+  await resolveLeadSla(ctx, lead._id);
+  return true;
+}
+
 export const log = memberMutation({
   args: {
     target: vTarget,
@@ -290,20 +315,13 @@ export const log = memberMutation({
     await notifyMentions(ctx, { _id: id, ...entry }, ctx.viewer, mentions);
     await notifyFollowers(ctx, { _id: id, ...entry }, mentions);
 
-    const firstTouch =
-      lead !== null &&
-      !lead.firstTouchedAt &&
-      lead.ownerId === ctx.viewer._id &&
-      isOpen(lead);
-    if (lead && firstTouch) {
-      await ctx.db.patch(lead._id, {
-        firstTouchedAt: Math.max(lead._creationTime, occurredAt),
-        ...(args.kind !== "note" && lead.status === "new"
-          ? { status: "contacted" as const }
-          : {}),
-      });
-      await resolveLeadSla(ctx, lead._id);
-    }
+    const firstTouch = await markFirstTouch(
+      ctx,
+      lead,
+      ctx.viewer._id,
+      args.kind,
+      occurredAt,
+    );
     return { id, firstTouch };
   },
 });

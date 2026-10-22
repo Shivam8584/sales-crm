@@ -393,6 +393,8 @@ export default function AutomationsPage() {
       ) : (
         <>
           <PageToolbar
+            activeFilters={Number(subject !== ALL)}
+            onClearFilters={clearFilters}
             search={
               <SearchInput
                 value={search}
@@ -445,7 +447,12 @@ export default function AutomationsPage() {
               ]}
             />
             {filtered && (
-              <Button variant="ghost" size="xs" onClick={clearFilters}>
+              <Button
+                variant="ghost"
+                size="xs"
+                data-filter-clear
+                onClick={clearFilters}
+              >
                 Clear
               </Button>
             )}

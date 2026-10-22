@@ -16,6 +16,7 @@ import {
   periodWindows,
   sourceOf,
   teamReport,
+  type Period,
 } from "./lib/reports";
 import { literals } from "./lib/validators";
 
@@ -30,7 +31,7 @@ const OPEN_STAGES = ["discovery", "demo", "proposal", "onboarding"] as const;
 const CLOSED_STAGES = ["won", "lost"] as const;
 
 /** Deals closed since `since`, plus the open ones when asked for. */
-async function dealsSince(ctx: QueryCtx, since: number, open: boolean) {
+export async function dealsSince(ctx: QueryCtx, since: number, open: boolean) {
   const byStage = (stage: DealStage, from?: number) =>
     ctx.db
       .query("deals")
@@ -109,65 +110,73 @@ async function accountsById(ctx: QueryCtx, ids: Id<"accounts">[]) {
   return found.filter((account) => account !== null);
 }
 
+export type OverviewArgs = {
+  period: Period;
+  source?: string;
+  owner?: string;
+};
+
 /** Overview, funnel, sources and speed to lead. */
+export async function overviewReport(ctx: QueryCtx, args: OverviewArgs) {
+  const now = Date.now();
+  const since = periodWindows(args.period, now).previous.start;
+  const [
+    leads,
+    created,
+    onPlatform,
+    people,
+    facts,
+    accountSource,
+    deals,
+    owner,
+  ] = await Promise.all([
+    leadsSince(ctx, since),
+    accountsSince(ctx, since),
+    platformAccounts(ctx),
+    platformPeople(ctx),
+    stageFacts(ctx),
+    firstLeadSources(ctx),
+    dealsSince(ctx, since, true),
+    names(ctx),
+  ]);
+  const known = uniqueById([...created, ...onPlatform]);
+  const seen = new Set<string>(known.map((account) => account._id));
+  const linked = [...new Set(leads.flatMap((lead) => lead.accountId ?? []))];
+  const accounts = [
+    ...known,
+    ...(await accountsById(
+      ctx,
+      linked.filter((id) => !seen.has(id)),
+    )),
+  ];
+  const report = buildReport({
+    leads,
+    accounts,
+    people,
+    facts,
+    accountSource,
+    deals,
+    slaMs: (await leadSlaSeconds(ctx)) * 1000,
+    now,
+    period: args.period,
+    filters: { source: args.source, owner: args.owner },
+  });
+  return {
+    ...report,
+    speedByOwner: report.speedByOwner.map((row) => ({
+      ...row,
+      ownerName: owner(row.ownerId),
+    })),
+  };
+}
+
 export const overview = memberQuery({
   args: {
     period: vPeriod,
     source: v.optional(v.string()),
     owner: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    const since = periodWindows(args.period, now).previous.start;
-    const [
-      leads,
-      created,
-      onPlatform,
-      people,
-      facts,
-      accountSource,
-      deals,
-      owner,
-    ] = await Promise.all([
-      leadsSince(ctx, since),
-      accountsSince(ctx, since),
-      platformAccounts(ctx),
-      platformPeople(ctx),
-      stageFacts(ctx),
-      firstLeadSources(ctx),
-      dealsSince(ctx, since, true),
-      names(ctx),
-    ]);
-    const known = uniqueById([...created, ...onPlatform]);
-    const seen = new Set<string>(known.map((account) => account._id));
-    const linked = [...new Set(leads.flatMap((lead) => lead.accountId ?? []))];
-    const accounts = [
-      ...known,
-      ...(await accountsById(
-        ctx,
-        linked.filter((id) => !seen.has(id)),
-      )),
-    ];
-    const report = buildReport({
-      leads,
-      accounts,
-      people,
-      facts,
-      accountSource,
-      deals,
-      slaMs: (await leadSlaSeconds(ctx)) * 1000,
-      now,
-      period: args.period,
-      filters: { source: args.source, owner: args.owner },
-    });
-    return {
-      ...report,
-      speedByOwner: report.speedByOwner.map((row) => ({
-        ...row,
-        ownerName: owner(row.ownerId),
-      })),
-    };
-  },
+  handler: (ctx, args) => overviewReport(ctx, args),
 });
 
 function interaction(entry: Doc<"timeline">) {
@@ -205,71 +214,73 @@ async function platformReached(
 }
 
 /** Rep leaderboard for the period and the one before it. */
-export const team = memberQuery({
-  args: { period: vPeriod },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    const since = periodWindows(args.period, now).previous.start;
-    const today = istDay(now);
-    const [leads, tasks, timeline, deals, onPlatform, people, facts, members] =
-      await Promise.all([
-        leadsSince(ctx, since),
-        Promise.all([
-          ...(["todo", "in_progress"] as const).map((status) =>
-            ctx.db
-              .query("tasks")
-              .withIndex("by_status_due", (q) =>
-                q.eq("status", status).gt("dueDate", "").lt("dueDate", today),
-              )
-              .collect(),
-          ),
+export async function teamData(ctx: QueryCtx, args: { period: Period }) {
+  const now = Date.now();
+  const since = periodWindows(args.period, now).previous.start;
+  const today = istDay(now);
+  const [leads, tasks, timeline, deals, onPlatform, people, facts, members] =
+    await Promise.all([
+      leadsSince(ctx, since),
+      Promise.all([
+        ...(["todo", "in_progress"] as const).map((status) =>
           ctx.db
             .query("tasks")
-            .withIndex("by_status_completed", (q) =>
-              q.eq("status", "done").gte("completedAt", since),
+            .withIndex("by_status_due", (q) =>
+              q.eq("status", status).gt("dueDate", "").lt("dueDate", today),
             )
             .collect(),
-        ]).then((rows) => rows.flat()),
-        Promise.all(
-          (["call", "meeting"] as const).map((kind) =>
-            ctx.db
-              .query("timeline")
-              .withIndex("by_kind", (q) =>
-                q.eq("kind", kind).gte("occurredAt", since),
-              )
-              .collect(),
-          ),
-        ).then((rows) => rows.flat()),
-        dealsSince(ctx, since, false),
-        platformAccounts(ctx),
-        platformPeople(ctx),
-        stageFacts(ctx),
+        ),
         ctx.db
-          .query("members")
-          .withIndex("by_status", (q) => q.eq("status", "active"))
+          .query("tasks")
+          .withIndex("by_status_completed", (q) =>
+            q.eq("status", "done").gte("completedAt", since),
+          )
           .collect(),
-      ]);
-    const owner = await names(ctx);
-    const accounts = await platformReached(ctx, onPlatform, people);
-    const report = teamReport({
-      leads,
-      tasks,
-      interactions: timeline.map(interaction),
-      deals,
-      accounts,
-      people,
-      facts,
-      memberIds: members.map((member) => member._id),
-      slaMs: (await leadSlaSeconds(ctx)) * 1000,
-      now,
-      period: args.period,
-    });
-    return {
-      ...report,
-      rows: report.rows.map((row) => ({
-        ...row,
-        ownerName: owner(row.ownerId),
-      })),
-    };
-  },
+      ]).then((rows) => rows.flat()),
+      Promise.all(
+        (["call", "meeting"] as const).map((kind) =>
+          ctx.db
+            .query("timeline")
+            .withIndex("by_kind", (q) =>
+              q.eq("kind", kind).gte("occurredAt", since),
+            )
+            .collect(),
+        ),
+      ).then((rows) => rows.flat()),
+      dealsSince(ctx, since, false),
+      platformAccounts(ctx),
+      platformPeople(ctx),
+      stageFacts(ctx),
+      ctx.db
+        .query("members")
+        .withIndex("by_status", (q) => q.eq("status", "active"))
+        .collect(),
+    ]);
+  const owner = await names(ctx);
+  const accounts = await platformReached(ctx, onPlatform, people);
+  const report = teamReport({
+    leads,
+    tasks,
+    interactions: timeline.map(interaction),
+    deals,
+    accounts,
+    people,
+    facts,
+    memberIds: members.map((member) => member._id),
+    slaMs: (await leadSlaSeconds(ctx)) * 1000,
+    now,
+    period: args.period,
+  });
+  return {
+    ...report,
+    rows: report.rows.map((row) => ({
+      ...row,
+      ownerName: owner(row.ownerId),
+    })),
+  };
+}
+
+export const team = memberQuery({
+  args: { period: vPeriod },
+  handler: (ctx, args) => teamData(ctx, args),
 });

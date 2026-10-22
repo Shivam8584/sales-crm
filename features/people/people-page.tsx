@@ -418,6 +418,10 @@ export default function PeoplePage() {
         }))}
       />
       <PageToolbar
+        activeFilters={
+          [owner, activity].filter((value) => value !== ALL).length
+        }
+        onClearFilters={clearFilters}
         search={
           <SearchInput
             value={search}
@@ -465,7 +469,12 @@ export default function PeoplePage() {
           options={ACTIVITY_OPTIONS}
         />
         {filtered && (
-          <Button variant="ghost" size="xs" onClick={clearFilters}>
+          <Button
+            variant="ghost"
+            size="xs"
+            data-filter-clear
+            onClick={clearFilters}
+          >
             Clear
           </Button>
         )}

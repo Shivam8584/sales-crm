@@ -473,6 +473,10 @@ export default function AccountsPage() {
         }))}
       />
       <PageToolbar
+        activeFilters={
+          [owner, stage, activity].filter((value) => value !== ALL).length
+        }
+        onClearFilters={clearFilters}
         search={
           <SearchInput
             value={search}
@@ -534,7 +538,12 @@ export default function AccountsPage() {
           options={ACTIVITY_OPTIONS}
         />
         {filtered && (
-          <Button variant="ghost" size="xs" onClick={clearFilters}>
+          <Button
+            variant="ghost"
+            size="xs"
+            data-filter-clear
+            onClick={clearFilters}
+          >
             Clear
           </Button>
         )}

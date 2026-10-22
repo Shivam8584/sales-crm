@@ -19,6 +19,7 @@ import {
   LEAD_STATUS_LABEL,
   STAGE_LABEL,
 } from "./labels";
+import { normalizeEmail } from "./normalize";
 import {
   ACTIVATION_STAGES,
   ACTIVATION_STEP_LABEL,
@@ -405,6 +406,10 @@ export type AutomationSettings = {
   /** Exit as soon as these all hold, e.g. the lead converted. */
   goal: Condition[];
   allowReenroll: boolean;
+  /** Display name on emails; the address always comes from the server. */
+  senderName?: string;
+  /** Where replies go instead of the workspace's reply address. */
+  replyTo?: string;
 };
 
 export const DEFAULT_SETTINGS: AutomationSettings = {
@@ -429,7 +434,50 @@ export const LIMITS = {
   dueInDays: 365,
   goal: 10,
   conditions: 10,
+  senderName: 60,
 } as const;
+
+// Anything that could end or split a quoted display name, or start a new header line.
+const UNSAFE_NAME = /[\u0000-\u001f\u007f\u2028\u2029<>"\\]/;
+
+export type SenderCheck =
+  | { ok: true; senderName?: string; replyTo?: string }
+  | { ok: false; field: "senderName" | "replyTo"; message: string };
+
+export function checkSender(input: {
+  senderName?: string;
+  replyTo?: string;
+}): SenderCheck {
+  const senderName = input.senderName?.trim() || undefined;
+  if (senderName && senderName.length > LIMITS.senderName) {
+    return {
+      ok: false,
+      field: "senderName",
+      message: `Keep the sender name under ${LIMITS.senderName} characters`,
+    };
+  }
+  if (senderName && UNSAFE_NAME.test(senderName)) {
+    return {
+      ok: false,
+      field: "senderName",
+      message: "The sender name can't contain line breaks, quotes, < > or \\",
+    };
+  }
+  const typed = input.replyTo?.trim();
+  const replyTo = typed ? normalizeEmail(typed) : undefined;
+  if (typed && !replyTo) {
+    return {
+      ok: false,
+      field: "replyTo",
+      message: "Enter one plain email address, like name@company.com",
+    };
+  }
+  return {
+    ok: true,
+    ...(senderName && { senderName }),
+    ...(replyTo && { replyTo }),
+  };
+}
 
 // ── Conditions ──────────────────────────────────────────────────────────────
 

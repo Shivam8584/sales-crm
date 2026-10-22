@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Avatar from "@/components/_ui/avatar";
 import Tag from "@/components/_ui/tag";
+import { useCardFields } from "@/components/board/board-prefs";
 import AccountLogo from "@/features/accounts/account-logo";
 import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,13 @@ import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import TaskChips, { CardSafe } from "./task-chips";
 import { StatusIcon, type TaskRow } from "./task-meta";
 import { useTaskActions } from "./use-task-actions";
+
+export const TASK_CARD_FIELDS = [
+  { id: "priority", label: "Priority" },
+  { id: "assignee", label: "Assignee" },
+  { id: "due", label: "Due date" },
+  { id: "record", label: "Linked record" },
+];
 
 /** A record type the surrounding view already shows, so its chip would repeat it. */
 export type HiddenRecord = "account" | "person" | "deal" | "lead";
@@ -117,7 +125,7 @@ export function DoneToggle({
         aria-pressed={done}
         onClick={() => void setDone(task, !done)}
         className={cn(
-          "group/done focus-visible:ring-ring relative flex size-3.5 shrink-0 cursor-pointer items-center justify-center rounded-xs outline-none after:absolute after:-inset-2 after:content-[''] pointer-coarse:after:-inset-3.5 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-(--card)",
+          "group/done focus-visible:ring-ring relative flex size-3.5 shrink-0 cursor-pointer items-center justify-center rounded-xs outline-none after:absolute after:-inset-2 after:content-[''] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-(--card) pointer-coarse:after:-inset-3.5",
           className,
         )}
       >
@@ -145,10 +153,12 @@ export function AutoTag({ className }: { className?: string }) {
 
 /** Board card body: status and title, created date and record, then property chips. */
 export default function TaskCard({ task }: { task: TaskRow }) {
+  const show = useCardFields("tasks");
   const done = task.status === "done";
-  const hasRecord = Boolean(
-    task.person || task.account || task.deal || task.lead,
-  );
+  const hasRecord =
+    show("record") &&
+    Boolean(task.person || task.account || task.deal || task.lead);
+  const hasChips = ["priority", "assignee", "due"].some(show);
   return (
     <>
       <div className="flex flex-col gap-2 p-4">
@@ -179,9 +189,11 @@ export default function TaskCard({ task }: { task: TaskRow }) {
           )}
         </div>
       </div>
-      <div className="border-border border-t px-4 py-3">
-        <TaskChips task={task} />
-      </div>
+      {hasChips && (
+        <div className="border-border border-t px-4 py-3">
+          <TaskChips task={task} show={show} />
+        </div>
+      )}
     </>
   );
 }

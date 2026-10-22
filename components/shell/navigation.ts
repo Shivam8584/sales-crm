@@ -6,6 +6,7 @@ import TargetIcon from "@/public/assets/icons/target-05.svg";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
+import ClockIcon from "@/public/assets/icons/clock.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
 import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
@@ -77,6 +78,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Insights",
     items: [
       { href: "/reports", label: "Reports", icon: BarChartIcon, shortcut: "R" },
+      { href: "/activity", label: "Activity", icon: ClockIcon, shortcut: "Y" },
       {
         href: "/playbook",
         label: "Playbook",
@@ -118,9 +120,23 @@ export const SETTINGS_PAGES = [
   { href: "/settings/team", label: "Team", adminOnly: false },
   { href: "/settings/workspace", label: "Workspace", adminOnly: true },
   { href: "/settings/fields", label: "Custom fields", adminOnly: true },
+  {
+    href: "/settings/duplicates",
+    label: "Duplicates",
+    adminOnly: false,
+    minRole: "manager",
+  },
   { href: "/settings/integrations", label: "Integrations", adminOnly: true },
   { href: "/settings/system", label: "System", adminOnly: true },
 ] as const;
+
+export function canOpenSetting(
+  page: (typeof SETTINGS_PAGES)[number],
+  role: Role,
+) {
+  if (page.adminOnly) return role === "admin";
+  return ROLE_RANK[role] >= ROLE_RANK["minRole" in page ? page.minRole : "rep"];
+}
 
 export function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);

@@ -25,6 +25,14 @@ crons.daily(
   internal.files.sweepOrphans,
   {},
 );
+crons.daily(
+  "account embeddings",
+  { hourUTC: 20, minuteUTC: 30 },
+  internal.aiEmbeddings.embedStale,
+  {},
+);
+crons.daily("mcp call log", { hourUTC: 21, minuteUTC: 0 }, internal.mcp.trim, {});
 crons.cron("daily digest", "30 3 * * 1-5", internal.digest.sendDigests);
+crons.cron("weekly manager report", "0 4 * * 1", internal.weekly.send);
 
 export default crons;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
@@ -18,6 +18,8 @@ import { StatusTag, StoppedStatus } from "./automation-parts";
 import AutomationRuns from "./automation-runs";
 import { describeStep } from "./describe";
 import type { AutomationDoc } from "./editor/editor-context";
+import ExportDialog from "./export-dialog";
+import { SendingSection } from "./sending-settings";
 
 const CRUMBS = [{ label: "Sequences", href: "/automations" }];
 
@@ -33,6 +35,7 @@ export default function SequenceView({
   const sendTest = useMutation(api.automations.sendTest);
   const [view, setView] = useUrlState("view", "steps");
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const active = automation.status === "active";
   const reason = active
@@ -42,6 +45,17 @@ export default function SequenceView({
     const node = automation.graph.nodes.find((item) => item.id === nodeId);
     return node && node.kind !== "trigger" ? [node] : [];
   });
+  const exportSource = useMemo(
+    () => ({
+      name: automation.name,
+      description: automation.description,
+      subjectKind: automation.subjectKind,
+      trigger: automation.trigger,
+      settings: automation.settings,
+      graph: automation.graph,
+    }),
+    [automation],
+  );
   const hasEmail = steps.some((node) => node.kind === "send_email");
 
   async function run(action: () => Promise<string>) {
@@ -68,6 +82,13 @@ export default function SequenceView({
         }
         actions={
           <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setExporting(true)}
+            >
+              Export…
+            </Button>
             {hasEmail && (
               <Button
                 variant="secondary"
@@ -166,9 +187,16 @@ export default function SequenceView({
                 );
               })}
             </ol>
+            {automation.mine && <SendingSection automation={automation} />}
           </div>
         </div>
       )}
+      <ExportDialog
+        id={id}
+        source={exportSource}
+        open={exporting}
+        onOpenChange={setExporting}
+      />
     </Page>
   );
 }

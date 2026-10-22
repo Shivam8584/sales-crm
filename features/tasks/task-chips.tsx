@@ -441,17 +441,20 @@ export function DueChip({
 export default function TaskChips({
   task,
   size = "md",
+  show = () => true,
   className,
 }: {
   task: ChipTask;
   size?: ChipSize;
+  /** Which of "priority", "assignee" and "due" to render. */
+  show?: (field: string) => boolean;
   className?: string;
 }) {
   return (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
-      <PriorityChip task={task} size={size} />
-      <AssigneeChip task={task} size={size} />
-      <DueChip task={task} size={size} hideEmpty />
+      {show("priority") && <PriorityChip task={task} size={size} />}
+      {show("assignee") && <AssigneeChip task={task} size={size} />}
+      {show("due") && <DueChip task={task} size={size} hideEmpty />}
     </div>
   );
 }

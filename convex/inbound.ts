@@ -13,7 +13,11 @@
  * `?token=` or `X-Chatwoot-Token`.
  */
 import { v } from "convex/values";
-import { httpAction, type MutationCtx } from "./_generated/server";
+import {
+  httpAction,
+  type ActionCtx,
+  type MutationCtx,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -24,6 +28,11 @@ import {
   stripQuoted,
   REPLY_CHANNEL_LABEL,
 } from "../lib/domain/automations";
+import {
+  customerRecipients,
+  parseForwarded,
+  parseMailboxes,
+} from "../lib/domain/email-log";
 import { normalizeEmail, normalizePhone } from "../lib/domain/normalize";
 import { personName } from "../lib/domain/labels";
 import { recordReply } from "./lib/automations/engine";
@@ -34,10 +43,18 @@ import {
   readBody,
   timingSafeEqual,
 } from "./lib/http";
+import {
+  activeMemberByEmail,
+  activeMemberEmails,
+  logAddress,
+  logEmail,
+  ownDomains,
+} from "./lib/emailLog";
 import { isOpen, resolveLeadSla } from "./lib/leads";
 import { rateLimiter } from "./lib/rateLimiter";
 import type { RecordRefs } from "./lib/timeline";
 import { notify } from "./notifications";
+import { touch } from "./timeline";
 import { internalMutation } from "./lib/functions";
 
 const BODY_LIMIT = 512 * 1024;
@@ -46,6 +63,8 @@ const MAX_SUBJECT = 300;
 const MAX_ID = 300;
 const SKEW_MS = 5 * 60_000;
 const MATCH_LIMIT = 20;
+const MAX_CUSTOMERS = 20;
+const MAX_LOG_TEXT = 100 * 1024;
 
 const vChannel = v.union(v.literal("email"), v.literal("whatsapp"));
 
@@ -198,16 +217,6 @@ async function openDealIds(ctx: MutationCtx, person: Doc<"people"> | null) {
     .map((deal) => deal._id);
 }
 
-async function touch(ctx: MutationCtx, refs: RecordRefs, at: number) {
-  for (const id of [refs.accountId, refs.personId]) {
-    if (!id) continue;
-    const doc = await ctx.db.get(id);
-    if (doc && (doc.lastActivityAt ?? 0) < at) {
-      await ctx.db.patch(id, { lastActivityAt: at });
-    }
-  }
-}
-
 /** Logs one inbound message on every record it matches; idempotent per source and message id. */
 export const receive = internalMutation({
   args: {
@@ -288,6 +297,101 @@ export const receive = internalMutation({
   },
 });
 
+const vMailbox = v.object({ email: v.string(), name: v.optional(v.string()) });
+
+/**
+ * A rep's BCC or forward to the log address, filed on the customers' records.
+ * Only an active member's own address counts; idempotent per message id.
+ */
+export const logCustomerEmail = internalMutation({
+  args: {
+    messageId: v.string(),
+    sender: v.string(),
+    to: v.array(vMailbox),
+    cc: v.array(vMailbox),
+    subject: v.string(),
+    text: v.string(),
+    sentAt: v.number(),
+  },
+  handler: async (ctx, input) => {
+    const rep = await activeMemberByEmail(ctx, input.sender);
+    if (!rep) return { status: "ignored" as const, matched: 0, unmatched: 0 };
+    const dedupe = { key: `email-log:${input.messageId}` };
+    if (!(await rateLimiter.check(ctx, "inboundMessage", dedupe)).ok) {
+      return { status: "duplicate" as const, matched: 0, unmatched: 0 };
+    }
+
+    const skip = {
+      memberEmails: await activeMemberEmails(ctx),
+      logAddress: logAddress(),
+      ownDomains: ownDomains(),
+    };
+    const customers = customerRecipients(
+      [...parseMailboxes(input.to), ...parseMailboxes(input.cc)],
+      skip,
+    ).slice(0, MAX_CUSTOMERS);
+    const forwarded = customers.length
+      ? null
+      : parseForwarded(input.text, input.subject);
+    const senders = forwarded
+      ? customerRecipients([forwarded.from], skip)
+      : customers;
+
+    const at = Math.min(forwarded?.date ?? input.sentAt, Date.now());
+    const subject = forwarded
+      ? (forwarded.subject ?? input.subject).replace(
+          /^\s*(?:fwd?|fw)\s*:\s*/i,
+          "",
+        )
+      : input.subject;
+    const body = (forwarded ? forwarded.body : stripQuoted(input.text)).slice(
+      0,
+      MAX_TEXT,
+    );
+
+    let matched = 0;
+    const seen = new Set<string>();
+    for (const sender of senders) {
+      const groups = groupContacts(
+        await findContacts(ctx, { email: sender.email }, undefined),
+      ).filter((group) => !seen.has(group.href));
+      if (!groups.length) continue;
+      if (!matched) await rateLimiter.limit(ctx, "inboundMessage", dedupe);
+      matched++;
+      for (const group of groups) {
+        seen.add(group.href);
+        await logEmail(ctx, {
+          refs: group.refs,
+          lead: group.lead,
+          actorId: forwarded ? undefined : rep._id,
+          direction: forwarded ? "inbound" : "outbound",
+          subject:
+            subject ||
+            (forwarded
+              ? `Email from ${sender.name ?? group.name}`
+              : `Email to ${group.name}`),
+          body,
+          at,
+        });
+      }
+    }
+
+    const unmatched = Math.max(senders.length, 1) - matched;
+    if (!matched) {
+      await notify(ctx, rep._id, {
+        kind: "email_log",
+        title: "Couldn't find anyone for that email",
+        body: "Add them as a person or lead first.",
+      });
+    }
+    return {
+      status: matched ? ("logged" as const) : ("unmatched" as const),
+      matched,
+      unmatched,
+    };
+  },
+});
+
 async function signed(
   secret: string,
   timestamp: string | null,
@@ -320,6 +424,37 @@ function respond(result: Received) {
 const text = (value: unknown, max: number) =>
   typeof value === "string" ? value.trim().slice(0, max) : undefined;
 
+const ignored = () =>
+  json({ ok: true, status: "ignored", reason: "not accepted" }, 202);
+
+/** Never says why a message was refused. */
+async function logRequest(
+  ctx: ActionCtx,
+  payload: Record<string, unknown>,
+  messageId: string,
+  sender: string,
+  body: string,
+) {
+  if (payload.authenticated !== true) return ignored();
+  const result = await ctx.runMutation(internal.inbound.logCustomerEmail, {
+    messageId,
+    sender,
+    to: parseMailboxes(payload.to),
+    cc: parseMailboxes(payload.cc),
+    subject: text(payload.subject, MAX_SUBJECT) ?? "",
+    text: body,
+    sentAt:
+      parseTimestamp(payload.date) ??
+      parseTimestamp(payload.receivedAt) ??
+      Date.now(),
+  });
+  if (result.status === "ignored") return ignored();
+  return json(
+    { ok: true, ...result },
+    result.status === "unmatched" ? 202 : 200,
+  );
+}
+
 export const emailInbound = httpAction(async (ctx, request) => {
   const secret = process.env.INBOUND_EMAIL_SECRET;
   if (!secret) {
@@ -351,6 +486,16 @@ export const emailInbound = httpAction(async (ctx, request) => {
   const raw =
     text(payload.text, BODY_LIMIT) ||
     htmlToText(text(payload.html, BODY_LIMIT) ?? "");
+  const rcpt = parseAddress(payload.rcpt).email;
+  if (rcpt && rcpt === logAddress()) {
+    return await logRequest(
+      ctx,
+      payload,
+      messageId,
+      email,
+      raw.slice(0, MAX_LOG_TEXT),
+    );
+  }
   const result = await ctx.runMutation(internal.inbound.receive, {
     source: "email",
     externalId: messageId,

@@ -6,6 +6,7 @@ import {
   CUSTOM_FIELD_TYPES,
 } from "../lib/domain/custom-fields";
 import { PLAYBOOK_KINDS } from "../lib/domain/playbook";
+import { EMBED_DIMS } from "./lib/aiEmbedText";
 import {
   literals,
   vCallOutcome,
@@ -76,6 +77,7 @@ export default defineSchema({
     /** Set when the member finishes or skips the first-run tour. */
     tourCompletedAt: v.optional(v.number()),
     digestOff: v.optional(v.boolean()),
+    weeklyOff: v.optional(v.boolean()),
     /** E.164; the number click-to-call rings first. */
     phone: v.optional(v.string()),
   })
@@ -99,6 +101,7 @@ export default defineSchema({
     name: v.string(),
     domain: v.optional(v.string()),
     logoUrl: v.optional(v.string()),
+    logoStorageId: v.optional(v.id("_storage")),
     ownerId: v.id("members"),
     stage: vLifecycleStage,
     tags: v.array(v.string()),
@@ -107,12 +110,18 @@ export default defineSchema({
     platformOrgId: v.optional(v.string()),
     custom: vCustom,
     archivedAt: v.optional(v.number()),
+    /** Set on the record a merge is moving into `mergingInto`; on the receiving one, `mergingFrom`. */
+    mergingInto: v.optional(v.id("accounts")),
+    mergingFrom: v.optional(v.id("accounts")),
+    /** A merged-away record stays, archived, and its page redirects here. */
+    mergedIntoId: v.optional(v.id("accounts")),
     lastActivityAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_owner", ["ownerId"])
     .index("by_stage", ["stage"])
     .index("by_domain", ["domain"])
+    .index("by_logo_storage", ["logoStorageId"])
     .index("by_pan_root", ["panRoot"])
     .index("by_platform_org", ["platformOrgId"])
     .index("by_updated", ["updatedAt"])
@@ -141,6 +150,9 @@ export default defineSchema({
     custom: vCustom,
     archivedAt: v.optional(v.number()),
     erasedAt: v.optional(v.number()),
+    mergingInto: v.optional(v.id("people")),
+    mergingFrom: v.optional(v.id("people")),
+    mergedIntoId: v.optional(v.id("people")),
     lastActivityAt: v.optional(v.number()),
     updatedAt: v.number(),
     searchText: v.string(),
@@ -494,6 +506,53 @@ export default defineSchema({
   })
     .index("by_org", ["orgId"])
     .index("by_user", ["userId"]),
+
+  /** One vector per account for lookalike search; kept off `accounts` so list reads stay small. `hash` is of the embedded text. */
+  accountEmbeddings: defineTable({
+    accountId: v.id("accounts"),
+    stage: vLifecycleStage,
+    embedding: v.array(v.float64()),
+    hash: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_account", ["accountId"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: EMBED_DIMS,
+      filterFields: ["stage"],
+    }),
+
+  /** Personal access tokens for MCP clients; only the SHA-256 of a token is kept. */
+  apiTokens: defineTable({
+    memberId: v.id("members"),
+    name: v.string(),
+    tokenHash: v.string(),
+    prefix: v.string(),
+    access: literals(["read", "write"]),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+  })
+    .index("by_hash", ["tokenHash"])
+    .index("by_member", ["memberId"]),
+
+  /** One row per MCP tool call, trimmed after 30 days. */
+  mcpCalls: defineTable({
+    tokenId: v.id("apiTokens"),
+    memberId: v.id("members"),
+    tool: v.string(),
+    ok: v.boolean(),
+    at: v.number(),
+  }).index("by_at", ["at"]),
+
+  /** Two records a manager said are not duplicates; `aKey` sorts before `bKey`. */
+  dedupeDismissals: defineTable({
+    type: v.union(v.literal("accounts"), v.literal("people")),
+    aKey: v.string(),
+    bKey: v.string(),
+    byId: v.id("members"),
+  }).index("by_pair", ["type", "aKey", "bKey"]),
 
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({

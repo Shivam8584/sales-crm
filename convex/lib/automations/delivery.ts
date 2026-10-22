@@ -1,5 +1,7 @@
 import type { ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
+import { checkSender } from "../../../lib/domain/automations";
+import { normalizeEmail } from "../../../lib/domain/normalize";
 
 /**
  * Outbound delivery. With no provider configured a message stays in the outbox
@@ -8,7 +10,7 @@ import { internal } from "../../_generated/api";
  * Email: EMAIL_PROVIDER=resend (RESEND_API_KEY, EMAIL_FROM) or
  * EMAIL_PROVIDER=novu (NOVU_API_KEY, NOVU_EMAIL_WORKFLOW, optional NOVU_API_URL) or
  * EMAIL_PROVIDER=smtp (SMTP_HOST, SMTP_USER, SMTP_PASSWORD, EMAIL_FROM, optional SMTP_PORT).
- * EMAIL_REPLY_TO, if set, receives replies (resend and smtp); point it at the inbox that feeds the inbound webhook.
+ * EMAIL_REPLY_TO, if set, receives replies; point it at the inbox that feeds the inbound webhook.
  * WhatsApp (Meta Cloud API, approved templates only): WHATSAPP_PHONE_NUMBER_ID and
  * WHATSAPP_ACCESS_TOKEN, optional WHATSAPP_API_VERSION.
  */
@@ -83,6 +85,9 @@ export type OutboundMessage = {
   to: string;
   subject?: string;
   body?: string;
+  /** Per-sequence display name and reply address for email; see `emailHeaders`. */
+  senderName?: string;
+  replyTo?: string;
   template?: string;
   language?: string;
   params?: string[];
@@ -125,6 +130,42 @@ function describe(json: Record<string, unknown> | null, status: number) {
     : `HTTP ${status}`;
 }
 
+const HEADER_BREAKS = /[\u0000-\u001f\u007f\u2028\u2029]+/g;
+
+const addressOf = (value: string) =>
+  value.match(/<([^<>]+)>/)?.[1].trim() ?? value.trim();
+
+/**
+ * The address in From is always EMAIL_FROM's; a sequence may only change the
+ * display name. Values are re-checked here because they come from stored data.
+ */
+export function emailHeaders(sender: {
+  senderName?: string;
+  replyTo?: string;
+}) {
+  const base = env("EMAIL_FROM");
+  const name = checkSender({ senderName: sender.senderName });
+  const senderName = name.ok ? name.senderName : undefined;
+  const reply = checkSender({ replyTo: sender.replyTo });
+  const from =
+    base && senderName ? `"${senderName}" <${addressOf(base)}>` : base;
+  const replyTo = (reply.ok && reply.replyTo) || env("EMAIL_REPLY_TO");
+  return {
+    from: from?.replace(HEADER_BREAKS, " ").trim(),
+    replyTo: replyTo?.replace(HEADER_BREAKS, " ").trim(),
+  };
+}
+
+/** Whether replies to this sequence land in the inbox the CRM reads. */
+export function repliesTracked(replyTo: string | undefined) {
+  if (!replyTo) return true;
+  const workspace = env("EMAIL_REPLY_TO");
+  return (
+    Boolean(workspace) &&
+    normalizeEmail(addressOf(workspace!)) === normalizeEmail(replyTo)
+  );
+}
+
 /** Rejects what SMTP would read as several recipients, since stored emails only check for one `@`. */
 const SAFE_ADDRESS = /^[^\s@,;<>"()[\]\\:]+@[^\s@,;<>"()[\]\\:]+$/;
 
@@ -156,9 +197,12 @@ export async function deliver(
       subject: message.subject ?? "",
       text: message.body ?? "",
       key: message.stepKey,
+      senderName: message.senderName,
+      replyTo: message.replyTo,
     });
   }
   if (message.provider === "resend") {
+    const headers = emailHeaders(message);
     const result = await post(
       "https://api.resend.com/emails",
       {
@@ -166,8 +210,8 @@ export async function deliver(
         "Idempotency-Key": message.stepKey,
       },
       {
-        from: env("EMAIL_FROM"),
-        reply_to: env("EMAIL_REPLY_TO"),
+        from: headers.from,
+        reply_to: headers.replyTo,
         to: [message.to],
         subject: message.subject,
         text: message.body,
@@ -188,6 +232,11 @@ export async function deliver(
     };
   }
   if (message.provider === "novu") {
+    const headers = emailHeaders(message);
+    const overrides = {
+      ...(message.senderName && headers.from && { from: headers.from }),
+      ...(message.replyTo && headers.replyTo && { replyTo: headers.replyTo }),
+    };
     const base = env("NOVU_API_URL") ?? "https://api.novu.co";
     const result = await post(
       `${base}/v1/events/trigger`,
@@ -196,6 +245,9 @@ export async function deliver(
         name: env("NOVU_EMAIL_WORKFLOW"),
         to: { subscriberId: message.recipientId, email: message.to },
         payload: { subject: message.subject, body: message.body },
+        ...(Object.keys(overrides).length && {
+          overrides: { email: overrides },
+        }),
         transactionId: message.stepKey,
       },
     );

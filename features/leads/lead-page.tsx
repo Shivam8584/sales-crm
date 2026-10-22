@@ -24,6 +24,7 @@ import {
 import Timeline from "@/features/timeline/timeline";
 import { RecordAutomations } from "@/features/automations/record-automations";
 import PlaybookPicker from "@/features/playbook/playbook-picker";
+import AskRecord from "@/features/ai/ask-record";
 import { useDraftAction } from "@/features/ai/use-draft-action";
 import { usePinAction } from "@/features/pins/use-pins";
 import { useRecordUpdate } from "@/hooks/use-record-update";
@@ -258,6 +259,11 @@ function LeadView({ lead }: { lead: Lead }) {
             <LeadSummary
               lead={lead}
               actions={false}
+              className={ASIDE_SECTION}
+            />
+            <AskRecord
+              target={{ leadId: lead._id }}
+              noun="lead"
               className={ASIDE_SECTION}
             />
             <SpeedToLead lead={lead} className={ASIDE_SECTION} />

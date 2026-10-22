@@ -51,6 +51,7 @@ import TestRunDialog from "./editor/test-run-dialog";
 import { stopTestRun } from "./editor/test-run";
 import { STATUS_TONE } from "./node-meta";
 import { StoppedStatus } from "./automation-parts";
+import ExportDialog from "./export-dialog";
 import SequenceView from "./sequence-view";
 import AutomationAnalytics from "./automation-analytics";
 import AutomationRuns from "./automation-runs";
@@ -127,6 +128,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
 
   const [view, setView] = useUrlState("view", "editor");
   const [testing, setTesting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [savedRevision, setSavedRevision] = useState(0);
   const [saveFailed, setSaveFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -262,6 +264,25 @@ function Editor({ automation }: { automation: AutomationDoc }) {
     (node: GraphNode) =>
       describeStep(node, automation.trigger, automation.subjectKind, names),
     [automation.trigger, automation.subjectKind, names],
+  );
+
+  const exportSource = useMemo(
+    () => ({
+      name: automation.name,
+      description: automation.description,
+      subjectKind: automation.subjectKind,
+      trigger: automation.trigger,
+      settings: automation.settings,
+      graph,
+    }),
+    [
+      automation.name,
+      automation.description,
+      automation.subjectKind,
+      automation.trigger,
+      automation.settings,
+      graph,
+    ],
   );
 
   const patch = useCallback(
@@ -491,6 +512,10 @@ function Editor({ automation }: { automation: AutomationDoc }) {
                     onSelect: () => void onDuplicate(),
                   },
                   {
+                    label: "Export…",
+                    onSelect: () => setExporting(true),
+                  },
+                  {
                     label: "Delete",
                     icon: TrashIcon,
                     tone: "danger",
@@ -588,6 +613,12 @@ function Editor({ automation }: { automation: AutomationDoc }) {
           </Canvas>
         )}
       </Page>
+      <ExportDialog
+        id={id}
+        source={exportSource}
+        open={exporting}
+        onOpenChange={setExporting}
+      />
       <TestRunDialog
         automationId={id}
         subjectKind={automation.subjectKind}

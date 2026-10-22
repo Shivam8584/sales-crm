@@ -146,6 +146,10 @@ export default function TeamPage() {
       {view === "members" ? (
         <>
           <PageToolbar
+            activeFilters={
+              [role, status].filter((value) => value !== ANY).length
+            }
+            onClearFilters={clearFilters}
             search={
               <SearchInput
                 value={search}
@@ -175,7 +179,12 @@ export default function TeamPage() {
               ]}
             />
             {filtered && (
-              <Button variant="ghost" size="xs" onClick={clearFilters}>
+              <Button
+                variant="ghost"
+                size="xs"
+                data-filter-clear
+                onClick={clearFilters}
+              >
                 Clear
               </Button>
             )}

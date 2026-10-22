@@ -8,6 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import FilterMenu from "@/components/_common/filter-menu";
+import BoardDisplay from "@/components/board/board-display";
 import { useBoardPrefs } from "@/components/board/board-prefs";
 import { HiddenColumnsToggle } from "@/components/board/hidden-columns";
 import SearchInput from "@/components/data-table/search-input";
@@ -15,6 +16,7 @@ import type { SortState } from "@/components/data-table/types";
 import {
   CreateButton,
   Page,
+  PageActions,
   PageHeader,
   PageStatus,
   PageToolbar,
@@ -33,8 +35,10 @@ import FilterIcon from "@/public/assets/icons/filter.svg";
 import ListIcon from "@/public/assets/icons/list.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
+import PasteTasksDialog from "./paste-tasks-dialog";
 import Segmented from "./segmented";
 import TaskBulkBar from "./task-bulk-bar";
+import { TASK_CARD_FIELDS } from "./task-card";
 import TasksBoard, { TasksBoardSkeleton } from "./tasks-board";
 import TasksList, { LIST_COLUMNS } from "./tasks-list";
 import { dayFromToday, isOverdue } from "./task-meta";
@@ -63,6 +67,7 @@ export default function TasksPage() {
   const [group, setGroup] = useUrlState("group", "due");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pasting, setPasting] = useState(false);
   const boardPrefs = useBoardPrefs("tasks");
 
   useEffect(() => {
@@ -171,8 +176,22 @@ export default function TasksPage() {
             </PageStatus>
           )
         }
+        actions={
+          <PageActions
+            label="Task list actions"
+            actions={[
+              { label: "Paste tasks…", onSelect: () => setPasting(true) },
+            ]}
+          />
+        }
       />
       <PageToolbar
+        activeFilters={
+          Number(priority !== ANY) +
+          Number(Boolean(overdue)) +
+          Number(!mine && assignee !== ANY)
+        }
+        onClearFilters={clearFilters}
         search={
           <SearchInput
             value={search}
@@ -242,7 +261,12 @@ export default function TasksPage() {
           )}
         </Button>
         {filtered && (
-          <Button variant="ghost" size="xs" onClick={clearFilters}>
+          <Button
+            variant="ghost"
+            size="xs"
+            data-filter-clear
+            onClick={clearFilters}
+          >
             Clear
           </Button>
         )}
@@ -278,7 +302,12 @@ export default function TasksPage() {
           ]}
           className={view === "list" ? "max-sm:ml-auto" : "ml-auto"}
         />
-        {view !== "list" && <HiddenColumnsToggle prefs={boardPrefs} />}
+        {view !== "list" && (
+          <>
+            <BoardDisplay prefs={boardPrefs} fields={TASK_CARD_FIELDS} />
+            <HiddenColumnsToggle prefs={boardPrefs} />
+          </>
+        )}
       </PageToolbar>
       <div className="relative flex min-h-0 flex-1 flex-col">
         {view === "list" ? (
@@ -311,6 +340,7 @@ export default function TasksPage() {
           <TasksBoardSkeleton />
         )}
       </div>
+      <PasteTasksDialog open={pasting} onOpenChange={setPasting} />
     </Page>
   );
 }

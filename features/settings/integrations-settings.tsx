@@ -17,6 +17,7 @@ import Logo from "@/public/assets/images/_common/logo.svg";
 import BellIcon from "@/public/assets/icons/bell.svg";
 import CalendarIcon from "@/public/assets/icons/calendar.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
+import MailIcon from "@/public/assets/icons/mail.svg";
 import DemoFormCard from "./demo-form-card";
 import PlatformSyncCard from "./platform-sync-card";
 import {
@@ -69,6 +70,7 @@ function IntegrationList() {
       <KycCard kyc={status.kyc} />
       <AlertsCard alerts={status.alerts} />
       <CalcomCard calcom={status.calcom} />
+      <EmailLogCard address={status.emailLog.address} />
       <DemoFormCard />
     </>
   );
@@ -375,6 +377,20 @@ function AlertsCard({ alerts }: { alerts: Status["alerts"] }) {
       <SettingsRow label="Webhook" description={<Code>ALERT_WEBHOOK_URL</Code>}>
         <ConfiguredTag on={alerts.webhook} />
       </SettingsRow>
+    </IntegrationCard>
+  );
+}
+
+function EmailLogCard({ address }: { address: string }) {
+  return (
+    <IntegrationCard
+      visual={<IconTile icon={MailIcon} />}
+      title="Log emails to the CRM"
+      description="BCC this address on emails to customers, or forward them to it. Only works from your own CRM email address."
+    >
+      <SettingsBlock>
+        <CopyField id="email-log-address" label="BCC address" value={address} />
+      </SettingsBlock>
     </IntegrationCard>
   );
 }

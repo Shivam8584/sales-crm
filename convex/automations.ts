@@ -19,6 +19,7 @@ import {
   TRIGGER_LABEL,
   isValidFrequencyCap,
   checkGraphShape,
+  checkSender,
   describeNode,
   nodeFunnel,
   percent,
@@ -30,6 +31,7 @@ import {
   subjectKey,
   validateAutomation,
   type AutomationDraft,
+  type AutomationSettings,
   type Graph,
   type NameLookup,
   type ValidationContext,
@@ -58,6 +60,7 @@ import {
 import {
   deliver as deliverMessage,
   emailProvider,
+  repliesTracked,
   whatsappProvider,
 } from "./lib/automations/delivery";
 import {
@@ -112,6 +115,21 @@ const publishable = (automation: Doc<"automations">) => ({
   graph: automation.graph,
   settings: automation.settings,
 });
+
+/** The sender is edited on its own and applies at once, so a settings save never carries it. */
+function withSender(
+  settings: AutomationSettings,
+  { senderName, replyTo }: { senderName?: string; replyTo?: string },
+): AutomationSettings {
+  const rest = { ...settings };
+  delete rest.senderName;
+  delete rest.replyTo;
+  return {
+    ...rest,
+    ...(senderName && { senderName }),
+    ...(replyTo && { replyTo }),
+  };
+}
 
 function hasChanges(automation: Doc<"automations">) {
   const published = automation.published;
@@ -249,6 +267,7 @@ export const get = memberQuery({
       trigger: automation.trigger,
       graph: automation.graph as Graph,
       settings: automation.settings,
+      replyTracked: repliesTracked(automation.settings.replyTo),
       version: automation.version,
       publishedAt: automation.published?.publishedAt ?? null,
       hasChanges: hasChanges(automation),
@@ -703,7 +722,9 @@ export const update = managerMutation({
     if (patch.graph !== undefined)
       next.graph = cleanGraph(patch.graph as Graph);
     if (patch.trigger !== undefined) next.trigger = patch.trigger;
-    if (patch.settings !== undefined) next.settings = patch.settings;
+    if (patch.settings !== undefined) {
+      next.settings = withSender(patch.settings, automation.settings);
+    }
     if (patch.subjectKind !== undefined) {
       next.subjectKind = patch.subjectKind;
       const trigger = next.trigger ?? automation.trigger;
@@ -715,6 +736,38 @@ export const update = managerMutation({
     return {
       name: automation.name,
       description: automation.description,
+    };
+  },
+});
+
+/** Changes who emails appear to come from; takes effect on the live version without republishing. */
+export const setSender = memberMutation({
+  args: {
+    id: v.id("automations"),
+    senderName: v.optional(v.string()),
+    replyTo: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, ...input }) => {
+    const automation = await requireAutomation(ctx, id);
+    assertOwnSequence(ctx, automation);
+    const checked = checkSender(input);
+    if (!checked.ok) invalid(checked.field, checked.message);
+    const { published } = automation;
+    await ctx.db.patch(id, {
+      settings: withSender(automation.settings, checked),
+      ...(published && {
+        published: {
+          ...published,
+          settings: withSender(published.settings, checked),
+        },
+      }),
+      updatedAt: Date.now(),
+    });
+    return {
+      previous: {
+        senderName: automation.settings.senderName,
+        replyTo: automation.settings.replyTo,
+      },
     };
   },
 });
@@ -859,6 +912,8 @@ export const sendTest = memberMutation({
       to: ctx.viewer.email,
       subject: `[Test] ${renderTemplate(config.subject, vars).text}`,
       body: `${renderTemplate(config.body, vars).text.trim()}\n\n${UNSUBSCRIBE_LINE}`,
+      senderName: automation.settings.senderName,
+      replyTo: automation.settings.replyTo,
     });
     return ctx.viewer.email;
   },
@@ -870,8 +925,13 @@ export const deliverTest = internalAction({
     to: v.string(),
     subject: v.string(),
     body: v.string(),
+    senderName: v.optional(v.string()),
+    replyTo: v.optional(v.string()),
   },
-  handler: async (ctx, { memberId, to, subject, body }) => {
+  handler: async (
+    ctx,
+    { memberId, to, subject, body, senderName, replyTo },
+  ) => {
     const result = await deliverMessage(ctx, {
       channel: "email",
       provider: emailProvider().provider,
@@ -880,6 +940,8 @@ export const deliverTest = internalAction({
       to,
       subject,
       body,
+      senderName,
+      replyTo,
     });
     await ctx.runMutation(internal.automations.testSettled, {
       memberId,
@@ -972,7 +1034,11 @@ export const claimMessage = internalMutation({
       status: "sending",
       attempts: message.attempts + 1,
     });
+    const automation = await ctx.db.get(message.automationId);
+    const settings = automation?.published?.settings ?? automation?.settings;
     return {
+      senderName: settings?.senderName,
+      replyTo: settings?.replyTo,
       channel: message.channel,
       provider: message.provider as "resend" | "novu" | "meta",
       stepKey: message.stepKey,

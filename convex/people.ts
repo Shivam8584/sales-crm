@@ -530,12 +530,18 @@ export const get = memberQuery({
       ? await ctx.db.get(person.accountId)
       : null;
     const members = await memberIndex(ctx);
+    const winner = person.mergedIntoId
+      ? await ctx.db.get(person.mergedIntoId)
+      : null;
     return {
       ...toClient(
         person,
         members,
         new Map(account ? [[account._id, account]] : []),
       ),
+      mergedInto: winner
+        ? { _id: winner._id, name: personName(winner) }
+        : null,
       custom: await visibleCustom(ctx, "person", person.custom),
     };
   },
@@ -797,6 +803,9 @@ export const setArchived = memberMutation({
       assertCan(ctx.viewer, "person.archive", [person.ownerId]);
       if (!archived && person.erasedAt) {
         fail("forbidden", "Erased people stay archived");
+      }
+      if (person.mergedIntoId) {
+        fail("conflict", `${personName(person)} was merged into another person`);
       }
       const twin = archived
         ? null

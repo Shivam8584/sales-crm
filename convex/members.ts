@@ -185,6 +185,13 @@ export const setDigest = memberMutation({
   },
 });
 
+export const setWeekly = memberMutation({
+  args: { off: v.boolean() },
+  handler: async (ctx, { off }) => {
+    await ctx.db.patch(ctx.viewer._id, { weeklyOff: off });
+  },
+});
+
 async function requireOtherMember(
   ctx: MutationCtx & { viewer: Doc<"members"> },
   id: Doc<"members">["_id"],

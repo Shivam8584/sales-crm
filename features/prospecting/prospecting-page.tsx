@@ -726,6 +726,13 @@ export default function ProspectingPage() {
         views={VIEWS.map((item) => ({ ...item, count: counts[item.id] }))}
       />
       <PageToolbar
+        activeFilters={
+          Number(watchlist !== ALL) +
+          Number(marketplace !== ALL) +
+          Number(view === "prospects" && crm !== ALL) +
+          Number(view === "products" && status !== ALL)
+        }
+        onClearFilters={clearFilters}
         search={
           <SearchInput
             value={search}
@@ -793,7 +800,12 @@ export default function ProspectingPage() {
           />
         )}
         {filtered && (
-          <Button variant="ghost" size="xs" onClick={clearFilters}>
+          <Button
+            variant="ghost"
+            size="xs"
+            data-filter-clear
+            onClick={clearFilters}
+          >
             Clear
           </Button>
         )}

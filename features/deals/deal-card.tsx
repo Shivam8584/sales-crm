@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useCardFields } from "@/components/board/board-prefs";
 import AccountLogo from "@/features/accounts/account-logo";
 import { formatMoney } from "@/lib/domain/money";
 import { shortDate } from "@/lib/time";
@@ -12,6 +13,13 @@ import type { DealRow } from "./use-deal-actions";
 const CHIP =
   "text-fg-secondary shadow-hairline inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] leading-none whitespace-nowrap";
 
+export const DEAL_CARD_FIELDS = [
+  { id: "amount", label: "Amount" },
+  { id: "owner", label: "Owner" },
+  { id: "close", label: "Close date" },
+  { id: "account", label: "Account" },
+];
+
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
 /** Board card body: stage and title, account and age, then amount, owner and close date. */
@@ -22,6 +30,7 @@ export default function DealCard({
   deal: DealRow;
   today: string;
 }) {
+  const show = useCardFields("deals");
   const overdue =
     isOpenStage(deal.stage) &&
     deal.closeDate !== null &&
@@ -41,45 +50,51 @@ export default function DealCard({
           </h3>
         </div>
         <div className="text-fg-tertiary flex min-w-0 items-center gap-2 text-[13px] leading-5">
-          {deal.account ? (
-            <Link
-              href={`/accounts/${deal.account._id}`}
-              onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-              className="hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex min-w-0 items-center gap-1.5 rounded-sm px-1 transition-colors outline-none focus-visible:ring-2"
-            >
-              <AccountLogo account={deal.account} size="xs" />
-              <span className="truncate">{deal.account.name}</span>
-            </Link>
-          ) : (
-            <span>Account removed</span>
+          {show("account") && (
+            <>
+              {deal.account ? (
+                <Link
+                  href={`/accounts/${deal.account._id}`}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  className="hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex min-w-0 items-center gap-1.5 rounded-sm px-1 transition-colors outline-none focus-visible:ring-2"
+                >
+                  <AccountLogo account={deal.account} size="xs" />
+                  <span className="truncate">{deal.account.name}</span>
+                </Link>
+              ) : (
+                <span>Account removed</span>
+              )}
+              <span
+                aria-hidden
+                className="bg-fg-disabled size-0.75 shrink-0 rounded-full"
+              />
+            </>
           )}
-          <span
-            aria-hidden
-            className="bg-fg-disabled size-0.75 shrink-0 rounded-full"
-          />
           <span className="shrink-0 whitespace-nowrap">
             Created {shortDate(deal._creationTime)}
           </span>
         </div>
       </div>
-      <div className="border-border flex flex-wrap items-center gap-2 border-t px-4 py-3">
-        <span
-          className={cn(
-            CHIP,
-            deal.amount.amount
-              ? "text-foreground font-medium"
-              : "text-fg-tertiary",
-          )}
-          title={`Amount ${formatMoney(deal.amount)}`}
-        >
-          <span className="tabular-nums">
-            {deal.amount.amount
-              ? formatMoney(deal.amount, { compact: true })
-              : "No amount"}
+      <div className="border-border flex flex-wrap items-center gap-2 border-t px-4 py-3 empty:hidden">
+        {show("amount") && (
+          <span
+            className={cn(
+              CHIP,
+              deal.amount.amount
+                ? "text-foreground font-medium"
+                : "text-fg-tertiary",
+            )}
+            title={`Amount ${formatMoney(deal.amount)}`}
+          >
+            <span className="tabular-nums">
+              {deal.amount.amount
+                ? formatMoney(deal.amount, { compact: true })
+                : "No amount"}
+            </span>
           </span>
-        </span>
-        {deal.owner && (
+        )}
+        {show("owner") && deal.owner && (
           <span
             className={cn(CHIP, "max-w-36")}
             title={`Owner ${deal.owner.name}`}
@@ -91,7 +106,8 @@ export default function DealCard({
             <span className="truncate">{firstName(deal.owner.name)}</span>
           </span>
         )}
-        {deal.closeDate &&
+        {show("close") &&
+          deal.closeDate &&
           (overdue ? (
             <span
               className={cn(CHIP, "text-danger")}

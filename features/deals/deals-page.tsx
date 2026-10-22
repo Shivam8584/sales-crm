@@ -17,6 +17,7 @@ import Board, {
   type BoardColumnDef,
   type BoardSort,
 } from "@/components/board/board";
+import BoardDisplay from "@/components/board/board-display";
 import { useBoardPrefs } from "@/components/board/board-prefs";
 import { HiddenColumnsToggle } from "@/components/board/hidden-columns";
 import DataTable from "@/components/data-table/data-table";
@@ -53,7 +54,7 @@ import EyeIcon from "@/public/assets/icons/eye.svg";
 import FilterIcon from "@/public/assets/icons/filter.svg";
 import ListIcon from "@/public/assets/icons/list.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
-import DealCard from "./deal-card";
+import DealCard, { DEAL_CARD_FIELDS } from "./deal-card";
 import DealQuickAdd from "./deal-quick-add";
 import { formatDay, formatTotals, today as todayDay } from "./format";
 import LostReasonDialog from "./lost-reason-dialog";
@@ -373,6 +374,10 @@ export default function DealsPage() {
         }
       />
       <PageToolbar
+        activeFilters={
+          [owner, account, close].filter((value) => value !== ALL).length
+        }
+        onClearFilters={clearFilters}
         search={
           <SearchInput
             value={search}
@@ -401,7 +406,12 @@ export default function DealsPage() {
                 },
               ]}
             />
-            {!listView && <HiddenColumnsToggle prefs={boardPrefs} />}
+            {!listView && (
+              <>
+                <BoardDisplay prefs={boardPrefs} fields={DEAL_CARD_FIELDS} />
+                <HiddenColumnsToggle prefs={boardPrefs} />
+              </>
+            )}
             <SavedViewsMenu />
             <ExportButton
               disabled={!visible.length || exporting}
@@ -457,7 +467,12 @@ export default function DealsPage() {
           ]}
         />
         {filtered && (
-          <Button variant="ghost" size="xs" onClick={clearFilters}>
+          <Button
+            variant="ghost"
+            size="xs"
+            data-filter-clear
+            onClick={clearFilters}
+          >
             Clear
           </Button>
         )}

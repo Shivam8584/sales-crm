@@ -2,9 +2,14 @@
 
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
-type StoredPrefs = { hidden: string[]; panel: boolean };
+type StoredPrefs = {
+  hidden: string[];
+  panel: boolean;
+  /** Card fields to show; undefined shows all. */
+  fields: string[] | undefined;
+};
 
-const EMPTY: StoredPrefs = { hidden: [], panel: false };
+const EMPTY: StoredPrefs = { hidden: [], panel: false, fields: undefined };
 const listeners = new Set<() => void>();
 const cache = new Map<string, { raw: string | null; value: StoredPrefs }>();
 
@@ -29,6 +34,9 @@ function read(boardId: string): StoredPrefs {
           ? parsed.hidden.filter((id) => typeof id === "string")
           : [],
         panel: parsed.panel === true,
+        fields: Array.isArray(parsed.fields)
+          ? parsed.fields.filter((id) => typeof id === "string")
+          : undefined,
       };
     }
   } catch {
@@ -63,6 +71,11 @@ export type BoardPrefs = {
   hidden: ReadonlySet<string>;
   setHidden: (columnId: string, hidden: boolean) => void;
   showAll: () => void;
+  /** Card fields to show; undefined shows all. */
+  fields: readonly string[] | undefined;
+  /** `all` is every toggleable field, needed to turn one off from the default. */
+  toggleField: (field: string, all: readonly string[]) => void;
+  showAllFields: () => void;
   /** Hidden columns panel beside the board (desktop). */
   panelOpen: boolean;
   /** Hidden columns sheet (below `lg`). */
@@ -99,15 +112,49 @@ export function useBoardPrefs(boardId: string): BoardPrefs {
     (open: boolean) => write(boardId, { ...read(boardId), panel: open }),
     [boardId],
   );
+  const toggleField = useCallback(
+    (field: string, all: readonly string[]) => {
+      const current = read(boardId);
+      const shown = current.fields ?? [...all];
+      const next = shown.includes(field)
+        ? shown.filter((id) => id !== field)
+        : [...shown, field];
+      write(boardId, {
+        ...current,
+        fields: next.length === all.length ? undefined : next,
+      });
+    },
+    [boardId],
+  );
+  const showAllFields = useCallback(
+    () => write(boardId, { ...read(boardId), fields: undefined }),
+    [boardId],
+  );
   const hidden = useMemo(() => new Set(stored.hidden), [stored.hidden]);
 
   return {
     hidden,
     setHidden,
     showAll,
+    fields: stored.fields,
+    toggleField,
+    showAllFields,
     panelOpen: stored.panel,
     sheetOpen,
     setPanelOpen,
     setSheetOpen,
   };
+}
+
+/** Returns whether a board's cards show a field, per the board's "Show on cards" choice. */
+export function useCardFields(boardId: string) {
+  const { fields } = useSyncExternalStore(
+    subscribe,
+    () => read(boardId),
+    () => EMPTY,
+  );
+  return useCallback(
+    (field: string) => !fields || fields.includes(field),
+    [fields],
+  );
 }

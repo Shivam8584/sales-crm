@@ -193,7 +193,11 @@ export const sweepOrphans = internalMutation({
         .query("attachments")
         .withIndex("by_storage", (q) => q.eq("storageId", file._id))
         .first();
-      if (!attached) await ctx.storage.delete(file._id);
+      const logo = await ctx.db
+        .query("accounts")
+        .withIndex("by_logo_storage", (q) => q.eq("logoStorageId", file._id))
+        .first();
+      if (!attached && !logo) await ctx.storage.delete(file._id);
     }
   },
 });

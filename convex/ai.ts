@@ -2,11 +2,13 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { action, type ActionCtx, type QueryCtx } from "./_generated/server";
+import { lookalikes, type Lookalike } from "./aiEmbeddings";
 import { findAccounts } from "./accounts";
 import { findDeals } from "./deals";
 import { findPeople } from "./people";
 import { generate } from "./lib/ai";
 import {
+  askInput,
   contextHash,
   dayOrNull,
   firstName,
@@ -17,12 +19,14 @@ import {
   wrapData,
 } from "./lib/aiContext";
 import {
+  ASK,
   BRIEF,
   CALL,
   CAPTURE,
   EMAIL,
   NEXT,
   WHATSAPP,
+  type AskOut,
   type BriefOut,
   type CallOut,
   type CaptureOut,
@@ -67,6 +71,8 @@ const BODY = 400;
 const PER_KIND = 4;
 const CAPTURE_ITEMS = 10;
 const NOTES_MAX = 8000;
+const QUESTION_MAX = 500;
+const ANSWER_MAX = 1200;
 
 const unavailable = (): never =>
   fail("unavailable", "AI is not set up on this server");
@@ -687,5 +693,39 @@ export const summarizeCall = action({
           dueDate: dayOrNull(item.dueDate, today),
         })),
     };
+  },
+});
+
+/** Answers one question from a record's own data and recent history. Writes nothing. */
+export const askRecord = action({
+  args: { target: vTarget, question: v.string() },
+  handler: async (ctx, { target, question }): Promise<{ answer: string }> => {
+    await begin(ctx);
+    const asked = truncate(question, QUESTION_MAX);
+    if (!asked) invalid("question", "Type a question first");
+    const context = await ctx.runQuery(api.ai.targetContext, { target });
+    await spend(ctx);
+    const out = await generate<AskOut>({
+      model: "fast",
+      system: ASK.system,
+      input: askInput(istToday(), asked, context),
+      schema: ASK.schema,
+      maxOutputTokens: 2000,
+    });
+    const answer = truncate(out.answer, ANSWER_MAX);
+    if (!answer) {
+      fail("unavailable", "AI gave an answer we couldn't use. Try again.");
+    }
+    return { answer };
+  },
+});
+
+/** Accounts that look like this one, for prospecting. Embeds the account first if it has no current vector. */
+export const similarAccounts = action({
+  args: { accountId: v.id("accounts") },
+  handler: async (ctx, { accountId }): Promise<Lookalike[]> => {
+    await begin(ctx);
+    await spend(ctx);
+    return await lookalikes(ctx, accountId);
   },
 });

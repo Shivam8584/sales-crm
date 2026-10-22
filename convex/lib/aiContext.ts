@@ -79,6 +79,15 @@ export function wrapData(value: unknown) {
   return `<data>\n${JSON.stringify(value).replace(/</g, "\\u003c")}\n</data>`;
 }
 
+/** The rep's own words in a tag of their own, escaped like `wrapData` so they can't close it or pose as data. */
+export function wrapQuestion(question: string) {
+  return `<question>\n${JSON.stringify(question).replace(/</g, "\\u003c")}\n</question>`;
+}
+
+export function askInput(today: string, question: string, context: unknown) {
+  return `Today is ${todayLine(today)}.\n${wrapQuestion(question)}\n${wrapData(context)}`;
+}
+
 export async function contextHash(value: unknown) {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   const digest = await crypto.subtle.digest("SHA-256", bytes);

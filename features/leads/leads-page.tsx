@@ -349,6 +349,10 @@ export default function LeadsPage() {
         )}
       />
       <PageToolbar
+        activeFilters={
+          [owner, channel, kind].filter((value) => value !== ANY).length
+        }
+        onClearFilters={clearFilters}
         search={
           <SearchInput
             value={search}
@@ -407,7 +411,12 @@ export default function LeadsPage() {
           ]}
         />
         {hasFilters && (
-          <Button variant="ghost" size="xs" onClick={clearFilters}>
+          <Button
+            variant="ghost"
+            size="xs"
+            data-filter-clear
+            onClick={clearFilters}
+          >
             Clear
           </Button>
         )}

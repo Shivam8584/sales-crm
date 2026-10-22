@@ -10,6 +10,8 @@ import { DetailSection } from "@/components/record/detail";
 import { ASIDE_SECTION } from "@/features/accounts/account-insights";
 import { useMobileBreakpoints } from "@/hooks/use-mobile-breakpoints";
 import { relativeTime } from "@/lib/time";
+import { AskField } from "./ask-record";
+import SimilarAccounts from "./similar-accounts";
 import { aiError, useAiEnabled } from "./use-ai";
 
 export default function AccountBrief({
@@ -88,6 +90,8 @@ function Brief({ accountId }: { accountId: Id<"accounts"> }) {
           </Button>
         </div>
       )}
+      <AskField key={accountId} target={{ accountId }} noun="account" />
+      <SimilarAccounts key={accountId} accountId={accountId} />
     </DetailSection>
   );
 }

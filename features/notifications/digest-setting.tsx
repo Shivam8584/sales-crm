@@ -11,24 +11,45 @@ import { toast } from "@/stores/toast-store";
 export function DigestSetting() {
   const viewer = useViewer();
   const setDigest = useMutation(api.members.setDigest);
+  const setWeekly = useMutation(api.members.setWeekly);
+
+  const report = (reason: unknown, fallback: string) =>
+    toast(readError(reason, fallback).message, { tone: "danger" });
 
   return (
-    <SettingsRow
-      label="Daily email digest"
-      htmlFor="daily-digest"
-      description="A short morning summary of what needs you. Weekdays, 9:00 IST."
-    >
-      <Switch
-        id="daily-digest"
-        checked={viewer.digestOff !== true}
-        onCheckedChange={(checked) =>
-          void setDigest({ off: !checked }).catch((reason) =>
-            toast(readError(reason, "Couldn't update the digest").message, {
-              tone: "danger",
-            }),
-          )
-        }
-      />
-    </SettingsRow>
+    <>
+      <SettingsRow
+        label="Daily email digest"
+        htmlFor="daily-digest"
+        description="A short morning summary of what needs you. Weekdays, 9:00 IST."
+      >
+        <Switch
+          id="daily-digest"
+          checked={viewer.digestOff !== true}
+          onCheckedChange={(checked) =>
+            void setDigest({ off: !checked }).catch((reason) =>
+              report(reason, "Couldn't update the digest"),
+            )
+          }
+        />
+      </SettingsRow>
+      {viewer.role !== "rep" && (
+        <SettingsRow
+          label="Weekly team report"
+          htmlFor="weekly-report"
+          description="Leads, deals and team activity for the past week against the one before. Mondays, 9:30 IST."
+        >
+          <Switch
+            id="weekly-report"
+            checked={viewer.weeklyOff !== true}
+            onCheckedChange={(checked) =>
+              void setWeekly({ off: !checked }).catch((reason) =>
+                report(reason, "Couldn't update the weekly report"),
+              )
+            }
+          />
+        </SettingsRow>
+      )}
+    </>
   );
 }

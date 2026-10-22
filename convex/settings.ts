@@ -5,6 +5,7 @@ import { invalid, notFound } from "./lib/errors";
 import { adminMutation, adminQuery, memberQuery } from "./lib/functions";
 import { retry } from "./lib/platform";
 import { providerMode } from "./lib/enrichment/kyc";
+import { logAddress } from "./lib/emailLog";
 import { requireActiveMember } from "./lib/records";
 import { literals, vLeadKind } from "./lib/validators";
 import { DEFAULT_HOT_SLA_FACTOR, HOT_SLA_PERCENT } from "../lib/domain/scoring";
@@ -268,6 +269,7 @@ export const integrations = adminQuery({
       leadForm: {
         endpoint: site ? `${site}/leads` : null,
       },
+      emailLog: { address: logAddress() },
     };
   },
 });

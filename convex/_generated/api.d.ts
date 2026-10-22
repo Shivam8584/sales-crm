@@ -11,7 +11,9 @@
 import type * as account360 from "../account360.js";
 import type * as accounts from "../accounts.js";
 import type * as activation from "../activation.js";
+import type * as activity from "../activity.js";
 import type * as ai from "../ai.js";
+import type * as aiEmbeddings from "../aiEmbeddings.js";
 import type * as alerts from "../alerts.js";
 import type * as auth from "../auth.js";
 import type * as automations from "../automations.js";
@@ -21,6 +23,7 @@ import type * as counts from "../counts.js";
 import type * as crons from "../crons.js";
 import type * as customFields from "../customFields.js";
 import type * as deals from "../deals.js";
+import type * as dedupe from "../dedupe.js";
 import type * as digest from "../digest.js";
 import type * as enrichment from "../enrichment.js";
 import type * as enrichmentWeb from "../enrichmentWeb.js";
@@ -34,6 +37,7 @@ import type * as leads from "../leads.js";
 import type * as lib_activation from "../lib/activation.js";
 import type * as lib_ai from "../lib/ai.js";
 import type * as lib_aiContext from "../lib/aiContext.js";
+import type * as lib_aiEmbedText from "../lib/aiEmbedText.js";
 import type * as lib_aiPrompts from "../lib/aiPrompts.js";
 import type * as lib_aiTypes from "../lib/aiTypes.js";
 import type * as lib_assignment from "../lib/assignment.js";
@@ -48,7 +52,10 @@ import type * as lib_consent from "../lib/consent.js";
 import type * as lib_counts from "../lib/counts.js";
 import type * as lib_crypto from "../lib/crypto.js";
 import type * as lib_deals from "../lib/deals.js";
+import type * as lib_dedupeDetect from "../lib/dedupeDetect.js";
+import type * as lib_dedupeMerge from "../lib/dedupeMerge.js";
 import type * as lib_demo from "../lib/demo.js";
+import type * as lib_emailLog from "../lib/emailLog.js";
 import type * as lib_enrichment_html from "../lib/enrichment/html.js";
 import type * as lib_enrichment_kyc from "../lib/enrichment/kyc.js";
 import type * as lib_enrichment_providers from "../lib/enrichment/providers.js";
@@ -62,6 +69,8 @@ import type * as lib_http from "../lib/http.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_leads from "../lib/leads.js";
 import type * as lib_lists from "../lib/lists.js";
+import type * as lib_mcp from "../lib/mcp.js";
+import type * as lib_mcpTools from "../lib/mcpTools.js";
 import type * as lib_mentions from "../lib/mentions.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_ownership from "../lib/ownership.js";
@@ -79,6 +88,8 @@ import type * as lib_stages from "../lib/stages.js";
 import type * as lib_tasks from "../lib/tasks.js";
 import type * as lib_timeline from "../lib/timeline.js";
 import type * as lib_validators from "../lib/validators.js";
+import type * as lib_weeklyReport from "../lib/weeklyReport.js";
+import type * as mcp from "../mcp.js";
 import type * as members from "../members.js";
 import type * as migrations from "../migrations.js";
 import type * as notifications from "../notifications.js";
@@ -100,7 +111,9 @@ import type * as smtp from "../smtp.js";
 import type * as system from "../system.js";
 import type * as tasks from "../tasks.js";
 import type * as timeline from "../timeline.js";
+import type * as tokens from "../tokens.js";
 import type * as views from "../views.js";
+import type * as weekly from "../weekly.js";
 
 import type {
   ApiFromModules,
@@ -112,7 +125,9 @@ declare const fullApi: ApiFromModules<{
   account360: typeof account360;
   accounts: typeof accounts;
   activation: typeof activation;
+  activity: typeof activity;
   ai: typeof ai;
+  aiEmbeddings: typeof aiEmbeddings;
   alerts: typeof alerts;
   auth: typeof auth;
   automations: typeof automations;
@@ -122,6 +137,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   customFields: typeof customFields;
   deals: typeof deals;
+  dedupe: typeof dedupe;
   digest: typeof digest;
   enrichment: typeof enrichment;
   enrichmentWeb: typeof enrichmentWeb;
@@ -135,6 +151,7 @@ declare const fullApi: ApiFromModules<{
   "lib/activation": typeof lib_activation;
   "lib/ai": typeof lib_ai;
   "lib/aiContext": typeof lib_aiContext;
+  "lib/aiEmbedText": typeof lib_aiEmbedText;
   "lib/aiPrompts": typeof lib_aiPrompts;
   "lib/aiTypes": typeof lib_aiTypes;
   "lib/assignment": typeof lib_assignment;
@@ -149,7 +166,10 @@ declare const fullApi: ApiFromModules<{
   "lib/counts": typeof lib_counts;
   "lib/crypto": typeof lib_crypto;
   "lib/deals": typeof lib_deals;
+  "lib/dedupeDetect": typeof lib_dedupeDetect;
+  "lib/dedupeMerge": typeof lib_dedupeMerge;
   "lib/demo": typeof lib_demo;
+  "lib/emailLog": typeof lib_emailLog;
   "lib/enrichment/html": typeof lib_enrichment_html;
   "lib/enrichment/kyc": typeof lib_enrichment_kyc;
   "lib/enrichment/providers": typeof lib_enrichment_providers;
@@ -163,6 +183,8 @@ declare const fullApi: ApiFromModules<{
   "lib/identity": typeof lib_identity;
   "lib/leads": typeof lib_leads;
   "lib/lists": typeof lib_lists;
+  "lib/mcp": typeof lib_mcp;
+  "lib/mcpTools": typeof lib_mcpTools;
   "lib/mentions": typeof lib_mentions;
   "lib/money": typeof lib_money;
   "lib/ownership": typeof lib_ownership;
@@ -180,6 +202,8 @@ declare const fullApi: ApiFromModules<{
   "lib/tasks": typeof lib_tasks;
   "lib/timeline": typeof lib_timeline;
   "lib/validators": typeof lib_validators;
+  "lib/weeklyReport": typeof lib_weeklyReport;
+  mcp: typeof mcp;
   members: typeof members;
   migrations: typeof migrations;
   notifications: typeof notifications;
@@ -201,7 +225,9 @@ declare const fullApi: ApiFromModules<{
   system: typeof system;
   tasks: typeof tasks;
   timeline: typeof timeline;
+  tokens: typeof tokens;
   views: typeof views;
+  weekly: typeof weekly;
 }>;
 
 /**

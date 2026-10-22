@@ -2,6 +2,7 @@
 
 import {
   Fragment,
+  useState,
   type ComponentType,
   type ReactNode,
   type SVGProps,
@@ -9,6 +10,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "@/components/_ui/button";
+import CountBadge from "@/components/_ui/count-badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,11 +19,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/_ui/dropdown-menu";
 import Kbd from "@/components/_ui/kbd";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/_ui/sheet";
 import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
 import NotificationBell from "@/features/notifications/notification-bell";
 import { can } from "@/convex/lib/permissions";
+import { useMobileBreakpoints } from "@/hooks/use-mobile-breakpoints";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useViewer } from "@/hooks/use-viewer";
 import { MOD_KEY } from "@/lib/keyboard";
@@ -30,10 +42,12 @@ import { useUiStore } from "@/stores/ui-store";
 import ActiveDot from "@/public/assets/icons/active-dot.svg";
 import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
 import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
+import FilterIcon from "@/public/assets/icons/filter.svg";
 import MenuIcon from "@/public/assets/icons/menu.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
 import ShareIcon from "@/public/assets/icons/share.svg";
+import XIcon from "@/public/assets/icons/x.svg";
 import UserMenu from "./user-menu";
 
 export function Page({
@@ -398,18 +412,28 @@ function MenuAction({
  * Search and filters on the left, view actions on the right (`ExportButton`,
  * `CreateButton`). Filters stay on one row and scroll sideways when they don't
  * fit; on phones they move to a row of their own under search and the actions.
+ * Pass `activeFilters` (0 for none) when `children` are only filters: phones
+ * then get a "Filters" button that opens them in a bottom sheet instead.
+ * `onClearFilters` adds "Clear all" there and hides the children's own
+ * `data-filter-clear` button.
  */
 export function PageToolbar({
   search,
   children,
   actions,
+  activeFilters,
+  onClearFilters,
   className,
 }: {
   search?: ReactNode;
   children?: ReactNode;
   actions?: ReactNode;
+  activeFilters?: number;
+  onClearFilters?: () => void;
   className?: string;
 }) {
+  const { belowSm } = useMobileBreakpoints();
+  const sheet = Boolean(children) && activeFilters !== undefined;
   return (
     <div
       data-slot="page-toolbar"
@@ -421,11 +445,22 @@ export function PageToolbar({
       {search && (
         <div className="flex min-w-28 flex-1 sm:flex-none">{search}</div>
       )}
-      {children && (
+      {sheet && (
+        <FilterSheet
+          active={activeFilters ?? 0}
+          onClear={onClearFilters}
+          enabled={belowSm}
+        >
+          {children}
+        </FilterSheet>
+      )}
+      {children && !(sheet && belowSm) && (
         <div
           className={cn(
             "scrollbar-none -my-1 flex min-w-0 flex-1 items-center gap-2 overflow-x-auto mask-r-from-[calc(100%-1.5rem)] py-1 pr-4",
-            search && "max-sm:order-last max-sm:basis-full",
+            sheet
+              ? "max-sm:hidden"
+              : search && "max-sm:order-last max-sm:basis-full",
           )}
         >
           {children}
@@ -437,6 +472,77 @@ export function PageToolbar({
         </div>
       )}
     </div>
+  );
+}
+
+function FilterSheet({
+  active,
+  onClear,
+  enabled,
+  children,
+}: {
+  active: number;
+  onClear?: () => void;
+  enabled: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Sheet open={open && enabled} onOpenChange={setOpen}>
+      <Button
+        variant="secondary"
+        size="sm"
+        aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
+        data-active={active > 0}
+        onClick={() => setOpen(true)}
+        className="data-[active=true]:bg-muted h-control-md max-[359px]:w-control-md py-0 max-[359px]:px-0 sm:hidden"
+      >
+        <FilterIcon aria-hidden className="size-3" />
+        <span className="max-[359px]:sr-only">Filters</span>
+        {active > 0 && (
+          <CountBadge className="max-[359px]:hidden">{active}</CountBadge>
+        )}
+      </Button>
+      <SheetContent side="bottom">
+        <SheetHeader className="px-4">
+          <SheetTitle>Filters</SheetTitle>
+          <SheetDescription className="sr-only">
+            Narrow down the list
+          </SheetDescription>
+          <SheetClose asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="-mr-1"
+              aria-label="Close filters"
+            >
+              <XIcon aria-hidden className="size-3.5" />
+            </Button>
+          </SheetClose>
+        </SheetHeader>
+        <div className="scrollbar-none flex min-h-0 flex-1 flex-col items-start gap-3 overflow-y-auto p-4 [&_[data-filter-clear]]:hidden">
+          {children}
+        </div>
+        <SheetFooter className="px-4">
+          {onClear && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={active === 0}
+              onClick={onClear}
+              className="-ml-1.5"
+            >
+              Clear all
+            </Button>
+          )}
+          <SheetClose asChild>
+            <Button variant="primary" size="sm" className="ml-auto">
+              Done
+            </Button>
+          </SheetClose>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 

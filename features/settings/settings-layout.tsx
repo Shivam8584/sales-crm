@@ -8,7 +8,11 @@ import { api } from "@/convex/_generated/api";
 import { buttonVariants } from "@/components/_ui/button";
 import CountBadge from "@/components/_ui/count-badge";
 import { Page, PageHeader, PageStatus } from "@/components/shell/page";
-import { SETTINGS_PAGES, isActive } from "@/components/shell/navigation";
+import {
+  SETTINGS_PAGES,
+  canOpenSetting,
+  isActive,
+} from "@/components/shell/navigation";
 import { useViewer } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { cn } from "@/lib/utils";
@@ -26,6 +30,7 @@ const ICONS: Record<SettingsHref, ComponentType<SVGProps<SVGSVGElement>>> = {
   "/settings/team": UsersIcon,
   "/settings/workspace": BuildingIcon,
   "/settings/fields": ListIcon,
+  "/settings/duplicates": UsersIcon,
   "/settings/integrations": LinkIcon,
   "/settings/system": ActivityIcon,
 };
@@ -38,6 +43,7 @@ const GROUPS: { title: string; hrefs: SettingsHref[] }[] = [
       "/settings/team",
       "/settings/workspace",
       "/settings/fields",
+      "/settings/duplicates",
       "/settings/integrations",
       "/settings/system",
     ],
@@ -49,8 +55,8 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const viewer = useViewer();
   const team = useQuery(api.members.team, {});
-  const pages = SETTINGS_PAGES.filter(
-    (page) => !page.adminOnly || viewer.role === "admin",
+  const pages = SETTINGS_PAGES.filter((page) =>
+    canOpenSetting(page, viewer.role),
   );
   const current = SETTINGS_PAGES.find((page) => isActive(pathname, page.href));
   const activeMembers = team?.filter((member) => member.status === "active");

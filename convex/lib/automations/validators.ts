@@ -66,6 +66,8 @@ export const vSettings = v.object({
   stopOnReply: v.boolean(),
   goal: v.array(vCondition),
   allowReenroll: v.boolean(),
+  senderName: v.optional(v.string()),
+  replyTo: v.optional(v.string()),
 });
 
 export const vStats = v.object({

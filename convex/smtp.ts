@@ -3,7 +3,11 @@
 import nodemailer from "nodemailer";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
-import { smtpFailure, type DeliveryResult } from "./lib/automations/delivery";
+import {
+  emailHeaders,
+  smtpFailure,
+  type DeliveryResult,
+} from "./lib/automations/delivery";
 
 const env = (name: string) => process.env[name]?.trim() || undefined;
 
@@ -14,12 +18,15 @@ export const send = internalAction({
     subject: v.string(),
     text: v.string(),
     key: v.string(),
+    senderName: v.optional(v.string()),
+    replyTo: v.optional(v.string()),
   },
   handler: async (
     _ctx,
-    { to, subject, text, key },
+    { to, subject, text, key, senderName, replyTo },
   ): Promise<DeliveryResult> => {
     const port = Number(env("SMTP_PORT") ?? 587);
+    const headers = emailHeaders({ senderName, replyTo });
     const from = env("EMAIL_FROM") ?? "";
     const domain = from.match(/@([^>\s]+)/)?.[1] ?? "localhost";
     const transport = nodemailer.createTransport({
@@ -34,8 +41,8 @@ export const send = internalAction({
     });
     try {
       const info = await transport.sendMail({
-        from,
-        replyTo: env("EMAIL_REPLY_TO"),
+        from: headers.from ?? "",
+        replyTo: headers.replyTo,
         to,
         subject,
         text,

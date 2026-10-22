@@ -28,6 +28,8 @@ import {
 } from "@/components/shell/page";
 import AccountBrief from "@/features/ai/account-brief";
 import { useDraftAction } from "@/features/ai/use-draft-action";
+import { useDuplicatesAction } from "@/features/dedupe/use-duplicates-action";
+import { useMergedRedirect } from "@/features/dedupe/use-merged-redirect";
 import AccountStallBanner from "@/features/activation/account-stall-banner";
 import { RecordAutomations } from "@/features/automations/record-automations";
 import RecordDeals from "@/features/deals/record-deals";
@@ -56,7 +58,7 @@ import PlusIcon from "@/public/assets/icons/plus.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
-import AccountLogo from "./account-logo";
+import AccountLogoButton from "./logo-dialog";
 import {
   ASIDE_SECTION,
   AccountSummary,
@@ -73,8 +75,11 @@ const CRUMBS = [{ label: "Accounts", href: "/accounts" }];
 
 export default function AccountPage({ id }: { id: Id<"accounts"> }) {
   const account = useQuery(api.accounts.get, { id });
+  useMergedRedirect(account?.mergedInto, "accounts");
 
-  if (account === undefined) return <AccountPageSkeleton />;
+  if (account === undefined || account?.mergedInto) {
+    return <AccountPageSkeleton />;
+  }
   if (account === null) {
     return (
       <Page>
@@ -105,6 +110,7 @@ function AccountView({ account }: { account: Account }) {
   const save = useRecordUpdate(update, account._id);
   const pin = usePinAction({ accountId: account._id });
   const draft = useDraftAction({ accountId: account._id });
+  const duplicates = useDuplicatesAction({ accountId: account._id });
   const setCreate = useUiStore((state) => state.setCreate);
   const people = useQuery(api.people.list, { accountId: account._id });
   const deals = useQuery(api.deals.list, { accountId: account._id });
@@ -184,6 +190,7 @@ function AccountView({ account }: { account: Account }) {
               actions={[
                 pin,
                 draft.action,
+                duplicates.action,
                 {
                   label: "Add person",
                   icon: UserPlusIcon,
@@ -201,6 +208,7 @@ function AccountView({ account }: { account: Account }) {
               ]}
             />
             {draft.dialog}
+            {duplicates.dialog}
           </>
         }
       />
@@ -208,7 +216,7 @@ function AccountView({ account }: { account: Account }) {
         header={
           <div className="flex flex-col gap-5">
             <RecordHeader
-              visual={<AccountLogo account={account} size="lg" />}
+              visual={<AccountLogoButton account={account} />}
               title={
                 <span data-record-title className="flex min-w-0">
                   <InlineText

@@ -32,6 +32,7 @@ import { useUiStore } from "@/stores/ui-store";
 import MonitorIcon from "@/public/assets/icons/monitor.svg";
 import MoonIcon from "@/public/assets/icons/moon.svg";
 import SunIcon from "@/public/assets/icons/sun.svg";
+import ApiTokens from "./api-tokens";
 import { SettingsRow, SettingsSection } from "./settings-ui";
 
 const MAX_NAME = 80;
@@ -155,6 +156,8 @@ export default function ProfileSettings() {
       </SettingsSection>
 
       <CallingSection />
+
+      <ApiTokens />
 
       <SettingsSection title="Session">
         <SettingsRow

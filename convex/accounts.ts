@@ -9,6 +9,7 @@ import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { LIFECYCLE_STAGES } from "../lib/domain/enums";
 import { STAGE_LABEL } from "../lib/domain/labels";
 import { checkGstin, panRoot } from "../lib/domain/gstin";
+import { logoProblem } from "../lib/domain/logo";
 import { cleanTags, normalizeDomain } from "../lib/domain/normalize";
 import { accountHealth } from "../lib/domain/health";
 import { sumMoney } from "../lib/domain/money";
@@ -17,7 +18,7 @@ import { sourceFamily } from "./lib/enrichment/kyc";
 import { emitAutomationTrigger } from "./lib/automations/engine";
 import { countAccounts } from "./lib/counts";
 import { visibleCustom } from "./customFields";
-import { fail, invalid } from "./lib/errors";
+import { fail, invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery } from "./lib/functions";
 import { findAccount } from "./lib/identity";
 import {
@@ -518,8 +519,12 @@ export const get = memberQuery({
     if (!account) return null;
     const members = await memberIndex(ctx);
     const owner = members.get(account.ownerId);
+    const winner = account.mergedIntoId
+      ? await ctx.db.get(account.mergedIntoId)
+      : null;
     return {
       ...account,
+      mergedInto: winner ? { _id: winner._id, name: winner.name } : null,
       domain: account.domain ?? null,
       gstin: account.gstin ?? null,
       custom: await visibleCustom(ctx, "account", account.custom),
@@ -720,6 +725,66 @@ export const update = memberMutation({
   },
 });
 
+/**
+ * Sets or (with null) removes the account's own logo; without one the domain's
+ * favicon shows. A refused upload is answered, not thrown: an error would roll
+ * back the deletion of the blob it leaves behind.
+ */
+export const setLogo = memberMutation({
+  args: {
+    id: v.id("accounts"),
+    storageId: v.union(v.id("_storage"), v.null()),
+  },
+  handler: async (ctx, { id, storageId }) => {
+    const account = await requireAccount(ctx, id);
+    if ((storageId ?? undefined) === account.logoStorageId) {
+      return { ok: true as const };
+    }
+    let logoUrl: string | undefined;
+    if (storageId) {
+      const meta = await ctx.db.system.get(storageId);
+      if (!meta) notFound("File");
+      const [logo, attachment] = await Promise.all([
+        ctx.db
+          .query("accounts")
+          .withIndex("by_logo_storage", (q) => q.eq("logoStorageId", storageId))
+          .first(),
+        ctx.db
+          .query("attachments")
+          .withIndex("by_storage", (q) => q.eq("storageId", storageId))
+          .first(),
+      ]);
+      if (logo || attachment) fail("conflict", "That file is already in use");
+      const message = logoProblem({
+        type: meta.contentType ?? "",
+        size: meta.size,
+      });
+      if (message) {
+        await ctx.storage.delete(storageId);
+        return { ok: false as const, message };
+      }
+      logoUrl = (await ctx.storage.getUrl(storageId)) ?? undefined;
+    }
+    const previous = account.logoStorageId;
+    if (previous && (await ctx.db.system.get(previous))) {
+      await ctx.storage.delete(previous);
+    }
+    await ctx.db.patch(id, {
+      logoUrl,
+      logoStorageId: storageId ?? undefined,
+      updatedAt: Date.now(),
+    });
+    await logSystem(
+      ctx,
+      { accountId: id },
+      storageId ? "changed the logo" : "removed the custom logo",
+      undefined,
+      ctx.viewer._id,
+    );
+    return { ok: true as const };
+  },
+});
+
 export const setArchived = memberMutation({
   args: { ids: v.array(v.id("accounts")), archived: v.boolean() },
   handler: async (ctx, { ids, archived }) => {
@@ -728,6 +793,9 @@ export const setArchived = memberMutation({
       const account = await requireAccount(ctx, id);
       if (Boolean(account.archivedAt) === archived) continue;
       assertCan(ctx.viewer, "account.archive", [account.ownerId]);
+      if (account.mergedIntoId) {
+        fail("conflict", `${account.name} was merged into another account`);
+      }
       const twin = archived
         ? null
         : await findAccount(

@@ -1,7 +1,8 @@
 import { fail } from "./errors";
+import { EMBED_DIMS } from "./aiEmbedText";
 
-const endpoint = () =>
-  `${(process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/$/, "")}/responses`;
+const endpoint = (path: "responses" | "embeddings") =>
+  `${(process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/$/, "")}/${path}`;
 const TIMEOUT_MS = 20_000;
 const RETRY_MS = 400;
 
@@ -70,11 +71,12 @@ async function post(
   fetcher: typeof fetch,
   key: string,
   body: string,
+  path: "responses" | "embeddings" = "responses",
 ): Promise<Reply> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetcher(endpoint(), {
+    const response = await fetcher(endpoint(path), {
       method: "POST",
       headers: {
         authorization: `Bearer ${key}`,
@@ -192,4 +194,61 @@ export async function generate<T>(
     fail("unavailable", "AI gave an answer we couldn't use. Try again.");
   }
   return parsed as T;
+}
+
+const MAX_EMBED_BATCH = 64;
+
+export const embedModel = () =>
+  process.env.AI_EMBED_MODEL?.trim() || "text-embedding-3-small";
+
+/** One vector per input, in order. The inputs are never logged. */
+export async function embed(
+  inputs: string[],
+  fetcher: typeof fetch = fetch,
+): Promise<number[][]> {
+  const key = process.env.OPENAI_API_KEY?.trim();
+  if (!key) fail("unavailable", "AI is not set up on this server");
+  if (inputs.length === 0 || inputs.length > MAX_EMBED_BATCH) {
+    fail("unavailable", "Too many texts to embed at once");
+  }
+  const model = embedModel();
+  const body = JSON.stringify({
+    model,
+    input: inputs,
+    encoding_format: "float",
+    ...(/^text-embedding-3/.test(model) ? { dimensions: EMBED_DIMS } : {}),
+  });
+
+  let reply = await post(fetcher, key, body, "embeddings");
+  if (reply.status === 429 || reply.status >= 500) {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+    reply = await post(fetcher, key, body, "embeddings");
+  }
+  if (!reply.ok) {
+    console.log("ai embed failed", model, reply.status);
+    fail(
+      "unavailable",
+      reply.status === 401 || reply.status === 403
+        ? "The AI key on this server was not accepted"
+        : "AI is unavailable right now. Try again.",
+    );
+  }
+
+  const data = (
+    reply.json as { data?: { index?: number; embedding?: unknown }[] }
+  )?.data;
+  const vectors = [...(data ?? [])]
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+    .map((item) => item.embedding);
+  const valid = vectors.every(
+    (vector) =>
+      Array.isArray(vector) &&
+      vector.length === EMBED_DIMS &&
+      vector.every((value) => Number.isFinite(value)),
+  );
+  if (!valid || vectors.length !== inputs.length) {
+    fail("unavailable", "AI gave an answer we couldn't use. Try again.");
+  }
+  console.log("ai embed ok", model, inputs.length);
+  return vectors as number[][];
 }

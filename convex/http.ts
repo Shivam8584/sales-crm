@@ -3,6 +3,7 @@ import { auth } from "./auth";
 import { exotelWebhook } from "./calls";
 import { chatwootWebhook, emailInbound } from "./inbound";
 import { calcomWebhook, submit, submitPreflight } from "./leads";
+import { endpoint as mcpEndpoint, methodNotAllowed as mcpGet } from "./mcp";
 import { webhook as platformWebhook } from "./platform";
 import { reviewGap, reviewGapPreflight } from "./prospecting";
 
@@ -43,5 +44,7 @@ http.route({
   method: "POST",
   handler: exotelWebhook,
 });
+http.route({ path: "/mcp", method: "POST", handler: mcpEndpoint });
+http.route({ path: "/mcp", method: "GET", handler: mcpGet });
 
 export default http;

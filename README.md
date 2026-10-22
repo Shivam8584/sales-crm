@@ -5,6 +5,7 @@ The sales CRM for the Hypedrive team, built for selling to D2C brands and market
 - **Pipeline:** inbound leads with a speed-to-lead SLA, scoring and routing rules; accounts and people with GSTIN/DIN verification and an enrichment waterfall; deals with a board, a deal desk and one proposal per deal; tasks and a Today cockpit; a per-record timeline; custom fields and file attachments.
 - **Selling:** Sequences (template-first multi-step email and task follow-ups, with consent checks and one-reply unsubscribe), a Playbook of objection answers and battlecards, click-to-call and a call log, optional AI briefs, next-action hints, quick capture, drafts and call summaries.
 - **Platform:** sync and activation tracking against the Hypedrive platform, stuck-brand alerts, prospecting from marketplace listings, reports.
+- **Data quality and access:** duplicate finder and merge (Settings → Duplicates), a team Activity feed, a weekly manager report email, rep emails logged to timelines by BCC (`log@replies.hypedrive.app`), and an MCP server with personal API tokens so Claude or Cursor can read the CRM and add tasks and notes as you.
 - **Working in it:** saved views, pins, inline and bulk edits with Undo (Ctrl/Cmd+Z), a command palette, smart notifications with a daily digest and web push, a first-run tour, an installable PWA with an offline page, and an admin System page.
 
 Only `/demo` (the embeddable demo-request form) and `/api/health` are public. Everything else is behind sign-in.
@@ -115,6 +116,7 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `SMTP_USER`, `SMTP_PASSWORD`         | Convex | SMTP credentials                                                                                           |
 | `EMAIL_FROM`                         | Convex | Sender, e.g. `Hypedrive <no-reply@hypedrive.app>`                                                          |
 | `EMAIL_REPLY_TO`                     | Convex | Reply-To of sequence emails; the inbox that feeds the inbound webhook                                      |
+| `INBOUND_LOG_ADDRESS`                | Convex | Address reps BCC to log customer emails; default `log@replies.hypedrive.app`                               |
 | `VAPID_PUBLIC_KEY`                   | Convex | Browser push only. Public key; generate a pair with `npx web-push generate-vapid-keys`                     |
 | `VAPID_PRIVATE_KEY`                  | Convex | Browser push only. Private key of the same pair; keep it secret                                            |
 | `VAPID_SUBJECT`                      | Convex | Browser push only. Contact for push services, e.g. `mailto:you@hypedrive.in`                               |
@@ -126,7 +128,8 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `EXOTEL_CALLER_ID`                   | Convex | Your ExoPhone number, shown to the customer                                                                |
 | `EXOTEL_WEBHOOK_SECRET`              | Convex | Secret in the status callback `/webhooks/exotel?secret=…` that logs each call; unset rejects it            |
 | `AI_MODEL`                           | Convex | Model for briefs, drafts and call summaries; default `gpt-6.1-sol`                                         |
-| `AI_MODEL_FAST`                      | Convex | Model for quick capture and next actions; default `gpt-6-luna`                                             |
+| `AI_MODEL_FAST`                      | Convex | Model for quick capture, next actions and record questions; default `gpt-6-luna`                           |
+| `AI_EMBED_MODEL`                     | Convex | Embedding model for similar accounts; default `text-embedding-3-small` (1536 dimensions)                   |
 | `OPENAI_BASE_URL`                    | Convex | Optional proxy or compatible endpoint, e.g. `https://proxy.example/v1`                                     |
 | `NEXT_PUBLIC_CONVEX_URL`             | Next   | Required. Convex API URL (`CONVEX_CLOUD_ORIGIN`)                                                           |
 | `NEXT_PUBLIC_CONVEX_SITE_URL`        | Next   | Convex HTTP-actions URL (`CONVEX_SITE_ORIGIN`); the demo form posts leads here                             |
@@ -262,6 +265,14 @@ npx convex run playbook:seedStarter                    # starter Playbook entrie
 ```
 
 The admin System page (Settings → System) shows service health, the last week's failures and whether the list counts match, with a Rebuild button per table.
+
+### MCP (AI assistants)
+
+`POST https://convex-sales-site.hypedrive.app/mcp` is a stateless MCP server (Streamable HTTP, JSON-RPC). Each member creates a token under Settings → Profile → AI assistants; a token acts as that member, read-only or read and write, never with more permission than the member has. Tools: `search_records`, `get_account`, `get_person`, `get_lead`, `get_deal`, `list_my_tasks`, `todays_summary`, `list_sequences`, `get_sequence`, `read_sequence_log`, and (write tokens) `create_task` and `add_note`. Tokens are stored hashed, limited to 60 calls a minute, and browser origins are refused. The failed-auth limiter keys on `X-Forwarded-For`, so the proxy must set it.
+
+### Logging customer emails
+
+BCC `log@replies.hypedrive.app` (or forward the mail to it) from your own CRM email address and it appears on the matching person's or lead's timeline. It is accepted only when the sender is an active member and the mail passed SPF or DKIM; otherwise it is ignored silently. The Cloudflare rule and Worker are described in `deploy/inbound-email-worker/README.md`.
 
 ### AI, push and calls
 

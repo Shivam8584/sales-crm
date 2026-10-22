@@ -43,7 +43,10 @@ import FilesSection from "@/features/files/files-section";
 import MemberPicker from "@/features/members/member-picker";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
+import AskRecord from "@/features/ai/ask-record";
 import { useDraftAction } from "@/features/ai/use-draft-action";
+import { useDuplicatesAction } from "@/features/dedupe/use-duplicates-action";
+import { useMergedRedirect } from "@/features/dedupe/use-merged-redirect";
 import { usePinAction } from "@/features/pins/use-pins";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
@@ -69,8 +72,9 @@ const CRUMBS = [{ label: "People", href: "/people" }];
 
 export default function PersonPage({ id }: { id: Id<"people"> }) {
   const person = useQuery(api.people.get, { id });
+  useMergedRedirect(person?.mergedInto, "people");
 
-  if (person === undefined) {
+  if (person === undefined || person?.mergedInto) {
     return (
       <Page>
         <PageHeader crumbs={CRUMBS} title="" />
@@ -175,6 +179,7 @@ function PersonView({ person }: { person: Person }) {
   const save = useRecordUpdate(update, person._id);
   const pin = usePinAction({ personId: person._id });
   const draft = useDraftAction({ personId: person._id });
+  const duplicates = useDuplicatesAction({ personId: person._id });
   const setCreate = useUiStore((state) => state.setCreate);
   const deals = useQuery(api.people.deals, { personId: person._id });
   const tasks = useQuery(api.tasks.list, {
@@ -257,6 +262,7 @@ function PersonView({ person }: { person: Person }) {
               actions={[
                 pin,
                 draft.action,
+                duplicates.action,
                 { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
                 newDeal && {
                   label: "New deal",
@@ -273,6 +279,7 @@ function PersonView({ person }: { person: Person }) {
               ]}
             />
             {draft.dialog}
+            {duplicates.dialog}
           </>
         }
       />
@@ -379,6 +386,11 @@ function PersonView({ person }: { person: Person }) {
                 </Property>
               </Properties>
             </DetailSection>
+            <AskRecord
+              target={{ personId: person._id }}
+              noun="person"
+              className={ASIDE_SECTION}
+            />
             <ActivityTrend
               target={{ personId: person._id }}
               className={ASIDE_SECTION}
