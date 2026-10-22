@@ -5,7 +5,7 @@ import NoteIcon from "@/public/assets/icons/note.svg";
 import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
 import MailIcon from "@/public/assets/icons/mail-03.svg";
-import MessageIcon from "@/public/assets/icons/message.svg";
+import WhatsAppIcon from "@/public/assets/icons/whatsapp.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
 import DotIcon from "@/public/assets/icons/dot.svg";
 
@@ -32,7 +32,7 @@ export const KIND_META: Record<
   call: { label: "Call", icon: PhoneCallIcon },
   meeting: { label: "Meeting", icon: CalendarIcon },
   email: { label: "Email", icon: MailIcon },
-  whatsapp: { label: "WhatsApp", icon: MessageIcon },
+  whatsapp: { label: "WhatsApp", icon: WhatsAppIcon },
   change: { label: "Change", icon: EditIcon },
   system: { label: "Event", icon: DotIcon },
 };

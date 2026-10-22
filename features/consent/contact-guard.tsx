@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
 import MailIcon from "@/public/assets/icons/mail-04.svg";
-import MessageIcon from "@/public/assets/icons/message.svg";
+import WhatsAppIcon from "@/public/assets/icons/whatsapp.svg";
 import PhoneIcon from "@/public/assets/icons/phone.svg";
 
 function whatsappHref(phone: string) {
@@ -66,7 +66,7 @@ function actionsFor(person: { email: string | null; phone: string | null }) {
       channel: "whatsapp",
       label: "WhatsApp",
       verb: "Message",
-      icon: MessageIcon,
+      icon: WhatsAppIcon,
       href: whatsappHref(person.phone),
       external: true,
     });
