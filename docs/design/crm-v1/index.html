@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en" class="antialiased">
+<head>
+<meta charset="utf-8" />
+<title>Hypedrive CRM v1</title>
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="icons.js"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --font-sans: InterVariable, Inter, ui-sans-serif, system-ui, sans-serif;
+    --color-ink: #0a0b0d;
+    --color-rose-hd: #e11d48;
+    --color-well: #f5f5f6;
+    --color-well-hover: #eeeef0;
+  }
+  :root { font-feature-settings: "cv02","cv03","cv04","cv11","ss01"; --ease-out: cubic-bezier(.32,.72,0,1); }
+
+  .sb { width: 248px; transition: width 280ms var(--ease-out); }
+  .sb[data-collapsed] { width: 72px; }
+  .sb .lbl { white-space: nowrap; transition: opacity 160ms ease 80ms, transform 240ms var(--ease-out) 80ms; }
+  .sb[data-collapsed] .lbl { opacity: 0; transform: translateX(-4px); pointer-events: none; transition-delay: 0ms; }
+  .sb .logo-clip { width: 104px; transition: width 280ms var(--ease-out), opacity 160ms ease; }
+  .sb[data-collapsed] .logo-clip { width: 14px; }
+  .sb .cdot { opacity: 0; transition: opacity 160ms ease; }
+  .sb[data-collapsed] .cdot { opacity: 1; }
+  .sb[data-collapsed] .foot { flex-direction: column; align-items: stretch; }
+  .sb[data-collapsed] .foot .lbl { display: none; }
+  .sb .tgl { position: absolute; top: 16px; right: 12px; transition: right 280ms var(--ease-out), opacity 160ms ease; }
+  .sb[data-collapsed] .tgl { right: 20px; opacity: 0; }
+  .sb[data-collapsed]:hover .tgl { opacity: 1; }
+  .sb[data-collapsed]:hover .logo-clip { opacity: 0; }
+
+  .nav-a { color: rgb(10 11 13 / .55); transition: color 200ms ease, background-color 200ms ease, transform 120ms ease; }
+  .nav-a:hover { color: #0a0b0d; transition-duration: 120ms; }
+  .nav-a:not([aria-current]):hover { background: rgb(10 11 13 / .04); }
+  .nav-a[aria-current] { color: #0a0b0d; }
+  .ind { transition: transform 320ms var(--ease-out); }
+
+  .press { transition: transform 120ms ease, background-color 200ms ease, color 200ms ease; }
+  .press:active { transform: scale(.97); }
+  .row { transition: background-color 200ms ease, transform 120ms ease; }
+  .row:hover { background: #f5f5f6; transition-duration: 120ms; }
+  .row:active { transform: scale(.985); }
+  .seg-ind { transition: transform 320ms var(--ease-out), width 320ms var(--ease-out); }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .rise { animation: rise 480ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
+  @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+  .sk { background: linear-gradient(90deg,#f1f1f3 25%,#e8e8eb 37%,#f1f1f3 63%); background-size: 400% 100%; animation: shimmer 1.6s ease infinite; border-radius: .5rem; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; transition-delay: 0ms !important; } }
+</style>
+</head>
+<body class="bg-[#eceef1] font-sans text-ink">
+<div id="board" class="mx-auto flex max-w-[1764px] flex-col gap-16 p-12"></div>
+<script>
+const ic = (name, cls = "size-4") => `<i data-icon="${name}" class="${cls}"></i>`;
+const dot = (c) => `<span class="size-1.5 shrink-0 rounded-full ${c}"></span>`;
+const slash = `<span class="text-ink/20">/</span>`;
+const inr = (n) => "₹" + n.toLocaleString("en-IN");
+const fig = (n, text) => `<span data-count="${n}" data-text="${text ?? ""}">${text ?? n}</span>`;
+const fav = (letter, tint = "bg-white", text = "text-[0.8125rem]") => `<span class="grid size-full place-items-center rounded-[inherit] ${tint} ${text} font-semibold text-ink/70">${letter}</span>`;
+const logoTile = (letter, size = "size-11", r = "rounded-xl", text) => `<span class="${size} ${r} shrink-0 overflow-hidden bg-well outline-1 -outline-offset-1 outline-ink/5">${fav(letter, "bg-well", text ?? (/size-1[4-6]/.test(size) ? "text-xl" : undefined))}</span>`;
+const avatar = (ini, c = "bg-indigo-100 text-indigo-700", cls = "size-9 text-xs") => `<span class="grid ${cls} shrink-0 place-items-center rounded-full ${c} font-semibold">${ini}</span>`;
+const kbd = (k) => `<kbd class="rounded-md bg-white px-1.5 py-0.5 font-sans text-xs font-medium text-ink/50 shadow-[0_0_0_1px_rgba(10,11,13,.08)]">${k}</kbd>`;
+const btn = (label, icon = "", cls = "") => `<a href="#" class="press inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85 ${cls}">${icon ? ic(icon, "size-3.5") : ""}${label}</a>`;
+const quiet = (label, icon = "", cls = "") => `<a href="#" class="press inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium ring-1 ring-ink/10 ring-inset hover:bg-well ${cls}">${icon ? ic(icon, "size-3.5 text-ink/60") : ""}${label}</a>`;
+const wellBtn = (label, icon = "", cls = "") => `<a href="#" class="press inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-full bg-well px-3.5 text-sm font-medium hover:bg-well-hover ${cls}">${icon ? ic(icon, "size-3.5 text-ink/60") : ""}${label}</a>`;
+const iconBtn = (icon, label, cls = "") => `<a href="#" aria-label="${label}" class="press grid size-10 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-well hover:text-ink ${cls}">${ic(icon, "size-4")}</a>`;
+const act = (l) => `<span class="press inline-flex h-9 shrink-0 items-center rounded-full bg-white px-4 text-sm font-medium shadow-[0_0_0_1px_rgba(10,11,13,.1)]">${l}</span>`;
+
+/* ---------- shell ---------- */
+const NAV = [
+  [["activity", "Today"], ["inbox", "Inbox", "7"], ["check-square", "Tasks", "2"]],
+  [["eye", "Prospecting"], ["target-05", "Leads", "3"], ["clipboard", "Deals"], ["alert-triangle", "Activation"], ["automation", "Sequences"]],
+  [["building", "Accounts", "14"], ["users", "People"], ["bar-chart-10", "Reports"], ["clock", "Activity"], ["message-question", "Playbook"]],
+];
+const navItem = ([icon, label, count], on) => `
+  <li class="relative">
+    <a href="#" data-nav ${on ? 'aria-current="page"' : ""} class="nav-a press relative z-10 flex h-9 items-center gap-3 overflow-hidden rounded-xl pr-3 pl-4 text-sm font-medium">
+      <span class="relative shrink-0">${ic(icon, "size-4")}${count ? `<span class="cdot absolute -top-0.5 -right-1 size-1.5 rounded-full bg-ink/40"></span>` : ""}</span>
+      <span class="lbl min-w-0 flex-1 truncate">${label}</span>
+      ${count ? `<span class="lbl text-[0.8125rem] font-normal text-ink/35 tabular-nums">${count}</span>` : ""}
+    </a>
+  </li>`;
+const hair = `<li aria-hidden="true" class="mx-4 my-3 h-px bg-ink/[0.07]"></li>`;
+const sidebar = ({ active = "Today", collapsed } = {}) => `
+  <aside class="sb relative shrink-0 border-r border-ink/[0.06] bg-[#fafafa]" ${collapsed ? "data-collapsed" : ""}>
+    <div class="sticky top-0 flex flex-col pb-6">
+      <div class="relative flex h-16 shrink-0 items-center pl-7">
+        <span class="logo-clip block overflow-hidden"><img src="logo.svg" alt="Hypedrive" class="h-5 w-auto max-w-none" /></span>
+        <div class="tgl"><button data-collapse aria-label="Collapse sidebar" class="nav-a press grid size-8 place-items-center rounded-lg">${ic("sidebar", "size-4")}</button></div>
+      </div>
+      <nav aria-label="Primary" class="mt-2">
+        <ul class="nav relative flex flex-col gap-0.5 px-3">
+          <span aria-hidden="true" class="ind pointer-events-none absolute top-0 right-3 left-3 h-9 rounded-xl bg-white shadow-[0_1px_2px_rgba(10,11,13,.06),0_0_0_1px_rgba(10,11,13,.06)]"></span>
+          ${NAV.map((g) => g.map((n) => navItem(n, n[1] === active)).join("")).join(hair)}
+          ${hair}
+        </ul>
+      </nav>
+      <div class="foot flex items-center gap-0.5 px-3">
+        <a href="#" class="nav-a press flex h-9 min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-xl pr-3 pl-4 text-sm font-medium">${ic("settings", "size-4 shrink-0")}<span class="lbl truncate">Settings</span></a>
+        <a href="#" aria-label="Invite teammates" class="nav-a press grid h-9 min-w-9 place-items-center rounded-xl">${ic("user-plus", "size-4")}</a>
+        <a href="#" aria-label="Help and shortcuts" class="nav-a press grid h-9 min-w-9 place-items-center rounded-xl">${ic("message-question", "size-4")}</a>
+      </div>
+      <p class="lbl mt-6 px-7 text-xs text-ink/35">Pinned</p>
+      <ul class="mt-1 flex flex-col gap-0.5 px-3">${navItem(["building", "Drogo"])}${navItem(["clipboard", "Nykaa launch pilot"])}</ul>
+    </div>
+  </aside>`;
+
+const topBar = ({ wide } = {}) => `
+  <header class="sticky top-0 z-20 bg-white/85 backdrop-blur-xl">
+    <div class="mx-auto grid h-16 ${wide ? "" : "max-w-[1200px]"} grid-cols-12 items-center gap-x-8 px-10">
+      <button class="press ${wide ? "col-span-6" : "col-span-8"} flex h-10 items-center gap-2.5 rounded-full bg-well pr-2 pl-4 text-left text-sm text-ink/45 hover:bg-well-hover">
+        ${ic("search", "size-4 shrink-0")}<span class="flex-1 truncate">Search accounts, people, deals</span>${kbd("⌘K")}
+      </button>
+      <div class="${wide ? "col-span-6" : "col-span-4"} flex items-center justify-end gap-1">
+        <button aria-label="Notifications, 3 unread" class="press relative grid size-10 place-items-center rounded-full text-ink/60 hover:bg-well hover:text-ink">${ic("bell", "size-4")}<span class="absolute top-2 right-2.5 size-2 rounded-full bg-ink ring-2 ring-white"></span></button>
+        <button class="press -mr-1 flex h-10 items-center gap-2 rounded-full py-0.5 pr-3 pl-0.5 text-sm font-medium hover:bg-well">${avatar("SG")}Shivam Gupta${ic("chevron-down", "size-3 text-ink/40")}</button>
+      </div>
+    </div>
+  </header>`;
+
+const head = ({ crumbs, title, meta, actions = "", lead = "", phone }) => `
+  <section class="rise flex ${phone ? "flex-col gap-4" : "items-end justify-between gap-8"}">
+    <div class="flex min-w-0 items-center gap-5">
+      ${lead}
+      <div class="min-w-0">
+        ${crumbs ? `<p class="flex items-center gap-1.5 text-sm text-ink/45">${crumbs.map((c) => `<a href="#" class="hover:text-ink">${c}</a>`).join(slash)}</p>` : ""}
+        <h1 class="${crumbs ? "mt-1" : ""} ${phone ? "text-[1.875rem]/[1.1]" : "text-[2.75rem]/[1.1]"} font-semibold tracking-[-0.035em] text-balance">${title}</h1>
+        ${meta ? `<p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9375rem] text-ink/55 tabular-nums">${meta}</p>` : ""}
+      </div>
+    </div>
+    ${actions ? `<div class="flex shrink-0 items-center gap-2">${actions}</div>` : ""}
+  </section>`;
+
+const sectionHead = (title, link, count) => `
+  <div class="flex h-7 items-center justify-between gap-4">
+    <h2 class="text-[1.0625rem] font-semibold tracking-[-0.01em]">${title}${count ? `<span class="ml-1.5 font-medium text-ink/35 tabular-nums">${count}</span>` : ""}</h2>
+    ${link ? `<a href="#" class="press -mr-2 rounded-full px-2 py-1 text-sm font-medium text-ink/55 hover:bg-well hover:text-ink">${link}</a>` : ""}
+  </div>`;
+
+const seg = (items, on = 0, cls = "") => `
+  <div class="seg relative inline-flex rounded-full bg-well p-1 ${cls}">
+    <span aria-hidden="true" class="seg-ind absolute top-1 bottom-1 left-0 rounded-full bg-white shadow-[0_1px_2px_rgba(10,11,13,.06),0_0_0_1px_rgba(10,11,13,.06)]"></span>
+    ${items.map(([l, n], i) => `<button data-seg ${i === on ? 'aria-pressed="true"' : ""} class="press relative z-10 inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium ${i === on ? "text-ink" : "text-ink/50 hover:text-ink"}">${l}${n !== undefined ? `<span class="text-ink/35 tabular-nums">${n}</span>` : ""}</button>`).join("")}
+  </div>`;
+
+const searchPill = (ph, w = "w-72") => `<label class="flex h-10 ${w} items-center gap-2.5 rounded-full bg-well pr-2 pl-4 text-sm text-ink/45">${ic("search", "size-3.5 shrink-0")}<span class="flex-1 truncate">${ph}</span>${kbd("/")}</label>`;
+const chip = (label, value) => `<button class="press inline-flex h-10 items-center gap-1.5 rounded-full bg-well px-4 text-sm hover:bg-well-hover"><span class="text-ink/45">${label}</span><span class="font-medium">${value}</span>${ic("chevron-down", "size-3 text-ink/35")}</button>`;
+const toolbar = ({ search, chips = "", actions = "" }) => `
+  <div class="rise mt-6 flex items-center gap-2">
+    ${search ? searchPill(search) : ""}${chips}
+    <div class="ml-auto flex items-center gap-2">${actions}</div>
+  </div>`;
+const stats = (items, cls = "") => `
+  <div class="rise grid rounded-2xl bg-well p-1 ${cls}" style="grid-template-columns:repeat(${items.length},minmax(0,1fr))">
+    ${items.map(([l, n, c, text, tone]) => `
+      <a href="#" class="row rounded-xl px-4 py-3 hover:!bg-white">
+        <p class="flex items-center gap-1.5 text-xs text-ink/50">${c ? dot(c) : ""}<span class="truncate">${l}</span></p>
+        <p class="mt-1 text-xl font-semibold tabular-nums ${tone ?? ""}">${fig(n, text)}</p>
+      </a>`).join("")}
+  </div>`;
+
+/* ---------- frames ---------- */
+const caption = (label, note = "") => `<figcaption class="mb-3 flex items-baseline gap-3"><span class="text-xs font-semibold tracking-[0.08em] text-ink/45 uppercase">${label}</span>${note ? `<span class="text-xs text-ink/35">${note}</span>` : ""}</figcaption>`;
+const desktop = (label, { active, collapsed, wide, body, height = "", overlay = "" }) => `
+  <figure>
+    ${caption(label, "1440 wide")}
+    <div data-frame class="relative flex overflow-hidden rounded-[1.25rem] bg-white shadow-[0_40px_100px_-40px_rgba(0,0,0,.22),0_0_0_1px_rgba(10,11,13,.04)] ${height}" style="width:1440px">
+      ${sidebar({ active, collapsed })}
+      <div class="min-w-0 flex-1">
+        ${topBar({ wide })}
+        <main class="mx-auto ${wide ? "" : "max-w-[1200px]"} px-10 pt-6 pb-16">${body}</main>
+      </div>
+      ${overlay}
+    </div>
+  </figure>`;
+
+const TABS = [["activity", "Today"], ["inbox", "Inbox"], ["check-square", "Tasks"], ["target-05", "Leads"]];
+const tabBar = (on = "Today") => `
+  <div class="absolute inset-x-4 bottom-5 flex items-center gap-2.5">
+    <nav aria-label="Primary" class="flex h-[3.75rem] flex-1 items-center gap-1 rounded-full bg-white/80 p-1.5 shadow-[0_8px_30px_-8px_rgba(10,11,13,.22),0_0_0_1px_rgba(10,11,13,.06)] backdrop-blur-xl">
+      ${TABS.map(([i, l]) => `
+        <a href="#" class="press relative flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-full text-[0.6875rem] font-medium ${l === on ? "bg-ink/[0.06] text-ink" : "text-ink/45"}">
+          ${ic(i, "size-5")}<span>${l}</span>${l === "Inbox" ? `<span class="absolute top-2 right-[calc(50%-14px)] size-2 rounded-full bg-ink ring-2 ring-white"></span>` : ""}
+        </a>`).join("")}
+    </nav>
+    <a href="#" aria-label="More" class="press grid size-[3.75rem] shrink-0 place-items-center rounded-full bg-white/80 text-ink/60 shadow-[0_8px_30px_-8px_rgba(10,11,13,.22),0_0_0_1px_rgba(10,11,13,.06)] backdrop-blur-xl">${ic("dots-horizontal", "size-5")}</a>
+  </div>`;
+const phone = (label, { body, tab, sheet = "" }) => `
+  <figure class="shrink-0">
+    ${caption(label)}
+    <div data-frame class="relative h-[844px] w-[390px] overflow-hidden rounded-[2.75rem] bg-white shadow-[0_40px_100px_-40px_rgba(0,0,0,.3)] ring-1 ring-black/5">
+      <div class="flex h-14 items-center gap-1 px-5 pt-3">
+        <img src="logo.svg" class="h-[18px]" alt="Hypedrive" />
+        <span class="ml-auto grid size-10 place-items-center rounded-full text-ink/70">${ic("search", "size-4")}</span>
+        <span class="relative grid size-10 place-items-center rounded-full text-ink/70">${ic("bell", "size-4")}<span class="absolute top-2.5 right-2.5 size-2 rounded-full bg-ink ring-2 ring-white"></span></span>
+        ${avatar("SG", undefined, "size-8 text-[0.6875rem]")}
+      </div>
+      <div class="flex flex-col gap-8 px-5 pt-4 pb-28">${body}</div>
+      <div class="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white from-30% to-transparent"></div>
+      ${tabBar(tab)}
+      ${sheet}
+    </div>
+  </figure>`;
+
+/* ---------- Today ---------- */
+const metaToday = `<span class="inline-flex items-center gap-1.5 font-medium text-amber-700">${dot("bg-amber-500")}1 lead waiting</span>${slash}<span>1 due today</span>${slash}<span>3 stuck brands</span>`;
+const focusLead = ({ phone } = {}) => phone ? `
+  <section class="rise rounded-3xl bg-well p-4">
+    <div class="flex items-start gap-4">
+      ${avatar("DM", "bg-emerald-50 text-emerald-700", "size-12 text-sm")}
+      <div class="min-w-0 flex-1 pt-0.5">
+        <p class="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-amber-700">${ic("clock", "size-3.5")}Waiting 4h 8m, past the 1h reply goal</p>
+        <h2 class="mt-1 text-[1.0625rem]/6 font-semibold tracking-[-0.015em]">Dev Malhotra, Green Roots</h2>
+      </div>
+    </div>
+    ${btn("Call Dev", "phone", "mt-4 h-11 w-full")}
+  </section>` : `
+  <section class="rise flex h-full flex-col justify-between gap-8 rounded-[1.75rem] bg-well p-7">
+    <div class="flex items-start gap-5">
+      ${avatar("DM", "bg-emerald-50 text-emerald-700", "size-14 text-base")}
+      <div class="min-w-0">
+        <p class="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700">${ic("clock", "size-3.5")}Waiting 4h 8m, past the 1h reply goal</p>
+        <h2 class="mt-2 text-2xl/[1.2] font-semibold tracking-[-0.02em]">Dev Malhotra from Green Roots asked for a demo</h2>
+        <p class="mt-2 max-w-[48ch] text-[0.9375rem]/6 text-pretty text-ink/55">Came in through the contact form. Sells on Amazon and Nykaa, around 40 listings. Reply first, then qualify.</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 pl-[4.75rem]">
+      ${btn("Call Dev", "phone", "h-11 px-5")}${quiet("Open lead", "", "h-11")}
+      <span class="ml-auto text-sm text-ink/45">Contact form · Inbound</span>
+    </div>
+  </section>`;
+const month = ({ phone } = {}) => `
+  <section class="rise relative flex h-full flex-col overflow-hidden rounded-[1.75rem] bg-white p-6 shadow-[0_10px_40px_-18px_rgba(10,11,13,.22),0_0_0_1px_rgba(10,11,13,.06)]">
+    <div class="pointer-events-none absolute -top-24 -right-24 size-60 rounded-full bg-rose-hd/[0.07] blur-3xl"></div>
+    <p class="relative text-sm text-ink/50">Won this month</p>
+    <p class="relative mt-1 ${phone ? "text-[2.25rem]" : "text-[2.75rem]"}/none font-semibold tracking-[-0.035em] text-rose-hd tabular-nums">${fig(180000, "₹1.8L")}</p>
+    <div class="relative mt-4"><div class="flex h-1.5 overflow-hidden rounded-full bg-ink/[0.06]"><span class="w-[36%] rounded-full bg-rose-hd"></span></div><p class="mt-2 text-xs text-ink/45 tabular-nums">36% of the ₹5L target · 9 days left</p></div>
+    <dl class="relative mt-5 flex flex-col gap-3 border-t border-ink/[0.06] pt-4 text-sm tabular-nums">
+      <div class="flex items-baseline justify-between"><dt class="text-ink/50">Open pipeline</dt><dd class="font-medium">₹5.5L</dd></div>
+      <div class="flex items-baseline justify-between"><dt class="text-ink/50">Activations</dt><dd class="font-medium">3</dd></div>
+      <div class="flex items-baseline justify-between"><dt class="text-ink/50">Calls and meetings</dt><dd class="font-medium">14</dd></div>
+    </dl>
+  </section>`;
+const taskRow = ({ title, sub, tone, trail, lead }) => `
+  <li><a href="#" class="row -mx-3 flex min-h-[4.25rem] items-center gap-4 rounded-2xl px-3 py-2.5">
+    ${lead}
+    <div class="min-w-0 flex-1"><p class="truncate text-[0.9375rem] font-medium">${title}</p><p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-ink/50">${dot(tone)}<span class="truncate">${sub}</span></p></div>
+    ${trail}
+  </a></li>`;
+const checkLead = `<span class="grid size-11 shrink-0 place-items-center rounded-xl bg-well text-ink/50">${ic("check-square", "size-4")}</span>`;
+const upNext = ({ phone } = {}) => `
+  <section class="rise">
+    ${sectionHead("Up next", "All tasks", "3")}
+    <ul class="mt-2">
+      ${taskRow({ lead: checkLead, title: "Send revised proposal with bundled price", sub: phone ? "Drogo · today" : "Drogo · due today · high", tone: "bg-amber-500", trail: act("Done") })}
+      ${taskRow({ lead: checkLead, title: "Prepare demo around their Nykaa listings", sub: "Kesar Leaf Naturals · tomorrow", tone: "bg-sky-500", trail: phone ? "" : `<span class="text-sm text-ink/45">Tomorrow</span>` })}
+      ${taskRow({ lead: checkLead, title: "Win-back call: ask what changed", sub: "Glow Theory · Monday", tone: "bg-sky-500", trail: phone ? "" : `<span class="text-sm text-ink/45">Mon</span>` })}
+    </ul>
+  </section>`;
+const stuck = () => `
+  <section class="rise">
+    ${sectionHead("Stuck brands", "Activation", "3")}
+    <ul class="mt-2">
+      ${[["G", "Glow Theory", "Renewal due · 9 days", "bg-amber-500"], ["S", "Snackwala", "GST failed · 24 hours", "bg-red-500"], ["D", "Drogo", "Paused, no funds · 13 hours", "bg-amber-500"]].map(([l, t, s, c]) => `
+        <li><a href="#" class="row -mx-3 flex items-center gap-3.5 rounded-2xl px-3 py-2.5">${logoTile(l, "size-10")}<div class="min-w-0 flex-1"><p class="truncate text-[0.9375rem] font-medium">${t}</p><p class="flex items-center gap-1.5 truncate text-sm text-ink/45">${dot(c)}${s}</p></div></a></li>`).join("")}
+    </ul>
+  </section>`;
+const touched = () => `
+  <section class="rise">
+    ${sectionHead("Recently touched", "My accounts")}
+    <ul class="mt-2">
+      ${[["D", "Drogo", "Just now", "Live", "bg-emerald-500"], ["S", "Snackwala", "Yesterday", "Signed up", "bg-sky-500"]].map(([l, t, s, st, c]) => `
+        <li><a href="#" class="row -mx-3 flex items-center gap-3.5 rounded-2xl px-3 py-2.5">${logoTile(l, "size-10")}<div class="min-w-0 flex-1"><p class="truncate text-[0.9375rem] font-medium">${t}</p><p class="truncate text-sm text-ink/45">${s}</p></div><span class="flex items-center gap-1.5 text-sm text-ink/55">${dot(c)}${st}</span></a></li>`).join("")}
+    </ul>
+  </section>`;
+const todayBody = () => `
+  ${head({ crumbs: null, title: "Good evening, Shivam", meta: metaToday, actions: quiet("New task", "plus") })}
+  <div class="rise mt-6">${seg([["All", 7], ["Leads waiting", 1], ["Due today", 1], ["Next 7 days", 2], ["Stuck brands", 3]])}</div>
+  <div class="mt-8 grid grid-cols-12 gap-x-8 gap-y-12">
+    <div class="col-span-8 min-w-0">${focusLead()}</div>
+    <div class="col-span-4 min-w-0">${month()}</div>
+    <div class="col-span-8 min-w-0">${upNext()}</div>
+    <div class="col-span-4 flex min-w-0 flex-col gap-10">${stuck()}${touched()}</div>
+  </div>`;
+
+/* ---------- Deals board ---------- */
+const dealCard = ({ title, acct, letter, amount, owner, date, won, tone = "bg-sky-500", note }) => `
+  <li class="press cursor-grab rounded-2xl bg-white p-3.5 shadow-[0_1px_2px_rgba(10,11,13,.05),0_0_0_1px_rgba(10,11,13,.06)] hover:shadow-[0_6px_18px_-8px_rgba(10,11,13,.18),0_0_0_1px_rgba(10,11,13,.08)]">
+    <p class="text-[0.9375rem]/5 font-medium text-pretty">${title}</p>
+    <p class="mt-1.5 flex items-center gap-1.5 text-sm text-ink/50"><span class="size-4 overflow-hidden rounded-[4px]">${fav(letter, "bg-well !text-[0.5625rem]")}</span><span class="truncate">${acct}</span></p>
+    ${note ? `<p class="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-700">${dot("bg-amber-500")}${note}</p>` : ""}
+    <div class="mt-3 flex items-center gap-2 border-t border-ink/[0.06] pt-3 text-sm tabular-nums">
+      <span class="font-semibold ${won ? "text-rose-hd" : ""}">${amount}</span>
+      <span class="ml-auto text-ink/45">${date}</span>
+      ${avatar(owner, owner === "RR" ? "bg-amber-50 text-amber-800" : "bg-indigo-100 text-indigo-700", "size-6 text-[0.625rem]")}
+    </div>
+  </li>`;
+const column = (name, n, sum, cards, tone, won) => `
+  <section data-column class="flex w-[17.5rem] shrink-0 flex-col rounded-3xl bg-well p-2">
+    <header class="flex h-10 items-center gap-2 px-2.5">
+      ${dot(tone)}<h2 class="text-sm font-semibold">${name}</h2><span class="text-sm text-ink/35 tabular-nums">${n}</span>
+      <span class="ml-auto text-sm font-medium tabular-nums ${won ? "text-rose-hd" : "text-ink/55"}">${sum}</span>
+      <span class="grid size-7 place-items-center rounded-full text-ink/40 hover:bg-white">${ic("plus", "size-3.5")}</span>
+    </header>
+    <ul class="flex flex-col gap-2">${cards}</ul>
+  </section>`;
+const dealsBody = () => `
+  ${head({ title: "Deals", meta: `<span class="inline-flex items-center gap-1.5">${dot("bg-sky-500")}7 open</span>${slash}<span>₹5.5L open pipeline</span>${slash}<span><span class="font-medium text-rose-hd">₹1.8L</span> won this month</span>`, actions: seg([["Board"], ["List"]]) + quiet("Export", "share") + btn("New deal", "plus") })}
+  ${toolbar({ search: "Search deals", chips: chip("Owner", "Anyone") + chip("Account", "Any") + chip("Close date", "Any") })}
+  <div class="rise mt-6 -mr-10 flex gap-3 overflow-hidden pr-10 mask-r-from-[calc(100%-4rem)]">
+    ${column("Discovery", 3, "₹2.3L", dealCard({ title: "Myntra winter drop", acct: "Thread Theory", letter: "T", amount: "₹75K", owner: "RR", date: "21 Nov" }) + dealCard({ title: "Diaper range reviews, Q1", acct: "Baybee", letter: "B", amount: "₹1.2L", owner: "SG", date: "1 Dec" }) + dealCard({ title: "Amazon starter pack", acct: "Pawsome Pets", letter: "P", amount: "₹30K", owner: "SG", date: "26 Nov" }), "bg-ink/30")}
+    ${column("Demo", 1, "₹45K", dealCard({ title: "Quick commerce pilot", acct: "Urban Tadka", letter: "U", amount: "₹45K", owner: "RR", date: "29 Oct", note: "No activity in 9 days" }), "bg-sky-500")}
+    ${column("Proposal", 2, "₹1.8L", dealCard({ title: "Earbuds review push", acct: "Drogo", letter: "D", amount: "₹1.2L", owner: "SG", date: "5 Nov" }) + dealCard({ title: "Nykaa launch pilot", acct: "Kesar Leaf Naturals", letter: "K", amount: "₹60K", owner: "RR", date: "12 Nov" }), "bg-violet-500")}
+    ${column("Onboarding", 1, "₹95K", dealCard({ title: "Kitchen range launch, 3 SKUs", acct: "Dailora", letter: "D", amount: "₹95K", owner: "RR", date: "1 Nov" }), "bg-amber-500")}
+    ${column("Won", 1, "₹1.8L", dealCard({ title: "Festive bundle, 40 creators", acct: "Glow Theory", letter: "G", amount: "₹1.8L", owner: "SG", date: "18 Oct", won: true }), "bg-emerald-500", true)}
+  </div>`;
+
+/* ---------- Accounts ---------- */
+const ACCTS = [
+  ["D", "Drogo", "Live", "bg-emerald-500", "Electronics · Flipkart", 68, "SG", "₹1,20,000", 80, "20 Oct · Email"],
+  ["D", "Dailora", "Live", "bg-emerald-500", "Home · Amazon", 88, "RR", "₹95,000", 80, "21 Oct · Call"],
+  ["T", "Tiny Tots", "Org created", "bg-sky-500", "Baby", 35, "RR", "—", 40, "—"],
+  ["L", "Loom & Weft", "Live", "bg-emerald-500", "Apparel · Ajio", 85, "RR", "—", 80, "21 Oct · Call"],
+  ["S", "Snackwala", "Signed up", "bg-sky-500", "Food · Amazon", null, "SG", "—", 20, "22 Oct · Call"],
+  ["B", "Baybee", "Expanding", "bg-violet-500", "Baby · Amazon", 99, "SG", "₹1,20,000", 100, "22 Oct · Note"],
+  ["U", "Urban Tadka", "Org created", "bg-sky-500", "Food · Quick commerce", 35, "RR", "₹45,000", 40, "19 Oct · Meeting"],
+  ["M", "Mitti Craft", "Funded", "bg-amber-500", "Home · Meesho", 63, "RR", "—", 60, "18 Oct · WhatsApp"],
+];
+const health = (n) => n == null ? `<span class="text-ink/30">—</span>` : `<span class="inline-flex items-center gap-1.5 tabular-nums"><span class="relative size-3.5 rounded-full" style="background:conic-gradient(${n >= 70 ? "#10b981" : n >= 50 ? "#f59e0b" : "#ef4444"} ${n}%, rgb(10 11 13 / .08) 0)"><span class="absolute inset-[3px] rounded-full bg-white"></span></span>${n}</span>`;
+const bar = (n) => `<span class="inline-flex items-center gap-2 tabular-nums"><span class="h-1.5 w-16 overflow-hidden rounded-full bg-ink/[0.06]"><span class="block h-full rounded-full bg-ink" style="width:${n}%"></span></span><span class="w-9 text-ink/55">${n}%</span></span>`;
+const table = (rows) => `
+  <div class="rise mt-6">
+    <div class="grid h-9 grid-cols-[2rem_minmax(0,2.2fr)_minmax(0,1.6fr)_4.5rem_6rem_7rem_8rem_minmax(0,1.3fr)_2rem] items-center gap-4 border-b border-ink/[0.06] text-xs text-ink/45">
+      <span class="pl-1"><span class="block size-4 rounded-[5px] ring-1 ring-ink/15 ring-inset"></span></span><span>Account</span><span>Stage</span><span>Health</span><span>Owner</span><span class="text-right">Pipeline</span><span>Activation</span><span>Last interaction</span><span></span>
+    </div>
+    ${rows.map(([l, name, stage, tone, tags, h, owner, val, actv, last], i) => `
+      <a href="#" class="row group grid min-h-14 grid-cols-[2rem_minmax(0,2.2fr)_minmax(0,1.6fr)_4.5rem_6rem_7rem_8rem_minmax(0,1.3fr)_2rem] items-center gap-4 border-b border-ink/[0.06] text-sm ${i === 1 ? "bg-well" : ""}">
+        <span class="pl-1"><span class="block size-4 rounded-[5px] ring-1 ring-ink/15 ring-inset ${i === 1 ? "bg-ink ring-ink" : ""}"></span></span>
+        <span class="flex min-w-0 items-center gap-3">${logoTile(l, "size-8", "rounded-lg")}<span class="truncate text-[0.9375rem] font-medium">${name}</span></span>
+        <span class="flex min-w-0 flex-col"><span class="flex items-center gap-1.5">${dot(tone)}${stage}</span><span class="truncate text-xs text-ink/45">${tags}</span></span>
+        <span>${health(h)}</span>
+        <span class="flex items-center gap-2">${avatar(owner, owner === "RR" ? "bg-amber-50 text-amber-800" : undefined, "size-6 text-[0.625rem]")}<span class="truncate text-ink/70">${owner === "SG" ? "Shivam" : "Riya"}</span></span>
+        <span class="text-right font-medium tabular-nums ${val === "—" ? "text-ink/30" : ""}">${val}</span>
+        <span>${bar(actv)}</span>
+        <span class="truncate text-ink/55">${last}</span>
+        <span class="text-ink/30 opacity-0 group-hover:opacity-100">${ic("dots-horizontal", "size-4")}</span>
+      </a>`).join("")}
+  </div>`;
+const accountsBody = () => `
+  ${head({ title: "Accounts", meta: `<span class="inline-flex items-center gap-1.5">${dot("bg-emerald-500")}14 active</span>${slash}<span>₹5.5L in open pipeline</span>${slash}<span>67% average activation</span>`, actions: quiet("Export", "share") + btn("New account", "plus") })}
+  <div class="rise mt-6 flex items-center gap-2">${seg([["All", 14], ["My accounts", 6], ["Archived", 0]])}<span class="mx-1 h-5 w-px bg-ink/10"></span>${searchPill("Search accounts", "w-64")}${chip("Owner", "Anyone")}${chip("Stage", "Any")}<div class="ml-auto">${wellBtn("Views", "filter")}</div></div>
+  ${table(ACCTS)}
+  <p class="rise mt-4 text-sm text-ink/45 tabular-nums">14 accounts · 7 open deals</p>`;
+
+/* ---------- Account detail ---------- */
+const stepBars = (labels, done) => `
+  <div class="rise mt-8 grid gap-3" style="grid-template-columns:repeat(${labels.length},minmax(0,1fr))">
+    ${labels.map(([l, d], i) => `<div><span class="block h-1 rounded-full ${i < done ? "bg-ink" : "bg-ink/10"}"></span><p class="mt-2 flex items-center gap-1 text-sm ${i < done ? "font-medium" : "text-ink/40"}">${i < done ? ic("check-circle", "size-3.5 text-emerald-600") : ""}${l}</p><p class="text-xs text-ink/45">${d}</p></div>`).join("")}
+  </div>`;
+const notice = (glyph, tone, text, action) => `
+  <div class="rise mt-6 flex min-h-11 items-center gap-3 rounded-2xl ${tone} py-1.5 pr-1.5 pl-4 text-sm">
+    ${ic(glyph, "size-4 shrink-0")}<p class="min-w-0 flex-1 truncate">${text}</p>${action}
+  </div>`;
+const underline = (items, on = 0) => `
+  <div class="relative flex gap-6 border-b border-ink/[0.06]">
+    ${items.map(([l, n], i) => `<a href="#" class="relative -mb-px flex h-11 items-center gap-1.5 text-[0.9375rem] font-medium ${i === on ? "text-ink" : "text-ink/45 hover:text-ink"}">${l}${n ? `<span class="text-ink/35 tabular-nums">${n}</span>` : ""}${i === on ? `<span class="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-ink"></span>` : ""}</a>`).join("")}
+  </div>`;
+const timelineRow = (who, what, when, icon = "edit") => `
+  <li class="flex gap-3.5 py-3"><span class="grid size-8 shrink-0 place-items-center rounded-full bg-well text-ink/50">${ic(icon, "size-3.5")}</span><p class="min-w-0 flex-1 pt-1 text-[0.9375rem]/6"><span class="font-medium">${who}</span> <span class="text-ink/60">${what}</span></p><span class="pt-1.5 text-sm text-ink/40">${when}</span></li>`;
+const accountBody = () => `
+  ${head({ crumbs: ["Records", "Accounts"], lead: logoTile("D", "size-16", "rounded-2xl"), title: "Drogo", meta: `<span class="inline-flex items-center gap-1.5">${dot("bg-emerald-500")}Live</span>${slash}<span>Electronics · Flipkart</span>${slash}<a href="#" class="underline decoration-ink/20 underline-offset-2">drogo.in</a>`, actions: quiet("Follow", "eye") + `<a href="#" class="press grid size-10 place-items-center rounded-full ring-1 ring-ink/10 ring-inset">${ic("dots-horizontal", "size-4")}</a>` })}
+  ${stepBars([["Signed up", "12 Oct"], ["Org created", "14 Oct"], ["Funded", "16 Oct"], ["Live", "21 Oct"], ["Activated", "Next"]], 4)}
+  ${notice("alert-triangle", "bg-amber-50 text-amber-950", `<span class="font-medium">Paused, no funds for 13 hours.</span> <span class="opacity-70">Call: they top up and resume the campaign by hand.</span>`, `<span class="text-sm text-amber-900/70 px-2">Snooze</span>${btn("Open task", "", "h-8 px-3.5 text-[0.8125rem]")}`)}
+  <div class="mt-10 grid grid-cols-12 gap-x-8">
+    <div class="col-span-8 min-w-0">
+      <div class="rise">${underline([["Activity"], ["Platform"], ["People", 2], ["Deals", 1], ["Tasks", 2], ["Sequences"]])}</div>
+      <div class="rise mt-6 rounded-3xl bg-well p-2">
+        <div class="flex gap-1 p-1">${["Note", "Call", "Meeting", "Email", "WhatsApp"].map((t, i) => `<span class="inline-flex h-8 items-center rounded-full px-3 text-sm font-medium ${i === 0 ? "bg-white shadow-[0_0_0_1px_rgba(10,11,13,.06)]" : "text-ink/50"}">${t}</span>`).join("")}</div>
+        <div class="flex min-h-24 items-end justify-between rounded-[1.25rem] bg-white p-4 shadow-[0_0_0_1px_rgba(10,11,13,.06)]"><span class="self-start text-[0.9375rem] text-ink/35">Write a note, @ to mention</span>${btn("Add note", "", "h-9 px-3.5 opacity-40")}</div>
+      </div>
+      <div class="rise mt-8">${sectionHead("Today")}<ul class="mt-1 divide-y divide-ink/[0.06]">
+        ${timelineRow("Shivam Gupta", "completed “Send revised proposal with bundled price”", "2 min ago", "check-square")}
+        ${timelineRow("Riya Rep", "logged a call: they want the bundle at ₹1.1L", "1 h ago", "phone-call")}
+        ${timelineRow("Platform", "campaign paused, wallet at ₹0", "13 h ago", "alert-triangle")}
+      </ul></div>
+    </div>
+    <div class="col-span-4 flex min-w-0 flex-col gap-10">
+      <section class="rise relative overflow-hidden rounded-[1.75rem] bg-white p-6 shadow-[0_10px_40px_-18px_rgba(10,11,13,.22),0_0_0_1px_rgba(10,11,13,.06)]">
+        <p class="text-sm text-ink/50">Open pipeline</p>
+        <p class="mt-1 text-[2.25rem]/none font-semibold tracking-[-0.035em] tabular-nums">${fig(120000, "₹1,20,000")}</p>
+        <p class="mt-2 text-sm text-ink/45">Across 1 deal · Proposal</p>
+        <dl class="mt-5 flex flex-col gap-3 border-t border-ink/[0.06] pt-4 text-sm tabular-nums">
+          ${[["Discovery", 0], ["Demo", 0], ["Proposal", 100], ["Onboarding", 0]].map(([s, p]) => `<div><div class="flex justify-between"><dt class="text-ink/50">${s}</dt><dd class="font-medium">${p ? "₹1.2L" : "—"}</dd></div><div class="mt-1.5 h-1 rounded-full bg-ink/[0.06]"><span class="block h-full rounded-full bg-ink" style="width:${p}%"></span></div></div>`).join("")}
+        </dl>
+      </section>
+      <section class="rise">${sectionHead("People", "Add")}<ul class="mt-2">
+        ${[["SG", "Shivam Gupta", "Owner · shivam@hypedrive.in"], ["SQ", "Sana Qureshi", "Head of growth · +91 00000 33344"]].map(([i, n, s]) => `<li><a href="#" class="row -mx-3 flex items-center gap-3.5 rounded-2xl px-3 py-2.5">${avatar(i, i === "SQ" ? "bg-rose-50 text-rose-700" : undefined, "size-10 text-xs")}<div class="min-w-0"><p class="truncate text-[0.9375rem] font-medium">${n}</p><p class="truncate text-sm text-ink/45">${s}</p></div></a></li>`).join("")}
+      </ul></section>
+    </div>
+  </div>`;
+
+/* ---------- Reports ---------- */
+const reportsBody = () => `
+  ${head({ title: "Reports", meta: `<span>22 Sept – 22 Oct</span>${slash}<span>against 23 Aug – 22 Sept</span>`, actions: quiet("Export", "share") })}
+  <div class="rise mt-6 flex items-center gap-2">${seg([["Overview"], ["Funnel and sources"], ["Forecast"], ["Team"]])}<span class="mx-1 h-5 w-px bg-ink/10"></span>${chip("Period", "Last 30 days")}${chip("Source", "Any")}${chip("Owner", "Anyone")}</div>
+  ${stats([["New leads", 8, "", "8"], ["Converted", 2, "", "2"], ["Activated", 0, "", "0"], ["Speed to lead", 0, "", "0s"], ["Touched in 1h", 57, "", "57%"], ["Deals won", 180000, "", "₹1.8L", "text-rose-hd"], ["NPS", 0, "", "—"]], "mt-8")}
+  <p class="rise mt-2 flex gap-6 px-4 text-xs text-ink/45"><span><span class="font-medium text-emerald-700">+8</span> leads vs previous</span><span><span class="font-medium text-emerald-700">+1</span> deal won</span><span>3 replies breached the 1h goal</span></p>
+  <div class="mt-12 grid grid-cols-12 gap-x-8 gap-y-12">
+    <section class="rise col-span-6">
+      ${sectionHead("Pipeline", "Export")}
+      <p class="mt-1 text-sm text-ink/50 tabular-nums">7 open deals · ₹5.5L · ₹2.1L weighted</p>
+      <ul class="mt-5 flex flex-col gap-4">${[["Discovery", "₹2.3L", 3, 100], ["Demo", "₹45K", 1, 20], ["Proposal", "₹1.8L", 2, 78], ["Onboarding", "₹95K", 1, 41]].map(([s, v, n, w]) => `<li><div class="flex items-baseline justify-between text-sm"><span class="font-medium">${s}<span class="ml-1.5 font-normal text-ink/35">${n}</span></span><span class="font-medium tabular-nums">${v}</span></div><div class="mt-2 h-2 rounded-full bg-well"><span class="block h-full rounded-full bg-ink" style="width:${w}%"></span></div></li>`).join("")}</ul>
+      <div class="mt-6 grid grid-cols-2 rounded-2xl bg-well p-1"><div class="rounded-xl px-4 py-3"><p class="text-xs text-ink/50">Won in period</p><p class="mt-1 text-xl font-semibold text-rose-hd tabular-nums">₹1.8L <span class="text-sm font-medium text-ink/40">1 deal</span></p></div><div class="rounded-xl px-4 py-3"><p class="text-xs text-ink/50">Lost in period</p><p class="mt-1 text-xl font-semibold tabular-nums">₹50K <span class="text-sm font-medium text-ink/40">1 deal</span></p></div></div>
+    </section>
+    <section class="rise col-span-6">
+      ${sectionHead("Time to activate", "Export")}
+      <p class="mt-1 text-sm text-ink/50">Signup to activated: median 15 days across 2 brands</p>
+      <ul class="mt-5 divide-y divide-ink/[0.06]">${[["Signed up → Org created", "2.1d", "8 done · 0 waiting", 42], ["Org created → Funded", "2.2d", "6 done · 2 waiting", 44], ["Funded → Live", "4.4d", "5 done · 1 waiting", 88, true], ["Live → Activated", "2.1d", "2 done · 3 waiting", 42]].map(([s, d, sub, w, slow]) => `<li class="py-3.5"><div class="flex items-baseline justify-between text-sm"><span class="font-medium">${s}${slow ? `<span class="ml-2 inline-flex items-center gap-1 text-xs font-medium text-amber-700">${dot("bg-amber-500")}Slowest</span>` : ""}</span><span class="font-semibold tabular-nums">${d}</span></div><div class="mt-2 h-1.5 rounded-full bg-well"><span class="block h-full rounded-full ${slow ? "bg-amber-500" : "bg-ink/70"}" style="width:${w}%"></span></div><p class="mt-1.5 text-xs text-ink/45">${sub}</p></li>`).join("")}</ul>
+    </section>
+  </div>`;
+
+/* ---------- Sequences ---------- */
+const stepGlyphs = (list) => `<span class="flex items-center gap-1">${list.map((g) => `<span class="grid size-6 place-items-center rounded-md bg-well text-ink/55">${ic(g, "size-3")}</span>`).join("")}</span>`;
+const sequencesBody = () => `
+  ${head({ title: "Sequences", meta: `<span class="inline-flex items-center gap-1.5">${dot("bg-emerald-500")}1 live of 3</span>${slash}<span>1 record in progress</span>${slash}<span>1 exited early</span>`, actions: btn("New sequence", "plus") })}
+  <div class="rise mt-6 flex items-center gap-2">${seg([["All", 3], ["Active", 1], ["Drafts", 2], ["Paused", 0], ["Templates", 7]])}<span class="mx-1 h-5 w-px bg-ink/10"></span>${searchPill("Search sequences", "w-64")}${chip("Sort by", "Last edited")}<div class="ml-auto">${seg([["Table"], ["Cards"]])}</div></div>
+  <ul class="rise mt-6 divide-y divide-ink/[0.06] border-y border-ink/[0.06]">
+    ${[["New lead follow-up", "Live · v1", "bg-emerald-500", "A teammate enrols the record", ["automations/bolt", "mail", "clock", "mail", "clock"], 2, 1, "10 min ago"], ["New lead follow-up (copy)", "Draft", "bg-ink/25", "A teammate enrols the record", ["automations/bolt", "mail", "clock", "mail"], 0, 0, "9 h ago"], ["New demo request follow-up", "Draft", "bg-ink/25", "A demo request lead comes in", ["automations/bolt", "mail", "check-square", "clock", "automations/git-branch"], 0, 0, "21 h ago"]].map(([t, st, c, trig, steps, en, ac, ed]) => `
+      <li><a href="#" class="row -mx-3 flex min-h-[4.5rem] items-center gap-4 rounded-2xl px-3 py-3">
+        <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-well text-ink/60">${ic("automation", "size-4")}</span>
+        <div class="min-w-0 flex-1"><p class="truncate text-[0.9375rem] font-medium">${t}</p><p class="mt-0.5 flex items-center gap-1.5 text-sm text-ink/50">${dot(c)}<span>${st}</span><span class="text-ink/25">·</span><span class="truncate">${trig}</span></p></div>
+        ${stepGlyphs(steps)}
+        <span class="w-24 text-right text-sm tabular-nums"><span class="font-medium">${en}</span> <span class="text-ink/45">enrolled</span></span>
+        <span class="w-20 text-right text-sm tabular-nums"><span class="font-medium">${ac}</span> <span class="text-ink/45">active</span></span>
+        <span class="w-24 text-right text-sm text-ink/45">${ed}</span>
+      </a></li>`).join("")}
+  </ul>`;
+
+/* ---------- Settings ---------- */
+const field = (label, value, hint) => `<label class="block"><span class="text-sm font-medium">${label}</span><span class="mt-2 flex h-11 items-center rounded-xl bg-well px-4 text-[0.9375rem]">${value}</span>${hint ? `<span class="mt-1.5 block text-xs text-ink/45">${hint}</span>` : ""}</label>`;
+const settingsBody = () => `
+  ${head({ crumbs: ["Settings"], title: "Profile", meta: `<span class="inline-flex items-center gap-1.5">${dot("bg-emerald-500")}Admin</span>${slash}<span>shivam@hypedrive.in</span>` })}
+  <div class="mt-10 grid grid-cols-12 gap-x-8">
+    <nav class="rise col-span-3"><ul class="flex flex-col gap-0.5">
+      ${["Profile", "Team", "Workspace", "Custom fields", "Targets", "Duplicates", "Integrations", "System"].map((l, i) => `${i === 1 ? `<li class="mx-3 my-2 h-px bg-ink/[0.07]"></li>` : ""}<li><a href="#" class="row flex h-9 items-center rounded-xl px-3 text-sm font-medium ${i === 0 ? "bg-well text-ink" : "text-ink/55"}">${l}${l === "Team" ? `<span class="ml-auto font-normal text-ink/35">4</span>` : ""}</a></li>`).join("")}
+    </ul></nav>
+    <div class="col-span-7 flex flex-col gap-12">
+      <section class="rise">
+        <div class="flex items-center gap-4">${avatar("SG", undefined, "size-14 text-base")}<div><p class="text-[1.0625rem] font-semibold">Shivam Gupta</p><p class="text-sm text-ink/45">Member since 21 Oct</p></div></div>
+        <div class="mt-6"><span class="text-sm font-medium">Display name</span><div class="mt-2 flex gap-2"><span class="flex h-11 flex-1 items-center rounded-xl bg-well px-4 text-[0.9375rem]">Shivam Gupta</span>${btn("Save", "", "h-11 opacity-40")}</div><span class="mt-1.5 block text-xs text-ink/45">Shown on records you own, in the timeline and in mentions.</span></div>
+        <dl class="mt-4 divide-y divide-ink/[0.06] text-[0.9375rem]">${[["Email", "shivam@hypedrive.in"], ["Role", "Full access, including inviting people and changing roles"]].map(([a, b]) => `<div class="flex gap-4 py-3"><dt class="w-32 shrink-0 text-ink/50">${a}</dt><dd>${b}</dd></div>`).join("")}</dl>
+      </section>
+      <section class="rise">${sectionHead("Appearance")}<div class="mt-3 flex items-center justify-between gap-4 border-y border-ink/[0.06] py-4"><div><p class="text-[0.9375rem] font-medium">Theme</p><p class="text-sm text-ink/50">System follows your device's setting.</p></div>${seg([["System"], ["Light"], ["Dark"]], 1)}</div></section>
+      <section class="rise">${sectionHead("Keyboard shortcuts", "View all")}<ul class="mt-2 divide-y divide-ink/[0.06] border-y border-ink/[0.06]">${[["Search and run commands", "⌘ K"], ["Go to a page, e.g. leads", "G L"], ["Create a record", "C"], ["Undo the last action", "⌘ Z"]].map(([a, k]) => `<li class="flex h-12 items-center justify-between text-[0.9375rem]">${a}<span class="flex gap-1">${k.split(" ").map(kbd).join("")}</span></li>`).join("")}</ul></section>
+    </div>
+  </div>`;
+
+/* ---------- command palette ---------- */
+const palette = `
+  <div class="absolute inset-0 z-30 bg-[rgb(17_17_19/0.24)]"></div>
+  <div class="absolute top-[12%] left-1/2 z-40 w-[640px] -translate-x-1/2 overflow-hidden rounded-3xl bg-white shadow-[0_24px_80px_-24px_rgba(10,11,13,.4),0_0_0_1px_rgba(10,11,13,.06)]">
+    <div class="flex h-14 items-center gap-3 px-5">${ic("search", "size-4 text-ink/45")}<span class="flex-1 text-[0.9375rem]">dro<span class="ml-px inline-block h-5 w-px translate-y-1 bg-ink"></span></span>${kbd("Esc")}</div>
+    <div class="border-t border-ink/[0.06] p-2">
+      <p class="px-3 pt-2 pb-1 text-xs text-ink/45">Records</p>
+      ${[["D", "Drogo", "Account · Live · Shivam", true], ["E", "Earbuds review push", "Deal · Drogo · ₹1.2L", false], ["S", "Sana Qureshi", "Person · Drogo", false]].map(([l, t, s, on]) => `<div class="flex h-12 items-center gap-3 rounded-xl px-3 ${on ? "bg-well" : ""}">${logoTile(l, "size-8", "rounded-lg")}<span class="text-[0.9375rem] font-medium">${t}</span><span class="truncate text-sm text-ink/45">${s}</span>${on ? `<span class="ml-auto">${ic("arrow-right", "size-3.5 text-ink/40")}</span>` : ""}</div>`).join("")}
+      <p class="px-3 pt-3 pb-1 text-xs text-ink/45">Actions</p>
+      ${[["plus", "New deal for Drogo", "C"], ["phone-call", "Log a call on Drogo", ""], ["clipboard", "Go to Deals", "G D"]].map(([i, t, k]) => `<div class="flex h-11 items-center gap-3 rounded-xl px-3"><span class="grid size-8 place-items-center rounded-lg bg-well text-ink/55">${ic(i, "size-3.5")}</span><span class="text-[0.9375rem]">${t}</span><span class="ml-auto flex gap-1">${k.split(" ").filter(Boolean).map(kbd).join("")}</span></div>`).join("")}
+    </div>
+    <div class="flex h-11 items-center gap-4 border-t border-ink/[0.06] px-5 text-xs text-ink/45"><span>${kbd("↑↓")} move</span><span>${kbd("↵")} open</span><span class="ml-auto">${kbd("?")} all shortcuts</span></div>
+  </div>`;
+
+/* ---------- states ---------- */
+const emptyCard = (glyph, title, line, action) => `
+  <section class="rise flex flex-col items-center rounded-3xl bg-well px-8 py-12 text-center">
+    <span class="grid size-11 place-items-center rounded-full bg-white text-ink/60 shadow-[0_0_0_1px_rgba(10,11,13,.06)]">${ic(glyph, "size-4")}</span>
+    <p class="mt-4 text-[1.0625rem] font-semibold">${title}</p>
+    <p class="mt-1 max-w-[36ch] text-sm text-pretty text-ink/50">${line}</p>
+    ${action ? `<div class="mt-5">${action}</div>` : ""}
+  </section>`;
+const caughtUp = () => `
+  <section class="rise flex items-center gap-4 rounded-3xl bg-well p-4">
+    <span class="grid size-11 shrink-0 place-items-center rounded-full bg-white text-emerald-600">${ic("check-circle", "size-5")}</span>
+    <div class="min-w-0"><p class="font-semibold">You're all caught up</p><p class="text-sm text-pretty text-ink/50">No leads waiting and nothing due. New work shows up here.</p></div>
+  </section>`;
+const skeleton = () => `
+  <div class="flex flex-col gap-8" aria-busy="true">
+    <div><div class="sk h-4 w-28"></div><div class="sk mt-3 h-9 w-64"></div><div class="sk mt-3 h-4 w-48"></div></div>
+    <div class="sk h-10 w-full !rounded-full"></div>
+    ${[0, 1, 2, 3, 4].map(() => `<div class="flex items-center gap-4"><div class="sk size-11 !rounded-xl"></div><div class="flex-1"><div class="sk h-4 w-3/5"></div><div class="sk mt-2 h-3 w-2/5"></div></div><div class="sk h-4 w-14"></div></div>`).join("")}
+  </div>`;
+const errorState = () => emptyCard("alert-circle", "Couldn't load your accounts", "Check your connection and try again. Nothing you changed was lost.", btn("Try again", "", "h-9 px-4"));
+
+/* ---------- phone bodies ---------- */
+const phoneToday = () => `${head({ phone: true, title: "Good evening, Shivam", meta: metaToday.replace("3 stuck brands", "3 stuck") })}${focusLead({ phone: true })}${month({ phone: true })}${upNext({ phone: true })}`;
+const phoneDeals = () => `
+  ${head({ phone: true, title: "Deals", meta: `<span>7 open · ₹5.5L</span>${slash}<span class="font-medium text-rose-hd">₹1.8L won</span>`, actions: `<div class="flex gap-2">${searchPill("Search deals", "flex-1")}${btn("New", "plus", "h-10")}</div>` })}
+  <div class="-mx-5 flex gap-2 overflow-hidden px-5 mask-r-from-[calc(100%-3rem)]">${seg([["Discovery", 3], ["Demo", 1], ["Proposal", 2], ["Onboarding", 1]])}</div>
+  <ul class="-mt-4 divide-y divide-ink/[0.06]">${[["Myntra winter drop", "Thread Theory · 21 Nov", "₹75K", "T"], ["Diaper range reviews, Q1", "Baybee · 1 Dec", "₹1.2L", "B"], ["Amazon starter pack", "Pawsome Pets · 26 Nov", "₹30K", "P"]].map(([t, s, v, l]) => `<li class="flex items-center gap-3.5 py-3">${logoTile(l)}<div class="min-w-0 flex-1"><p class="truncate text-[0.9375rem] font-medium">${t}</p><p class="truncate text-sm text-ink/45">${s}</p></div><span class="text-[0.9375rem] font-semibold tabular-nums">${v}</span></li>`).join("")}</ul>`;
+const phoneAccount = () => `
+  ${head({ phone: true, crumbs: ["Accounts"], lead: logoTile("D", "size-14", "rounded-2xl"), title: "Drogo", meta: `<span class="inline-flex items-center gap-1.5">${dot("bg-emerald-500")}Live</span>${slash}<span>drogo.in</span>` })}
+  <div class="-mt-2 flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950">${ic("alert-triangle", "size-4 shrink-0")}<p class="flex-1 truncate font-medium">Paused, no funds · 13 h</p><span class="font-semibold">Open</span></div>
+  <div class="-mx-5 overflow-hidden px-5">${underline([["Activity"], ["Platform"], ["People", 2], ["Deals", 1]])}</div>
+  <ul class="-mt-4 divide-y divide-ink/[0.06]">${timelineRow("Shivam", "completed the proposal task", "2m", "check-square")}${timelineRow("Riya", "logged a call", "1h", "phone-call")}${timelineRow("Platform", "campaign paused", "13h", "alert-triangle")}</ul>`;
+const moreSheet = `
+  <div class="absolute inset-0 z-30 bg-[rgb(17_17_19/0.24)]"></div>
+  <div class="absolute inset-x-0 bottom-0 z-40 rounded-t-[2rem] bg-white px-3 pt-2 pb-8 shadow-[0_-20px_60px_-20px_rgba(10,11,13,.3)]">
+    <span class="mx-auto block h-1 w-9 rounded-full bg-ink/15"></span>
+    <div class="flex items-center justify-between px-3 pt-4 pb-2"><p class="text-[1.0625rem] font-semibold">More</p><span class="grid size-8 place-items-center rounded-full bg-well text-ink/50">${ic("x", "size-3.5")}</span></div>
+    <ul class="flex flex-col gap-0.5">${[["eye", "Prospecting"], ["clipboard", "Deals"], ["alert-triangle", "Activation"], ["automation", "Sequences"]].map((n) => navItem(n)).join("")}${hair}${[["building", "Accounts", "14"], ["users", "People"], ["bar-chart-10", "Reports"], ["clock", "Activity"], ["message-question", "Playbook"]].map((n) => navItem(n)).join("")}${hair}${navItem(["settings", "Settings"])}</ul>
+  </div>`;
+
+/* ---------- board copy ---------- */
+const DECISIONS = [
+  ["Rose", "Rose means money that has landed: won deal amounts, the Won column, Won this month, Won in period. Open pipeline, forecasts and weighted values stay ink. In a CRM nearly every screen shows money, so rose for all of it would stop meaning anything; tying it to won revenue keeps it rare and makes a close feel like a close."],
+  ["One primary", "Each screen has one ink button: the page's create action, or the focus card's action on Today (the head's New task drops to an outline). Everything else is a well or outline secondary."],
+  ["Sidebar", "No section headings. Hairlines split daily work (Today, Inbox, Tasks), the pipeline with its sequences, and records with insights. Settings, invite and help are one compact row right after the nav; pinned records follow under a quiet sentence-case label."],
+  ["Top bar", "64px, aligned to the 12-column content column: search spans 8 columns, the bell and the account button sit over the 4-column rail. Full-width pages (board, canvas) align it to their own column."],
+  ["Page head", "Breadcrumb as a quiet line above a large tight title (44px desktop, 30px phone, -0.035em), one meta line at 15px with status dots, actions at the right end of the head."],
+  ["Surfaces", "Wells (#f5f5f6) instead of bordered boxes. Lists are flat on 6% hairlines with 40–48px leads. One lifted card per screen: This month on Today, Open pipeline on a record."],
+  ["Views and filters", "Saved views are a segmented well with a sliding white capsule. Filters are well pills that read as sentences (Owner Anyone). Record tabs keep an ink underline."],
+  ["Notices", "Slim one-line rows with one glyph and at most one action, tinted by meaning (amber for stuck, red for failed). The old boxed alert panels are gone."],
+  ["Board", "Columns are 24px wells; cards are white 16px tiles with a 6% ring that lift on hover and while dragging. The column header carries the stage dot, count and value."],
+  ["Tables", "Rows are 56px on hairlines, 32px logo leads, status as dot and words, numbers tabular. Selection fills the row with the well colour."],
+];
+const MOTION = [
+  ["Sidebar collapse", "Width 248 → 72, labels fade and slide 4px left, the wordmark clips to its H", "280ms · (.32,.72,0,1)"],
+  ["Active indicator", "The white capsule slides to the chosen nav item, across the hairlines", "320ms · ease-out"],
+  ["Segmented views", "The capsule slides and resizes to the chosen view", "320ms · ease-out"],
+  ["Hover", "Rows and nav items tint to the well; out is slower than in", "120ms in · 200ms out"],
+  ["Press", "Buttons press to 97%, rows to 98.5%", "120ms"],
+  ["Entrance", "Head, then each section rises 8px and fades in, 60ms apart", "480ms · ease-out"],
+  ["Count-up", "Headline figures count from 0 on first load", "700ms · ease-out-cubic"],
+  ["Board drag", "The picked card lifts with a deeper shadow and tilts 2°; drop settles", "200ms"],
+  ["Reduced motion", "Everything cuts; figures render at their final value", "—"],
+];
+
+const board = document.getElementById("board");
+board.innerHTML = `
+  <header class="flex items-end justify-between gap-12">
+    <div class="max-w-3xl">
+      <h1 class="text-3xl font-semibold tracking-[-0.03em]">Hypedrive CRM, v1</h1>
+      <p class="mt-2 text-[0.9375rem]/6 text-pretty text-ink/55">The sales CRM redrawn in the language of creator Home v8: a light sidebar without headings, a top bar on the content column, large tight titles, wells instead of boxes, flat lists on hairlines and one ink button per screen. Rose is kept for revenue that has been won. Hover, press, collapse, views and the nav indicator are live.</p>
+    </div>
+    <button id="replay" class="press inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium shadow-[0_0_0_1px_rgba(10,11,13,.08)]">${ic("automations/play", "size-3.5")}Replay entrance</button>
+  </header>
+
+  <section class="rounded-3xl bg-white p-8">
+    <h2 class="text-xl font-semibold tracking-[-0.02em]">Decisions</h2>
+    <dl class="mt-4 grid grid-cols-2 gap-x-16">${DECISIONS.map(([a, b]) => `<div class="flex gap-4 border-t border-ink/[0.06] py-3"><dt class="w-36 shrink-0 text-sm font-medium">${a}</dt><dd class="text-sm text-pretty text-ink/60">${b}</dd></div>`).join("")}</dl>
+  </section>
+
+  ${desktop("a · Today", { active: "Today", body: todayBody() })}
+  ${desktop("b · Deals board", { active: "Deals", wide: true, body: dealsBody() })}
+  ${desktop("c · Accounts list", { active: "Accounts", body: accountsBody() })}
+  ${desktop("d · Account detail", { active: "Accounts", body: accountBody() })}
+  ${desktop("e · Reports", { active: "Reports", body: reportsBody() })}
+  ${desktop("f · Sequences", { active: "Sequences", body: sequencesBody() })}
+  ${desktop("g · Settings, profile", { active: "", body: settingsBody() })}
+  ${desktop("h · Search and commands (⌘K), sidebar collapsed", { active: "Accounts", collapsed: true, body: accountsBody(), height: "h-[760px]", overlay: palette })}
+
+  <div class="flex items-start gap-8">
+    ${phone("i · Phone · Today", { body: phoneToday(), tab: "Today" })}
+    ${phone("j · Phone · Deals", { body: phoneDeals(), tab: "" })}
+    ${phone("k · Phone · Account", { body: phoneAccount(), tab: "" })}
+    ${phone("l · Phone · More", { body: phoneToday(), tab: "", sheet: moreSheet })}
+  </div>
+
+  <div class="flex items-start gap-8">
+    ${phone("m · Empty", { body: head({ phone: true, title: "Tasks", meta: "<span>Nothing assigned to you</span>" }) + emptyCard("check-square", "No tasks yet", "Tasks you create or get assigned show up here, grouped by when they're due.", btn("New task", "plus", "h-9 px-4")), tab: "Tasks" })}
+    ${phone("n · Loading", { body: skeleton(), tab: "" })}
+    ${phone("o · Couldn't load", { body: head({ phone: true, title: "Accounts" }) + errorState(), tab: "" })}
+    ${phone("p · All caught up, offline", { body: head({ phone: true, title: "Good evening, Shivam", meta: "<span>Nothing due today</span>" }) + `<div class="-mt-4 flex min-h-11 items-center gap-3 rounded-2xl bg-well py-1.5 pr-1.5 pl-4 text-sm">${ic("alert-circle", "size-4 shrink-0 text-ink/50")}<p class="flex-1 truncate">You're offline, reconnecting</p></div>` + caughtUp() + month({ phone: true }), tab: "Today" })}
+  </div>
+
+  <section class="rounded-3xl bg-white p-8">
+    <h2 class="text-xl font-semibold tracking-[-0.02em]">Motion</h2>
+    <table class="mt-6 w-full text-sm"><tbody class="divide-y divide-ink/[0.06]">${MOTION.map(([a, b, c]) => `<tr><td class="py-2.5 pr-4 align-top font-medium whitespace-nowrap">${a}</td><td class="py-2.5 pr-4 align-top text-pretty text-ink/60">${b}</td><td class="py-2.5 text-right align-top whitespace-nowrap text-ink/45 tabular-nums">${c}</td></tr>`).join("")}</tbody></table>
+  </section>
+`;
+
+for (const el of document.querySelectorAll("i[data-icon]")) {
+  const def = window.ICONS[el.dataset.icon]; if (!def) { console.warn("missing icon", el.dataset.icon); continue; }
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", def.viewBox); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("fill", "none");
+  svg.setAttribute("class", el.getAttribute("class") ?? "size-4"); svg.innerHTML = def.inner; el.replaceWith(svg);
+}
+
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+for (const sb of document.querySelectorAll(".sb")) {
+  const ul = sb.querySelector(".nav"), ind = ul.querySelector(".ind");
+  const place = (a) => { if (!a) { ind.style.opacity = "0"; return; } ind.style.opacity = "1"; ind.style.transform = `translateY(${a.parentElement.offsetTop}px)`; };
+  new ResizeObserver(() => { ind.style.transition = "none"; place(ul.querySelector("[aria-current]")); ind.offsetWidth; ind.style.transition = ""; }).observe(ul);
+  for (const a of ul.querySelectorAll("[data-nav]")) a.addEventListener("click", (e) => { e.preventDefault(); ul.querySelector("[aria-current]")?.removeAttribute("aria-current"); a.setAttribute("aria-current", "page"); place(a); });
+  sb.querySelector("[data-collapse]").addEventListener("click", () => sb.toggleAttribute("data-collapsed"));
+}
+for (const s of document.querySelectorAll(".seg")) {
+  const ind = s.querySelector(".seg-ind");
+  const place = (b) => { ind.style.width = b.offsetWidth + "px"; ind.style.transform = `translateX(${b.offsetLeft}px)`; };
+  new ResizeObserver(() => { ind.style.transition = "none"; place(s.querySelector("[aria-pressed]")); ind.offsetWidth; ind.style.transition = ""; }).observe(s);
+  for (const b of s.querySelectorAll("[data-seg]")) b.addEventListener("click", () => {
+    const old = s.querySelector("[aria-pressed]"); old.removeAttribute("aria-pressed"); old.classList.replace("text-ink", "text-ink/50");
+    b.setAttribute("aria-pressed", "true"); b.classList.replace("text-ink/50", "text-ink"); place(b);
+  });
+}
+document.addEventListener("click", (e) => { if (e.target.closest('a[href="#"]')) e.preventDefault(); });
+
+const ease = (t) => 1 - Math.pow(1 - t, 3);
+const countUp = () => {
+  for (const el of document.querySelectorAll("[data-count]")) {
+    const end = +el.dataset.count, text = el.dataset.text;
+    if (reduce || !end) { el.textContent = text; continue; }
+    const fmt = (v) => text.startsWith("₹") ? (text.includes("L") ? `₹${(v / 100000).toFixed(1)}L` : inr(v)) : text.endsWith("%") ? `${v}%` : String(v);
+    const t0 = performance.now() + 180;
+    const tick = (now) => { const p = Math.min(1, Math.max(0, (now - t0) / 700)); el.textContent = p >= 1 ? text : fmt(Math.round(end * ease(p))); if (p < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }
+};
+const stagger = () => {
+  for (const f of document.querySelectorAll("[data-frame]")) [...f.querySelectorAll(".rise")].forEach((el, i) => { el.style.setProperty("--i", i); el.style.animation = "none"; el.offsetWidth; el.style.animation = ""; });
+  countUp();
+};
+document.getElementById("replay").addEventListener("click", stagger);
+stagger();
+</script>
+</body>
+</html>
