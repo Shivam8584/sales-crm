@@ -106,10 +106,14 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `SMTP_HOST`, `SMTP_PORT`             | Convex | SMTP server for `EMAIL_PROVIDER=smtp`; port 587 (STARTTLS) by default, 465 for TLS                         |
 | `SMTP_USER`, `SMTP_PASSWORD`         | Convex | SMTP credentials                                                                                           |
 | `EMAIL_FROM`                         | Convex | Sender, e.g. `Hypedrive <no-reply@hypedrive.app>`                                                          |
+| `EMAIL_REPLY_TO`                     | Convex | Reply-To of sequence emails; the inbox that feeds the inbound webhook                                      |
 | `VAPID_PUBLIC_KEY`                   | Convex | Browser push only. Public key; generate a pair with `npx web-push generate-vapid-keys`                     |
 | `VAPID_PRIVATE_KEY`                  | Convex | Browser push only. Private key of the same pair; keep it secret                                            |
 | `VAPID_SUBJECT`                      | Convex | Browser push only. Contact for push services, e.g. `mailto:you@hypedrive.in`                               |
 | `WHATSAPP_PHONE_NUMBER_ID`           | Convex | Meta WhatsApp Cloud API number; with `WHATSAPP_ACCESS_TOKEN` automations send for real                     |
+| `OPENAI_API_KEY`                     | Convex | Turns on AI briefs, drafts, call summaries and quick capture; unset = AI is hidden                         |
+| `AI_MODEL`                           | Convex | Model for briefs, drafts and call summaries; default `gpt-6.1-sol`                                         |
+| `AI_MODEL_FAST`                      | Convex | Model for quick capture and next actions; default `gpt-6-luna`                                             |
 | `NEXT_PUBLIC_CONVEX_URL`             | Next   | Required. Convex API URL (`CONVEX_CLOUD_ORIGIN`)                                                           |
 | `NEXT_PUBLIC_CONVEX_SITE_URL`        | Next   | Convex HTTP-actions URL (`CONVEX_SITE_ORIGIN`); the demo form posts leads here                             |
 | `NEXT_PUBLIC_CALCOM_LINK`            | Next   | Cal.com booking link shown after the demo form                                                             |

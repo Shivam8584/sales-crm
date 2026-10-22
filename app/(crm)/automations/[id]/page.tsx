@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 import AutomationPage from "@/features/automations/automation-page";
 
-export const metadata = { title: "Automation" };
+export const metadata = { title: "Sequence" };
 
 export default async function Page({
   params,

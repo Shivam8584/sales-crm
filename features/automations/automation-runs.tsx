@@ -68,7 +68,7 @@ export function RunStatus({
   );
 }
 
-/** Every record that went through the automation, newest first. */
+/** Every record that went through the sequence, newest first. */
 export default function AutomationRuns({
   id,
   graph,
@@ -98,7 +98,7 @@ export default function AutomationRuns({
   async function remove(run: Run) {
     try {
       await exit({ id: run._id });
-      toast(`Removed ${run.subject.name} from the automation`);
+      toast(`Removed ${run.subject.name} from the sequence`);
     } catch (error) {
       toast(readError(error).message, { tone: "danger" });
     }
@@ -215,7 +215,7 @@ export default function AutomationRuns({
             onSelect: () => void togglePause(run),
           },
           isLive(run.status) && {
-            label: "Remove from automation",
+            label: "Remove from sequence",
             icon: LogOutIcon,
             onSelect: () => void remove(run),
           },
@@ -242,7 +242,7 @@ export default function AutomationRuns({
           <EmptyState
             icon={AutomationIcon}
             title="No runs yet"
-            description={`Once the automation is active, every ${SUBJECT_LABEL[subjectKind][0]} it enrols shows up here with the step it's on.`}
+            description={`Once the sequence is active, every ${SUBJECT_LABEL[subjectKind][0]} it enrols shows up here with the step it's on.`}
           />
         }
       />

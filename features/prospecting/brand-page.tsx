@@ -375,7 +375,7 @@ function BrandView({ brand }: { brand: Brand }) {
             )}
           />
         </RecordSection>
-        <RecordSection title="Automations">
+        <RecordSection title="Sequences">
           {openLead || brand.account ? (
             <RecordAutomations
               target={

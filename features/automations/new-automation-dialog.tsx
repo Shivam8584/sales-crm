@@ -28,7 +28,7 @@ import { readError } from "@/lib/errors";
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** Name, trigger and record type for a blank automation; opens the editor after. */
+/** Name, trigger and record type for a blank sequence; opens the editor after. */
 export default function NewAutomationDialog({
   open,
   onOpenChange,
@@ -73,7 +73,7 @@ export default function NewAutomationDialog({
       <DialogContent>
         <form onSubmit={onSubmit}>
           <DialogHeader>
-            <DialogTitle>New automation</DialogTitle>
+            <DialogTitle>New sequence</DialogTitle>
             <DialogDescription>
               Pick what starts it and which records go through it. You’ll add
               the steps on the canvas.
@@ -90,7 +90,7 @@ export default function NewAutomationDialog({
                 autoFocus
                 value={name}
                 maxLength={120}
-                placeholder="Untitled automation"
+                placeholder="Untitled sequence"
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>

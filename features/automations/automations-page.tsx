@@ -54,7 +54,7 @@ const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const COLUMNS: Column<Row>[] = [
   {
     id: "name",
-    header: "Automation",
+    header: "Sequence",
     width: "minmax(14rem,2fr)",
     sortValue: (row) => row.name,
     cell: (row) => (
@@ -304,7 +304,7 @@ export default function AutomationsPage() {
   const empty = filtered ? (
     <EmptyState
       icon={AutomationIcon}
-      title="No automations match"
+      title="No sequences match"
       description="Try another search or clear the filters."
       action={
         <Button variant="secondary" size="sm" onClick={clearFilters}>
@@ -315,44 +315,44 @@ export default function AutomationsPage() {
   ) : view !== "all" ? (
     <EmptyState
       icon={AutomationIcon}
-      title={`No ${view === "draft" ? "drafts" : `${view} automations`}`}
+      title={`No ${view === "draft" ? "drafts" : `${view} sequences`}`}
       description={
         view === "active"
-          ? "Activate a draft to start enrolling records."
+          ? "Activate a draft to start adding records."
           : view === "paused"
-            ? "Paused automations hold their runs until you activate them again."
-            : "New automations start as drafts until you activate them."
+            ? "Paused sequences hold their runs until you activate them again."
+            : "New sequences start as drafts until you activate them."
       }
       action={
         <Button variant="secondary" size="sm" onClick={() => setView("all")}>
-          Show all automations
+          Show all sequences
         </Button>
       }
     />
   ) : (
     <EmptyState
       icon={AutomationIcon}
-      title="No automations yet"
-      description="Automations follow up for you: emails and WhatsApp templates with consent checks, tasks for the owner and waits that respect India working hours."
+      title="No sequences yet"
+      description="A sequence follows up for you with a few emails and call tasks, spaced out and sent only to people who agreed to hear from you. Start from a template."
       action={
-        canEdit && (
-          <span className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setView("templates")}
-            >
-              Browse templates
-            </Button>
+        <span className="flex gap-2">
+          <Button
+            variant={canEdit ? "secondary" : "primary"}
+            size="sm"
+            onClick={() => setView("templates")}
+          >
+            Browse templates
+          </Button>
+          {canEdit && (
             <Button
               variant="primary"
               size="sm"
               onClick={() => setCreating(true)}
             >
-              New automation
+              New sequence
             </Button>
-          </span>
-        )
+          )}
+        </span>
       }
     />
   );
@@ -360,7 +360,7 @@ export default function AutomationsPage() {
   return (
     <Page>
       <PageHeader
-        title="Automations"
+        title="Sequences"
         meta={
           <>
             {counts && (
@@ -383,15 +383,11 @@ export default function AutomationsPage() {
             <div className="flex flex-col gap-1">
               <h2 className="text-base font-medium">Start from a template</h2>
               <p className="caption-style text-fg-tertiary max-w-2xl leading-snug">
-                Each template opens as a draft you can edit. Nothing runs until
-                you activate it; messages stay in the outbox until an email or
-                WhatsApp provider is connected.
+                Each template opens as your own draft. Nothing is sent until you
+                activate it, and only to people who agreed to hear from us.
               </p>
             </div>
-            <TemplatesGallery
-              templates={catalog?.templates}
-              canCreate={canEdit}
-            />
+            <TemplatesGallery templates={catalog?.templates} />
           </div>
         </div>
       ) : (
@@ -401,7 +397,7 @@ export default function AutomationsPage() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder="Search automations"
+                placeholder="Search sequences"
               />
             }
             actions={
@@ -418,7 +414,7 @@ export default function AutomationsPage() {
                 />
                 {canEdit && (
                   <CreateButton onClick={() => setCreating(true)}>
-                    New automation
+                    New sequence
                   </CreateButton>
                 )}
               </>
@@ -456,13 +452,13 @@ export default function AutomationsPage() {
           </PageToolbar>
           {automations?.length !== 0 && (
             <dl
-              aria-label="Automations summary"
+              aria-label="Sequences summary"
               className="flex shrink-0 flex-wrap gap-x-6 gap-y-3 px-4 pt-3 pb-1 max-sm:hidden sm:gap-x-10"
             >
               {(
                 [
                   [
-                    "Live automations",
+                    "Live sequences",
                     counts && `${counts.active} of ${counts.all}`,
                   ],
                   ["Records in progress", totals?.active],
@@ -488,7 +484,7 @@ export default function AutomationsPage() {
           ) : (
             <div className="relative flex min-h-0 flex-1 flex-col sm:pt-4">
               <DataTable
-                label="Automations"
+                label="Sequences"
                 columns={COLUMNS}
                 rows={sortedRows}
                 getId={(row) => row._id}
@@ -497,13 +493,16 @@ export default function AutomationsPage() {
                 sort={sort}
                 onSortChange={(next) => setSortParam(`${next.id}:${next.dir}`)}
                 rowMenu={(row) =>
-                  canEdit
+                  canEdit || row.mine
                     ? [
                         {
                           label: row.status === "active" ? "Pause" : "Activate",
                           onSelect: () => void toggle(row),
                         },
-                        { label: "Duplicate", onSelect: () => void copy(row) },
+                        canEdit && {
+                          label: "Duplicate",
+                          onSelect: () => void copy(row),
+                        },
                         {
                           label: "Delete",
                           icon: TrashIcon,
@@ -515,7 +514,7 @@ export default function AutomationsPage() {
                 }
                 footer={[
                   {
-                    label: "Automations in view",
+                    label: "Sequences in view",
                     value: sortedRows?.length ?? 0,
                   },
                   {

@@ -51,10 +51,11 @@ import TestRunDialog from "./editor/test-run-dialog";
 import { stopTestRun } from "./editor/test-run";
 import { STATUS_TONE } from "./node-meta";
 import { StoppedStatus } from "./automation-parts";
+import SequenceView from "./sequence-view";
 import AutomationAnalytics from "./automation-analytics";
 import AutomationRuns from "./automation-runs";
 
-const CRUMBS = [{ label: "Automations", href: "/automations" }];
+const CRUMBS = [{ label: "Sequences", href: "/automations" }];
 const SAVE_DELAY = 600;
 const RULE_FIELDS = new Set([
   "goal",
@@ -74,6 +75,7 @@ const RULE_FIELDS = new Set([
 ]);
 
 export default function AutomationPage({ id }: { id: Id<"automations"> }) {
+  const viewer = useViewer();
   const automation = useQuery(api.automations.get, { id });
   if (automation === undefined) return <EditorSkeleton />;
   if (automation === null) {
@@ -82,17 +84,18 @@ export default function AutomationPage({ id }: { id: Id<"automations"> }) {
         <PageHeader crumbs={CRUMBS} title="Not found" />
         <EmptyState
           icon={AutomationIcon}
-          title="This automation doesn't exist"
+          title="This sequence doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
             <Button variant="secondary" size="sm" href="/automations">
-              Back to automations
+              Back to sequences
             </Button>
           }
         />
       </Page>
     );
   }
+  if (viewer.role === "rep") return <SequenceView automation={automation} />;
   return <Editor key={id} automation={automation} />;
 }
 
@@ -112,9 +115,7 @@ function EditorSkeleton() {
 
 function Editor({ automation }: { automation: AutomationDoc }) {
   const router = useRouter();
-  const viewer = useViewer();
   const id = automation._id as Id<"automations">;
-  const readOnly = viewer.role === "rep";
   const catalog = useQuery(api.automations.catalog, {});
   const nodeStats = useQuery(api.automations.nodeStats, { id });
   const update = useMutation(api.automations.update);
@@ -164,12 +165,12 @@ function Editor({ automation }: { automation: AutomationDoc }) {
 
   const saveTimer = useRef<number | null>(null);
   useEffect(() => {
-    if (revision === 0 || readOnly) return;
+    if (revision === 0) return;
     saveTimer.current = window.setTimeout(() => void persist(), SAVE_DELAY);
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
-  }, [revision, persist, readOnly]);
+  }, [revision, persist]);
 
   const flush = useCallback(async () => {
     if (saveTimer.current) {
@@ -284,7 +285,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
     automation,
     catalog,
     names,
-    readOnly,
+    readOnly: false,
     nodeStats,
     setTrigger: (trigger) => void patch({ trigger }),
     setSettings: (settings) => void patch({ settings }),
@@ -372,68 +373,63 @@ function Editor({ automation }: { automation: AutomationDoc }) {
   const active = automation.status === "active";
   const changed = active && automation.hasChanges;
 
-  useCommandActions(
-    readOnly
-      ? []
-      : [
-          {
-            id: "automation-test",
-            label: "Test run",
-            perform: () => setTesting(true),
-            icon: PlayIcon,
-          },
-          active
-            ? {
-                id: "automation-pause",
-                label: "Pause automation",
-                perform: () => void onPause(),
-              }
-            : {
-                id: "automation-activate",
-                label: "Activate automation",
-                perform: () => void onActivate(),
-              },
-        ],
-  );
+  useCommandActions([
+    {
+      id: "automation-test",
+      label: "Test run",
+      perform: () => setTesting(true),
+      icon: PlayIcon,
+    },
+    active
+      ? {
+          id: "automation-pause",
+          label: "Pause sequence",
+          perform: () => void onPause(),
+        }
+      : {
+          id: "automation-activate",
+          label: "Activate sequence",
+          perform: () => void onActivate(),
+        },
+  ]);
 
-  const primary = readOnly ? null : active && !changed ? (
-    <Button
-      variant="secondary"
-      size="sm"
-      className="h-control-md py-0"
-      onClick={() => void onPause()}
-    >
-      Pause
-    </Button>
-  ) : (
-    <Tooltip
-      content={
-        issues.length
-          ? `${issues.length} to fix first`
-          : changed
-            ? `Publish as version ${automation.version + 1}`
-            : "Start enrolling"
-      }
-    >
+  const primary =
+    active && !changed ? (
       <Button
-        variant="primary"
+        variant="secondary"
         size="sm"
         className="h-control-md py-0"
-        loading={busy}
-        onClick={() => void onActivate()}
+        onClick={() => void onPause()}
       >
-        {changed ? "Publish changes" : "Activate"}
+        Pause
       </Button>
-    </Tooltip>
-  );
+    ) : (
+      <Tooltip
+        content={
+          issues.length
+            ? `${issues.length} to fix first`
+            : changed
+              ? `Publish as version ${automation.version + 1}`
+              : "Start enrolling"
+        }
+      >
+        <Button
+          variant="primary"
+          size="sm"
+          className="h-control-md py-0"
+          loading={busy}
+          onClick={() => void onActivate()}
+        >
+          {changed ? "Publish changes" : "Activate"}
+        </Button>
+      </Tooltip>
+    );
 
-  const saveLabel = readOnly
-    ? null
-    : saveFailed
-      ? "Not saved"
-      : revision > savedRevision
-        ? "Saving…"
-        : `Saved ${relativeTime(automation.updatedAt)}`;
+  const saveLabel = saveFailed
+    ? "Not saved"
+    : revision > savedRevision
+      ? "Saving…"
+      : `Saved ${relativeTime(automation.updatedAt)}`;
   const stats = automation.stats;
 
   return (
@@ -475,39 +471,33 @@ function Editor({ automation }: { automation: AutomationDoc }) {
               <PageActions
                 label="Automation actions"
                 primary={primary}
-                primaryItem={
-                  !readOnly && {
-                    label:
-                      active && !changed
-                        ? "Pause"
-                        : changed
-                          ? "Publish changes"
-                          : "Activate",
-                    onSelect: () =>
-                      void (active && !changed ? onPause() : onActivate()),
-                  }
-                }
-                actions={
-                  readOnly
-                    ? []
-                    : [
-                        changed && {
-                          label: "Pause",
-                          onSelect: () => void onPause(),
-                        },
-                        {
-                          label: "Duplicate",
-                          onSelect: () => void onDuplicate(),
-                        },
-                        {
-                          label: "Delete",
-                          icon: TrashIcon,
-                          tone: "danger",
-                          separated: true,
-                          onSelect: () => void onDelete(),
-                        },
-                      ]
-                }
+                primaryItem={{
+                  label:
+                    active && !changed
+                      ? "Pause"
+                      : changed
+                        ? "Publish changes"
+                        : "Activate",
+                  onSelect: () =>
+                    void (active && !changed ? onPause() : onActivate()),
+                }}
+                actions={[
+                  changed && {
+                    label: "Pause",
+                    onSelect: () => void onPause(),
+                  },
+                  {
+                    label: "Duplicate",
+                    onSelect: () => void onDuplicate(),
+                  },
+                  {
+                    label: "Delete",
+                    icon: TrashIcon,
+                    tone: "danger",
+                    separated: true,
+                    onSelect: () => void onDelete(),
+                  },
+                ]}
               />
             </>
           }
@@ -534,25 +524,19 @@ function Editor({ automation }: { automation: AutomationDoc }) {
           }
         >
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            {readOnly ? (
-              <span className="text-fg-secondary truncate text-sm">
-                {automation.description || "No description"}
-              </span>
-            ) : (
-              <InlineText
-                label="Description"
-                value={automation.description || null}
-                placeholder="Add a description"
-                className="max-w-xl min-w-0 flex-1 text-sm"
-                onSave={async (description) => {
-                  try {
-                    await update({ id, patch: { description } });
-                  } catch (error) {
-                    return readError(error).message;
-                  }
-                }}
-              />
-            )}
+            <InlineText
+              label="Description"
+              value={automation.description || null}
+              placeholder="Add a description"
+              className="max-w-xl min-w-0 flex-1 text-sm"
+              onSave={async (description) => {
+                try {
+                  await update({ id, patch: { description } });
+                } catch (error) {
+                  return readError(error).message;
+                }
+              }}
+            />
           </div>
           <dl className="flex shrink-0 items-center gap-3 text-xs max-md:hidden">
             {(
@@ -569,7 +553,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
               </div>
             ))}
           </dl>
-          {issues.length > 0 && !readOnly && (
+          {issues.length > 0 && (
             <Button
               variant="ghost"
               size="xs"
@@ -595,7 +579,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
         ) : (
           <Canvas
             subjectKind={automation.subjectKind}
-            readOnly={readOnly}
+            readOnly={false}
             describe={describe}
             issues={issuesByNode}
             counts={counts}

@@ -19,6 +19,11 @@ import {
 } from "@/components/_ui/command";
 import AccountLogo from "@/features/accounts/account-logo";
 import {
+  CaptureDialog,
+  type CaptureRequest,
+} from "@/features/ai/capture-dialog";
+import { useAiEnabled } from "@/features/ai/use-ai";
+import {
   DEAL_STAGE_LABEL,
   LEAD_STATUS_LABEL,
   personName,
@@ -109,11 +114,25 @@ function rank<T>(
     .map((entry) => entry.item);
 }
 
+export default function CommandMenu() {
+  const [capture, setCapture] = useState<CaptureRequest | null>(null);
+  return (
+    <>
+      <Palette onCapture={setCapture} />
+      <CaptureDialog request={capture} onClose={() => setCapture(null)} />
+    </>
+  );
+}
+
 /**
  * ⌘K: contextual actions, server-side record search across every type
  * (recently opened records while the box is empty), create and navigation.
  */
-export default function CommandMenu() {
+function Palette({
+  onCapture,
+}: {
+  onCapture: (request: CaptureRequest) => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const open = useUiStore((state) => state.commandOpen);
@@ -123,6 +142,7 @@ export default function CommandMenu() {
   const { role } = useViewer();
   const { belowLg } = useMobileBreakpoints();
   const [search, setSearch] = useState("");
+  const aiEnabled = useAiEnabled();
   const deferred = useRef<(() => void) | null>(null);
   const history = useToastStore(selectUndoHistory);
   const toggleHere = useMutation(api.pins.toggle);
@@ -244,6 +264,18 @@ export default function CommandMenu() {
 
   function go(href: string) {
     run(() => router.push(href));
+  }
+
+  const typed = search.trim();
+  const canCapture = aiEnabled && typed.length >= 12 && /\s/.test(typed);
+
+  function startCapture() {
+    const here = recordAt(pathname);
+    const request: CaptureRequest = { text: typed };
+    if (here?.type === "account") {
+      request.accountId = here.id as CaptureRequest["accountId"];
+    }
+    run(() => onCapture(request));
   }
 
   return (
@@ -462,6 +494,17 @@ export default function CommandMenu() {
                   <Kbd className="ml-auto">[</Kbd>
                 </CommandItem>
               )}
+            </CommandGroup>
+          )}
+
+          {canCapture && (
+            <CommandGroup>
+              <CommandItem value="ai:capture" onSelect={startCapture}>
+                <ItemIcon>
+                  <PlusIcon aria-hidden className="size-3" />
+                </ItemIcon>
+                <span className="truncate">Add with AI: “{typed}”</span>
+              </CommandItem>
             </CommandGroup>
           )}
         </CommandList>

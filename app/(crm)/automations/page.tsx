@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import AutomationsPage from "@/features/automations/automations-page";
 
-export const metadata = { title: "Automations" };
+export const metadata = { title: "Sequences" };
 
 export default function Page() {
   return (

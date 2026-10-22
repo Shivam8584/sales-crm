@@ -28,6 +28,7 @@ import {
 import AccountLogo from "@/features/accounts/account-logo";
 import AccountPicker from "@/features/accounts/account-picker";
 import MemberPicker from "@/features/members/member-picker";
+import { useDraftAction } from "@/features/ai/use-draft-action";
 import { usePinAction } from "@/features/pins/use-pins";
 import RecordTasks from "@/features/tasks/record-tasks";
 import { TaskChecklistSkeleton } from "@/features/tasks/task-checklist";
@@ -99,6 +100,7 @@ function DealView({ deal }: { deal: DealRow }) {
   const setCreate = useUiStore((state) => state.setCreate);
   const tasks = useQuery(api.tasks.list, { dealId: deal._id, done: "none" });
   const pin = usePinAction({ dealId: deal._id });
+  const draft = useDraftAction({ dealId: deal._id });
   const open = isOpenStage(deal.stage);
 
   const addTask = () =>
@@ -167,6 +169,7 @@ function DealView({ deal }: { deal: DealRow }) {
               }
               actions={[
                 pin,
+                draft.action,
                 { label: "Add task", icon: PlusIcon, onSelect: addTask },
                 deal.account && {
                   label: "Open account",
@@ -182,6 +185,7 @@ function DealView({ deal }: { deal: DealRow }) {
                 },
               ]}
             />
+            {draft.dialog}
           </>
         }
       />

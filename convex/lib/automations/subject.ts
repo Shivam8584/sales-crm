@@ -3,6 +3,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import {
   CONSENT_PURPOSES,
   type ConsentPurpose,
+  type ContactReason,
 } from "../../../lib/domain/consent";
 import type { Channel } from "../../../lib/domain/enums";
 import {
@@ -218,7 +219,11 @@ export async function recipientFor(
   return chosen ? fromPerson(chosen) : null;
 }
 
-export type Decision = { allowed: boolean; message: string };
+export type Decision = {
+  allowed: boolean;
+  message: string;
+  reason?: ContactReason;
+};
 
 /** The consent gate for one outbound message, through `canContact`. */
 export async function contactDecision(
@@ -236,7 +241,11 @@ export async function contactDecision(
   const decision = recipient.personId
     ? await canContact(ctx, recipient.personId, channel, purpose)
     : await canContactLead(ctx, recipient.leadId!, channel, purpose);
-  return { allowed: decision.allowed, message: decision.message };
+  return {
+    allowed: decision.allowed,
+    message: decision.message,
+    reason: decision.reason,
+  };
 }
 
 export function recipientAddress(recipient: Recipient, channel: Channel) {

@@ -278,6 +278,7 @@ export const receive = internalMutation({
       const result = await recordReply(ctx, {
         refs: group.refs,
         channel: input.channel,
+        text: input.text,
         at,
         dealIds: await openDealIds(ctx, group.person),
       });

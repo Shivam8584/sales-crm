@@ -26,6 +26,8 @@ import {
   PageHeader,
   PageStatus,
 } from "@/components/shell/page";
+import AccountBrief from "@/features/ai/account-brief";
+import { useDraftAction } from "@/features/ai/use-draft-action";
 import AccountStallBanner from "@/features/activation/account-stall-banner";
 import { RecordAutomations } from "@/features/automations/record-automations";
 import RecordDeals from "@/features/deals/record-deals";
@@ -100,6 +102,7 @@ function AccountView({ account }: { account: Account }) {
   const setArchived = useMutation(api.accounts.setArchived);
   const save = useRecordUpdate(update, account._id);
   const pin = usePinAction({ accountId: account._id });
+  const draft = useDraftAction({ accountId: account._id });
   const setCreate = useUiStore((state) => state.setCreate);
   const people = useQuery(api.people.list, { accountId: account._id });
   const deals = useQuery(api.deals.list, { accountId: account._id });
@@ -178,6 +181,7 @@ function AccountView({ account }: { account: Account }) {
               label="Account actions"
               actions={[
                 pin,
+                draft.action,
                 {
                   label: "Add person",
                   icon: UserPlusIcon,
@@ -194,6 +198,7 @@ function AccountView({ account }: { account: Account }) {
                 },
               ]}
             />
+            {draft.dialog}
           </>
         }
       />
@@ -250,6 +255,7 @@ function AccountView({ account }: { account: Account }) {
         }
         aside={
           <>
+            <AccountBrief accountId={account._id} />
             <AccountSummary
               account={account}
               people={people}
@@ -401,7 +407,7 @@ function AccountView({ account }: { account: Account }) {
             },
             {
               id: "automations",
-              label: "Automations",
+              label: "Sequences",
               content: (
                 <RecordAutomations target={{ accountId: account._id }} />
               ),

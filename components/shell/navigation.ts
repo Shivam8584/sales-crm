@@ -54,7 +54,7 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         href: "/automations",
-        label: "Automations",
+        label: "Sequences",
         icon: AutomationIcon,
         shortcut: "U",
       },

@@ -35,6 +35,7 @@ export const send = internalAction({
     try {
       const info = await transport.sendMail({
         from,
+        replyTo: env("EMAIL_REPLY_TO"),
         to,
         subject,
         text,

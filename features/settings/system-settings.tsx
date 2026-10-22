@@ -118,6 +118,12 @@ function ServicesSection({ services }: { services: Overview["services"] }) {
       <SettingsRow label="Product scraper">
         <ModeTag mode={services.scraper} />
       </SettingsRow>
+      <SettingsRow
+        label="AI"
+        description={`${services.ai.main}, ${services.ai.fast}`}
+      >
+        <ModeTag mode={services.ai.configured ? "live" : null} />
+      </SettingsRow>
     </SettingsSection>
   );
 }

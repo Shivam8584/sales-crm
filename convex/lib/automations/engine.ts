@@ -48,6 +48,8 @@ import {
   type Trigger,
   type TriggerEvent,
 } from "../../../lib/domain/automations";
+import type { ContactReason } from "../../../lib/domain/consent";
+import { appendLedger } from "../consent";
 import { dailySendCap, rateLimiter } from "../rateLimiter";
 import { killSwitchOn, readSafety } from "./safety";
 import { nextOwner } from "../assignment";
@@ -555,7 +557,7 @@ type Outcome =
     }
   | { type: "defer"; at: number; message: string }
   | { type: "wait"; at: number; waitingFor?: Trigger; message: string }
-  | { type: "exit"; reason: string; kind: ExitKind };
+  | { type: "exit"; reason: string; kind?: ExitKind };
 
 type StepContext = {
   automation: Automation;
@@ -854,6 +856,15 @@ function waitStep({ node, enrollment, now }: StepContext): Outcome {
 
 const CHANNEL_NOUN = { email: "email", whatsapp: "WhatsApp message" } as const;
 
+const STOPPED_FOR_GOOD = new Set<ContactReason>([
+  "withdrawn",
+  "erased",
+  "erasure_requested",
+]);
+
+export const UNSUBSCRIBE_LINE =
+  "--\nDon't want these emails? Reply \"unsubscribe\" and I'll stop.";
+
 async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
   const { node, subject, published, automation, enrollment, now, stepKey } =
     step;
@@ -869,6 +880,13 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
     channel,
     config.purpose,
   );
+  if (decision.reason && STOPPED_FOR_GOOD.has(decision.reason)) {
+    return {
+      type: "exit",
+      kind: "no_consent",
+      reason: `${decision.message}, so the sequence stopped`,
+    };
+  }
   if (!decision.allowed || !recipient) {
     return {
       type: "next",
@@ -973,7 +991,7 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
   if (node.kind === "send_email") {
     const email = configOf(node, "send_email");
     subjectLine = renderTemplate(email.subject, vars).text.trim();
-    body = renderTemplate(email.body, vars).text.trim();
+    body = `${renderTemplate(email.body, vars).text.trim()}\n\n${UNSUBSCRIBE_LINE}`;
   } else {
     const whatsapp = configOf(node, "send_whatsapp");
     template = whatsapp.template;
@@ -1373,7 +1391,42 @@ export type ReplyInput = {
   channel: "email" | "whatsapp";
   at: number;
   dealIds?: Id<"deals">[];
+  text?: string;
 };
+
+const STOP_PHRASE =
+  /\b(unsubscribe|opt[\s-]?out|remove me|stop (emailing|sending|contacting))\b/i;
+const STOP_ALONE = /^\W*(please\s+)?stop\W*$/i;
+
+/** Only a short first line counts, so a long reply that merely mentions the word isn't an opt-out. */
+export function asksToStop(text: string) {
+  const first =
+    text
+      .split("\n")
+      .find((line) => line.trim())
+      ?.trim() ?? "";
+  return (
+    first.length <= 60 && (STOP_PHRASE.test(first) || STOP_ALONE.test(first))
+  );
+}
+
+async function withdrawConsent(ctx: MutationCtx, input: ReplyInput) {
+  const { personId, leadId } = input.refs;
+  if (!personId && !leadId) return;
+  await appendLedger(ctx, {
+    personId,
+    leadId: personId ? undefined : leadId,
+    channels: [input.channel],
+    event: "withdraw",
+    source: input.channel,
+    text: "Asked to unsubscribe by replying to an automated message",
+  });
+  await logSystem(
+    ctx,
+    input.refs,
+    `unsubscribed from ${CHANNEL_WORD[input.channel]} by reply`,
+  );
+}
 
 /**
  * A contact replied: their runs are marked replied, live runs that stop on
@@ -1391,6 +1444,8 @@ export async function recordReply(ctx: MutationCtx, input: ReplyInput) {
     ...subjectKeys(input.refs),
     ...(input.dealIds ?? []).map((id) => subjectKey("deal", id)),
   ];
+  const unsubscribed = input.text ? asksToStop(input.text) : false;
+  if (unsubscribed) await withdrawConsent(ctx, input);
   let exited = 0;
   let marked = 0;
   const statuses = [
@@ -1422,12 +1477,14 @@ export async function recordReply(ctx: MutationCtx, input: ReplyInput) {
           enrollment.waitingFor && matchesTrigger(enrollment.waitingFor, event);
         const automation = await ctx.db.get(enrollment.automationId);
         const stops = automation?.published?.settings.stopOnReply ?? false;
-        if (stops && !awaited) {
+        if ((stops || unsubscribed) && (!awaited || unsubscribed)) {
           await finish(
             ctx,
             { ...enrollment, repliedAt: enrollment.repliedAt ?? input.at },
             "exited",
-            `They replied by ${CHANNEL_WORD[input.channel]}`,
+            unsubscribed
+              ? "They asked to unsubscribe"
+              : `They replied by ${CHANNEL_WORD[input.channel]}`,
             undefined,
             "replied",
           );

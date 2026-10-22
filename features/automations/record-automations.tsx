@@ -39,7 +39,7 @@ function subjectOf(target: AutomationTarget): {
   return { kind: "deal", id: target.dealId };
 }
 
-/** A record's automation runs, with add, pause, resume and remove; for a record page tab. */
+/** A record's sequence runs, with add, pause, resume and remove; for a record page tab. */
 export function RecordAutomations({ target }: { target: AutomationTarget }) {
   const subject = subjectOf(target);
   const data = useQuery(api.automations.forRecord, { target: subject });
@@ -90,7 +90,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
       className="h-control-sm"
     >
       <PlusIcon aria-hidden className="size-2.5" />
-      Add to automation
+      Add to sequence
     </AddToAutomation>
   );
 
@@ -107,16 +107,16 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
       )}
       {data.runs.length === 0 ? (
         <div className="border-border flex flex-col items-start gap-2 rounded-xl border border-dashed px-4 py-5">
-          <span className="text-sm font-medium">Not in any automation</span>
+          <span className="text-sm font-medium">Not in any sequence</span>
           <span className="caption-style text-fg-tertiary leading-snug">
-            Automations enrol this {noun} when their trigger fires.
+            Sequences enrol this {noun} when their trigger fires.
             {data.available.length
               ? " You can also add it by hand."
-              : ` No active automation runs on ${SUBJECT_LABEL[subject.kind][1]} yet.`}
+              : ` No active sequence runs on ${SUBJECT_LABEL[subject.kind][1]} yet.`}
           </span>
           {data.available.length === 0 && (
             <Button variant="secondary" size="xs" href="/automations">
-              Open automations
+              Open sequences
             </Button>
           )}
         </div>

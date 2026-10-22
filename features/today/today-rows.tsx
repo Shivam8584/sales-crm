@@ -7,6 +7,7 @@ import type { api } from "@/convex/_generated/api";
 import Avatar from "@/components/_ui/avatar";
 import Tag from "@/components/_ui/tag";
 import AccountLogo from "@/features/accounts/account-logo";
+import { NextAction } from "@/features/ai/next-action";
 import {
   ActivationCell,
   MoneyValue,
@@ -139,6 +140,7 @@ export function LeadItem({
           <Dot />
           <span className="shrink-0">{LEAD_KIND_LABEL[lead.kind]}</span>
         </span>
+        <NextAction type="leads" id={lead._id} />
       </span>
       <span className="caption-style flex shrink-0 items-center gap-3 max-sm:basis-full max-sm:justify-between max-sm:pl-9">
         {lead.demoAt && <DemoTag at={lead.demoAt} />}
@@ -178,6 +180,7 @@ export function StuckItem({ row: item, ...row }: RowProps & { row: StuckRow }) {
             <ActivationCell steps={activationSteps(true, item.stage)} />
           </span>
         </span>
+        <NextAction type="accounts" id={item._id} />
         {task && (
           <button
             type="button"
@@ -240,6 +243,7 @@ export function DealItem({ deal, ...row }: RowProps & { deal: DealRow }) {
             </span>
           )}
         </span>
+        <NextAction type="deals" id={deal._id} />
       </span>
     </RowShell>
   );

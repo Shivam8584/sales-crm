@@ -12,6 +12,8 @@ import {
   LIMITS,
   SUBJECT_LABEL,
   TRIGGER_SUBJECTS,
+  VARIABLES,
+  configOf,
   EXIT_KIND_LABEL,
   FREQUENCY_CAP,
   TRIGGER_LABEL,
@@ -33,7 +35,9 @@ import {
   type ValidationContext,
 } from "../lib/domain/automations";
 import { STALL_RULES } from "./lib/activation";
+import { notify } from "./notifications";
 import {
+  UNSUBSCRIBE_LINE,
   enroll,
   finish,
   logStep,
@@ -43,6 +47,7 @@ import {
   resumeRun,
   runStep,
   stepFailed,
+  subjectOf,
 } from "./lib/automations/engine";
 import {
   SAFETY_KEYS,
@@ -60,6 +65,7 @@ import {
   recipientFor,
   subjectFacts,
   subjectVars,
+  type SubjectRef,
 } from "./lib/automations/subject";
 import { TEMPLATE, TEMPLATES } from "./lib/automations/templates";
 import {
@@ -76,6 +82,7 @@ import {
   memberMutation,
   memberQuery,
 } from "./lib/functions";
+import { assertCan, can } from "./lib/permissions";
 import { memberIndex } from "./lib/records";
 
 const MAX_ENROLLMENTS_SCAN = 5000;
@@ -160,6 +167,38 @@ function stepKinds(graph: Graph) {
     .map((node) => node.kind);
 }
 
+/** Why this can't go live yet, or null. */
+function blockedReason(graph: Graph) {
+  const kinds = new Set(graph.nodes.map((node) => node.kind));
+  if (kinds.has("send_email") && emailProvider().provider === "outbox") {
+    return "Email sending isn't set up yet. Ask an admin to connect an email provider in the server settings.";
+  }
+  if (kinds.has("send_whatsapp") && whatsappProvider().provider === "outbox") {
+    return "WhatsApp sending isn't set up yet. Ask an admin to connect WhatsApp in the server settings.";
+  }
+  return null;
+}
+
+type Viewed = MutationCtx & { viewer: Doc<"members"> };
+
+/** Reps run only what they created; managers run anything. */
+function assertOwnSequence(ctx: Viewed, automation: Doc<"automations">) {
+  assertCan(ctx.viewer, "sequence.run", [automation.createdById]);
+}
+
+/** Reps enrol and remove only records they own. */
+async function ownsRecord(ctx: Viewed, ref: SubjectRef) {
+  if (can(ctx.viewer, "sequence.run")) return true;
+  const subject = await loadSubject(ctx, ref);
+  return can(ctx.viewer, "sequence.run", [subject?.ownerId]);
+}
+
+async function assertOwnsRecord(ctx: Viewed, ref: SubjectRef) {
+  if (!(await ownsRecord(ctx, ref))) {
+    fail("forbidden", "Only the record's owner or a manager can do that");
+  }
+}
+
 // ── Queries ─────────────────────────────────────────────────────────────────
 
 export const list = memberQuery({
@@ -185,6 +224,7 @@ export const list = memberQuery({
         version: automation.version,
         hasChanges: automation.status === "active" && hasChanges(automation),
         createdBy: members.get(automation.createdById)?.name ?? null,
+        mine: automation.createdById === ctx.viewer._id,
         updatedAt: automation.updatedAt,
       }));
   },
@@ -214,6 +254,8 @@ export const get = memberQuery({
       stats: automation.stats,
       updatedAt: automation.updatedAt,
       issues,
+      blocked: blockedReason(automation.graph as Graph),
+      mine: automation.createdById === ctx.viewer._id,
     };
   },
 });
@@ -619,7 +661,7 @@ export const create = managerMutation({
   },
 });
 
-export const createFromTemplate = managerMutation({
+export const createFromTemplate = memberMutation({
   args: { key: v.string() },
   handler: async (ctx, { key }) => {
     const template = TEMPLATE[key];
@@ -628,7 +670,10 @@ export const createFromTemplate = managerMutation({
       name: template.name,
       description: template.description,
       subjectKind: template.subjectKind,
-      trigger: template.trigger,
+      // An automatic trigger would run a rep's copy on everyone's records.
+      trigger: can(ctx.viewer, "sequence.run")
+        ? template.trigger
+        : { kind: "manual" },
       graph: template.graph,
       settings: template.settings,
       templateKey: template.key,
@@ -674,10 +719,11 @@ export const update = managerMutation({
 });
 
 /** Publishes the draft (a new version when it changed) and starts enrolling. */
-export const activate = managerMutation({
+export const activate = memberMutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
     const automation = await requireAutomation(ctx, id);
+    assertOwnSequence(ctx, automation);
     const issues = validateAutomation(
       draftOf(automation),
       await validationContext(ctx, id),
@@ -690,6 +736,8 @@ export const activate = managerMutation({
           : `Fix ${issues.length} problems first, starting with: ${issues[0].message}`,
       );
     }
+    const blocked = blockedReason(automation.graph as Graph);
+    if (blocked) fail("conflict", blocked);
     const now = Date.now();
     const changed = hasChanges(automation);
     const version = changed ? automation.version + 1 : automation.version;
@@ -711,10 +759,11 @@ export const activate = managerMutation({
   },
 });
 
-export const pause = managerMutation({
+export const pause = memberMutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
     const automation = await requireAutomation(ctx, id);
+    assertOwnSequence(ctx, automation);
     if (automation.status !== "active") return { previous: automation.status };
     await ctx.db.patch(id, { status: "paused", updatedAt: Date.now() });
     return { previous: automation.status };
@@ -738,10 +787,11 @@ export const duplicate = managerMutation({
 });
 
 /** Deletes the automation and ends its live runs; undo brings the automation back paused. */
-export const remove = managerMutation({
+export const remove = memberMutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
     const automation = await requireAutomation(ctx, id);
+    assertOwnSequence(ctx, automation);
     const now = Date.now();
     await ctx.db.patch(id, {
       deletedAt: now,
@@ -772,32 +822,79 @@ export const remove = managerMutation({
   },
 });
 
-export const restore = managerMutation({
+export const restore = memberMutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
     const automation = await ctx.db.get(id);
     if (!automation) notFound("Automation");
+    assertOwnSequence(ctx, automation);
     await ctx.db.patch(id, { deletedAt: undefined, updatedAt: Date.now() });
   },
 });
 
-// ── Runs ────────────────────────────────────────────────────────────────────
-
-export const enrollRecord = memberMutation({
-  args: { id: v.id("automations"), target: vTarget },
-  handler: async (ctx, { id, target }) => {
+/** Emails the first email step to the viewer with sample values, and tells them how it went. */
+export const sendTest = memberMutation({
+  args: { id: v.id("automations") },
+  handler: async (ctx, { id }) => {
     const automation = await requireAutomation(ctx, id);
-    const result = await enroll(
-      ctx,
-      automation,
-      target,
-      `Enrolled by ${ctx.viewer.name}`,
-      ctx.viewer._id,
+    const graph = automation.graph as Graph;
+    const node = stepOrder(graph)
+      .map((nodeId) => graph.nodes.find((item) => item.id === nodeId))
+      .find((item) => item?.kind === "send_email");
+    if (!node) invalid("id", "This sequence has no email to test");
+    const provider = emailProvider().provider;
+    if (provider === "outbox") fail("conflict", blockedReason(graph)!);
+    const vars: Record<string, string> = Object.fromEntries(
+      VARIABLES.map((item) => [item.key, item.example]),
     );
-    if (result.outcome !== "enrolled") fail("conflict", result.message);
-    return result.enrollmentId;
+    vars["owner.firstName"] = ctx.viewer.name.split(/\s+/)[0];
+    const config = configOf(node, "send_email");
+    await ctx.scheduler.runAfter(0, internal.automations.deliverTest, {
+      memberId: ctx.viewer._id,
+      to: ctx.viewer.email,
+      subject: `[Test] ${renderTemplate(config.subject, vars).text}`,
+      body: `${renderTemplate(config.body, vars).text.trim()}\n\n${UNSUBSCRIBE_LINE}`,
+    });
+    return ctx.viewer.email;
   },
 });
+
+export const deliverTest = internalAction({
+  args: {
+    memberId: v.id("members"),
+    to: v.string(),
+    subject: v.string(),
+    body: v.string(),
+  },
+  handler: async (ctx, { memberId, to, subject, body }) => {
+    const result = await deliverMessage(ctx, {
+      channel: "email",
+      provider: emailProvider().provider,
+      stepKey: `test:${memberId}:${Date.now()}`,
+      recipientId: memberId,
+      to,
+      subject,
+      body,
+    });
+    await ctx.runMutation(internal.automations.testSettled, {
+      memberId,
+      error: result.ok ? undefined : result.error.slice(0, 200),
+    });
+  },
+});
+
+export const testSettled = internalMutation({
+  args: { memberId: v.id("members"), error: v.optional(v.string()) },
+  handler: async (ctx, { memberId, error }) => {
+    await notify(ctx, memberId, {
+      kind: "automation",
+      title: error ? "Test email failed" : "Test email sent",
+      body: error ?? "Check your inbox.",
+    });
+  },
+});
+
+// ── Runs ────────────────────────────────────────────────────────────────────
 
 export const exitEnrollment = memberMutation({
   args: { id: v.id("automationEnrollments") },
@@ -805,6 +902,7 @@ export const exitEnrollment = memberMutation({
     const enrollment = await ctx.db.get(id);
     if (!enrollment) notFound("Run");
     if (!isLive(enrollment.status)) fail("conflict", "This run already ended");
+    await assertOwnsRecord(ctx, subjectOf(enrollment));
     await finish(
       ctx,
       enrollment,
@@ -1069,6 +1167,12 @@ export const enrolMany = memberMutation({
       const key = subjectKey(subject.kind, subject.id);
       if (seen.has(key)) continue;
       seen.add(key);
+      if (!(await ownsRecord(ctx, subject))) {
+        counts.skipped++;
+        const message = "Only the record's owner can add it";
+        problems.set(message, (problems.get(message) ?? 0) + 1);
+        continue;
+      }
       const result = await enroll(
         ctx,
         automation,
@@ -1128,6 +1232,7 @@ export const pauseEnrollment = memberMutation({
     if (!enrollment) notFound("Run");
     if (!isLive(enrollment.status)) fail("conflict", "This run already ended");
     if (enrollment.pausedById) fail("conflict", "This run is already paused");
+    await assertOwnsRecord(ctx, subjectOf(enrollment));
     await pauseRun(ctx, enrollment, ctx.viewer._id, ctx.viewer.name);
   },
 });
@@ -1139,6 +1244,7 @@ export const resumeEnrollment = memberMutation({
     if (!enrollment) notFound("Run");
     if (!isLive(enrollment.status)) fail("conflict", "This run already ended");
     if (!enrollment.pausedById) fail("conflict", "This run isn't paused");
+    await assertOwnsRecord(ctx, subjectOf(enrollment));
     await resumeRun(ctx, enrollment, ctx.viewer.name);
   },
 });

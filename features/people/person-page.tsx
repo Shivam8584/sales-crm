@@ -41,6 +41,7 @@ import { RecordAutomations } from "@/features/automations/record-automations";
 import MemberPicker from "@/features/members/member-picker";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
+import { useDraftAction } from "@/features/ai/use-draft-action";
 import { usePinAction } from "@/features/pins/use-pins";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
@@ -171,6 +172,7 @@ function PersonView({ person }: { person: Person }) {
   const setArchived = useMutation(api.people.setArchived);
   const save = useRecordUpdate(update, person._id);
   const pin = usePinAction({ personId: person._id });
+  const draft = useDraftAction({ personId: person._id });
   const setCreate = useUiStore((state) => state.setCreate);
   const deals = useQuery(api.people.deals, { personId: person._id });
   const tasks = useQuery(api.tasks.list, {
@@ -247,25 +249,29 @@ function PersonView({ person }: { person: Person }) {
         title={name}
         meta={archived && <PageStatus tone="warning">Archived</PageStatus>}
         actions={
-          <PageActions
-            label="Person actions"
-            actions={[
-              pin,
-              { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
-              newDeal && {
-                label: "New deal",
-                icon: TargetIcon,
-                onSelect: newDeal,
-              },
-              {
-                label: archived ? "Restore person" : "Archive person",
-                icon: TrashIcon,
-                tone: archived ? undefined : "danger",
-                separated: true,
-                onSelect: () => void toggleArchived(),
-              },
-            ]}
-          />
+          <>
+            <PageActions
+              label="Person actions"
+              actions={[
+                pin,
+                draft.action,
+                { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
+                newDeal && {
+                  label: "New deal",
+                  icon: TargetIcon,
+                  onSelect: newDeal,
+                },
+                {
+                  label: archived ? "Restore person" : "Archive person",
+                  icon: TrashIcon,
+                  tone: archived ? undefined : "danger",
+                  separated: true,
+                  onSelect: () => void toggleArchived(),
+                },
+              ]}
+            />
+            {draft.dialog}
+          </>
         }
       />
       <RecordLayout
@@ -487,7 +493,7 @@ function PersonView({ person }: { person: Person }) {
             },
             {
               id: "automations",
-              label: "Automations",
+              label: "Sequences",
               content: <RecordAutomations target={{ personId: person._id }} />,
             },
           ]}

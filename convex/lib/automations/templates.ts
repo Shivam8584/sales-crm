@@ -4,8 +4,10 @@ import {
   type Graph,
   type GraphEdge,
   type GraphNode,
+  type EmailConfig,
   type NodeConfigs,
   type NodeKind,
+  type TaskConfig,
   type PortId,
   type SubjectKind,
   type Trigger,
@@ -54,402 +56,206 @@ function build(specs: Spec[]): Graph {
   return { nodes, edges };
 }
 
-const NOT_FUNDED = {
+const FUNDED = {
   field: "platform.event",
-  op: "not_happened" as const,
+  op: "happened" as const,
   value: ["wallet.topup_succeeded", "wallet.deposit_received"],
 };
 
+const REGISTERED = {
+  field: "platform.event",
+  op: "happened" as const,
+  value: ["organization.created"],
+};
+
+const LEAD_DONE = {
+  field: "lead.status",
+  op: "is" as const,
+  value: ["qualified", "nurture", "disqualified", "converted"],
+};
+
+type Step = Pick<Spec, "kind" | "config">;
+
+const FIRST_NAME = "{{person.firstName|there}}";
+const SIGN_OFF = "{{owner.firstName|The Hypedrive team}}";
+
+const email = (subject: string, text: string): Step => ({
+  kind: "send_email",
+  config: {
+    subject,
+    body: `Hi ${FIRST_NAME},\n\n${text}\n\n${SIGN_OFF}`,
+    purpose: "sales_outreach",
+  } satisfies EmailConfig,
+});
+
+const wait = (amount: number, unit: "hours" | "days" = "days"): Step => ({
+  kind: "wait",
+  config: { mode: "duration", amount, unit },
+});
+
+const task = (title: string, notes: string): Step => ({
+  kind: "create_task",
+  config: {
+    title,
+    notes,
+    assignee: "owner",
+    dueInDays: 0,
+    priority: "high",
+  } satisfies TaskConfig,
+});
+
+function sequence(steps: Step[]): Graph {
+  return build([
+    { id: "trigger", kind: "trigger", row: 0 },
+    ...steps.map((step, index) => ({
+      ...step,
+      id: `step-${index + 1}`,
+      row: index + 1,
+      from: [index ? `step-${index}` : "trigger", "out"] as [string, PortId],
+    })),
+  ]);
+}
+
 export const TEMPLATES: AutomationTemplate[] = [
   {
-    key: "demo-follow-up",
-    name: "New demo request follow-up",
+    key: "new-lead-follow-up",
+    name: "New lead follow-up",
     description:
-      "Confirms a new demo request by email, gives the owner a call task, then nudges on WhatsApp if the lead hasn't moved in two days.",
+      "An intro email as soon as a lead comes in, a nudge the next day and a last-call task for the owner on day 3.",
     subjectKind: "lead",
-    trigger: { kind: "lead_created", leadKinds: ["demo"] },
-    settings: {
-      ...DEFAULT_SETTINGS,
-      goal: [{ field: "lead.status", op: "is", value: ["converted"] }],
-    },
-    graph: build([
-      { id: "trigger", kind: "trigger", row: 0 },
-      {
-        id: "email",
-        kind: "send_email",
-        row: 1,
-        from: ["trigger", "out"],
-        config: {
-          subject: "Your Hypedrive demo with {{owner.firstName}}",
-          body: "Hi {{person.firstName|there}},\n\nThanks for asking for a demo of Hypedrive. I'm {{owner.firstName}}, and I'll walk you through how brands like {{account.name}} get honest reviews and UGC from real buyers on the marketplaces you sell on.\n\nI'll call you shortly to find a time that works. If it's easier, reply with a slot.\n\n{{owner.firstName}}",
-          purpose: "sales_outreach",
-        },
-      },
-      {
-        id: "call",
-        kind: "create_task",
-        row: 2,
-        from: ["email", "out"],
-        config: {
-          title: "Call {{record.name}} to confirm the demo",
-          notes:
-            "Confirm the slot, the marketplaces they sell on and their monthly orders.",
-          assignee: "owner",
-          dueInDays: 0,
-          priority: "high",
-        },
-      },
-      {
-        id: "wait",
-        kind: "wait",
-        row: 3,
-        from: ["call", "out"],
-        config: { mode: "duration", amount: 2, unit: "days" },
-      },
-      {
-        id: "still-open",
-        kind: "condition",
-        row: 4,
-        from: ["wait", "out"],
-        config: {
-          match: "all",
-          conditions: [
-            { field: "lead.status", op: "is", value: ["new", "contacted"] },
-          ],
-        },
-      },
-      {
-        id: "whatsapp",
-        kind: "send_whatsapp",
-        row: 5.2,
-        col: -1,
-        from: ["still-open", "yes"],
-        config: {
-          template: "demo_follow_up",
-          language: "en",
-          params: ["{{person.firstName|there}}", "{{owner.firstName}}"],
-          purpose: "sales_outreach",
-        },
-      },
-      {
-        id: "moved-on",
-        kind: "exit",
-        row: 5.2,
-        col: 1,
-        from: ["still-open", "no"],
-        config: { reason: "The lead moved on" },
-      },
+    trigger: { kind: "lead_created" },
+    settings: { ...DEFAULT_SETTINGS, goal: [LEAD_DONE] },
+    graph: sequence([
+      email(
+        "Quick hello from Hypedrive",
+        "Thanks for your interest in Hypedrive. We help brands selling on marketplaces get genuine reviews and photos from real buyers.\n\nTell me which marketplaces you sell on and roughly how many orders you ship a month, and I'll suggest where to start. Or reply with a time for a short call.",
+      ),
+      wait(1),
+      email(
+        "Still interested in Hypedrive?",
+        "Just checking my earlier note reached you. If now isn't a good time, tell me when to come back and I will.",
+      ),
+      wait(2),
+      task(
+        "Last call: {{record.name}}",
+        "Two emails sent and no reply. Call once. If there's no answer, move the lead to Nurture.",
+      ),
     ]),
   },
   {
-    key: "gst-not-funded",
-    name: "GST verified but not funded nudge",
+    key: "demo-no-show",
+    name: "Demo no-show re-book",
     description:
-      "After a brand creates its organisation with a verified GSTIN, nudges them on WhatsApp to top up, then hands the owner a call if they still haven't funded.",
+      "Start it by hand when a lead misses a demo: a re-book email now, a second one after two days and a call task after five.",
+    subjectKind: "lead",
+    trigger: { kind: "manual" },
+    settings: { ...DEFAULT_SETTINGS, goal: [LEAD_DONE] },
+    graph: sequence([
+      email(
+        "Sorry we missed each other",
+        "We missed you at the Hypedrive demo. These things happen.\n\nReply with a day and time that works and I'll set it up again. It takes about 20 minutes.",
+      ),
+      wait(2),
+      email(
+        "Shall we find a new time for your demo?",
+        "I haven't heard back about rescheduling. If a different day or time suits you better, reply with it. If you'd rather not go ahead, a one-line reply is fine too.",
+      ),
+      wait(3),
+      task(
+        "Call {{record.name}} to re-book the demo",
+        "They missed the demo and haven't replied to two emails. Call, offer two slots, and close the lead if they decline.",
+      ),
+    ]),
+  },
+  {
+    key: "gst-failed",
+    name: "GST verification failed",
+    description:
+      "When a brand's GST check fails at signup, emails the usual fixes after two hours and gives the owner a call task two days later.",
+    subjectKind: "person",
+    trigger: {
+      kind: "platform_event",
+      eventTypes: ["organization.gst_failed"],
+    },
+    settings: { ...DEFAULT_SETTINGS, goal: [REGISTERED] },
+    graph: sequence([
+      wait(2, "hours"),
+      email(
+        "Your GST check on Hypedrive didn't go through",
+        "Your GST verification didn't go through when you signed up. The usual causes are a typo in the GSTIN, a registration that is cancelled or suspended, or a legal name that doesn't match the one on the GST portal.\n\nReply with the GSTIN you used and I'll go through it with you. Hypedrive needs a verified GSTIN before you can create your brand.",
+      ),
+      wait(2),
+      task(
+        "Call {{record.name}} to fix their GST",
+        "GST failed at signup and they still have no organisation. Find out why, walk them through a retry, or point them to a CA if the registration itself needs fixing.",
+      ),
+    ]),
+  },
+  {
+    key: "signup-no-org",
+    name: "Signed up, no organisation yet",
+    description:
+      "A day after signup with no organisation created, offers help with the setup form, then a call task two days on.",
+    subjectKind: "person",
+    trigger: { kind: "platform_event", eventTypes: ["user.signed_up"] },
+    settings: { ...DEFAULT_SETTINGS, goal: [REGISTERED] },
+    graph: sequence([
+      wait(1),
+      email(
+        "Need a hand setting up your brand on Hypedrive?",
+        "You signed up for Hypedrive but haven't created your brand yet. It takes about five minutes and needs your brand name, website, a support phone number and your GSTIN.\n\nIf it's easier, reply and I'll fill it in with you on a call.",
+      ),
+      wait(2),
+      task(
+        "Call {{record.name}}: signed up, no organisation",
+        "Signed up three days ago and still hasn't created an organisation. Offer to fill the form in together on the call.",
+      ),
+    ]),
+  },
+  {
+    key: "no-first-top-up",
+    name: "No first top-up",
+    description:
+      "After a brand's organisation is created, explains how to fund the wallet after two days, then gives the owner a call task three days later.",
     subjectKind: "account",
     trigger: { kind: "platform_event", eventTypes: ["organization.created"] },
-    settings: {
-      ...DEFAULT_SETTINGS,
-      goal: [{ ...NOT_FUNDED, op: "happened" }],
-    },
-    graph: build([
-      { id: "trigger", kind: "trigger", row: 0 },
-      {
-        id: "wait",
-        kind: "wait",
-        row: 1,
-        from: ["trigger", "out"],
-        config: { mode: "duration", amount: 1, unit: "days" },
-      },
-      {
-        id: "unfunded",
-        kind: "condition",
-        row: 2,
-        from: ["wait", "out"],
-        config: { match: "all", conditions: [NOT_FUNDED] },
-      },
-      {
-        id: "nudge",
-        kind: "send_whatsapp",
-        row: 3.2,
-        col: -1,
-        from: ["unfunded", "yes"],
-        config: {
-          template: "wallet_topup_nudge",
-          language: "en",
-          params: ["{{person.firstName|there}}", "{{account.name}}"],
-          purpose: "sales_outreach",
-        },
-      },
-      {
-        id: "funded",
-        kind: "exit",
-        row: 3.2,
-        col: 1,
-        from: ["unfunded", "no"],
-        config: { reason: "They funded their wallet" },
-      },
-      {
-        id: "wait-again",
-        kind: "wait",
-        row: 4.2,
-        col: -1,
-        from: ["nudge", "out"],
-        config: { mode: "duration", amount: 2, unit: "days" },
-      },
-      {
-        id: "still-unfunded",
-        kind: "condition",
-        row: 5.2,
-        col: -1,
-        from: ["wait-again", "out"],
-        config: { match: "all", conditions: [NOT_FUNDED] },
-      },
-      {
-        id: "call",
-        kind: "create_task",
-        row: 6.4,
-        col: -2,
-        from: ["still-unfunded", "yes"],
-        config: {
-          title: "Call {{account.name}} about their first top-up",
-          notes:
-            "Send a UPI top-up link on WhatsApp, share their virtual account for bank transfers and recap what a first campaign returns.",
-          assignee: "owner",
-          dueInDays: 0,
-          priority: "urgent",
-        },
-      },
-      {
-        id: "funded-later",
-        kind: "exit",
-        row: 6.4,
-        col: 0,
-        from: ["still-unfunded", "no"],
-        config: { reason: "They funded their wallet" },
-      },
+    settings: { ...DEFAULT_SETTINGS, goal: [FUNDED] },
+    graph: sequence([
+      wait(2),
+      email(
+        "Adding funds to start your first campaign",
+        "{{account.name|Your brand}} is set up on Hypedrive. The next step is adding funds to your wallet, which you can do by UPI or a bank transfer to your virtual account.\n\nIf you'd like to know how much to start with, tell me your monthly orders and I'll suggest a size.",
+      ),
+      wait(3),
+      task(
+        "Call {{account.name}} about their first top-up",
+        "Verified and still no top-up after five days. Share the UPI link and virtual account details, and ask what's holding them back.",
+      ),
     ]),
   },
   {
-    key: "paused-for-funds",
-    name: "Paused for funds rescue",
+    key: "dormant-win-back",
+    name: "Dormant brand win-back",
     description:
-      "When a campaign auto-pauses for insufficient funds, alerts the owner, opens an urgent task and messages the brand. Nothing resumes the campaign after a top-up, so the task asks for both.",
+      "For brands whose campaigns have all ended and nothing new has started: an email, a short follow-up after four days and a call task after eight.",
     subjectKind: "account",
-    trigger: {
-      kind: "platform_event",
-      eventTypes: ["campaign.status_changed"],
-      campaignStatuses: ["paused"],
-      pauseReasons: ["insufficient_funds"],
-    },
-    settings: { ...DEFAULT_SETTINGS, stopOnReply: false },
-    graph: build([
-      { id: "trigger", kind: "trigger", row: 0 },
-      {
-        id: "alert",
-        kind: "notify",
-        row: 1,
-        from: ["trigger", "out"],
-        config: {
-          to: "owner",
-          message:
-            "{{account.name}}'s campaign paused: out of funds. It won't resume on its own after a top-up.",
-        },
-      },
-      {
-        id: "task",
-        kind: "create_task",
-        row: 2,
-        from: ["alert", "out"],
-        config: {
-          title: "Get {{account.name}} to top up and resume their campaign",
-          notes:
-            "A top-up alone doesn't resume the campaign. Confirm the payment, then have them press Resume (or resume it with them on a call).",
-          assignee: "owner",
-          dueInDays: 0,
-          priority: "urgent",
-        },
-      },
-      {
-        id: "message",
-        kind: "send_whatsapp",
-        row: 3,
-        from: ["task", "out"],
-        config: {
-          template: "campaign_paused_funds",
-          language: "en",
-          params: ["{{person.firstName|there}}", "{{account.name}}"],
-          purpose: "sales_outreach",
-        },
-      },
-      {
-        id: "wait-live",
-        kind: "wait",
-        row: 4,
-        from: ["message", "out"],
-        config: {
-          mode: "event",
-          event: {
-            kind: "platform_event",
-            eventTypes: ["campaign.status_changed"],
-            campaignStatuses: ["live"],
-          },
-          timeoutAmount: 2,
-          timeoutUnit: "days",
-        },
-      },
-      {
-        id: "resumed",
-        kind: "exit",
-        row: 5.2,
-        col: -1,
-        from: ["wait-live", "met"],
-        config: { reason: "The campaign is live again" },
-      },
-      {
-        id: "escalate",
-        kind: "notify",
-        row: 5.2,
-        col: 1,
-        from: ["wait-live", "timeout"],
-        config: {
-          to: "owner",
-          message:
-            "{{account.name}} is still paused two days later. Escalate or call again.",
-        },
-      },
-    ]),
-  },
-  {
-    key: "proposal-follow-up",
-    name: "Proposal sent follow-up",
-    description:
-      "Three days after a deal reaches Proposal, emails the main contact and gives the owner a follow-up task, unless the deal has moved.",
-    subjectKind: "deal",
-    trigger: { kind: "deal_stage_changed", dealStages: ["proposal"] },
-    settings: {
-      ...DEFAULT_SETTINGS,
-      goal: [
-        { field: "deal.stage", op: "is", value: ["onboarding", "won", "lost"] },
-      ],
-    },
-    graph: build([
-      { id: "trigger", kind: "trigger", row: 0 },
-      {
-        id: "wait",
-        kind: "wait",
-        row: 1,
-        from: ["trigger", "out"],
-        config: { mode: "duration", amount: 3, unit: "days" },
-      },
-      {
-        id: "still-proposal",
-        kind: "condition",
-        row: 2,
-        from: ["wait", "out"],
-        config: {
-          match: "all",
-          conditions: [{ field: "deal.stage", op: "is", value: ["proposal"] }],
-        },
-      },
-      {
-        id: "email",
-        kind: "send_email",
-        row: 3.2,
-        col: -1,
-        from: ["still-proposal", "yes"],
-        config: {
-          subject: "Following up on your Hypedrive proposal",
-          body: "Hi {{person.firstName|there}},\n\nChecking in on the proposal for {{deal.title}}. Happy to walk through the numbers or adjust the slots and bonus to fit your budget.\n\nWould a 15-minute call this week help?\n\n{{owner.firstName}}",
-          purpose: "sales_outreach",
-        },
-      },
-      {
-        id: "moved",
-        kind: "exit",
-        row: 3.2,
-        col: 1,
-        from: ["still-proposal", "no"],
-        config: { reason: "The deal moved on" },
-      },
-      {
-        id: "task",
-        kind: "create_task",
-        row: 4.2,
-        col: -1,
-        from: ["email", "out"],
-        config: {
-          title: "Follow up on the proposal for {{deal.title}}",
-          assignee: "owner",
-          dueInDays: 2,
-          priority: "normal",
-        },
-      },
-    ]),
-  },
-  {
-    key: "renewal-after-end",
-    name: "Renewal after campaign ended",
-    description:
-      "When a brand's campaign ends, tells the owner on the next weekday morning, sends a check-in email and books a renewal call.",
-    subjectKind: "account",
-    trigger: {
-      kind: "platform_event",
-      eventTypes: ["campaign.status_changed"],
-      campaignStatuses: ["ended"],
-    },
+    trigger: { kind: "stall_started", ruleIds: ["renewal_due"] },
     settings: DEFAULT_SETTINGS,
-    graph: build([
-      { id: "trigger", kind: "trigger", row: 0 },
-      {
-        id: "morning",
-        kind: "wait",
-        row: 1,
-        from: ["trigger", "out"],
-        config: { mode: "until", days: [1, 2, 3, 4, 5], time: "10:00" },
-      },
-      {
-        id: "alert",
-        kind: "notify",
-        row: 2,
-        from: ["morning", "out"],
-        config: {
-          to: "owner",
-          message:
-            "{{account.name}} just ended a campaign. Plan the renewal while results are fresh.",
-        },
-      },
-      {
-        id: "email",
-        kind: "send_email",
-        row: 3,
-        from: ["alert", "out"],
-        config: {
-          subject: "What's next for {{account.name}} after this campaign?",
-          body: "Hi {{person.firstName|there}},\n\nYour campaign on Hypedrive has wrapped up. I'd love to share what worked for {{account.name}} and plan the next one: new SKUs, another marketplace or a bigger slot count.\n\nWhen's a good time to talk?\n\n{{owner.firstName}}",
-          purpose: "sales_outreach",
-        },
-      },
-      {
-        id: "wait",
-        kind: "wait",
-        row: 4,
-        from: ["email", "out"],
-        config: { mode: "duration", amount: 5, unit: "days" },
-      },
-      {
-        id: "call",
-        kind: "create_task",
-        row: 5,
-        from: ["wait", "out"],
-        config: {
-          title: "Renewal call with {{account.name}}",
-          notes: "Review the last campaign's results and propose the next one.",
-          assignee: "owner",
-          dueInDays: 0,
-          priority: "high",
-        },
-      },
+    graph: sequence([
+      email(
+        "What's next for {{account.name|your brand}}?",
+        "Your last campaign on Hypedrive has wrapped up. If it went well, the next one is usually easier to plan: new products, another marketplace, or more slots on what sold out.\n\nWant me to send a few suggestions based on your last results?",
+      ),
+      wait(4),
+      email(
+        "Closing the loop",
+        "A short follow-up on my last note. If you're planning another campaign, reply and I'll help you set it up. If not, no problem, and I won't keep writing.",
+      ),
+      wait(4),
+      task(
+        "Win-back call: {{account.name}}",
+        "Last campaign ended and two emails got no reply. Share the results, then pitch the next campaign.",
+      ),
     ]),
   },
 ];

@@ -376,6 +376,15 @@ export default defineSchema({
     query: v.string(),
   }).index("by_member_path", ["memberId", "path"]),
 
+  /** The last model answer per account brief or member's Today list; `hash` is of the context it was written from. */
+  aiCache: defineTable({
+    kind: v.union(v.literal("brief"), v.literal("next")),
+    key: v.string(),
+    hash: v.string(),
+    data: v.any(),
+    at: v.number(),
+  }).index("by_kind_key", ["kind", "key"]),
+
   /** A record a member keeps in the sidebar. */
   pins: defineTable({
     memberId: v.id("members"),

@@ -8,6 +8,7 @@ import { internal } from "../../_generated/api";
  * Email: EMAIL_PROVIDER=resend (RESEND_API_KEY, EMAIL_FROM) or
  * EMAIL_PROVIDER=novu (NOVU_API_KEY, NOVU_EMAIL_WORKFLOW, optional NOVU_API_URL) or
  * EMAIL_PROVIDER=smtp (SMTP_HOST, SMTP_USER, SMTP_PASSWORD, EMAIL_FROM, optional SMTP_PORT).
+ * EMAIL_REPLY_TO, if set, receives replies (resend and smtp); point it at the inbox that feeds the inbound webhook.
  * WhatsApp (Meta Cloud API, approved templates only): WHATSAPP_PHONE_NUMBER_ID and
  * WHATSAPP_ACCESS_TOKEN, optional WHATSAPP_API_VERSION.
  */
@@ -150,6 +151,7 @@ export async function deliver(
       },
       {
         from: env("EMAIL_FROM"),
+        reply_to: env("EMAIL_REPLY_TO"),
         to: [message.to],
         subject: message.subject,
         text: message.body,

@@ -20,14 +20,14 @@ type Safety = FunctionReturnType<typeof api.automations.safety>;
 const messages = (count: number) =>
   `${count} ${count === 1 ? "message" : "messages"}`;
 
-/** Settings → Workspace: the automations kill switch and the per-person frequency cap. */
+/** Settings → Workspace: the sequences kill switch and the per-person frequency cap. */
 export default function AutomationSafety() {
   const safety = useQuery(api.automations.safety, {});
   return (
     <SettingsSection
       tone={safety?.killSwitch ? "danger" : "default"}
-      title="Automation safety"
-      description="Limits that apply to every automation, whoever built it."
+      title="Sequence safety"
+      description="Limits that apply to every sequence, whoever built it."
     >
       {safety ? (
         <>
@@ -70,7 +70,7 @@ function KillSwitchRow({ safety }: { safety: Safety }) {
           toast(readError(reason).message, { tone: "danger" }),
         );
       if (on) {
-        toast("All automations stopped. Runs hold where they are.", {
+        toast("All sequences stopped. Runs hold where they are.", {
           tone: "warning",
           undo,
         });
@@ -78,7 +78,7 @@ function KillSwitchRow({ safety }: { safety: Safety }) {
         const resumed = result.resumed
           ? ` · ${result.resumed} held ${result.resumed === 1 ? "run" : "runs"} resumed`
           : "";
-        toast(`Automations running again${resumed}`, undo);
+        toast(`Sequences running again${resumed}`, undo);
       }
     } catch (reason) {
       toast(readError(reason).message, { tone: "danger" });
@@ -89,7 +89,7 @@ function KillSwitchRow({ safety }: { safety: Safety }) {
 
   return (
     <SettingsRow
-      label="Stop all automations"
+      label="Stop all sequences"
       htmlFor="automations-kill-switch"
       description={
         stopped && safety.killSwitch ? (
@@ -108,7 +108,7 @@ function KillSwitchRow({ safety }: { safety: Safety }) {
             carry on from where they stopped.
           </>
         ) : (
-          "An emergency stop for every automation: runs hold where they are, nothing new enrols and no message goes out until you turn it off."
+          "An emergency stop for every sequence: runs hold where they are, nothing new enrols and no message goes out until you turn it off."
         )
       }
     >
@@ -178,7 +178,7 @@ function FrequencyRow({ safety }: { safety: Safety }) {
         description={
           <>
             The most automated emails and WhatsApp messages one person gets in
-            any {FREQUENCY_WINDOW_DAYS} days, across all automations. Further
+            any {FREQUENCY_WINDOW_DAYS} days, across all sequences. Further
             messages wait until they’re under the cap.{" "}
             {safety.frequencyCapIsDefault
               ? "Using the default."

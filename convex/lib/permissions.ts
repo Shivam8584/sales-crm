@@ -34,6 +34,7 @@ export const PERMISSIONS = {
   "activation.task": { min: "manager", own: true },
   "proposal.approve": { min: "manager" },
   "activation.run": { min: "manager" },
+  "sequence.run": { min: "manager", own: true },
 
   "member.manage": { min: "admin" },
   "invite.manage": { min: "admin" },
@@ -70,6 +71,8 @@ const DENIED: Partial<Record<Action, string>> = {
   "task.delete": "Only the assignee or a manager can delete this task",
   "timeline.edit": "Only the author or an admin can change this",
   "proposal.approve": "Only a manager or an admin can decide on pricing",
+  "sequence.run":
+    "Reps can only start, pause and enrol records in their own sequences",
 };
 
 export function assertCan(

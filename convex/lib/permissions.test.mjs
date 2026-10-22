@@ -30,6 +30,7 @@ const MATRIX = [
   ["activation.task", false, true, true, true],
   ["proposal.approve", false, false, true, true],
   ["activation.run", false, false, true, true],
+  ["sequence.run", false, true, true, true],
   ["member.manage", false, false, false, true],
   ["invite.manage", false, false, false, true],
   ["settings.write", false, false, false, true],

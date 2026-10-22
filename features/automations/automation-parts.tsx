@@ -30,25 +30,25 @@ export function StatusTag({
   );
 }
 
-/** Header pill while an admin has stopped every automation; links to the switch. */
+/** Header pill while an admin has stopped every sequence; links to the switch. */
 export function StoppedStatus() {
   const safety = useQuery(api.automations.safety, {});
   if (!safety?.killSwitch) return null;
   return (
     <Tooltip
-      content={`${safety.killSwitch.by} stopped all automations. Runs hold and nothing sends until it's turned off in Settings → Workspace.`}
+      content={`${safety.killSwitch.by} stopped all sequences. Runs hold and nothing sends until it's turned off in Settings → Workspace.`}
     >
       <Link
         href="/settings/workspace"
         className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
       >
-        <PageStatus tone="danger">All automations stopped</PageStatus>
+        <PageStatus tone="danger">All sequences stopped</PageStatus>
       </Link>
     </Tooltip>
   );
 }
 
-/** The steps of an automation as a row of small coloured icon tiles. */
+/** The steps of a sequence as a row of small coloured icon tiles. */
 export function StepIcons({
   steps,
   max = 6,

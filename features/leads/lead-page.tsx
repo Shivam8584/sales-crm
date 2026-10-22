@@ -23,6 +23,7 @@ import {
 } from "@/features/accounts/use-title-shortcut";
 import Timeline from "@/features/timeline/timeline";
 import { RecordAutomations } from "@/features/automations/record-automations";
+import { useDraftAction } from "@/features/ai/use-draft-action";
 import { usePinAction } from "@/features/pins/use-pins";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { useViewer } from "@/hooks/use-viewer";
@@ -93,6 +94,7 @@ function LeadView({ lead }: { lead: Lead }) {
   const update = useMutation(api.leads.update);
   const save = useRecordUpdate(update, lead._id);
   const pin = usePinAction({ leadId: lead._id });
+  const draft = useDraftAction({ leadId: lead._id });
   const { convert, assign } = useLeadActions();
   const [converting, setConverting] = useState(false);
   const converted = lead.status === "converted";
@@ -190,6 +192,7 @@ function LeadView({ lead }: { lead: Lead }) {
               label="Lead actions"
               actions={[
                 pin,
+                draft.action,
                 lead.owner?._id !== viewer._id && {
                   label: "Assign to me",
                   icon: UserPlusIcon,
@@ -198,6 +201,7 @@ function LeadView({ lead }: { lead: Lead }) {
                 { label: "Copy link", icon: LinkIcon, onSelect: copyLink },
               ]}
             />
+            {draft.dialog}
           </>
         }
       />
@@ -363,7 +367,7 @@ function LeadView({ lead }: { lead: Lead }) {
             },
             {
               id: "automations",
-              label: "Automations",
+              label: "Sequences",
               content: <RecordAutomations target={{ leadId: lead._id }} />,
             },
           ]}

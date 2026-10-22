@@ -1,6 +1,7 @@
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { adminMutation, adminQuery } from "./lib/functions";
+import { aiModels } from "./lib/ai";
 import { accountCounts, leadCounts, peopleCounts } from "./lib/counts";
 import { emailProvider, whatsappProvider } from "./lib/automations/delivery";
 import { providerMode } from "./lib/enrichment";
@@ -98,6 +99,10 @@ export const overview = adminQuery({
         },
         enrichment: providerMode(process.env),
         scraper: scraperMode(process.env),
+        ai: {
+          configured: Boolean(process.env.OPENAI_API_KEY?.trim()),
+          ...aiModels(process.env),
+        },
       },
       failures: {
         messages: failedMessages.map((message) => ({

@@ -10,6 +10,8 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   leadForm: { kind: "fixed window", rate: 5, period: MINUTE },
   enrichment: { kind: "fixed window", rate: 20, period: MINUTE },
   productChecks: { kind: "fixed window", rate: 300, period: HOUR },
+  /** Model calls per member per IST day. */
+  ai: { kind: "fixed window", rate: 100, period: DAY, start: IST_MIDNIGHT },
   /** One token per message for 30 days: a second delivery of the same message is a duplicate. */
   inboundMessage: {
     kind: "token bucket",

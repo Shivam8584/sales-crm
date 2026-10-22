@@ -257,7 +257,7 @@ function AnalyticsSkeleton() {
   );
 }
 
-/** How an automation performs: outcomes, the step funnel, messages and replies. */
+/** How a sequence performs: outcomes, the step funnel, messages and replies. */
 export default function AutomationAnalytics({ id }: { id: Id<"automations"> }) {
   const data = useQuery(api.automations.analytics, { id });
   return (
@@ -316,7 +316,7 @@ export default function AutomationAnalytics({ id }: { id: Id<"automations"> }) {
                 </Section>
                 <Section
                   title="Messages"
-                  description="Emails and WhatsApp templates the automation queued, by delivery status."
+                  description="Emails and WhatsApp templates the sequence queued, by delivery status."
                 >
                   <Messages messages={data.messages} />
                 </Section>

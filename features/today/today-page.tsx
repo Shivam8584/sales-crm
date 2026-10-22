@@ -28,6 +28,7 @@ import {
 import AccountLogo from "@/features/accounts/account-logo";
 import { TrendCell } from "@/features/accounts/record-cells";
 import { StageTag } from "@/features/accounts/stage";
+import { useRefreshNextActions } from "@/features/ai/next-action";
 import TaskComposer from "@/features/tasks/task-composer";
 import {
   byUrgency,
@@ -257,6 +258,7 @@ export default function TodayPage() {
     cursor && navigable.some((item) => item.id === cursor) ? cursor : null;
 
   const loaded = sections.every((section) => section.items !== undefined);
+  useRefreshNextActions(loaded);
   const total = sections.reduce(
     (sum, section) => sum + (section.items?.length ?? 0),
     0,

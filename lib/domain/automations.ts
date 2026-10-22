@@ -1724,6 +1724,7 @@ export const EXIT_KINDS = [
   "record_gone",
   "deleted",
   "step_removed",
+  "no_consent",
   "failed",
 ] as const;
 export type ExitKind = (typeof EXIT_KINDS)[number];
@@ -1737,6 +1738,7 @@ export const EXIT_KIND_LABEL: Record<ExitKind | "other", string> = {
   record_gone: "Record archived or erased",
   deleted: "Automation deleted",
   step_removed: "Step removed in a new version",
+  no_consent: "No consent to contact",
   failed: "A step kept failing",
   other: "Other",
 };

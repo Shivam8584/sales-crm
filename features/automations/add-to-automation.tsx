@@ -51,7 +51,7 @@ type AddToAutomationProps = {
   children?: ReactNode;
 };
 
-/** Picks an active automation and enrols the given records in it by hand. */
+/** Picks an active sequence and enrols the given records in it by hand. */
 export default function AddToAutomation({
   kind,
   ids,
@@ -97,13 +97,13 @@ export default function AddToAutomation({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={busy || ids.length === 0}
-        aria-label={`Add ${ids.length === 1 ? `this ${noun[0]}` : `${ids.length} ${noun[1]}`} to an automation`}
+        aria-label={`Add ${ids.length === 1 ? `this ${noun[0]}` : `${ids.length} ${noun[1]}`} to a sequence`}
         className={cn(
           "hover:bg-overlay-1 data-[state=open]:bg-overlay-2 focus-visible:ring-ring duration-fast text-foreground inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs leading-none font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-60",
           className,
         )}
       >
-        {children ?? (busy ? "Adding…" : "Add to automation")}
+        {children ?? (busy ? "Adding…" : "Add to sequence")}
       </PopoverTrigger>
       <PopoverContent
         align={align}
@@ -117,16 +117,16 @@ export default function AddToAutomation({
         <CommandPrimitive
           ref={commandRef}
           loop
-          label="Automations"
+          label="Sequences"
           className="flex flex-col outline-none"
         >
           <CommandPrimitive.Input
-            placeholder="Search automations…"
+            placeholder="Search sequences…"
             className="border-line-strong placeholder:text-fg-tertiary h-10 border-b bg-transparent px-3 text-sm outline-none"
           />
           {stopped && (
             <p className="caption-style text-warning border-line-strong border-b px-3 py-2 leading-snug">
-              Automations are stopped for the workspace, so nothing can be added
+              Sequences are stopped for the workspace, so nothing can be added
               right now.
             </p>
           )}
@@ -144,14 +144,14 @@ export default function AddToAutomation({
                   className="text-fg-tertiary size-4"
                 />
                 <span className="text-sm font-medium">
-                  No active automation runs on {noun[1]}
+                  No active sequence runs on {noun[1]}
                 </span>
                 <Link
                   href="/automations"
                   className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2"
                   onClick={() => setOpen(false)}
                 >
-                  Open automations
+                  Open sequences
                 </Link>
               </div>
             ) : (

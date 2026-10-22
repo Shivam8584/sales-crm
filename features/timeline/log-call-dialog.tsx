@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
+import { Checkbox } from "@/components/_ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -16,6 +17,8 @@ import {
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import OptionPicker from "@/components/fields/option-picker";
+import { aiError, useAiEnabled } from "@/features/ai/use-ai";
+import { formatDay } from "@/features/tasks/task-meta";
 import { CALL_OUTCOMES, type CallOutcome } from "@/lib/domain/enums";
 import { CALL_OUTCOME_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
@@ -25,6 +28,9 @@ import type { TimelineTarget } from "./kinds";
 import MentionTextarea, { useMentionDraft } from "./mention-textarea";
 
 type Errors = Partial<Record<"durationMin" | "body" | "form", string>>;
+type ActionItem = { title: string; dueDate: string | null; on: boolean };
+
+const SUMMARY_MIN = 60;
 
 /** Logs a call against a record without opening it, e.g. from a list row. */
 export default function LogCallDialog({
@@ -35,6 +41,12 @@ export default function LogCallDialog({
   onClose: () => void;
 }) {
   const log = useMutation(api.timeline.log);
+  const createTask = useMutation(api.tasks.create);
+  const summarizeCall = useAction(api.ai.summarizeCall);
+  const aiEnabled = useAiEnabled();
+  const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [actions, setActions] = useState<ActionItem[]>([]);
+  const [summarizing, setSummarizing] = useState(false);
   const [outcome, setOutcome] = useState<CallOutcome>("connected");
   const [duration, setDuration] = useState("");
   const draft = useMentionDraft();
@@ -46,6 +58,25 @@ export default function LogCallDialog({
     setDuration("");
     draft.reset();
     setErrors({});
+    setSuggestion(null);
+    setActions([]);
+  }
+
+  async function summarize() {
+    if (!call || summarizing) return;
+    setSummarizing(true);
+    try {
+      const result = await summarizeCall({
+        target: call.target,
+        notes: draft.text.trim(),
+      });
+      setSuggestion(result.summary);
+      setActions(result.actionItems.map((item) => ({ ...item, on: false })));
+    } catch (error) {
+      aiError(error, "Couldn't summarize the call");
+    } finally {
+      setSummarizing(false);
+    }
   }
 
   async function submit(event?: FormEvent) {
@@ -60,8 +91,24 @@ export default function LogCallDialog({
         durationMin: duration ? Number(duration) : undefined,
         body: draft.encoded() || undefined,
       });
+      const picked = actions.filter((item) => item.on);
+      const results = await Promise.allSettled(
+        picked.map((item) =>
+          createTask({
+            title: item.title,
+            dueDate: item.dueDate ?? undefined,
+            ...call.target,
+          }),
+        ),
+      );
+      const added = results.filter((r) => r.status === "fulfilled").length;
       onClose();
-      toast(`Call with ${call.name} logged`);
+      toast(
+        `Call with ${call.name} logged${added ? `, ${added} ${added === 1 ? "task" : "tasks"} added` : ""}`,
+      );
+      if (added < picked.length) {
+        toast("Some tasks couldn't be added", { tone: "danger" });
+      }
     } catch (error) {
       const { message, field } = readError(error, "Couldn't log the call");
       setErrors({
@@ -138,6 +185,58 @@ export default function LogCallDialog({
                 className="border-input bg-secondary text-foreground duration-fast ease-power3-out placeholder:text-fg-tertiary hover:border-fg-tertiary focus-visible:border-selected focus-visible:ring-selected/20 aria-invalid:border-danger field-sizing-content max-h-40 min-h-24 w-full resize-none rounded-lg border px-3 py-2.5 text-sm leading-snug transition-[border-color,box-shadow] outline-none focus-visible:ring-3 pointer-coarse:text-base"
               />
             </Field>
+            {aiEnabled && draft.text.trim().length >= SUMMARY_MIN && (
+              <Button
+                variant="ghost"
+                size="xs"
+                loading={summarizing}
+                onClick={() => void summarize()}
+                className="-mt-2 self-start"
+              >
+                Summarize with AI
+              </Button>
+            )}
+            {suggestion && (
+              <div className="flex flex-col gap-2">
+                <p className="caption-style text-fg-secondary leading-snug">
+                  {suggestion}
+                </p>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  className="self-start"
+                  onClick={() => {
+                    draft.setText(suggestion);
+                    setSuggestion(null);
+                  }}
+                >
+                  Use summary
+                </Button>
+              </div>
+            )}
+            {actions.map((item, index) => (
+              <div key={index} className="flex items-start gap-3">
+                <Checkbox
+                  id={`log-call-task-${index}`}
+                  checked={item.on}
+                  onCheckedChange={(on) =>
+                    setActions(
+                      actions.map((other, at) =>
+                        at === index ? { ...other, on: on === true } : other,
+                      ),
+                    )
+                  }
+                  className="mt-0.5"
+                />
+                <label
+                  htmlFor={`log-call-task-${index}`}
+                  className="text-fg-secondary cursor-pointer text-sm leading-snug select-none"
+                >
+                  Create task: {item.title}
+                  {item.dueDate && ` (due ${formatDay(item.dueDate)})`}
+                </label>
+              </div>
+            ))}
             {errors.form && (
               <p role="alert" className="caption-style text-danger">
                 {errors.form}
