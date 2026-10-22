@@ -96,7 +96,7 @@ export default function InlineText({
           onBlur={() => void commit()}
           onKeyDown={onKeyDown}
           className={cn(
-            "border-selected ring-selected/20 bg-secondary aria-invalid:border-danger aria-invalid:ring-danger/20 -mx-1.5 h-7 min-w-0 rounded-md border px-1.5 text-sm leading-none ring-3 outline-none",
+            "bg-background ring-foreground/15 aria-invalid:ring-danger/40 -mx-1.5 h-7 min-w-0 rounded-lg px-1.5 text-sm leading-none ring-2 outline-none",
             inputClassName,
           )}
         />
@@ -118,7 +118,7 @@ export default function InlineText({
         title={value ?? undefined}
         aria-label={`Edit ${label}`}
         className={cn(
-          "hover:bg-overlay-1 focus-visible:ring-ring duration-fast -mx-1.5 flex h-7 min-w-0 flex-1 items-center rounded-md px-1.5 text-left text-sm leading-none transition-colors outline-none focus-visible:ring-2",
+          "hover:bg-well focus-visible:ring-ring duration-base -mx-1.5 flex h-7 min-w-0 flex-1 items-center rounded-lg px-1.5 text-left text-sm leading-none transition-colors outline-none focus-visible:ring-2",
           inputClassName,
         )}
       >

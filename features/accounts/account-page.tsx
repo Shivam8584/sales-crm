@@ -60,6 +60,7 @@ import {
   ASIDE_SECTION,
   AccountSummary,
   ActivityTrend,
+  LIFTED_SECTION,
   PipelineHealth,
 } from "./account-insights";
 import ActivationPath from "./activation-path";
@@ -223,7 +224,7 @@ function AccountView({ account }: { account: Account }) {
                     value={account.name}
                     label="Account name"
                     onSave={(name) => save({ name }, "Name")}
-                    inputClassName="font-display h-9 text-2xl font-medium"
+                    inputClassName="text-display lg:text-hero h-auto py-0.5 font-semibold"
                   />
                 </span>
               }
@@ -262,13 +263,14 @@ function AccountView({ account }: { account: Account }) {
         }
         aside={
           <>
-            <AccountBrief accountId={account._id} />
-            <AccountSummary people={people} className={ASIDE_SECTION} />
             <PipelineHealth
               accountId={account._id}
               deals={deals}
-              className={ASIDE_SECTION}
+              className={LIFTED_SECTION}
+              divider={false}
             />
+            <AccountBrief accountId={account._id} />
+            <AccountSummary people={people} className={ASIDE_SECTION} />
             <ActivityTrend
               target={{ accountId: account._id }}
               className={ASIDE_SECTION}

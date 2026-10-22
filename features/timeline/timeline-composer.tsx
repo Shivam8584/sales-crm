@@ -99,14 +99,11 @@ export default function TimelineComposer({
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="border-border focus-within:border-line-strong duration-fast rounded-xl border transition-colors"
-    >
+    <form onSubmit={submit} className="bg-well rounded-3xl p-1.5">
       <div
         role="tablist"
         aria-label="Entry type"
-        className="scrollbar-none flex gap-1 overflow-x-auto px-2 pt-2 max-sm:mask-r-from-[calc(100%-1.5rem)] max-sm:pr-6"
+        className="scrollbar-none flex gap-1 overflow-x-auto p-1 pb-2 max-sm:mask-r-from-[calc(100%-1.5rem)] max-sm:pr-6"
       >
         {LOGGABLE_KINDS.map((value) => {
           const meta = KIND_META[value];
@@ -118,8 +115,9 @@ export default function TimelineComposer({
               aria-selected={kind === value}
               onClick={() => setKind(value)}
               className={cn(
-                "caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 transition-colors outline-none focus-visible:ring-2",
-                kind === value && "bg-overlay-2 text-foreground",
+                "text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-base flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-[color,background-color,scale] outline-none focus-visible:ring-2 active:scale-[0.97]",
+                kind === value &&
+                  "bg-background text-foreground shadow-capsule",
               )}
             >
               <meta.icon aria-hidden className="size-3" />
@@ -128,67 +126,69 @@ export default function TimelineComposer({
           );
         })}
       </div>
-      <label htmlFor={bodyId} className="sr-only">
-        {KIND_META[kind].label}
-      </label>
-      <MentionTextarea
-        id={bodyId}
-        draft={draft}
-        onKeyDown={onKeyDown}
-        placeholder={PLACEHOLDER[kind]}
-        rows={2}
-        className="placeholder:text-fg-tertiary block field-sizing-content max-h-60 min-h-16 w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-snug outline-none"
-      />
-      <div className="flex flex-wrap items-center gap-2 px-3 pb-2.5">
-        {kind === "call" && (
-          <OptionPicker
-            value={outcome}
-            label="Outcome"
-            onChange={(value) => value && setOutcome(value as CallOutcome)}
-            options={CALL_OUTCOMES.map((value) => ({
-              value,
-              label: CALL_OUTCOME_LABEL[value],
-            }))}
-            className="border-border h-control-sm mx-0 border px-2 text-xs"
-          />
-        )}
-        {(kind === "call" || kind === "meeting") && (
-          <label className="caption-style text-fg-tertiary border-border h-control-sm flex items-center gap-1.5 rounded-md border px-2">
-            <input
-              type="number"
-              min={0}
-              max={600}
-              inputMode="numeric"
-              value={duration}
-              onChange={(event) => setDuration(event.target.value)}
-              aria-label="Duration in minutes"
-              placeholder="0"
-              className="text-foreground w-8 bg-transparent text-right tabular-nums outline-none"
+      <div className="bg-background shadow-tile rounded-[1.25rem]">
+        <label htmlFor={bodyId} className="sr-only">
+          {KIND_META[kind].label}
+        </label>
+        <MentionTextarea
+          id={bodyId}
+          draft={draft}
+          onKeyDown={onKeyDown}
+          placeholder={PLACEHOLDER[kind]}
+          rows={2}
+          className="placeholder:text-fg-tertiary text-body block field-sizing-content max-h-60 min-h-18 w-full resize-none rounded-t-[1.25rem] bg-transparent px-4 pt-3.5 pb-2 outline-none"
+        />
+        <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
+          {kind === "call" && (
+            <OptionPicker
+              value={outcome}
+              label="Outcome"
+              onChange={(value) => value && setOutcome(value as CallOutcome)}
+              options={CALL_OUTCOMES.map((value) => ({
+                value,
+                label: CALL_OUTCOME_LABEL[value],
+              }))}
+              className="border-border h-control-sm mx-0 border px-2 text-xs"
             />
-            min
-          </label>
-        )}
-        {error && (
-          <span role="alert" className="caption-style text-danger">
-            {error}
+          )}
+          {(kind === "call" || kind === "meeting") && (
+            <label className="caption-style text-fg-tertiary border-border h-control-sm flex items-center gap-1.5 rounded-md border px-2">
+              <input
+                type="number"
+                min={0}
+                max={600}
+                inputMode="numeric"
+                value={duration}
+                onChange={(event) => setDuration(event.target.value)}
+                aria-label="Duration in minutes"
+                placeholder="0"
+                className="text-foreground w-8 bg-transparent text-right tabular-nums outline-none"
+              />
+              min
+            </label>
+          )}
+          {error && (
+            <span role="alert" className="caption-style text-danger">
+              {error}
+            </span>
+          )}
+          <span className="caption-style text-fg-tertiary ml-auto flex items-center gap-1 max-sm:hidden">
+            <Kbd>{MOD_KEY}</Kbd>
+            <Kbd>↵</Kbd>
           </span>
-        )}
-        <span className="caption-style text-fg-tertiary ml-auto flex items-center gap-1 max-sm:hidden">
-          <Kbd>{MOD_KEY}</Kbd>
-          <Kbd>↵</Kbd>
-        </span>
-        <Button
-          type="submit"
-          variant="primary"
-          size="xs"
-          className="max-sm:ml-auto"
-          disabled={!canSubmit}
-          loading={saving}
-        >
-          {kind === "note"
-            ? "Add note"
-            : `Log ${KIND_META[kind].label.toLowerCase()}`}
-        </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="xs"
+            className="max-sm:ml-auto"
+            disabled={!canSubmit}
+            loading={saving}
+          >
+            {kind === "note"
+              ? "Add note"
+              : `Log ${KIND_META[kind].label.toLowerCase()}`}
+          </Button>
+        </div>
       </div>
     </form>
   );

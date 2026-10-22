@@ -4,6 +4,7 @@ import {
   Fragment,
   createContext,
   useContext,
+  useEffect,
   useId,
   useState,
   type ComponentType,
@@ -62,8 +63,12 @@ import UserMenu from "./user-menu";
 type Slots = {
   head: HTMLElement | null;
   toolbar: HTMLElement | null;
+  record: HTMLElement | null;
+  hasRecord: boolean;
   setHead: (node: HTMLElement | null) => void;
   setToolbar: (node: HTMLElement | null) => void;
+  setRecord: (node: HTMLElement | null) => void;
+  setHasRecord: (has: boolean) => void;
 };
 const SlotsContext = createContext<Slots | null>(null);
 const InToolbarContext = createContext(false);
@@ -72,12 +77,25 @@ function Slot({
   target,
   children,
 }: {
-  target: "head" | "toolbar";
+  target: "head" | "toolbar" | "record";
   children: ReactNode;
 }) {
   const slots = useContext(SlotsContext);
   const node = slots?.[target];
   return node ? createPortal(children, node) : children;
+}
+
+/** Lets a record's own header (editable name, logo, stage) stand in for the page title. */
+export function RecordHeadSlot({ children }: { children: ReactNode }) {
+  const slots = useContext(SlotsContext);
+  const setHasRecord = slots?.setHasRecord;
+  useEffect(() => {
+    if (!setHasRecord) return;
+    setHasRecord(true);
+    return () => setHasRecord(false);
+  }, [setHasRecord]);
+  if (!slots) return children;
+  return slots.record ? createPortal(children, slots.record) : null;
 }
 
 export function Page({
@@ -92,8 +110,21 @@ export function Page({
 }) {
   const [head, setHead] = useState<HTMLElement | null>(null);
   const [toolbar, setToolbar] = useState<HTMLElement | null>(null);
+  const [record, setRecord] = useState<HTMLElement | null>(null);
+  const [hasRecord, setHasRecord] = useState(false);
   return (
-    <SlotsContext.Provider value={{ head, toolbar, setHead, setToolbar }}>
+    <SlotsContext.Provider
+      value={{
+        head,
+        toolbar,
+        record,
+        hasRecord,
+        setHead,
+        setToolbar,
+        setRecord,
+        setHasRecord,
+      }}
+    >
       <div
         data-wide={wide || undefined}
         className={cn(
@@ -145,7 +176,7 @@ export function PageHeader({
         )}
       >
         <div className="flex min-w-0 flex-1 items-center gap-4 lg:gap-5">
-          {lead}
+          {!slots?.hasRecord && lead}
           <div className="min-w-0 flex-1">
             {crumbs.length > 0 && (
               <nav
@@ -191,12 +222,16 @@ export function PageHeader({
                 ))}
               </nav>
             )}
-            <h1
-              title={typeof title === "string" ? title : undefined}
-              className="text-display short:text-2xl lg:text-hero truncate font-semibold"
-            >
-              {title}
-            </h1>
+            {slots?.hasRecord ? (
+              <div ref={slots.setRecord} className="min-w-0" />
+            ) : (
+              <h1
+                title={typeof title === "string" ? title : undefined}
+                className="text-display short:text-2xl lg:text-hero truncate font-semibold"
+              >
+                {title}
+              </h1>
+            )}
             {meta && (
               <div className="text-body text-fg-secondary mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 tabular-nums max-[399px]:hidden">
                 {meta}

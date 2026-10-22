@@ -173,9 +173,7 @@ export default function Timeline({
         <div className="flex flex-col gap-4">
           {groups.map((group) => (
             <section key={group.key} aria-label={group.label}>
-              <h3 className="caption-style text-fg-tertiary pb-3">
-                {group.label}
-              </h3>
+              <h3 className="title-style pb-2">{group.label}</h3>
               <ol className="flex flex-col">
                 {group.entries.map((entry) => (
                   <TimelineItem
@@ -310,16 +308,16 @@ function AutomaticItem({
     <li
       id={`${ENTRY_ANCHOR}${entry._id}`}
       className={cn(
-        "animate-item-in relative flex gap-3 pb-3.5",
+        "animate-item-in relative flex gap-3.5 py-2.5",
         ANCHOR,
         highlighted && ANCHOR_ON,
       )}
     >
-      <span className="text-fg-tertiary flex h-5.5 w-5 shrink-0 items-center justify-center">
-        <meta.icon aria-hidden className="size-3" />
+      <span className="bg-well text-fg-secondary flex size-8 shrink-0 items-center justify-center rounded-full">
+        <meta.icon aria-hidden className="size-3.5" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="caption-style flex min-h-5.5 items-baseline gap-2 pt-0.5 leading-5">
+        <div className="text-body flex min-h-8 items-baseline gap-2 pt-1 leading-6">
           <p className="text-fg-secondary min-w-0 flex-1">
             <span className="text-foreground font-medium">{actorName}</span>{" "}
             {entry.kind === "system" ? (
@@ -466,16 +464,16 @@ function LoggedItem({
     <li
       id={`${ENTRY_ANCHOR}${entry._id}`}
       className={cn(
-        "group/item animate-item-in relative flex gap-3 pb-5",
+        "group/item animate-item-in relative flex gap-3.5 py-2.5",
         ANCHOR,
         highlighted && ANCHOR_ON,
       )}
     >
-      <span className="text-fg-tertiary flex h-6 w-5 shrink-0 items-center justify-center">
+      <span className="bg-well text-fg-secondary flex size-8 shrink-0 items-center justify-center rounded-full">
         <meta.icon aria-hidden className="size-3.5" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
-        <div className="flex min-h-5 items-baseline gap-2 text-sm leading-5">
+        <div className="text-body flex min-h-6 items-baseline gap-2 leading-6">
           <p className="text-fg-secondary min-w-0 flex-1">
             {entry.direction === "inbound" ? (
               <>

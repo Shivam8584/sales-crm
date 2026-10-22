@@ -223,7 +223,7 @@ function DealView({
                   value={deal.title}
                   label="Deal title"
                   onSave={(title) => save({ title }, "Title", { inline: true })}
-                  inputClassName="font-display h-9 text-2xl font-medium"
+                  inputClassName="text-display lg:text-hero h-auto py-0.5 font-semibold"
                 />
               </span>
             }

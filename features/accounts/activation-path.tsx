@@ -30,46 +30,48 @@ export default function ActivationPath({
   const current = [...steps].reverse().find((step) => step.done);
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <p className="caption-style text-fg-tertiary flex items-center justify-between gap-3">
+    <div className="flex flex-col gap-2">
+      <p className="text-fg-tertiary flex items-center justify-between gap-3 text-xs sm:sr-only">
         <span>Activation</span>
         <span className="tabular-nums">
-          <span className="text-foreground sm:hidden">
+          <span className="text-foreground">
             {current ? STAGE_LABEL[current.stage] : "Not started"} ·{" "}
           </span>
           {doneCount} of {steps.length}
         </span>
       </p>
-      <ol aria-label="Activation path" className="flex items-start">
-        {steps.map((step, index) => {
-          const next = steps[index + 1];
+      <ol
+        aria-label={`Activation path, ${doneCount} of ${steps.length}`}
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {steps.map((step) => {
           const isCurrent = step === current;
           return (
-            <li
-              key={step.stage}
-              className="relative flex min-w-0 flex-1 flex-col gap-1.5"
-            >
-              <span className="flex items-center">
-                <Dot done={step.done} current={isCurrent} />
-                {next && (
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "mx-1 h-px flex-1",
-                      next.done ? "bg-success/60" : "bg-line-strong",
-                    )}
-                  />
-                )}
-              </span>
-              <span className="flex min-w-0 flex-col gap-0.5 pr-2 max-sm:sr-only">
+            <li key={step.stage} className="flex min-w-0 flex-col gap-2">
+              <span
+                aria-hidden
+                className="bg-foreground/10 block h-1 overflow-hidden rounded-full"
+              >
                 <span
                   className={cn(
-                    "caption-style truncate",
+                    "bg-foreground ease-out-hd block h-full rounded-full transition-[width] duration-[420ms]",
+                    step.done ? "w-full" : "w-0",
+                  )}
+                />
+              </span>
+              <span className="flex min-w-0 flex-col max-sm:sr-only">
+                <span
+                  className={cn(
+                    "flex min-w-0 items-center gap-1 text-sm",
                     step.done ? "text-foreground" : "text-fg-tertiary",
                     isCurrent && "font-medium",
                   )}
                 >
-                  {STAGE_LABEL[step.stage]}
+                  {step.done && <Dot />}
+                  <span className="truncate">{STAGE_LABEL[step.stage]}</span>
                   <span className="sr-only">
                     {step.done ? ", done" : ", not yet"}
                   </span>
@@ -78,15 +80,13 @@ export default function ActivationPath({
                   <Tooltip content={dateTime(step.at)}>
                     <time
                       dateTime={new Date(step.at).toISOString()}
-                      className="caption-style text-fg-tertiary w-fit tabular-nums"
+                      className="text-fg-tertiary w-fit text-xs tabular-nums"
                     >
                       {shortDate(step.at)}
                     </time>
                   </Tooltip>
                 ) : (
-                  <span aria-hidden className="caption-style text-fg-disabled">
-                    —
-                  </span>
+                  <span className="text-fg-disabled text-xs">Next</span>
                 )}
               </span>
             </li>
@@ -97,32 +97,22 @@ export default function ActivationPath({
   );
 }
 
-function Dot({ done, current }: { done: boolean; current: boolean }) {
-  if (!done) {
-    return (
-      <span
-        aria-hidden
-        className="border-line-strong size-3.5 shrink-0 rounded-full border border-dashed"
-      />
-    );
-  }
+function Dot() {
   return (
-    <span
+    <svg
       aria-hidden
-      className={cn(
-        "bg-success text-background flex size-3.5 shrink-0 items-center justify-center rounded-full",
-        current && "ring-success/25 ring-3",
-      )}
+      viewBox="0 0 12 12"
+      fill="none"
+      className="text-success size-3.5 shrink-0"
     >
-      <svg viewBox="0 0 12 12" fill="none" className="size-2.5">
-        <path
-          d="M3 6.25 5 8.25 9 4"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
+      <circle cx="6" cy="6" r="5.25" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        d="M3.75 6.1 5.3 7.6 8.25 4.6"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

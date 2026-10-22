@@ -228,7 +228,7 @@ function LeadView({ lead }: { lead: Lead }) {
                   value={lead.name}
                   label="Name"
                   onSave={(name) => save({ name }, "Name")}
-                  inputClassName="font-display h-9 text-2xl font-medium"
+                  inputClassName="text-display lg:text-hero h-auto py-0.5 font-semibold"
                 />
               </span>
             }

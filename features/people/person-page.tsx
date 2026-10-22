@@ -295,14 +295,14 @@ function PersonView({ person }: { person: Person }) {
                   label="First name"
                   onSave={(firstName) => save({ firstName }, "First name")}
                   className="shrink-0"
-                  inputClassName="font-display h-9 text-2xl font-medium"
+                  inputClassName="text-display lg:text-hero h-auto py-0.5 font-semibold"
                 />
                 {person.lastName && (
                   <InlineText
                     value={person.lastName}
                     label="Last name"
                     onSave={(lastName) => save({ lastName }, "Last name")}
-                    inputClassName="font-display h-9 text-2xl font-medium"
+                    inputClassName="text-display lg:text-hero h-auto py-0.5 font-semibold"
                   />
                 )}
               </span>
