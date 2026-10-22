@@ -120,6 +120,7 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `EXOTEL_WEBHOOK_SECRET`              | Convex | Secret in the status callback `/webhooks/exotel?secret=…` that logs each call; unset rejects it            |
 | `AI_MODEL`                           | Convex | Model for briefs, drafts and call summaries; default `gpt-6.1-sol`                                         |
 | `AI_MODEL_FAST`                      | Convex | Model for quick capture and next actions; default `gpt-6-luna`                                             |
+| `OPENAI_BASE_URL`                    | Convex | Optional proxy or compatible endpoint, e.g. `https://proxy.example/v1`                                     |
 | `NEXT_PUBLIC_CONVEX_URL`             | Next   | Required. Convex API URL (`CONVEX_CLOUD_ORIGIN`)                                                           |
 | `NEXT_PUBLIC_CONVEX_SITE_URL`        | Next   | Convex HTTP-actions URL (`CONVEX_SITE_ORIGIN`); the demo form posts leads here                             |
 | `NEXT_PUBLIC_CALCOM_LINK`            | Next   | Cal.com booking link shown after the demo form                                                             |

@@ -8,7 +8,7 @@ import {
 } from "../lib/domain/files";
 import { ROLE_RANK } from "../lib/domain/enums";
 import { fail, notFound } from "./lib/errors";
-import { memberMutation, memberQuery } from "./lib/functions";
+import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
 import {
   MAX_ATTACHMENTS,
   attachmentsOf,
@@ -175,3 +175,25 @@ function targetOf(row: Doc<"attachments">): AttachmentTarget {
   if (row.dealId) return { dealId: row.dealId };
   return { leadId: row.leadId! };
 }
+
+const ORPHAN_AFTER_MS = 24 * 60 * 60_000;
+
+/** Deletes uploads that were never attached to a record (an upload URL used, then the form abandoned). */
+export const sweepOrphans = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - ORPHAN_AFTER_MS;
+    const stale = await ctx.db.system
+      .query("_storage")
+      .order("asc")
+      .filter((q) => q.lt(q.field("_creationTime"), cutoff))
+      .take(200);
+    for (const file of stale) {
+      const attached = await ctx.db
+        .query("attachments")
+        .withIndex("by_storage", (q) => q.eq("storageId", file._id))
+        .first();
+      if (!attached) await ctx.storage.delete(file._id);
+    }
+  },
+});

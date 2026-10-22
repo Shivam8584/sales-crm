@@ -75,6 +75,7 @@ import {
   vTrigger,
 } from "./lib/automations/validators";
 import { fail, invalid, notFound } from "./lib/errors";
+import { rateLimiter } from "./lib/rateLimiter";
 import {
   adminMutation,
   internalMutation,
@@ -836,6 +837,10 @@ export const restore = memberMutation({
 export const sendTest = memberMutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
+    const { ok } = await rateLimiter.limit(ctx, "testEmail", {
+      key: ctx.viewer._id,
+    });
+    if (!ok) fail("rate_limited", "Too many test emails. Try again later.");
     const automation = await requireAutomation(ctx, id);
     const graph = automation.graph as Graph;
     const node = stepOrder(graph)

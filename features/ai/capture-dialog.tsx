@@ -79,22 +79,33 @@ function CaptureBody({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const started = useRef(false);
+  const live = useRef(true);
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    parse(request).then(
-      (capture) => {
-        setRows(
-          capture.items.map((item) => ({ item, on: Boolean(canCreate(item)) })),
-        );
-        setUnresolved(capture.unresolved);
-      },
-      (failure) => {
-        aiError(failure, "Couldn't read that");
-        onClose();
-      },
-    );
+    live.current = true;
+    if (!started.current) {
+      started.current = true;
+      parse(request).then(
+        (capture) => {
+          if (!live.current) return;
+          setRows(
+            capture.items.map((item) => ({
+              item,
+              on: Boolean(canCreate(item)),
+            })),
+          );
+          setUnresolved(capture.unresolved);
+        },
+        (failure) => {
+          if (!live.current) return;
+          aiError(failure, "Couldn't read that");
+          onClose();
+        },
+      );
+    }
+    return () => {
+      live.current = false;
+    };
   }, [parse, request, onClose]);
 
   async function create() {

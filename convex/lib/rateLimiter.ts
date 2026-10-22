@@ -10,6 +10,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   leadForm: { kind: "fixed window", rate: 5, period: MINUTE },
   enrichment: { kind: "fixed window", rate: 20, period: MINUTE },
   fileUpload: { kind: "fixed window", rate: 30, period: MINUTE },
+  testEmail: { kind: "fixed window", rate: 10, period: HOUR },
   calls: { kind: "fixed window", rate: 20, period: MINUTE },
   productChecks: { kind: "fixed window", rate: 300, period: HOUR },
   /** Model calls per member per IST day. */

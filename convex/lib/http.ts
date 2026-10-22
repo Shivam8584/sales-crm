@@ -9,9 +9,10 @@ export function allowedOrigins(envName: string, defaults: string[]) {
   return list.length > 0 ? list : defaults;
 }
 
-/** The CRM's own origin (SITE_URL) plus local development. */
+/** The CRM's own origin (SITE_URL); localhost too unless the site is served over https. */
 export function siteOrigins() {
   const site = process.env.SITE_URL?.replace(/\/$/, "");
+  if (site?.startsWith("https://")) return [site];
   return [
     ...new Set([site, "http://localhost:3000"].filter(Boolean)),
   ] as string[];

@@ -142,6 +142,8 @@ function Palette({
   const { role } = useViewer();
   const { belowLg } = useMobileBreakpoints();
   const [search, setSearch] = useState("");
+  const [active, setActive] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
   const aiEnabled = useAiEnabled();
   const deferred = useRef<(() => void) | null>(null);
   const history = useToastStore(selectUndoHistory);
@@ -246,6 +248,15 @@ function Palette({
 
   const loading = searching && (found === undefined || query !== search.trim());
 
+  // cmdk picks the first item it sees, which is the AI item before results arrive.
+  useEffect(() => {
+    const first = listRef.current
+      ?.querySelector<HTMLElement>("[cmdk-item]:not([data-value='ai:capture'])")
+      ?.getAttribute("data-value");
+    if (first)
+      setActive((current) => (current === "ai:capture" ? first : current));
+  }, [search, loading, found]);
+
   function onOpenChange(next: boolean) {
     setOpen(next);
     if (!next) setSearch("");
@@ -292,7 +303,7 @@ function Palette({
         action();
       }}
     >
-      <Command shouldFilter={false}>
+      <Command shouldFilter={false} value={active} onValueChange={setActive}>
         <CommandInput
           value={search}
           onValueChange={setSearch}
@@ -300,7 +311,7 @@ function Palette({
           aria-label="Search records and commands"
           autoFocus
         />
-        <CommandList>
+        <CommandList ref={listRef}>
           <CommandEmpty>
             {loading ? "Searching…" : "Nothing matches that search."}
           </CommandEmpty>

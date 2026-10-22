@@ -1,6 +1,7 @@
 import { fail } from "./errors";
 
-const ENDPOINT = "https://api.openai.com/v1/responses";
+const endpoint = () =>
+  `${(process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/$/, "")}/responses`;
 const TIMEOUT_MS = 20_000;
 const RETRY_MS = 400;
 
@@ -73,7 +74,7 @@ async function post(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetcher(ENDPOINT, {
+    const response = await fetcher(endpoint(), {
       method: "POST",
       headers: {
         authorization: `Bearer ${key}`,
