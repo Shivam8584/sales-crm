@@ -177,9 +177,9 @@ Convex stores its data in a dedicated `postgres:17` container (database `hypedri
 
 ### Deploying a new version
 
-Merging to `main` deploys: GitHub Actions (`.github/workflows/ci.yml`) runs the checks and a production build, then `npx convex deploy`, then `deploy/deploy.sh`, which syncs the source to the server, builds the image there, restarts `web` and polls `/api/health`. If the new container isn't healthy within two minutes it re-tags the previous image and restarts it, and the job fails. The workflow reads these repository secrets: `DEPLOY_SSH_KEY` (a key authorised for `ubuntu@ampere2`), `DEPLOY_KNOWN_HOSTS`, `DEPLOY_HOST`, `CONVEX_SELF_HOSTED_URL` and `CONVEX_SELF_HOSTED_ADMIN_KEY`.
+`deploy/deploy.sh` syncs the source to the server, builds the image there, restarts `web` and polls `/api/health`; if the new container isn't healthy within two minutes it re-tags the previous image and restarts it. Convex functions are deployed separately, before it.
 
-By hand, with the two Convex variables from `.env.production.local` exported:
+With the two Convex variables from `.env.production.local` exported:
 
 ```bash
 set -a; . ./.env.production.local; set +a
@@ -267,4 +267,4 @@ The admin System page (Settings → System) shows service health, the last week'
 
 ### Checks
 
-`npm run check` runs the type check, lint and the pure-logic tests; GitHub Actions runs it plus a production build on every push.
+`npm run check` runs the type check, lint and the pure-logic tests.
