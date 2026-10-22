@@ -13,6 +13,11 @@ and a rule sends `reply@replies.hypedrive.app` to the Worker; production sets
 `EMAIL_REPLY_TO` to that address. The root domain's own mail (`mail.hypedrive.app`)
 is untouched.
 
+A second rule sends `log@replies.hypedrive.app` to the same Worker: a member who BCCs it
+(or forwards a customer email to it) from their own CRM address gets that email on the matching
+person's or lead's timeline. The Worker adds `authenticated` (SPF/DKIM passed at Cloudflare) to the
+payload and the CRM ignores log mail that isn't authenticated or isn't from an active member.
+
 To redeploy after editing the Worker: `npm install && npx wrangler deploy` here.
 To rebuild the routing from scratch (token needs `zone:read` and `email_routing:write`):
 
