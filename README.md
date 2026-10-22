@@ -1,6 +1,11 @@
 # Hypedrive CRM
 
-The sales CRM for the Hypedrive team, built for selling to D2C brands and marketplace sellers in India. It covers inbound leads with a speed-to-lead SLA, accounts and people with GSTIN verification, deals, tasks, a per-record timeline, platform sync and activation, reports and team management. Everything is live: every screen updates in real time across the team.
+The sales CRM for the Hypedrive team, built for selling to D2C brands and marketplace sellers in India. Everything is live: every screen updates in real time across the team.
+
+- **Pipeline:** inbound leads with a speed-to-lead SLA, scoring and routing rules; accounts and people with GSTIN/DIN verification and an enrichment waterfall; deals with a board, a deal desk and one proposal per deal; tasks and a Today cockpit; a per-record timeline; custom fields and file attachments.
+- **Selling:** Sequences (template-first multi-step email and task follow-ups, with consent checks and one-reply unsubscribe), a Playbook of objection answers and battlecards, click-to-call and a call log, optional AI briefs, next-action hints, quick capture, drafts and call summaries.
+- **Platform:** sync and activation tracking against the Hypedrive platform, stuck-brand alerts, prospecting from marketplace listings, reports.
+- **Working in it:** saved views, pins, inline and bulk edits with Undo (Ctrl/Cmd+Z), a command palette, smart notifications with a daily digest and web push, a first-run tour, an installable PWA with an offline page, and an admin System page.
 
 Only `/demo` (the embeddable demo-request form) and `/api/health` are public. Everything else is behind sign-in.
 
@@ -18,11 +23,13 @@ app/                   thin route files; each imports a feature page
 convex/schema.ts       data model
 convex/<module>.ts     one file per domain: accounts, people, deals, leads, tasks,
                        timeline, notifications, members, invites, enrichment,
-                       platform, activation, reports, alerts, seed
+                       platform, activation, reports, alerts, automations (Sequences),
+                       ai, playbook, customFields, files, calls, views, pins, push,
+                       digest, system, seed
 convex/lib/            functions.ts (memberQuery/memberMutation/managerMutation/admin*),
                        errors.ts, validators.ts, records.ts, timeline.ts, money.ts,
                        crypto.ts, http.ts, plus helpers per module
-convex/http.ts         public endpoints: POST /leads, /webhooks/calcom, /webhooks/platform
+convex/http.ts         public endpoints: POST /leads, /webhooks/{calcom,platform,email-inbound,chatwoot,exotel}
 lib/domain/            pure shared domain: enums, labels, money (integer minor units),
                        normalize, gstin, leads
 lib/                   client utilities: errors, keyboard, time, utils, seo
@@ -113,7 +120,7 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `VAPID_SUBJECT`                      | Convex | Browser push only. Contact for push services, e.g. `mailto:you@hypedrive.in`                               |
 | `WHATSAPP_PHONE_NUMBER_ID`           | Convex | Meta WhatsApp Cloud API number; with `WHATSAPP_ACCESS_TOKEN` automations send for real                     |
 | `OPENAI_API_KEY`                     | Convex | Turns on AI briefs, drafts, call summaries and quick capture; unset = AI is hidden                         |
-| `EXOTEL_SID`, `EXOTEL_API_KEY`       | Convex | Exotel account SID and API key for click-to-call; needs every Exotel variable here, else it is hidden        |
+| `EXOTEL_SID`, `EXOTEL_API_KEY`       | Convex | Exotel account SID and API key for click-to-call; needs every Exotel variable here, else it is hidden      |
 | `EXOTEL_API_TOKEN`                   | Convex | Exotel API token                                                                                           |
 | `EXOTEL_SUBDOMAIN`                   | Convex | Exotel API host for your region: `api.exotel.com` (Singapore) or `api.in.exotel.com` (Mumbai)              |
 | `EXOTEL_CALLER_ID`                   | Convex | Your ExoPhone number, shown to the customer                                                                |
@@ -232,4 +239,36 @@ sudo docker compose exec -T postgres dropdb -U convex hypedrive_crm_restore_test
 
 ### Webhooks
 
-Point Cal.com and the platform at `https://convex-sales-site.hypedrive.app/webhooks/calcom` and `/webhooks/platform` once their secrets are set.
+Set each secret first; an endpoint with no secret answers 503. All are on `https://convex-sales-site.hypedrive.app`:
+
+| Path                      | From                                         | Secret                                                |
+| ------------------------- | -------------------------------------------- | ----------------------------------------------------- |
+| `/webhooks/calcom`        | Cal.com bookings                             | `CALCOM_WEBHOOK_SECRET`                               |
+| `/webhooks/platform`      | Hypedrive platform events                    | `PLATFORM_WEBHOOK_SECRET`                             |
+| `/webhooks/email-inbound` | Inbound email relay (replies, "unsubscribe") | `INBOUND_EMAIL_SECRET` (HMAC)                         |
+| `/webhooks/chatwoot`      | Chatwoot messages                            | `INBOUND_CHATWOOT_SECRET` or `INBOUND_CHATWOOT_TOKEN` |
+| `/webhooks/exotel`        | Exotel call status                           | `EXOTEL_WEBHOOK_SECRET` (`?secret=`)                  |
+
+Point `EMAIL_REPLY_TO` at the inbox that feeds `/webhooks/email-inbound`, so a reply of "unsubscribe" withdraws consent and stops the person's sequences.
+
+### One-off steps after a release
+
+Run against production with the admin key exported (see Deploying a new version). Each is idempotent:
+
+```bash
+npx convex run counts:rebuild '{"table":"accounts"}'   # also people, leads, platformEvents: repairs list counts and report facts
+npx convex run migrations:run '{"fn":"migrations:scoreLeads"}'   # backfills lead scores
+npx convex run playbook:seedStarter                    # starter Playbook entries, only when the table is empty
+```
+
+The admin System page (Settings → System) shows service health, the last week's failures and whether the list counts match, with a Rebuild button per table.
+
+### AI, push and calls
+
+- **AI:** set `OPENAI_API_KEY` (and optionally `AI_MODEL`, `AI_MODEL_FAST`) on the Convex deployment. Unset, every AI surface stays hidden.
+- **Web push:** generate a VAPID pair with `node -e "console.log(require('web-push').generateVAPIDKeys())"` and set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`.
+- **Click-to-call from the CRM:** set the `EXOTEL_*` variables; without them the Call button opens the phone dialer or a timed call log.
+
+### Checks
+
+`npm run check` runs the type check, lint and the pure-logic tests; GitHub Actions runs it plus a production build on every push.
