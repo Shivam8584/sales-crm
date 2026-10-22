@@ -532,3 +532,245 @@ describe("research providers and summaries", () => {
     vi.unstubAllGlobals();
   });
 });
+
+const PRIYA = "Regards,\nPriya Shah\nHead of Sales\nM: +91 98450 12345";
+
+const questions = (t: T) =>
+  t.run((ctx) => ctx.db.query("researchQuestions").collect());
+const steps = (t: T) => t.run((ctx) => ctx.db.query("researchSteps").collect());
+
+async function withPriya() {
+  const base = await setup();
+  const priyaId = await newPerson(base.team.rep, {
+    firstName: "Priya",
+    lastName: "Shah",
+    email: "priya@kesar.in",
+    accountId: base.accountId,
+  });
+  await addEmail(base.t, base.personId, PRIYA);
+  return { ...base, priyaId };
+}
+
+describe("research step log", () => {
+  it("records what a check did, in order, and the reason for the next one", async () => {
+    const { t, team, personId } = await setup();
+    await addEmail(t, personId, REPLY);
+    await t.action(internal.research.tick, {});
+    const view = await team.rep.as.query(api.research.forRecord, {
+      subject: { personId },
+    });
+    const lines = view!.steps.map((step) => step.text).reverse();
+    expect(lines[0]).toMatch(/^Checked \d+ recent entries/);
+    expect(lines).toContain(
+      "Filled in the phone number from an email signature",
+    );
+    expect(lines.at(-1)).toMatch(/^Will check again in \d+ days: /);
+  });
+
+  it("notes who asked for a check, and keeps rows for 60 days", async () => {
+    const { t, team, personId } = await setup();
+    await team.rep.as.mutation(api.research.requestNow, {
+      subject: { personId },
+    });
+    expect((await steps(t)).map((step) => step.text)).toEqual([
+      "Ria Rep asked for a check now",
+    ]);
+    vi.setSystemTime(Date.now() + 59 * DAY);
+    await t.mutation(internal.research.claim, {});
+    expect(await steps(t)).toHaveLength(1);
+    vi.setSystemTime(Date.now() + 2 * DAY);
+    await t.mutation(internal.research.claim, {});
+    expect(await steps(t)).toHaveLength(0);
+  });
+
+  it("is empty and hidden while the agent is off", async () => {
+    const { t, team, personId } = await setup({ enabled: false });
+    expect(
+      await team.rep.as.query(api.research.forRecord, {
+        subject: { personId },
+      }),
+    ).toBeNull();
+    expect(await steps(t)).toHaveLength(0);
+  });
+});
+
+describe("research questions", () => {
+  it("asks which of two people signed, and does not use the signature meanwhile", async () => {
+    const { t, team, personId, priyaId } = await withPriya();
+    await research(t, personId);
+    const view = await team.rep.as.query(api.research.forRecord, {
+      subject: { personId },
+    });
+    expect(view?.questions).toHaveLength(1);
+    expect(view?.questions[0].options.map((option) => option.label)).toEqual([
+      "Ravi Menon",
+      "Priya Shah",
+    ]);
+    expect(view?.review).toEqual([]);
+    expect(view?.filled).toEqual([]);
+    expect((await t.run((ctx) => ctx.db.get(personId)))?.phone).toBeUndefined();
+    expect((await questions(t))[0].refPersonId).toBe(priyaId);
+
+    await research(t, personId);
+    expect(await questions(t)).toHaveLength(1);
+  });
+
+  it("treats 'this is the person' as strong evidence and remembers it", async () => {
+    const { t, team, personId } = await withPriya();
+    await research(t, personId);
+    const [question] = await questions(t);
+    await team.rep.as.mutation(api.research.answerQuestion, {
+      questionId: question._id,
+      answer: "self",
+    });
+    const [task] = (await tasks(t)).filter((row) => row.personId === personId);
+    expect(task.rank).toBe(0);
+    await research(t, personId);
+    expect((await t.run((ctx) => ctx.db.get(personId)))?.phone).toBe(
+      "+919845012345",
+    );
+    expect(await questions(t)).toHaveLength(1);
+    const view = await team.rep.as.query(api.research.forRecord, {
+      subject: { personId },
+    });
+    expect(view?.questions).toEqual([]);
+  });
+
+  it("ignores the signature after 'someone else' or 'not sure', and never asks again", async () => {
+    for (const answer of ["other", "skip"]) {
+      const { t, team, personId } = await withPriya();
+      await research(t, personId);
+      const [question] = await questions(t);
+      await team.rep.as.mutation(api.research.answerQuestion, {
+        questionId: question._id,
+        answer,
+      });
+      await research(t, personId);
+      await research(t, personId);
+      expect(
+        (await t.run((ctx) => ctx.db.get(personId)))?.phone,
+      ).toBeUndefined();
+      expect(await questions(t)).toHaveLength(1);
+      expect(
+        (
+          await team.rep.as.query(api.research.forRecord, {
+            subject: { personId },
+          })
+        )?.review,
+      ).toEqual([]);
+    }
+  });
+
+  it("rejects unknown answers and answers given twice", async () => {
+    const { t, team, personId } = await withPriya();
+    await research(t, personId);
+    const [question] = await questions(t);
+    expect(
+      await failureCode(
+        team.rep.as.mutation(api.research.answerQuestion, {
+          questionId: question._id,
+          answer: "maybe",
+        }),
+      ),
+    ).toBe("invalid");
+    await team.rep.as.mutation(api.research.answerQuestion, {
+      questionId: question._id,
+      answer: "other",
+    });
+    expect(
+      await failureCode(
+        team.otherRep.as.mutation(api.research.answerQuestion, {
+          questionId: question._id,
+          answer: "self",
+        }),
+      ),
+    ).toBe("conflict");
+  });
+
+  async function twoDomains() {
+    const base = await setup();
+    for (const [first, email] of [
+      ["Asha", "asha@kesar.in"],
+      ["Dev", "dev@leaf.in"],
+      ["Esha", "esha@leaf.in"],
+    ]) {
+      await newPerson(base.team.rep, {
+        firstName: first,
+        email,
+        accountId: base.accountId,
+      });
+    }
+    await t_claim(base.t);
+    const task = (await tasks(base.t)).find(
+      (row) => row.accountId === base.accountId,
+    )!;
+    await base.t.mutation(internal.research.begin, { taskId: task._id });
+    return base;
+  }
+  const t_claim = (t: T) => t.mutation(internal.research.claim, {});
+
+  it("asks which website when contacts tie between two domains, then sets it", async () => {
+    const { t, team, accountId } = await twoDomains();
+    const view = await team.rep.as.query(api.research.forRecord, {
+      subject: { accountId },
+    });
+    expect(view?.questions).toHaveLength(1);
+    expect(view?.questions[0].options.map((option) => option.value)).toEqual([
+      "kesar.in",
+      "leaf.in",
+    ]);
+    expect(view?.review).toEqual([]);
+    expect(
+      (await t.run((ctx) => ctx.db.get(accountId)))?.domain,
+    ).toBeUndefined();
+
+    await team.rep.as.mutation(api.research.answerQuestion, {
+      questionId: view!.questions[0]._id,
+      answer: "leaf.in",
+    });
+    expect((await t.run((ctx) => ctx.db.get(accountId)))?.domain).toBe(
+      "leaf.in",
+    );
+    const task = (await tasks(t)).find((row) => row.accountId === accountId)!;
+    await t.mutation(internal.research.begin, { taskId: task._id });
+    expect(await questions(t)).toHaveLength(1);
+    expect((await steps(t)).map((step) => step.text)).toContain(
+      'Ria Rep answered "leaf.in · 2 contacts"',
+    );
+  });
+
+  it("remembers 'not sure' for the same two domains", async () => {
+    const { t, team, accountId } = await twoDomains();
+    const [question] = await questions(t);
+    await team.rep.as.mutation(api.research.answerQuestion, {
+      questionId: question._id,
+      answer: "skip",
+    });
+    const task = (await tasks(t)).find((row) => row.accountId === accountId)!;
+    await t.mutation(internal.research.begin, { taskId: task._id });
+    expect(await questions(t)).toHaveLength(1);
+    expect(
+      (await t.run((ctx) => ctx.db.get(accountId)))?.domain,
+    ).toBeUndefined();
+  });
+
+  it("erasing a person removes their log and questions, and questions that name them", async () => {
+    const { t, team, personId, priyaId } = await withPriya();
+    await research(t, personId);
+    expect(await questions(t)).toHaveLength(1);
+    await team.admin.as.mutation(api.consents.erase, {
+      personId: priyaId,
+      confirmation: "erase",
+    });
+    expect(await questions(t)).toHaveLength(0);
+
+    await research(t, personId);
+    await team.admin.as.mutation(api.consents.erase, {
+      personId,
+      confirmation: "erase",
+    });
+    expect(
+      (await steps(t)).filter((step) => step.personId === personId),
+    ).toHaveLength(0);
+  });
+});

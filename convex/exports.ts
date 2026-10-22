@@ -21,6 +21,8 @@ import { ACTIVATION_STAGES } from "../lib/domain/platform";
 import { toCsv, type CsvCell } from "../lib/csv";
 
 const BATCH = 100;
+// Leads and deals are listed one page after another, so bigger pages save round trips.
+const PAGE = 500;
 const IDS_PAGE = 2000;
 const PARALLEL = 8;
 const MAX_ROWS = 50_000;
@@ -269,7 +271,7 @@ export const csv = action({
   },
   handler: async (ctx, { list }): Promise<{ url: string; count: number }> => {
     await ctx.runQuery(api.exports.assertCanExport, {});
-    const opts = (cursor: string | null) => ({ numItems: BATCH, cursor });
+    const opts = (cursor: string | null) => ({ numItems: PAGE, cursor });
     const idsOpts = (cursor: string | null) => ({
       numItems: IDS_PAGE,
       cursor,

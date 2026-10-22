@@ -8,8 +8,15 @@ import {
 import { TARGET_METRICS } from "../lib/domain/forecast";
 import { UNDO_OPS } from "../lib/domain/mcp";
 import { PLAYBOOK_KINDS } from "../lib/domain/playbook";
-import { RESEARCH_REASONS } from "../lib/domain/research";
+import { RESEARCH_QUESTIONS, RESEARCH_REASONS } from "../lib/domain/research";
 import { EMBED_DIMS } from "./lib/aiEmbedText";
+import {
+  vLogEntry as vAgentLogEntry,
+  vRunStatus as vAgentRunStatus,
+  vRunTrigger as vAgentRunTrigger,
+  vScope as vAgentScope,
+  vTrigger as vAgentTrigger,
+} from "./lib/agents/validators";
 import {
   literals,
   vCallOutcome,
@@ -559,7 +566,9 @@ export default defineSchema({
 
   /** Each change an MCP write token made; the key makes a retried call a no-op, `undo` lets its owner take it back. */
   mcpWrites: defineTable({
-    tokenId: v.id("apiTokens"),
+    tokenId: v.optional(v.id("apiTokens")),
+    /** Set instead of `tokenId` when a custom agent made the change. */
+    agentId: v.optional(v.id("agents")),
     memberId: v.id("members"),
     tool: v.string(),
     key: v.optional(v.string()),
@@ -719,6 +728,34 @@ export default defineSchema({
     .index("by_person", ["personId"])
     .index("by_rank_due", ["rank", "dueAt"]),
 
+  /** What the research agent did on a record, newest last; rows older than 60 days are swept. */
+  researchSteps: defineTable({
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    text: v.string(),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_person", ["personId"]),
+
+  /** Something the agent could not decide between; the answer is kept so it is never asked again. */
+  researchQuestions: defineTable({
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    kind: literals(RESEARCH_QUESTIONS),
+    /** Identifies what was asked, so the same question is filed once. */
+    key: v.string(),
+    prompt: v.string(),
+    evidence: v.optional(v.string()),
+    options: v.array(v.object({ value: v.string(), label: v.string() })),
+    /** The other person a signature could belong to; erasing them removes the question. */
+    refPersonId: v.optional(v.id("people")),
+    answer: v.optional(v.string()),
+    answeredById: v.optional(v.id("members")),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_person", ["personId"])
+    .index("by_ref", ["refPersonId"]),
+
   /** An account's monthly results email: opt-in, and what the last send did. */
   brandReports: defineTable({
     accountId: v.id("accounts"),
@@ -734,6 +771,59 @@ export default defineSchema({
   })
     .index("by_account", ["accountId"])
     .index("by_enabled_key", ["enabled", "lastKey"]),
+
+  /** Where each kind of Slack message goes; no row means that event isn't posted. */
+  slackRoutes: defineTable({
+    event: v.string(),
+    enabled: v.boolean(),
+    channel: v.optional(v.string()),
+  }).index("by_event", ["event"]),
+
+  /** A standing instruction in plain English that runs on a schedule, an event or on demand, as its owner. */
+  agents: defineTable({
+    ownerId: v.id("members"),
+    name: v.string(),
+    instruction: v.string(),
+    trigger: vAgentTrigger,
+    scope: vAgentScope,
+    /** Off until the owner allows it: write tools only record what they would do. */
+    allowChanges: v.boolean(),
+    enabled: v.boolean(),
+    dailyRuns: v.number(),
+    usage: v.optional(v.object({ day: v.string(), runs: v.number() })),
+    nextRunAt: v.optional(v.number()),
+    lastRunAt: v.optional(v.number()),
+    lastStatus: v.optional(vAgentRunStatus),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_enabled", ["enabled"])
+    .index("by_due", ["nextRunAt"]),
+
+  /** One run of an agent with its full log of tool calls; swept after 30 days. */
+  agentRuns: defineTable({
+    agentId: v.id("agents"),
+    ownerId: v.id("members"),
+    trigger: vAgentRunTrigger,
+    /** What started an event run, e.g. "A lead is created: Kesar Threads". */
+    context: v.optional(v.string()),
+    /** Nothing was written: a preview, or an agent whose changes are off. */
+    dryRun: v.boolean(),
+    status: vAgentRunStatus,
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    steps: v.number(),
+    toolCalls: v.number(),
+    tokens: v.number(),
+    log: v.array(vAgentLogEntry),
+    summary: v.optional(v.string()),
+    /** Why the run failed or stopped early. */
+    note: v.optional(v.string()),
+    writeIds: v.array(v.id("mcpWrites")),
+  })
+    .index("by_agent", ["agentId", "startedAt"])
+    .index("by_started", ["startedAt"])
+    .index("by_status", ["status", "startedAt"]),
 
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({

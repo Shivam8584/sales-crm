@@ -13,6 +13,7 @@ import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
 import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
 import SettingsIcon from "@/public/assets/icons/settings.svg";
 import AutomationIcon from "@/public/assets/icons/automation.svg";
+import BoltIcon from "@/public/assets/icons/automations/bolt.svg";
 import EyeIcon from "@/public/assets/icons/eye.svg";
 import MessageQuestionIcon from "@/public/assets/icons/message-question.svg";
 
@@ -108,6 +109,12 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Sequences",
         icon: AutomationIcon,
         shortcut: "U",
+      },
+      {
+        href: routes.agents,
+        label: "Agents",
+        icon: BoltIcon,
+        shortcut: "E",
       },
     ],
   },

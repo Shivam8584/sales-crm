@@ -7,6 +7,8 @@ import { ROLE_RANK } from "../lib/domain/enums";
 import { accountStall, platformAccounts } from "./lib/activation";
 import { deliver, emailProvider } from "./lib/automations/delivery";
 import { siteUrl } from "./lib/http";
+import { postToSlack } from "./lib/slack";
+import { slackEventMessage } from "../lib/domain/slack";
 import {
   FUNNEL_STEPS,
   UNASSIGNED,
@@ -183,15 +185,34 @@ export const send = internalAction({
   handler: async (ctx): Promise<void> => {
     try {
       const { provider, problem } = emailProvider();
-      if (provider === "outbox") {
+      const emailing = provider !== "outbox";
+      const slack = (
+        await ctx.runQuery(internal.slack.target, { event: "weekly_report" })
+      ).enabled;
+      if (!emailing) {
         console.log(
-          `Weekly report skipped: no email provider${problem ? ` (${problem})` : ""}`,
+          `Weekly report email skipped: no email provider${problem ? ` (${problem})` : ""}`,
         );
-        return;
       }
-      const people = await ctx.runQuery(internal.weekly.recipients, {});
-      if (people.length === 0) return;
+      const people = emailing
+        ? await ctx.runQuery(internal.weekly.recipients, {})
+        : [];
+      if (people.length === 0 && !slack) return;
       const data = await gather(ctx);
+      if (slack) {
+        await postToSlack(ctx, {
+          event: "weekly_report",
+          ...slackEventMessage(
+            "weekly_report",
+            {
+              name: "Last 7 days",
+              detail: `${data.leads.current} leads · ${data.converted.current} converted · ${data.won.current.count} deals won · ${data.lost.current.count} lost · ${data.overdue} overdue tasks`,
+              path: routes.reports,
+            },
+            siteUrl(),
+          ),
+        });
+      }
       const day = istDay(Date.now());
       for (const member of people) {
         const { subject, body } = weeklyReport({

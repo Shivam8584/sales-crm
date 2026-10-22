@@ -116,7 +116,9 @@ export const writes = memberQuery({
         _id: row._id,
         summary: row.summary,
         at: row.at,
-        token: (await ctx.db.get(row.tokenId))?.name ?? "Deleted token",
+        token: row.tokenId
+          ? ((await ctx.db.get(row.tokenId))?.name ?? "Deleted token")
+          : `Agent ${(row.agentId && (await ctx.db.get(row.agentId))?.name) || "(deleted)"}`,
         undoable: row.undo !== undefined && row.undoneAt === undefined,
         undone: row.undoneAt !== undefined,
       })),

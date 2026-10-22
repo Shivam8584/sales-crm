@@ -88,6 +88,7 @@ export function bucketCounts(
   return buckets;
 }
 
+const FIRST_ENTRIES = 4;
 const RECENT_ENTRIES = 30;
 
 /**
@@ -99,10 +100,18 @@ export async function latestInteraction(
   ctx: QueryCtx,
   target: { accountId: Id<"accounts"> } | { personId: Id<"people"> },
 ) {
-  const recent = await entriesFor(ctx, target)
-    .order("desc")
-    .take(RECENT_ENTRIES);
+  const newest = () => entriesFor(ctx, target).order("desc");
+  let recent = await newest().take(FIRST_ENTRIES);
   let last = newestInteraction(recent);
+  // Only a hit strictly newer than everything unread is final: an equal
+  // timestamp further down could still win the tie between kinds.
+  const settled =
+    recent.length < FIRST_ENTRIES ||
+    (last !== null && last.occurredAt > recent[recent.length - 1].occurredAt);
+  if (!settled) {
+    recent = await newest().take(RECENT_ENTRIES);
+    last = newestInteraction(recent);
+  }
   if (!last && recent.length === RECENT_ENTRIES) {
     last = newestInteraction(
       await Promise.all(

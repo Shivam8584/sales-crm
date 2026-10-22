@@ -35,6 +35,7 @@ import {
 } from "../lib/domain/email-log";
 import { normalizeEmail, normalizePhone } from "../lib/domain/normalize";
 import { personName } from "../lib/domain/labels";
+import { fireAgentEvent } from "./lib/agents/queue";
 import { recordReply } from "./lib/automations/engine";
 import {
   hmacSha256Hex,
@@ -297,6 +298,7 @@ export const receive = internalMutation({
         dealIds: await openDealIds(ctx, group.person),
       });
       exited += result.exited;
+      await fireAgentEvent(ctx, "reply_received", group.refs);
     }
     return { status: "logged" as const, matched: groups.length, exited };
   },

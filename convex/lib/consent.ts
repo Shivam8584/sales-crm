@@ -412,6 +412,18 @@ async function redactAround(
       .withIndex("by_person", (q) => q.eq("personId", personId))
       .collect();
     for (const task of tasks) await ctx.db.delete(task._id);
+    for (const table of ["researchSteps", "researchQuestions"] as const) {
+      const rows = await ctx.db
+        .query(table)
+        .withIndex("by_person", (q) => q.eq("personId", personId))
+        .collect();
+      for (const row of rows) await ctx.db.delete(row._id);
+    }
+    const mentions = await ctx.db
+      .query("researchQuestions")
+      .withIndex("by_ref", (q) => q.eq("refPersonId", personId))
+      .collect();
+    for (const row of mentions) await ctx.db.delete(row._id);
     const accountId = person.accountId;
     const accountTask = accountId
       ? await ctx.db

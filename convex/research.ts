@@ -22,7 +22,10 @@ import {
   researchable,
   taskFor,
 } from "./lib/research/queue";
+import { questionsFor } from "./lib/research/questions";
+import { addSteps, recentSteps, sweepSteps } from "./lib/research/steps";
 import { SUMMARY, type SummaryOut } from "./lib/research/summary";
+import { rescoreAccountLeads } from "./lib/leads";
 import { getSecret, secretEnv } from "./lib/secrets";
 import { istToday } from "../lib/domain/day";
 import {
@@ -32,8 +35,10 @@ import {
   LEASE_MS,
   LIMITS,
   MAX_ATTEMPTS,
+  SKIP_ANSWER,
   SUMMARY_OUTPUT_TOKENS,
   nextCheck,
+  nextStep,
 } from "../lib/domain/research";
 
 const vSubject = v.union(
@@ -42,6 +47,7 @@ const vSubject = v.union(
 );
 
 const AI_KEY = "OPENAI_API_KEY";
+const STEPS_SHOWN = 30;
 
 async function requireEnabled(ctx: Parameters<typeof researchConfig>[0]) {
   const config = await researchConfig(ctx);
@@ -86,16 +92,18 @@ export const setConfig = adminMutation({
   },
 });
 
-/** What the agent found and is waiting on for one record; null while the agent is off. */
+/** What the agent found, did and is waiting on for one record; null while the agent is off. */
 export const forRecord = memberQuery({
   args: { subject: vSubject },
   handler: async (ctx, { subject }) => {
     const config = await researchConfig(ctx);
     if (!config.enabled) return null;
     const now = Date.now();
-    const [task, facts] = await Promise.all([
+    const [task, facts, steps, questions] = await Promise.all([
       taskFor(ctx, subject),
       factsFor(ctx, subject),
+      recentSteps(ctx, subject, STEPS_SHOWN),
+      questionsFor(ctx, subject),
     ]);
     const mine = (
       await summarize(
@@ -130,6 +138,19 @@ export const forRecord = memberQuery({
       filled,
       current,
       review: mine.filter((fact) => fact.status === "suggested"),
+      steps: steps.map((step) => ({
+        _id: step._id,
+        text: step.text,
+        at: step._creationTime,
+      })),
+      questions: questions
+        .filter((question) => question.answer === undefined)
+        .map(({ _id, prompt, evidence, options }) => ({
+          _id,
+          prompt,
+          evidence: evidence ?? null,
+          options,
+        })),
     };
   },
 });
@@ -163,9 +184,46 @@ export const requestNow = memberMutation({
       fail("conflict", "A check is already running for this record");
     }
     await ctx.db.patch(id, { leaseUntil: now + LEASE_MS });
+    await addSteps(ctx, subject, [`${ctx.viewer.name} asked for a check now`]);
     await ctx.scheduler.runAfter(0, internal.research.runTasks, {
       taskIds: [id],
     });
+  },
+});
+
+/** Settles a question the agent filed; the answer is kept so it is never asked again. */
+export const answerQuestion = memberMutation({
+  args: { questionId: v.id("researchQuestions"), answer: v.string() },
+  handler: async (ctx, { questionId, answer }) => {
+    const question = await ctx.db.get(questionId);
+    if (!question) notFound("Question");
+    if (question.answer !== undefined) {
+      fail("conflict", "Someone already answered this question");
+    }
+    const option = question.options.find((item) => item.value === answer);
+    if (!option && answer !== SKIP_ANSWER)
+      invalid("answer", "Pick one of the options");
+    const subject = question.accountId
+      ? { accountId: question.accountId }
+      : { personId: question.personId! };
+    if (question.kind === "domain" && option) {
+      await applyToRecord(
+        ctx,
+        { accountId: question.accountId, field: "domain" },
+        option.value,
+        ctx.viewer._id,
+      );
+      await rescoreAccountLeads(ctx, question.accountId!);
+    }
+    await ctx.db.patch(questionId, { answer, answeredById: ctx.viewer._id });
+    await addSteps(ctx, subject, [
+      option
+        ? `${ctx.viewer.name} answered "${option.label}"`
+        : `${ctx.viewer.name} skipped a question`,
+    ]);
+    if (question.kind === "signer") {
+      await enqueue(ctx, subject, "recheck", Date.now(), 0);
+    }
   },
 });
 
@@ -196,9 +254,10 @@ export const undoFill = memberMutation({
 export const claim = internalMutation({
   args: {},
   handler: async (ctx): Promise<Id<"researchTasks">[]> => {
+    const now = Date.now();
+    await sweepSteps(ctx, now);
     const config = await researchConfig(ctx);
     if (!config.enabled) return [];
-    const now = Date.now();
     await discover(ctx, now);
     const room = config.dailyCap - config.usedToday;
     if (room <= 0) return [];
@@ -241,8 +300,9 @@ export const finish = internalMutation({
     failed: v.boolean(),
     analysis: v.optional(vAnalysis),
     summary: v.optional(v.object({ text: v.string(), hash: v.string() })),
+    steps: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, { taskId, failed, analysis, summary }) => {
+  handler: async (ctx, { taskId, failed, analysis, summary, steps }) => {
     const task = await ctx.db.get(taskId);
     if (!task) return;
     const config = await researchConfig(ctx);
@@ -267,6 +327,18 @@ export const finish = internalMutation({
       ...(failed ? {} : { lastRunAt: now }),
       ...(summary ? { summary: summary.text, summaryHash: summary.hash } : {}),
     });
+    await addSteps(
+      ctx,
+      task.personId
+        ? { personId: task.personId }
+        : { accountId: task.accountId! },
+      [
+        ...(steps ?? []),
+        ...(summary ? ["Wrote a new summary"] : []),
+        ...(failed ? ["The check failed"] : []),
+        nextStep(now, next),
+      ],
+    );
   },
 });
 
@@ -294,13 +366,21 @@ export const runTasks = internalAction({
       let failed = false;
       let analysis: Awaited<ReturnType<typeof analyse>> = null;
       let summary: { text: string; hash: string } | undefined;
+      const steps: string[] = [];
       try {
         analysis = await ctx.runMutation(internal.research.begin, { taskId });
         if (!analysis) continue;
         if (analysis.lookUp) {
-          await ctx.runAction(internal.enrichment.agentEnrich, {
+          const outcome = await ctx.runAction(internal.enrichment.agentEnrich, {
             accountId: analysis.lookUp,
           });
+          steps.push(
+            !outcome.ok
+              ? `The enrichment providers failed: ${outcome.error}`
+              : outcome.found > 0
+                ? `Ran the enrichment providers: ${outcome.found} ${outcome.found === 1 ? "value" : "values"} to review`
+                : "Ran the enrichment providers: nothing new",
+          );
         }
       } catch (error) {
         console.error("Research task failed", error);
@@ -325,6 +405,7 @@ export const runTasks = internalAction({
             }
           : undefined,
         summary,
+        steps,
       });
     }
   },

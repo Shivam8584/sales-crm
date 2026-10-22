@@ -31,7 +31,7 @@ import AccountStallBanner from "@/features/activation/account-stall-banner";
 import { RecordAutomations } from "@/features/automations/record-automations";
 import RecordDeals from "@/features/deals/record-deals";
 import AccountVerification from "@/features/enrichment/account-verification";
-import AgentSection from "@/features/research/agent-section";
+import { useAgentTab } from "@/features/research/agent-tab";
 import CustomFields from "@/features/fields/custom-fields";
 import FilesSection from "@/features/files/files-section";
 import MemberPicker from "@/features/members/member-picker";
@@ -122,6 +122,7 @@ function AccountView({ account }: { account: Account }) {
     accountId: account._id,
     done: "none",
   });
+  const agent = useAgentTab({ accountId: account._id });
   const archived = Boolean(account.archivedAt);
   useDocumentTitle(account.name);
   useTitleShortcut();
@@ -351,10 +352,6 @@ function AccountView({ account }: { account: Account }) {
               accountId={account._id}
               className={ASIDE_SECTION}
             />
-            <AgentSection
-              subject={{ accountId: account._id }}
-              className={ASIDE_SECTION}
-            />
             <AccountPlatform
               accountId={account._id}
               className={ASIDE_SECTION}
@@ -424,6 +421,7 @@ function AccountView({ account }: { account: Account }) {
                 <RecordAutomations target={{ accountId: account._id }} />
               ),
             },
+            ...agent,
           ]}
         />
       </RecordLayout>

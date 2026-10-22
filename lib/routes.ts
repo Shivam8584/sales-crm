@@ -19,6 +19,8 @@ export const routes = {
   activation: `${PIPELINE}/activation`,
   sequences: `${AUTOMATION}/sequences`,
   sequence: (id: string) => `${AUTOMATION}/sequences/${id}`,
+  agents: `${AUTOMATION}/agents`,
+  agent: (id: string) => `${AUTOMATION}/agents/${id}`,
   accounts: `${RECORDS}/accounts`,
   account: (id: string) => `${RECORDS}/accounts/${id}`,
   accountReport: (id: string, kind?: string, key?: string) =>

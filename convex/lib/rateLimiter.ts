@@ -13,6 +13,8 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   testEmail: { kind: "fixed window", rate: 10, period: HOUR },
   brandReport: { kind: "fixed window", rate: 10, period: HOUR },
   calls: { kind: "fixed window", rate: 20, period: MINUTE },
+  /** Slack posts across the whole workspace. */
+  slack: { kind: "fixed window", rate: 30, period: MINUTE },
   productChecks: { kind: "fixed window", rate: 300, period: HOUR },
   /** MCP requests per token. */
   mcp: { kind: "fixed window", rate: 60, period: MINUTE },

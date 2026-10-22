@@ -77,6 +77,22 @@ export const SECRET_GROUPS: SecretGroup[] = [
       { name: "EXOTEL_WEBHOOK_SECRET", label: "Callback secret", secret: true },
     ],
   },
+  {
+    id: "slack",
+    label: "Slack",
+    description:
+      "Set the bot token, or a webhook URL if you can't install an app.",
+    keys: [
+      { name: "SLACK_BOT_TOKEN", label: "Bot token", secret: true },
+      { name: "SLACK_SIGNING_SECRET", label: "Signing secret", secret: true },
+      {
+        name: "SLACK_WEBHOOK_URL",
+        label: "Incoming webhook URL",
+        secret: true,
+        example: "https://hooks.slack.com/services/…",
+      },
+    ],
+  },
 ];
 
 export const SECRET_KEYS = SECRET_GROUPS.flatMap((group) => group.keys);

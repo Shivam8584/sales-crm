@@ -17,6 +17,7 @@ import {
   StatusText,
 } from "./settings-ui";
 import { routes } from "@/lib/routes";
+import AgentsSettings from "@/features/agents/agents-settings";
 import ResearchSettings from "@/features/research/research-settings";
 
 type Overview = FunctionReturnType<typeof api.system.overview>;
@@ -52,6 +53,7 @@ function SystemOverview() {
     <>
       <ServicesSection services={overview.services} />
       <ResearchSettings />
+      <AgentsSettings />
       <FailuresSection failures={overview.failures} />
       <DataSection members={overview.members} />
     </>

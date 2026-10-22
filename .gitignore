@@ -45,3 +45,6 @@ deploy/**/node_modules
 # e2e
 /test-results/
 /playwright-report/
+
+# eslint
+.eslintcache

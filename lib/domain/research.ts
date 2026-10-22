@@ -14,6 +14,13 @@ export const RESEARCH_REASONS = [
 ] as const;
 export type ResearchReason = (typeof RESEARCH_REASONS)[number];
 
+/** What the agent files a question about: two company domains, or a signature that could be two people. */
+export const RESEARCH_QUESTIONS = ["domain", "signer"] as const;
+export type ResearchQuestionKind = (typeof RESEARCH_QUESTIONS)[number];
+
+/** The answer that closes a question without choosing; it is remembered like any other. */
+export const SKIP_ANSWER = "skip";
+
 /** Sources of facts the agent writes itself; registry and website facts come from the waterfall. */
 export const AGENT_SOURCES = ["email", "note", "contacts"] as const;
 export type AgentSource = (typeof AGENT_SOURCES)[number];
@@ -31,6 +38,7 @@ export const LIMITS = {
 export const BATCH = 5;
 export const LEASE_MS = 10 * 60_000;
 export const MAX_ATTEMPTS = 3;
+export const STEP_RETENTION_MS = 60 * 24 * 60 * 60_000;
 /** Per-record AI budget: this much history in, this many tokens out, one call. */
 export const SUMMARY_INPUT_CHARS = 6000;
 export const SUMMARY_OUTPUT_TOKENS = 300;
@@ -48,6 +56,18 @@ export type Entry = {
   body?: string;
 };
 
+const FIELD_NAME: Record<string, string> = {
+  phone: "phone number",
+  title: "job title",
+  linkedinUrl: "LinkedIn profile",
+  domain: "website",
+};
+const SOURCE_NAME: Record<AgentSource, string> = {
+  email: "an email signature",
+  note: "a teammate's note",
+  contacts: "the contacts' email addresses",
+};
+
 export type Finding = {
   field: string;
   value: string;
@@ -58,6 +78,17 @@ export type Finding = {
   evidence: string;
   at: number;
 };
+
+/** One line for the step log: what the agent did with a new finding. */
+export function findingStep(finding: Finding, filled: boolean) {
+  if (finding.field === "employment") {
+    return "Flagged a possible job change for review";
+  }
+  const name = FIELD_NAME[finding.field] ?? finding.field;
+  return filled
+    ? `Filled in the ${name} from ${SOURCE_NAME[finding.source]}`
+    : `Suggested a ${name} from ${SOURCE_NAME[finding.source]} for review`;
+}
 
 export type Signature = {
   name: string;
@@ -194,6 +225,18 @@ export function differentCompany(company: string, known: string[]) {
   });
 }
 
+const sourceOf = (entry: Entry) =>
+  `${entry.kind === "email" ? `The email "${clip(entry.subject ?? "", 80)}"` : `A ${entry.kind}`} on ${day(entry.occurredAt)}`;
+
+/** Stable key for a signed name, so an answer about "Priya  Shah" also covers "priya shah". */
+export const signedKey = (name: string) => tokens(name).join(" ");
+
+/**
+ * What the team told the agent about signed names: `same` are this person,
+ * `skip` are not (or undecided) and must not feed their record.
+ */
+export type Identity = { same: string[]; skip: string[] };
+
 type PersonFacts = {
   firstName: string;
   lastName: string;
@@ -202,7 +245,11 @@ type PersonFacts = {
 };
 
 /** Newest-first entries in, the most recent finding per field out. */
-export function personFindings(person: PersonFacts, entries: Entry[]) {
+export function personFindings(
+  person: PersonFacts,
+  entries: Entry[],
+  identity: Identity = { same: [], skip: [] },
+) {
   const found = new Map<string, Finding>();
   const add = (finding: Finding) => {
     if (!found.has(finding.field)) found.set(finding.field, finding);
@@ -216,12 +263,14 @@ export function personFindings(person: PersonFacts, entries: Entry[]) {
     const text = entry.body ?? "";
     if (!text) continue;
     const at = entry.occurredAt;
-    const from = `${entry.kind === "email" ? `The email "${clip(entry.subject ?? "", 80)}"` : `A ${entry.kind}`} on ${day(at)}`;
+    const from = sourceOf(entry);
 
     if (entry.kind === "email" && entry.direction === "inbound") {
       const signature = parseSignature(text);
-      if (signature) {
-        const strong = nameMatches(signature.name, person);
+      const signed = signature ? signedKey(signature.name) : "";
+      if (signature && !identity.skip.includes(signed)) {
+        const strong =
+          nameMatches(signature.name, person) || identity.same.includes(signed);
         const evidence = `${from}, signature block:\n${signature.lines.join("\n")}`;
         const base = {
           strong,
@@ -300,14 +349,9 @@ export function personFindings(person: PersonFacts, entries: Entry[]) {
   return [...found.values()];
 }
 
-/** A shared company address domain on an account that has no website yet. */
-export function domainFinding(
-  account: { domain?: string },
-  emails: string[],
-  skip: string[],
-  at: number,
-): Finding | null {
-  if (account.domain) return null;
+type Candidate = { domain: string; emails: string[] };
+
+function companyDomains(emails: string[], skip: string[]) {
   const byDomain = new Map<string, string[]>();
   for (const email of emails) {
     const domain = email.split("@")[1]?.toLowerCase();
@@ -315,17 +359,80 @@ export function domainFinding(
       continue;
     byDomain.set(domain, [...(byDomain.get(domain) ?? []), email]);
   }
-  const [best] = [...byDomain].sort((a, b) => b[1].length - a[1].length);
-  if (!best) return null;
+  return [...byDomain]
+    .map(([domain, list]): Candidate => ({ domain, emails: list }))
+    .sort((a, b) => b.emails.length - a.emails.length);
+}
+
+/** The company address domain most of an account's contacts share, while the account has no website and one domain clearly leads. */
+export function domainFinding(
+  account: { domain?: string },
+  emails: string[],
+  skip: string[],
+  at: number,
+): Finding | null {
+  if (account.domain) return null;
+  const [best, next] = companyDomains(emails, skip);
+  if (!best || next?.emails.length === best.emails.length) return null;
   return {
     field: "domain",
-    value: best[0],
+    value: best.domain,
     strong: false,
     source: "contacts",
     confidence: 0.6,
-    evidence: `Contacts on this account write from ${best[1].slice(0, 3).join(", ")}.`,
+    evidence: `Contacts on this account write from ${best.emails.slice(0, 3).join(", ")}.`,
     at,
   };
+}
+
+/** Up to three company domains tied for most contacts on an account with no website: the agent can't pick, so it asks. */
+export function domainTie(
+  account: { domain?: string },
+  emails: string[],
+  skip: string[],
+) {
+  if (account.domain) return null;
+  const ranked = companyDomains(emails, skip);
+  const top = ranked.filter(
+    (item) => item.emails.length === ranked[0]?.emails.length,
+  );
+  return top.length > 1 ? top.slice(0, 3) : null;
+}
+
+export type SignerConflict = {
+  signed: string;
+  key: string;
+  otherId: string;
+  evidence: string;
+};
+
+/**
+ * Inbound signatures that don't match this person but do match another
+ * person on the account, so the agent can't tell whose details they are.
+ * Names already asked about are left out.
+ */
+export function signerConflicts(
+  person: PersonFacts,
+  entries: Entry[],
+  others: { id: string; firstName: string; lastName: string }[],
+  asked: string[],
+) {
+  const found = new Map<string, SignerConflict>();
+  for (const entry of entries) {
+    if (entry.kind !== "email" || entry.direction !== "inbound") continue;
+    const signature = parseSignature(entry.body ?? "");
+    if (!signature || nameMatches(signature.name, person)) continue;
+    const key = signedKey(signature.name);
+    const other = others.find((item) => nameMatches(signature.name, item));
+    if (!other || asked.includes(key) || found.has(key)) continue;
+    found.set(key, {
+      signed: signature.name,
+      key,
+      otherId: other.id,
+      evidence: `${sourceOf(entry)}, signature block:\n${signature.lines.join("\n")}`,
+    });
+  }
+  return [...found.values()];
 }
 
 /** Outbound emails sent since the last reply, newest-first entries in. */
@@ -378,6 +485,28 @@ export function nextCheck(input: {
     };
   }
   return { dueAt: now + stale, note: "routine refresh" };
+}
+
+export function nextStep(now: number, next: { dueAt: number; note: string }) {
+  const days = Math.round((next.dueAt - now) / DAY);
+  const when =
+    days < 1 ? "later today" : days === 1 ? "tomorrow" : `in ${days} days`;
+  return `Will check again ${when}: ${next.note}`;
+}
+
+/** The names the team has settled, read off a record's answered signature questions. */
+export function identityOf(
+  questions: { kind: string; key: string; answer?: string }[],
+): Identity {
+  const signers = questions.filter((question) => question.kind === "signer");
+  return {
+    same: signers
+      .filter((question) => question.answer === "self")
+      .map((question) => question.key),
+    skip: signers
+      .filter((question) => question.answer !== "self")
+      .map((question) => question.key),
+  };
 }
 
 /** `"<day>:<count>"`, the count of runs started on that India day. */

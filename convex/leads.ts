@@ -46,6 +46,7 @@ import {
   leadStatusProblem,
 } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
+import { slackEvent } from "./lib/slack";
 import { countLeads } from "./lib/counts";
 import { fail, invalid, notFound } from "./lib/errors";
 import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
@@ -1189,6 +1190,13 @@ export const checkSla = internalMutation({
       event: "lead_sla",
       leadId: id,
     });
+    if (!lead.erasedAt) {
+      await slackEvent(ctx, "lead_sla", {
+        name: lead.name,
+        detail: `${lead.companyName} · ${owner ? `Owner: ${owner.name}` : "Unassigned"}`,
+        path: leadHref(id),
+      });
+    }
   },
 });
 

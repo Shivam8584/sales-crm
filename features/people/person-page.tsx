@@ -35,7 +35,7 @@ import {
   useTitleShortcut,
 } from "@/features/accounts/use-title-shortcut";
 import DinLookup from "@/features/enrichment/din-lookup";
-import AgentSection from "@/features/research/agent-section";
+import { useAgentTab } from "@/features/research/agent-tab";
 import FeedbackSection from "@/features/surveys/feedback-section";
 import { RecordAutomations } from "@/features/automations/record-automations";
 import CustomFields from "@/features/fields/custom-fields";
@@ -191,6 +191,7 @@ function PersonView({ person }: { person: Person }) {
   });
   const name = personName(person);
   const archived = Boolean(person.archivedAt);
+  const agent = useAgentTab({ personId: person._id });
   useDocumentTitle(name);
   useTitleShortcut();
 
@@ -487,10 +488,6 @@ function PersonView({ person }: { person: Person }) {
             />
             <ConsentRecords personId={person._id} className={ASIDE_SECTION} />
             <DinLookup personId={person._id} className={ASIDE_SECTION} />
-            <AgentSection
-              subject={{ personId: person._id }}
-              className={ASIDE_SECTION}
-            />
             <FeedbackSection
               target={{ personId: person._id }}
               className={ASIDE_SECTION}
@@ -522,6 +519,7 @@ function PersonView({ person }: { person: Person }) {
               label: "Sequences",
               content: <RecordAutomations target={{ personId: person._id }} />,
             },
+            ...agent,
           ]}
         />
       </RecordLayout>

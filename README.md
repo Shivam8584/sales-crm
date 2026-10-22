@@ -54,7 +54,7 @@ stores/                ui-store (dialogs, sidebar, command menu), toast-store
 | ---------- | ------------------------------------------------------------------------ |
 | Work       | `/today`, `/inbox`, `/tasks`                                             |
 | Pipeline   | `/pipeline/{prospecting,leads,deals,activation}`, detail at `…/<id>`     |
-| Automation | `/automation/sequences`, `/automation/sequences/<id>`                    |
+| Automation | `/automation/{sequences,agents}`, detail at `…/<id>`                      |
 | Records    | `/records/{accounts,people}`, detail at `…/<id>`, `…/accounts/<id>/report` |
 | Insights   | `/insights/{reports,activity,playbook}`                                  |
 | Settings   | `/settings/{profile,team,workspace,fields,targets,duplicates,audit,integrations,system}` |
@@ -120,6 +120,7 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `CALCOM_WEBHOOK_SECRET`              | Convex | Secret for the Cal.com booking webhook at `/webhooks/calcom` (`X-Cal-Signature-256`)                       |
 | `ALERT_SLACK_WEBHOOK_URL`            | Convex | Slack incoming webhook for new leads, demo bookings and SLA breaches                                       |
 | `ALERT_WEBHOOK_URL`                  | Convex | Generic JSON webhook for the same events                                                                   |
+| `SLACK_BOT_TOKEN`, `SLACK_WEBHOOK_URL`, `SLACK_SIGNING_SECRET` | Convex | Slack integration (Settings → Integrations → Slack): a bot token with `chat:write`, or an incoming webhook URL as the fallback. Can be saved under Keys instead; the section stays "Not configured" without one |
 | `KYC_BASE_URL`                       | Convex | KYC provider base URL for GSTIN and DIN lookups                                                            |
 | `KYC_API_TOKEN`                      | Convex | KYC provider API token                                                                                     |
 | `KYC_HMAC_SECRET`                    | Convex | Verifies signed KYC responses                                                                              |
@@ -299,6 +300,12 @@ In Google Cloud, create an OAuth client of type Web application, enable the Gmai
 
 A cron runs every 15 minutes. The first run reads 14 days of mail and 30 days of meetings; after that it follows Gmail history, at most 300 messages per member per run. A message is logged once even if the rep also BCCs it (matched by Message-ID), and a meeting once even if several teammates attended. Teammates, our own domains, each member's "Never log" list, erased people and anyone who withdrew consent or asked for erasure are skipped. Disconnecting deletes the stored token, revokes it at Google and, if asked, removes the entries it added. If Google revokes access the member gets a notification to reconnect.
 
+### Slack
+
+Settings → Integrations → Slack posts to a channel when something happens. Add a bot token (`SLACK_BOT_TOKEN`, scope `chat:write`, and invite the bot to the channel) or, if you can't install an app, an incoming webhook URL (`SLACK_WEBHOOK_URL`, which fixes the channel) under Keys or as environment variables. Then pick a default channel and switch on the events you want: new hot lead (score 70+), deal won, deal lost, SLA breached, weekly report and agent output; each can post to its own channel. Every event is off until switched on. "Send test message" checks the setup, and the last result is shown on the card.
+
+Messages carry names and links to the record only. As a safeguard, any email address or phone number in outgoing text is masked, and erased leads are never posted. Posts are limited to 30 a minute workspace-wide, retried with backoff on Slack rate limits and server errors, and failures never block the action that caused them. Tokens and webhook URLs are never logged. `ALERT_SLACK_WEBHOOK_URL` (lead alerts) keeps working separately; leave one of the two off to avoid double posts. Slash commands and interactivity are not supported.
+
 ### Research agent
 
 A background worker that keeps accounts and people fresh without anyone clicking. It is off until an admin turns it on under Settings → System → Research agent, which also sets the daily limit (default 50 checks) and how long a record may sit before its routine refresh (default 30 days). Turning the switch off stops it at once; a manual "Research now" is refused while it is off. It needs no env var: the queue and the CRM-history checks work without an AI key, and with a key (Settings → Integrations → Keys) each record also gets a short written summary.
@@ -306,7 +313,19 @@ A background worker that keeps accounts and people fresh without anyone clicking
 - **What it reads:** only what this install already has: inbound email signatures and replies on the person's timeline, teammates' notes and calls, the contacts' company email domain, and the enrichment waterfall (GST registry, platform, company website) for accounts that have a GSTIN, website or platform link. There is no web search.
 - **Nothing is guessed.** Findings are stored as facts with their evidence in the same model as enrichment suggestions. Only a person's own signature that names them may fill a field (phone, title, LinkedIn), and only while it is empty and nobody cleared or rejected that value; "Undo" on the record clears it and it never returns. Everything else, including a possible job change, is a suggestion to accept or reject. Human-entered values are never overwritten. Erased people are skipped and their queue entry and findings are deleted.
 - **When it looks:** new accounts and people, existing records (a few per run, urgent ones first), a reply that hints the sender moved on, a record not checked for the refresh interval, and "Research now". After each check it schedules the next with a visible reason on the record, for example "Checking again in 2 weeks: no reply to 2 emails".
+- **Agent tab:** account and person pages get an Agent tab while the agent is on (nothing shows when it is off). It lists what the agent did, newest first (history checked, providers run, what it filled or suggested, when it will look again and why), kept for 60 days. When it cannot decide, it files a question with up to three options and waits: which website, when contacts tie between two company domains; whose details, when a signature names another person on the same account. The answer is applied (a website is set on the account), feeds the next check, and is remembered so the same question is never asked twice; "Not sure" is remembered too. The tab also has Research now and, with an AI key, an Ask box answered from the record. Erasing a person deletes their log and questions.
 - **Cost bounds:** a cron runs every 10 minutes and leases at most 5 records, within the daily limit; a lease expires after 10 minutes and a record that keeps failing waits for its routine refresh. An AI summary is one call per changed history, at most 6,000 characters in and 300 tokens out, and is skipped when the history has not changed.
+
+### Custom agents
+
+Automation → Agents turns a sentence into a standing job: "every Monday list my deals with no activity for 10 days and make a task for each", "when a lead is created, post it to #sales". Anyone can make one (up to 10 each); it needs an AI key (Settings → Integrations → Keys) and is hidden behind a "needs an AI key" note without one. No other env var or migration is needed.
+
+- **When:** every day, every weekday or every week at an hour (India time), when a lead is created, a deal changes stage or a reply is logged, or only when run by hand. A cron checks schedules every 5 minutes. Event runs are queued from the same places that fire sequence triggers (replies from the inbound email logger); for an own-scope agent only records its owner owns count.
+- **What it can do:** only the MCP tool set (the read tools plus `create_note`, `create_task`, `complete_task`, `create_lead`, `update_deal_stage`, `log_call`, `add_tag`) and, while Slack is connected, `post_slack_message`. Each run acts as its owner with the owner's role, through the same mutations as the app, and shows on timelines as done via MCP (agent name). The model only proposes calls as JSON; the server checks every call against the MCP tool schemas before running it and never evaluates anything or writes to tables directly. "My records" agents are refused any record their owner does not own or is assigned; "The whole team" is for admins.
+- **Changes are off by default.** Until the owner switches on Allow changes, every write is only listed as planned. Preview always plans without writing, even with changes on. A run's changes appear under it with Undo (the same undo as Settings → Profile → AI assistants).
+- **Hard caps:** 8 model turns, 20 tool calls (6 per turn) and about 60,000 estimated tokens per run; an identical call is not repeated in a run; 10 runs a day per agent (adjustable) and 200 a day workspace-wide, both counting previews. At most one run per agent at a time (three for event agents). Hitting a cap ends the run as "Hit a limit" with the reason. A failed run notifies its owner. Run logs (every step, tool call, result and error) are kept 30 days.
+- **Kill switch:** Settings → System → Custom agents stops every agent at once, including queued runs and manual ones, and sets the workspace daily limit.
+- **Untrusted data:** record text can contain instructions, so the prompt tells the model to treat tool results as data. The caps, the schema checks, the scope rule and the lack of destructive tools are the real limits; keep Allow changes off for agents that read broad data you do not trust.
 
 ### Results reports and split tests
 
@@ -322,7 +341,7 @@ A background worker that keeps accounts and people fresh without anyone clicking
 
 ### Checks
 
-`npm run check` is the production gate: `next typegen`, the type check, lint, the pure-logic tests (`npm test`) and the Convex function tests (`npm run test:convex`). It needs no browser, server or network.
+`npm run check` is the production gate: `next typegen`, the type check, lint, the pure-logic tests (`npm test`) and the Convex function tests (`npm run test:convex`). It needs no browser, server or network. `scripts/check.mjs` runs ESLint beside the type check and tests, and ESLint caches in `.eslintcache`, so a re-run only lints files that changed. Node 22 is the target (`.nvmrc`, `engines`); Dependabot opens weekly grouped PRs for npm, the Dockerfile and `deploy/compose.prod.yml`, and skips major bumps of Next, React and Convex. The Dockerfile pins `node:22-alpine` by digest: bump it from the Dependabot PR.
 
 - **Convex function tests** (`tests/convex`, Vitest + `convex-test`) run the real functions against an in-memory Convex with the rate-limiter, aggregate and migrations components registered (`tests/convex/setup.ts`). They cover permissions by role, consent and erasure, lead scoring and routing, sequences, merge, MCP tokens, custom fields and attachments. Seed members with `seedMember`/`seedTeam`; sign in as one with its `as` client.
 - **End-to-end smoke tests** (`tests/e2e`, Playwright, `npm run e2e`) are not part of `check`. They drive a real browser against the local stack, so start it first (`npm run convex:up`, `npx convex dev`, `npm run dev`) and load the demo data once with `npx convex run seed:reset`. They sign in with the seeded logins, undo or delete what they change, and refuse to run against a non-local `E2E_BASE_URL`.

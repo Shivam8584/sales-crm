@@ -15,6 +15,7 @@ import { toast } from "@/stores/toast-store";
 import DemoFormCard from "./demo-form-card";
 import KeysSection from "./keys-section";
 import PlatformSyncCard from "./platform-sync-card";
+import SlackSection from "./slack-section";
 import {
   AdminOnly,
   Code,
@@ -50,8 +51,9 @@ function IntegrationList() {
   const status = useQuery(api.settings.integrations, {});
   const keys = useQuery(api.secrets.status, {});
   const sync = useQuery(api.account360.syncOverview, {});
-  // The keys and sync cards own these queries; waiting on them here stops a late section pushing the rest down.
-  if (!status || !keys || !sync) {
+  const slack = useQuery(api.slack.status, {});
+  // The keys, Slack and sync cards own these queries; waiting on them here stops a late section pushing the rest down.
+  if (!status || !keys || !sync || !slack) {
     return (
       <>
         <SettingsSkeleton rows={3} />
@@ -63,6 +65,7 @@ function IntegrationList() {
   return (
     <>
       <KeysSection />
+      <SlackSection />
       <PlatformCard platform={status.platform} />
       <PlatformSyncCard />
       <KycCard kyc={status.kyc} />

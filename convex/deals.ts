@@ -16,6 +16,8 @@ import { cleanText, isValidDay } from "../lib/domain/normalize";
 import { PROPOSAL_CURRENCY } from "../lib/domain/pricing";
 import { dealStageEffects, isDealClosed } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
+import { slackEvent } from "./lib/slack";
+import { routes } from "../lib/routes";
 import { visibleCustom } from "./customFields";
 import { fail, invalid, notFound } from "./lib/errors";
 import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
@@ -174,6 +176,24 @@ async function logStage(
     refs: { dealId: deal._id, accountId: deal.accountId },
     value: stage,
   });
+  if (stage === "won" || stage === "lost") {
+    const [account, current] = await Promise.all([
+      ctx.db.get(deal.accountId),
+      ctx.db.get(deal._id),
+    ]);
+    await slackEvent(ctx, stage === "won" ? "deal_won" : "deal_lost", {
+      name: deal.title,
+      detail: [
+        account?.name,
+        current && formatMoney(current.amount),
+        ctx.viewer.name,
+        stage === "lost" ? lostReason : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      path: routes.deal(deal._id),
+    });
+  }
 }
 
 /** Fields that follow from a stage change: close time and lost reason. */
@@ -192,12 +212,12 @@ async function toClient(
   deals: Doc<"deals">[],
   members: Awaited<ReturnType<typeof memberIndex>>,
 ) {
-  const accounts = new Map<Id<"accounts">, Doc<"accounts"> | null>();
-  for (const deal of deals) {
-    if (!accounts.has(deal.accountId)) {
-      accounts.set(deal.accountId, await ctx.db.get(deal.accountId));
-    }
-  }
+  const accountIds = [...new Set(deals.map((deal) => deal.accountId))];
+  const accounts = new Map(
+    await Promise.all(
+      accountIds.map(async (id) => [id, await ctx.db.get(id)] as const),
+    ),
+  );
   return deals.map((deal) => {
     const account = accounts.get(deal.accountId);
     return {
