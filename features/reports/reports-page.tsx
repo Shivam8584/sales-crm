@@ -156,7 +156,7 @@ export default function ReportsPage() {
       </PageToolbar>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-6 sm:px-6">
+        <div className="flex w-full flex-col gap-12 px-(--page-x) pt-2 pb-16">
           {tab === "overview" && (
             <OverviewTab
               report={report}

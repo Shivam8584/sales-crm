@@ -29,9 +29,9 @@ export function ReportSection({
     >
       <header className="flex min-w-0 items-start gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h2 className="text-sm leading-5 font-medium">{title}</h2>
+          <h2 className="title-style">{title}</h2>
           {description && (
-            <p className="caption-style text-fg-tertiary leading-snug text-pretty">
+            <p className="text-fg-secondary text-sm text-pretty">
               {description}
             </p>
           )}
@@ -66,11 +66,11 @@ export function MetricTile({
   tone?: "danger";
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <span className="caption-style text-fg-tertiary truncate">{label}</span>
+    <div className="hover:bg-background duration-base flex min-w-0 flex-col gap-1.5 rounded-2xl px-4 py-3.5 transition-colors hover:duration-[120ms]">
+      <span className="text-fg-secondary truncate text-xs">{label}</span>
       <span
         className={cn(
-          "truncate text-2xl leading-none font-medium tabular-nums",
+          "truncate text-2xl leading-none font-semibold tracking-[-0.02em] tabular-nums",
           tone === "danger" && "text-danger",
         )}
       >
@@ -79,7 +79,7 @@ export function MetricTile({
       {(detail || delta) && (
         <span className="flex min-h-4 flex-col gap-1.5">
           {detail && (
-            <span className="caption-style text-fg-tertiary truncate tabular-nums">
+            <span className="text-fg-tertiary truncate text-xs tabular-nums">
               {detail}
             </span>
           )}
@@ -94,7 +94,7 @@ export function Delta({ value, trend }: { value: string; trend: Trend }) {
   return (
     <span
       className={cn(
-        "caption-style tabular-nums",
+        "text-xs font-medium tabular-nums",
         trend === "good" && "text-success",
         trend === "bad" && "text-danger",
         trend === "flat" && "text-fg-secondary",

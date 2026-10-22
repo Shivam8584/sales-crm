@@ -643,7 +643,7 @@ export default function ProspectingPage() {
   const mode = overview?.mode;
 
   return (
-    <Page>
+    <Page wide>
       <PageHeader
         title="Prospecting"
         meta={

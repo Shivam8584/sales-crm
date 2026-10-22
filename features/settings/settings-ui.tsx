@@ -10,7 +10,7 @@ import { routes } from "@/lib/routes";
 
 /** One-paragraph context under the page header of a settings page. */
 export function SettingsIntro({ children }: { children: ReactNode }) {
-  return <p className="text-fg-tertiary max-w-prose">{children}</p>;
+  return <p className="text-body text-fg-secondary max-w-prose">{children}</p>;
 }
 
 /** A titled group of rows, separated from its neighbours by whitespace. */
@@ -68,17 +68,14 @@ function SectionHeader({
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <h2
             id={id}
-            className={cn(
-              "text-sm leading-5 font-medium",
-              tone === "danger" && "text-danger",
-            )}
+            className={cn("title-style", tone === "danger" && "text-danger")}
           >
             {title}
           </h2>
           {meta}
         </div>
         {description && (
-          <p className="caption-style text-fg-tertiary max-w-prose leading-snug">
+          <p className="text-fg-secondary max-w-prose text-sm text-pretty">
             {description}
           </p>
         )}
@@ -108,16 +105,16 @@ export function SettingsRow({
   return (
     <div
       className={cn(
-        "border-border flex flex-col gap-3 border-t py-3.5 sm:flex-row sm:items-center sm:gap-6",
+        "border-border flex flex-col gap-3 border-t py-4 sm:flex-row sm:items-center sm:gap-6",
         className,
       )}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <Label htmlFor={htmlFor} className="lead-style">
+        <Label htmlFor={htmlFor} className="text-body font-medium">
           {label}
         </Label>
         {description && (
-          <span className="caption-style text-fg-tertiary leading-snug">
+          <span className="text-fg-secondary text-sm text-pretty">
             {description}
           </span>
         )}

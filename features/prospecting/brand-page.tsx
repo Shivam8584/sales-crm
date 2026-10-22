@@ -412,7 +412,7 @@ function BrandSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-12 gap-y-8 px-4 pt-6 sm:px-6 lg:pt-8 @4xl/page:grid-cols-[minmax(0,1fr)_19rem]"
+        className="grid w-full gap-x-8 gap-y-10 px-(--page-x) pt-1 @4xl/page:grid-cols-[minmax(0,1fr)_20rem]"
       >
         <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-12 rounded-xl" />

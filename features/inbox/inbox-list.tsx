@@ -87,7 +87,7 @@ export function GroupHeader({ group }: { group: Group }) {
   const unread = group.items.filter((item) => !item.read).length;
   const record = group.record;
   return (
-    <div className="bg-background/95 z-sticky sticky top-0 flex h-9 items-center gap-2 px-4 backdrop-blur-sm">
+    <div className="bg-background/95 z-sticky sticky top-0 flex h-10 items-center gap-2 px-3 backdrop-blur-sm">
       {record ? (
         <Link
           href={record.href}
@@ -133,12 +133,8 @@ export function InboxRow({
     <li
       data-cursor={cursor || undefined}
       data-selected={selected || undefined}
-      className="group/row data-[cursor]:bg-row-hover data-[selected]:bg-row-selected hover:bg-row-hover relative"
+      className="group/row data-[cursor]:bg-well data-[selected]:bg-row-selected hover:bg-well duration-base relative rounded-2xl transition-colors hover:duration-[120ms]"
     >
-      <span
-        aria-hidden
-        className="bg-selected absolute inset-y-0 left-0 w-0.5 opacity-0 group-data-[cursor]/row:opacity-100"
-      />
       <Link
         href={href}
         {...{ [ROW_ATTR]: item._id }}
@@ -147,21 +143,22 @@ export function InboxRow({
           actions.open(item);
         }}
         onFocus={() => actions.setCursor(item._id)}
-        className="focus-visible:ring-ring flex min-w-0 items-start gap-3 py-2.5 pr-4 pl-11 outline-none focus-visible:ring-2 focus-visible:ring-inset max-sm:pl-4 pointer-coarse:pr-10"
+        className="focus-visible:ring-ring flex min-w-0 items-center gap-3.5 rounded-2xl py-2.5 pr-3 pl-11 outline-none focus-visible:ring-2 focus-visible:ring-inset max-sm:pl-3 pointer-coarse:pr-10"
       >
-        <KindIcon
-          kind={item.kind}
+        <span
           className={cn(
-            "mt-[3px] size-3.5 shrink-0",
-            isUrgentKind(item.kind) ? "text-danger" : "text-fg-tertiary",
+            "bg-well group-hover/row:bg-background group-data-[cursor]/row:bg-background grid size-10 shrink-0 place-items-center rounded-xl transition-colors",
+            isUrgentKind(item.kind) ? "text-danger" : "text-fg-secondary",
           )}
-        />
+        >
+          <KindIcon kind={item.kind} className="size-4" />
+        </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-2">
             <span
               title={item.title}
               className={cn(
-                "lead-style min-w-0 flex-1 truncate leading-5",
+                "text-body min-w-0 flex-1 truncate leading-5 font-medium",
                 item.read ? "text-fg-secondary" : "text-foreground",
               )}
             >
@@ -171,7 +168,7 @@ export function InboxRow({
               <span className="flex shrink-0">
                 <span
                   aria-hidden
-                  className="bg-selected size-1.5 rounded-full"
+                  className="bg-foreground size-1.5 rounded-full"
                 />
                 <span className="sr-only">Unread</span>
               </span>
@@ -186,7 +183,7 @@ export function InboxRow({
           </span>
           {(item.body || item.actor) && (
             <span
-              className="caption-style text-fg-tertiary truncate leading-5"
+              className="text-fg-tertiary truncate text-sm leading-5"
               title={item.body ?? undefined}
             >
               {item.body ?? item.actor?.name}
@@ -197,7 +194,7 @@ export function InboxRow({
 
       <span
         className={cn(
-          "absolute top-3.5 left-4 flex max-sm:hidden",
+          "absolute top-1/2 left-3 flex -translate-y-1/2 max-sm:hidden",
           !selecting &&
             !selected &&
             "opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100",
@@ -210,7 +207,7 @@ export function InboxRow({
         />
       </span>
 
-      <span className="bg-row-hover absolute top-1.5 right-2 flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 group-data-[cursor]/row:opacity-100 has-[[data-state=open]]:opacity-100 pointer-coarse:hidden">
+      <span className="bg-well absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-0.5 rounded-full p-1 opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 group-data-[cursor]/row:opacity-100 has-[[data-state=open]]:opacity-100 pointer-coarse:hidden">
         <Tooltip content={archived ? "Move to inbox" : "Archive"} shortcut="E">
           <Button
             variant="ghost"
@@ -290,15 +287,15 @@ function RowMenu({ item, actions }: { item: InboxItem; actions: RowActions }) {
 export function InboxSkeleton() {
   return (
     <div aria-busy className="flex flex-col">
-      <div className="flex h-9 items-center px-4">
+      <div className="flex h-10 items-center px-3">
         <Skeleton className="h-3 w-32" />
       </div>
       {Array.from({ length: 6 }, (_, index) => (
         <div
           key={index}
-          className="flex items-start gap-3 py-2.5 pr-4 pl-11 max-sm:pl-4"
+          className="flex items-center gap-3.5 py-2.5 pr-3 pl-11 max-sm:pl-3"
         >
-          <Skeleton className="size-3.5 rounded-sm" />
+          <Skeleton className="size-10 rounded-xl" />
           <span className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3 w-3/5" />
             <Skeleton className="h-2.5 w-2/5" />

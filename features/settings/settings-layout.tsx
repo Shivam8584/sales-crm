@@ -7,7 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { buttonVariants } from "@/components/_ui/button";
 import CountBadge from "@/components/_ui/count-badge";
-import { Page, PageHeader } from "@/components/shell/page";
+import { Page, PageHeader, PageStatus } from "@/components/shell/page";
 import {
   SETTINGS_PAGES,
   canOpenSetting,
@@ -57,18 +57,14 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       <PageHeader
         crumbs={[{ label: "Settings" }]}
         title={current?.label ?? "Settings"}
-        meta={
-          <span className="caption-style text-fg-tertiary">
-            {ROLE_LABEL[viewer.role]}
-          </span>
-        }
+        meta={<PageStatus>{ROLE_LABEL[viewer.role]}</PageStatus>}
       />
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row md:gap-8 md:pl-(--page-x)">
         <nav
           aria-label="Settings"
-          className="border-border shrink-0 max-md:border-b md:w-56 md:border-r"
+          className="border-border shrink-0 max-md:border-b md:w-56 md:overflow-y-auto"
         >
-          <ul className="scrollbar-none flex gap-4 overflow-x-auto px-4 md:hidden">
+          <ul className="scrollbar-none flex gap-5 overflow-x-auto px-(--page-x) md:hidden">
             {pages.map((page) => {
               const active = isActive(pathname, page.href);
               return (
@@ -92,7 +88,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
                     {active && (
                       <span
                         aria-hidden
-                        className="bg-foreground absolute inset-x-0 bottom-0 h-px"
+                        className="bg-foreground absolute inset-x-0 -bottom-px h-0.5 rounded-full"
                       />
                     )}
                   </Link>
@@ -107,11 +103,12 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
               );
               if (items.length === 0) return null;
               return (
-                <div key={group.title} className="flex flex-col gap-1 p-3">
-                  <h2 className="caption-style text-fg-tertiary px-2 py-1">
-                    {group.title}
-                  </h2>
-                  <ul className="flex flex-col gap-px">
+                <div
+                  key={group.title}
+                  className="after:bg-foreground/[0.07] flex flex-col pb-2 after:mx-3 after:mt-2 after:h-px last:after:hidden"
+                >
+                  <h2 className="sr-only">{group.title}</h2>
+                  <ul className="flex flex-col gap-0.5">
                     {items.map((page) => (
                       <NavItem
                         key={page.href}
@@ -131,7 +128,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         ) : (
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 pt-6 pb-16 sm:px-8 md:pt-8">
+            <div className="flex w-full max-w-180 flex-col gap-12 px-(--page-x) pt-6 pb-16 md:pt-1 md:pl-0">
               {children}
             </div>
           </div>
@@ -160,7 +157,7 @@ function NavItem({
         aria-current={active ? "page" : undefined}
         className={cn(
           buttonVariants({ variant: "nav", size: "md" }),
-          "h-8 gap-1.5 py-0 font-normal",
+          "data-[active=true]:bg-well hover:bg-well h-9 gap-1.5 rounded-xl px-3 py-0",
         )}
       >
         <span className="min-w-0 flex-1 truncate text-left">{label}</span>

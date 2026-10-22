@@ -60,9 +60,8 @@ export default function ActivationChart({
                 percent={((step.medianMs ?? 0) / longest) * 100}
                 segments={48}
                 tone={slowest ? "warning" : "success"}
-                className="border-overlay-1 h-3 w-full border px-px"
-                segmentClassName="h-2"
-                trackClassName="bg-overlay-3"
+                className="h-3 w-full"
+                trackClassName="bg-well h-2"
               />
               <span className="caption-style text-fg-tertiary tabular-nums">
                 {count(step.completed)} completed in period ·{" "}

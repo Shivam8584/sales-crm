@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import Skeleton from "@/components/_ui/skeleton";
 import NpsTile from "@/features/surveys/nps-tile";
 import type { Report } from "@/convex/lib/reports";
@@ -12,9 +13,10 @@ import {
 } from "./format";
 import { Delta, MetricTile } from "./section";
 
-const GRID = "grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 xl:grid-cols-6";
+const GRID =
+  "bg-well grid grid-cols-2 gap-1 rounded-3xl p-1 sm:grid-cols-3 xl:grid-cols-6";
 const GRID_WITH_NPS =
-  "grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4 xl:grid-cols-7";
+  "bg-well grid grid-cols-2 gap-1 rounded-3xl p-1 sm:grid-cols-4 xl:grid-cols-7";
 
 const pts = (current: number | null, previous: number | null) =>
   current === null || previous === null
@@ -99,7 +101,15 @@ export default function Kpis({ report }: { report: Report }) {
       <MetricTile
         label="Deals won"
         value={count(report.pipeline.won.count)}
-        detail={totals(report.pipeline.won.totals, "No value yet")}
+        detail={
+          <span
+            className={cn(
+              report.pipeline.won.count > 0 && "text-rose font-medium",
+            )}
+          >
+            {totals(report.pipeline.won.totals, "No value yet")}
+          </span>
+        }
         delta={
           <Delta
             value={signed(report.pipeline.won.count - report.previousWon.count)}
@@ -118,7 +128,7 @@ export function KpisSkeleton({ tiles = 6 }: { tiles?: number }) {
   return (
     <div className={tiles > 6 ? GRID_WITH_NPS : GRID}>
       {Array.from({ length: tiles }, (_, index) => (
-        <div key={index} className="flex flex-col gap-2">
+        <div key={index} className="flex flex-col gap-2 px-4 py-3.5">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-6 w-10" />
           <Skeleton className="h-3 w-24" />
