@@ -86,7 +86,7 @@ export default function ActivationPath({
                     </time>
                   </Tooltip>
                 ) : (
-                  <span className="text-fg-disabled text-xs">Next</span>
+                  <span className="text-fg-tertiary text-xs">Next</span>
                 )}
               </span>
             </li>

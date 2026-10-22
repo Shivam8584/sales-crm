@@ -73,9 +73,9 @@ function SheetContent({
         className={cn(
           "bg-background text-foreground data-[state=closed]:animate-out data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:ease-out-hd z-overlay data-[state=closed]:duration-slow fixed flex w-full flex-col overflow-hidden outline-none data-[state=open]:duration-[480ms]",
           side === "right" &&
-            "shadow-overlay data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-dvh sm:inset-y-2 sm:right-2 sm:h-[calc(100dvh-1rem)] sm:max-w-[calc(100vw-1rem)] sm:rounded-4xl",
+            "shadow-overlay data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-dvh sm:inset-y-2 sm:right-2 sm:h-[calc(100dvh-1rem)] sm:max-w-[calc(100vw-1rem)] sm:rounded-3xl",
           side === "left" &&
-            "shadow-overlay data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-dvh sm:inset-y-2 sm:left-2 sm:h-[calc(100dvh-1rem)] sm:rounded-4xl",
+            "shadow-overlay data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-dvh sm:inset-y-2 sm:left-2 sm:h-[calc(100dvh-1rem)] sm:rounded-3xl",
           side === "bottom" &&
             "shadow-overlay data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom rounded-t-5xl inset-x-0 bottom-0 max-h-[85dvh]",
           className,

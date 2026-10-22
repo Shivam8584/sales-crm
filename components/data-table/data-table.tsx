@@ -3,6 +3,7 @@
 import {
   Fragment,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -124,13 +125,18 @@ export default function DataTable<T>({
   const bodyRef = useRef<HTMLDivElement>(null);
   const selectable = selected !== undefined && onSelectedChange !== undefined;
 
-  const visibleColumns = useMemo(
-    () =>
-      columns.filter(
-        (column) => !column.minViewport || width >= column.minViewport,
-      ),
-    [columns, width],
-  );
+  const fitKey = `${columns.map((column) => column.id).join()}@${width}`;
+  const [fit, setFit] = useState({ key: fitKey, dropped: 0, room: 0 });
+  if (fit.key !== fitKey) setFit({ key: fitKey, dropped: 0, room: fit.room });
+  const dropped = fit.key === fitKey ? fit.dropped : 0;
+  const visibleColumns = useMemo(() => {
+    const fitting = columns.filter(
+      (column) => !column.minViewport || width >= column.minViewport,
+    );
+    return dropped
+      ? fitting.slice(0, Math.max(1, fitting.length - dropped))
+      : fitting;
+  }, [columns, width, dropped]);
 
   const sorted = useMemo(() => {
     const column = columns.find((item) => item.id === sort.id);
@@ -180,10 +186,29 @@ export default function DataTable<T>({
     );
   }
 
+  // The pinned Actions cell would cover real columns at rest; `minViewport`
+  // ignores the sidebar, so trailing columns that still overflow are dropped.
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (element && element.scrollWidth > element.clientWidth + 1)
+      setFit((current) =>
+        current.dropped < columns.length - 1
+          ? { ...current, dropped: current.dropped + 1 }
+          : current,
+      );
+  }, [visibleColumns, belowSm, loaded, columns.length, fit.room]);
+
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => measure(element));
+    let last = element.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (element.clientWidth !== last) {
+        last = element.clientWidth;
+        setFit((current) => ({ ...current, dropped: 0, room: last }));
+      }
+      measure(element);
+    });
     observer.observe(element);
     if (element.firstElementChild) observer.observe(element.firstElementChild);
     return () => observer.disconnect();
@@ -572,7 +597,7 @@ export default function DataTable<T>({
                       {index === 0 ? (
                         <Link
                           href={getHref(row)}
-                          className="focus-visible:ring-ring text-body -mx-1 flex min-w-0 items-center gap-3 rounded-md px-1 py-1 font-medium outline-none focus-visible:ring-2"
+                          className="focus-visible:ring-ring text-body relative -mx-1 flex min-w-0 items-center gap-3 rounded-md px-1 py-1 font-medium outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2 pointer-coarse:after:content-['']"
                         >
                           {column.cell(row)}
                         </Link>
@@ -813,7 +838,7 @@ function HeaderCell<T>({
           onClick={onSort}
           data-active={active}
           className={cn(
-            "group hover:text-foreground focus-visible:ring-ring -mx-1 inline-flex min-w-0 cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 outline-none focus-visible:ring-2",
+            "group hover:text-foreground focus-visible:ring-ring relative -mx-1 inline-flex min-w-0 cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-3 pointer-coarse:after:content-['']",
             column.align === "end" && "flex-row-reverse",
             active && "text-foreground",
           )}

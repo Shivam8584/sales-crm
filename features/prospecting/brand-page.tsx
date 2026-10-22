@@ -24,6 +24,7 @@ import {
 import AccountLogo from "@/features/accounts/account-logo";
 import { ASIDE_SECTION } from "@/features/accounts/account-insights";
 import { RecordAutomations } from "@/features/automations/record-automations";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { LEAD_STATUS_LABEL } from "@/lib/domain/labels";
 import { formatCount, marketplaceName } from "@/lib/domain/prospecting";
 import { readError } from "@/lib/errors";
@@ -80,6 +81,7 @@ export default function BrandPage({ brandKey }: { brandKey: string }) {
 }
 
 function BrandView({ brand }: { brand: Brand }) {
+  useDocumentTitle(brand.brand);
   const actions = useProspectActions();
   const refresh = useMutation(api.prospecting.refresh);
   const openLead = brand.lead?.open ? brand.lead : null;

@@ -97,7 +97,7 @@ export default function TaskComposer({
       onSubmit={submit}
       onBlur={onBlur}
       aria-label={label}
-      className={cn("bg-card shadow-card flex flex-col rounded-2xl", className)}
+      className={cn("bg-well flex flex-col rounded-2xl", className)}
     >
       <div className="flex flex-col gap-2 p-4 pb-2">
         <input

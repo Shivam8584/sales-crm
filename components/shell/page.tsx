@@ -14,7 +14,6 @@ import {
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
 import { Tabs as TabsPrimitive } from "radix-ui";
 import Button from "@/components/_ui/button";
 import CountBadge from "@/components/_ui/count-badge";
@@ -26,6 +25,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/_ui/dropdown-menu";
 import Kbd from "@/components/_ui/kbd";
+import {
+  SEGMENT_ITEM,
+  SEGMENT_TRACK,
+  SegmentThumb,
+} from "@/components/_ui/segmented-control";
 import {
   Sheet,
   SheetClose,
@@ -256,7 +260,7 @@ function TopBar() {
       <Link
         href={routes.today}
         aria-label="Hypedrive, go to Today"
-        className="focus-visible:ring-ring mr-auto rounded-md outline-none focus-visible:ring-2 lg:hidden"
+        className="focus-visible:ring-ring relative mr-auto rounded-md outline-none after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-[''] focus-visible:ring-2 lg:hidden"
       >
         <Wordmark aria-hidden className="text-foreground h-[18px] w-[90px]" />
       </Link>
@@ -289,7 +293,7 @@ function SearchButton() {
         aria-keyshortcuts="Meta+K Control+K"
         data-tour="search"
         onClick={() => setCommandOpen(true)}
-        className="bg-well text-fg-tertiary hover:bg-well-hover focus-visible:ring-ring duration-base col-span-8 hidden h-10 w-full max-w-160 cursor-pointer items-center gap-2.5 rounded-full pr-2 pl-4 text-left text-sm transition-[background-color,scale] outline-none hover:duration-[120ms] focus-visible:ring-2 active:scale-[0.99] lg:flex"
+        className="bg-well shadow-field text-fg-tertiary hover:bg-well-hover focus-visible:ring-ring duration-base col-span-8 hidden h-10 w-full max-w-160 cursor-pointer items-center gap-2.5 rounded-full pr-2 pl-4 text-left text-sm transition-[background-color,scale] outline-none hover:duration-[120ms] focus-visible:ring-2 active:scale-[0.99] lg:flex"
       >
         <SearchIcon aria-hidden className="size-4 shrink-0" />
         <span className="flex-1 truncate">Search accounts, people, deals</span>
@@ -380,33 +384,31 @@ export function PageViews({
             : "px-(--page-x) pb-4",
         )}
       >
-        <TabsPrimitive.List
-          aria-label={label}
-          className="bg-well scrollbar-none inline-flex h-10 max-w-full items-center overflow-x-auto rounded-full p-1"
-        >
-          {views.map((view) => (
-            <TabsPrimitive.Trigger
-              key={view.id}
-              value={view.id}
-              className="text-fg-secondary hover:text-foreground data-[state=active]:text-foreground focus-visible:ring-ring duration-base relative flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-[color,scale] outline-none focus-visible:ring-2 active:scale-[0.97] motion-reduce:active:scale-100"
-            >
-              {current === view.id && (
-                <motion.span
-                  aria-hidden
-                  layoutId={`${id}-view`}
-                  transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
-                  className="bg-background shadow-capsule absolute inset-0 rounded-full"
-                />
-              )}
-              <span className="relative">{view.label}</span>
-              {"count" in view && (
-                <span className="text-fg-disabled relative font-normal tabular-nums">
-                  {view.count === undefined ? "–" : view.count}
-                </span>
-              )}
-            </TabsPrimitive.Trigger>
-          ))}
-        </TabsPrimitive.List>
+        <div className="scrollbar-none max-w-full overflow-x-auto pointer-coarse:-my-2 pointer-coarse:py-2">
+          <TabsPrimitive.List
+            aria-label={label}
+            className={cn(SEGMENT_TRACK, "w-max")}
+          >
+            {views.map((view) => (
+              <TabsPrimitive.Trigger
+                key={view.id}
+                value={view.id}
+                className={cn(
+                  SEGMENT_ITEM,
+                  "data-[state=active]:text-foreground",
+                )}
+              >
+                {current === view.id && <SegmentThumb id={`${id}-view`} />}
+                <span className="relative">{view.label}</span>
+                {"count" in view && (
+                  <span className="text-fg-tertiary relative font-normal tabular-nums">
+                    {view.count === undefined ? "–" : view.count}
+                  </span>
+                )}
+              </TabsPrimitive.Trigger>
+            ))}
+          </TabsPrimitive.List>
+        </div>
       </TabsPrimitive.Root>
     </Slot>
   );
@@ -560,7 +562,7 @@ export function PageToolbar({
     <div
       data-slot="page-toolbar"
       className={cn(
-        "rise short:pb-2 flex shrink-0 flex-wrap items-center gap-2 px-(--page-x) pb-4 [--i:1] sm:flex-nowrap",
+        "rise short:pb-2 flex shrink-0 flex-wrap items-center gap-2 px-(--page-x) pb-4 [--i:1] lg:flex-nowrap",
         className,
       )}
     >
@@ -614,11 +616,11 @@ function FilterSheet({
     <Sheet open={open && enabled} onOpenChange={setOpen}>
       <Button
         variant="well"
-        size="md"
+        size="toolbar"
         aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
         data-active={active > 0}
         onClick={() => setOpen(true)}
-        className="max-[359px]:w-10 max-[359px]:px-0 sm:hidden"
+        className="max-[359px]:w-control-lg max-[359px]:px-0 sm:hidden"
       >
         <FilterIcon aria-hidden className="size-3.5" />
         <span className="max-[359px]:sr-only">Filters</span>
@@ -695,7 +697,7 @@ export function ExportButton({
         size="md"
         onClick={onClick}
         disabled={disabled}
-        className="max-sm:w-10 max-sm:px-0"
+        className="max-sm:w-control-lg max-sm:px-0"
       >
         <ShareIcon aria-hidden className="text-fg-secondary size-3.5" />
         <span className="max-sm:sr-only">{label}</span>

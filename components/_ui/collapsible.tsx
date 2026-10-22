@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { Collapsible as CollapsiblePrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
@@ -47,56 +47,9 @@ function CollapsibleChevron({ className }: { className?: string }) {
   );
 }
 
-/**
- * A titled block that folds away: title with a chevron, an optional
- * control on the right, and its content. Used in record sidebars and long settings.
- */
-function CollapsibleSection({
-  title,
-  action,
-  defaultOpen = true,
-  open,
-  onOpenChange,
-  children,
-  className,
-  contentClassName,
-}: {
-  title: string;
-  action?: ReactNode;
-  defaultOpen?: boolean;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  children: ReactNode;
-  className?: string;
-  contentClassName?: string;
-}) {
-  return (
-    <Collapsible
-      defaultOpen={defaultOpen}
-      open={open}
-      onOpenChange={onOpenChange}
-      className={cn("group/collapsible flex min-w-0 flex-col", className)}
-    >
-      <div className="min-h-control-md flex items-center justify-between gap-2">
-        <CollapsibleTrigger className="eyebrow-style text-foreground hover:text-fg-secondary focus-visible:ring-ring duration-fast -mx-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 font-medium transition-colors outline-none focus-visible:ring-2">
-          <span className="truncate">{title}</span>
-          <CollapsibleChevron />
-        </CollapsibleTrigger>
-        {action}
-      </div>
-      <CollapsibleContent>
-        <div className={cn("flex flex-col gap-4 pt-3", contentClassName)}>
-          {children}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
 export {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
   CollapsibleChevron,
-  CollapsibleSection,
 };

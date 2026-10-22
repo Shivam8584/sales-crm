@@ -4,7 +4,7 @@ import Link from "next/link";
 import Tag from "@/components/_ui/tag";
 import { useCardFields } from "@/components/board/board-prefs";
 import { cn } from "@/lib/utils";
-import TaskChips, { CardSafe } from "./task-chips";
+import TaskChips, { COARSE_HIT, CardSafe } from "./task-chips";
 import { StatusIcon, type TaskRow } from "./task-meta";
 import { useTaskActions } from "./use-task-actions";
 import { routes } from "@/lib/routes";
@@ -74,6 +74,7 @@ export function RecordChip({
       <Link
         href={target.href}
         className={cn(
+          COARSE_HIT,
           "hover:text-foreground focus-visible:ring-ring duration-fast ease-power3-out -mx-1 -my-0.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors outline-none focus-visible:ring-2",
           meta ? "text-fg-tertiary" : "caption-style text-fg-secondary",
           className,
@@ -116,7 +117,7 @@ export function DoneToggle({
         aria-pressed={done}
         onClick={() => void setDone(task, !done)}
         className={cn(
-          "group/done focus-visible:ring-ring relative flex size-3.5 shrink-0 cursor-pointer items-center justify-center rounded-xs outline-none after:absolute after:-inset-2 after:content-[''] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-(--card) pointer-coarse:after:-inset-3.5",
+          "group/done focus-visible:ring-ring relative flex size-3.5 shrink-0 cursor-pointer items-center justify-center rounded-xs outline-none after:absolute after:-inset-2 after:content-[''] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-(--card) pointer-coarse:after:inset-[min(0px,calc((100%-44px)/2))]",
           className,
         )}
       >

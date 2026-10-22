@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
+import Skeleton from "@/components/_ui/skeleton";
 import type { FunnelStepKey, Period } from "@/convex/lib/reports";
 import { STAGE_PROBABILITY_BPS } from "@/lib/domain/forecast";
 import { DEAL_STAGE_LABEL } from "@/lib/domain/labels";
@@ -16,7 +17,12 @@ import FunnelChart from "./funnel-chart";
 import Kpis, { KpisSkeleton } from "./kpis";
 import { PERIOD_LABEL } from "./periods";
 import PipelineChart from "./pipeline-chart";
-import { ChartSkeleton, Reloading, ReportSection } from "./section";
+import {
+  ChartSkeleton,
+  Reloading,
+  ReportSection,
+  StageSkeleton,
+} from "./section";
 import SourceTable from "./source-table";
 import { routes } from "@/lib/routes";
 
@@ -96,7 +102,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
         title="Overview"
         description={`${PERIOD_LABEL[period].long}, against the period before.`}
       >
-        {report ? <Kpis report={report} /> : <KpisSkeleton tiles={7} />}
+        {report ? <Kpis report={report} /> : <KpisSkeleton />}
       </ReportSection>
 
       <div className="grid items-stretch gap-10 lg:grid-cols-2">
@@ -116,7 +122,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
         >
           <div className="flex-1">
             {!report ? (
-              <ChartSkeleton rows={4} />
+              <StageSkeleton rowClassName="h-11" tiles />
             ) : report.pipeline.open.every((stage) => stage.count === 0) &&
               report.pipeline.won.count === 0 &&
               report.pipeline.lost.count === 0 ? (
@@ -155,7 +161,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
         >
           <div className="flex-1">
             {!report ? (
-              <ChartSkeleton rows={4} />
+              <StageSkeleton rowClassName="h-[54px]" />
             ) : !report.hasPlatformEvents ? (
               <EmptyState
                 className="mx-auto max-w-lg"
@@ -223,7 +229,10 @@ export function FunnelTab(props: LeadTabProps) {
       >
         <div>
           {!report ? (
-            <ChartSkeleton rows={10} />
+            <ChartSkeleton
+              rows={10}
+              className="h-138 justify-between md:h-90.5"
+            />
           ) : report.funnel.steps[0].count === 0 ? (
             <NoLeads {...props} />
           ) : (
@@ -234,6 +243,9 @@ export function FunnelTab(props: LeadTabProps) {
             />
           )}
         </div>
+        {!report && (
+          <Skeleton className="my-[3.5px] h-3 w-72 max-w-full" aria-hidden />
+        )}
         {report && report.direct.accounts > 0 && (
           <p className="lead-style text-fg-secondary leading-snug">
             Plus {count(report.direct.accounts)}{" "}
@@ -277,7 +289,10 @@ export function FunnelTab(props: LeadTabProps) {
               hrefFor={sourceHref}
             />
           ) : (
-            <ChartSkeleton rows={4} />
+            <ChartSkeleton
+              rows={4}
+              className="h-117.5 justify-between md:h-82"
+            />
           )}
         </div>
       </ReportSection>

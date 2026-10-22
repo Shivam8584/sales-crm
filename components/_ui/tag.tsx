@@ -14,7 +14,7 @@ export type TagTone =
   | "yellow"
   | "neutral";
 
-export const tagVariants = cva(
+const tagVariants = cva(
   "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full text-xs leading-none font-medium tabular-nums",
   {
     variants: {

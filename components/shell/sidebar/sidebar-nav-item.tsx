@@ -30,7 +30,7 @@ type SidebarNavItemProps = {
 };
 
 export const NAV_ITEM =
-  "group relative flex h-9 min-w-9 items-center gap-3 overflow-hidden rounded-xl text-sm font-medium text-sidebar-foreground outline-none transition-[color,background-color,scale] duration-base ease-out select-none hover:text-foreground hover:duration-[120ms] active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[active=true]:text-foreground not-data-[active=true]:hover:bg-overlay-2 pointer-coarse:h-11";
+  "group relative flex h-9 min-w-9 items-center gap-3 overflow-hidden rounded-xl text-sm font-medium text-sidebar-foreground outline-none transition-[color,background-color,scale] duration-base ease-out select-none hover:text-foreground hover:duration-[120ms] active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[active=true]:text-foreground not-data-[active=true]:hover:bg-overlay-2 pointer-coarse:h-11 pointer-coarse:min-w-11";
 
 export default function SidebarNavItem({
   icon: Icon,
@@ -77,7 +77,7 @@ export default function SidebarNavItem({
         </span>
       )}
       {showCount && !iconOnly && (
-        <span className="text-fg-disabled collapsed:opacity-0 relative text-[13px] font-normal tabular-nums transition-opacity delay-80 duration-160">
+        <span className="text-fg-tertiary collapsed:opacity-0 relative text-xs font-normal tabular-nums transition-opacity delay-80 duration-160">
           {alert && count > 99 ? "99+" : count}
           {countLabel && <span className="sr-only"> {countLabel}</span>}
         </span>

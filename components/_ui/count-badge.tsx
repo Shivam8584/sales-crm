@@ -8,7 +8,7 @@ export default function CountBadge({
   return (
     <span
       className={cn(
-        "text-fg-disabled inline-flex h-4 min-w-4 shrink-0 items-center justify-center text-center text-[13px] leading-none tabular-nums",
+        "text-fg-tertiary inline-flex h-4 min-w-4 shrink-0 items-center justify-center text-center text-xs leading-none tabular-nums",
         className,
       )}
       {...props}

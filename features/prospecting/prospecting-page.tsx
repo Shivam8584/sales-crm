@@ -623,7 +623,11 @@ export default function ProspectingPage() {
       title="Find brands with a review gap"
       description="Watch product links from marketplaces. Daily checks track ratings, so you can pitch brands whose listings trail their category."
       action={
-        <Button variant="primary" size="sm" onClick={() => setAdding(true)}>
+        <Button
+          variant={noWatchlists ? "primary" : "well"}
+          size="sm"
+          onClick={() => setAdding(true)}
+        >
           Watch products
         </Button>
       }
@@ -751,9 +755,11 @@ export default function ProspectingPage() {
         actions={
           <>
             <SavedViewsMenu />
-            <CreateButton onClick={() => setAdding(true)}>
-              Watch products
-            </CreateButton>
+            {!noWatchlists && (
+              <CreateButton onClick={() => setAdding(true)}>
+                Watch products
+              </CreateButton>
+            )}
           </>
         }
       >

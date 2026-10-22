@@ -48,7 +48,10 @@ export default function IntegrationsSettings() {
 
 function IntegrationList() {
   const status = useQuery(api.settings.integrations, {});
-  if (!status) {
+  const keys = useQuery(api.secrets.status, {});
+  const sync = useQuery(api.account360.syncOverview, {});
+  // The keys and sync cards own these queries; waiting on them here stops a late section pushing the rest down.
+  if (!status || !keys || !sync) {
     return (
       <>
         <SettingsSkeleton rows={3} />
@@ -166,7 +169,7 @@ function PlatformCard({ platform }: { platform: Status["platform"] }) {
           <Tooltip content={dateTime(platform.lastReceivedAt)}>
             <span
               tabIndex={0}
-              className="lead-style text-fg-secondary rounded-sm"
+              className="lead-style text-fg-secondary relative rounded-sm pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5 pointer-coarse:after:content-['']"
             >
               {relativeTime(platform.lastReceivedAt)}
             </span>

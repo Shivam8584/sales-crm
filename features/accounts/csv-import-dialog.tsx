@@ -3,6 +3,7 @@
 import { useId, useMemo, useRef, useState, type DragEvent } from "react";
 import type { ImportResult } from "@/convex/lib/records";
 import Button from "@/components/_ui/button";
+import SegmentedControl from "@/components/_ui/segmented-control";
 import {
   Dialog,
   DialogClose,
@@ -545,29 +546,16 @@ function ResultsStep({
           )}
         </p>
         {problems > 0 && (
-          <div
-            role="group"
-            aria-label="Show rows"
-            className="bg-muted ml-auto flex rounded-full p-0.5"
-          >
-            {(["problems", "all"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={filter === value}
-                onClick={() => setFilter(value)}
-                className={cn(
-                  "caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring h-6 rounded-full px-2.5 outline-none focus-visible:ring-2",
-                  filter === value &&
-                    "bg-raised text-foreground shadow-hairline",
-                )}
-              >
-                {value === "problems"
-                  ? `Problems ${problems}`
-                  : `All ${results.length}`}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            label="Show rows"
+            value={filter}
+            onChange={setFilter}
+            segments={[
+              { value: "problems", label: "Problems", count: problems },
+              { value: "all", label: "All", count: results.length },
+            ]}
+            className="ml-auto"
+          />
         )}
       </div>
       <ol className="border-border divide-border max-h-80 divide-y overflow-y-auto rounded-xl border">

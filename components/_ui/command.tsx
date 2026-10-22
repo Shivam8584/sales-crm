@@ -70,7 +70,7 @@ function CommandInput({ className, trailing, ...props }: CommandInputProps) {
   return (
     <div
       data-slot="command-input-wrapper"
-      className="border-border flex h-14 items-center gap-3 border-b px-5"
+      className="border-border flex h-14 items-center gap-3 border-b px-5 focus-within:shadow-[inset_0_-2px_0_var(--ring)]"
     >
       <SearchIcon aria-hidden className="text-fg-tertiary size-4 shrink-0" />
       <CommandPrimitive.Input

@@ -48,6 +48,7 @@ import { useDraftAction } from "@/features/ai/use-draft-action";
 import { useDuplicatesAction } from "@/features/dedupe/use-duplicates-action";
 import { useMergedRedirect } from "@/features/dedupe/use-merged-redirect";
 import { usePinAction } from "@/features/pins/use-pins";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
@@ -190,6 +191,7 @@ function PersonView({ person }: { person: Person }) {
   });
   const name = personName(person);
   const archived = Boolean(person.archivedAt);
+  useDocumentTitle(name);
   useTitleShortcut();
 
   const newTask = () =>

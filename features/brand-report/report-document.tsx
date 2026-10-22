@@ -66,7 +66,7 @@ export default function ReportDocument({
     <article
       data-theme="light"
       aria-label={`${data.period.label} results for ${data.account.name}`}
-      className="bg-card text-foreground border-border mx-auto flex max-w-[210mm] flex-col gap-10 rounded-xl border px-6 py-8 [print-color-adjust:exact] sm:px-12 sm:py-12 print:max-w-none print:rounded-none print:border-0 print:bg-transparent print:p-0"
+      className="bg-card text-foreground mx-auto flex max-w-[210mm] flex-col gap-10 rounded-3xl px-6 py-8 [print-color-adjust:exact] sm:px-12 sm:py-12 print:max-w-none print:rounded-none print:bg-transparent print:p-0"
     >
       <header className="flex flex-wrap items-start justify-between gap-6">
         <div className="flex items-center gap-2.5">

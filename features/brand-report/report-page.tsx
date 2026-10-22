@@ -81,12 +81,16 @@ function Report({
           <Button
             variant="ghost"
             size="icon"
+            className="size-control-lg"
             href={routes.account(id)}
             aria-label="Back to the account"
           >
             <ChevronDownIcon aria-hidden className="size-3 rotate-90" />
           </Button>
-          <h1 className="min-w-0 flex-1 truncate text-base">
+          <h1
+            title={data && `Results report · ${data.account.name}`}
+            className="min-w-40 flex-1 truncate text-base"
+          >
             Results report
             {data && (
               <span className="text-fg-tertiary font-normal">
@@ -103,18 +107,18 @@ function Report({
           />
           <SelectField
             aria-label="Period"
-            value={data?.period.key}
+            value={data?.period.key ?? ""}
             options={(data?.periods ?? []).map((item) => ({
               value: item.key,
               label: item.label,
             }))}
             disabled={!data}
             onChange={(key) => go(kind, key)}
-            className="w-44"
+            className="h-control-lg w-44"
           />
           <Button
             variant="secondary"
-            size="sm"
+            size="toolbar"
             disabled={!data?.report}
             onClick={() => setEmailing(true)}
           >
@@ -122,7 +126,7 @@ function Report({
           </Button>
           <Button
             variant="primary"
-            size="sm"
+            size="toolbar"
             disabled={!data?.report}
             onClick={() => window.print()}
           >
@@ -168,7 +172,7 @@ function PaperSkeleton() {
   return (
     <div
       aria-busy
-      className="border-border mx-auto flex max-w-[210mm] flex-col gap-8 rounded-xl border px-6 py-8 sm:px-12 sm:py-12"
+      className="bg-well mx-auto flex max-w-[210mm] flex-col gap-8 rounded-3xl px-6 py-8 sm:px-12 sm:py-12"
     >
       <div className="flex justify-between">
         <Skeleton className="h-10 w-40" />

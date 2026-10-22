@@ -75,7 +75,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
                     href={page.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "caption-style focus-visible:ring-ring duration-fast relative flex h-11 items-center gap-1.5 rounded-sm transition-colors outline-none focus-visible:ring-2",
+                      "caption-style focus-visible:ring-ring duration-fast h-touch min-w-touch relative flex items-center justify-center gap-1.5 rounded-sm transition-colors outline-none focus-visible:ring-2",
                       active
                         ? "text-foreground font-medium"
                         : "text-fg-tertiary hover:text-fg-secondary",

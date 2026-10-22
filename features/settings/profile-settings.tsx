@@ -72,7 +72,7 @@ export default function ProfileSettings() {
           <Tooltip content={dateTime(viewer.joinedAt)}>
             <span
               tabIndex={0}
-              className="lead-style text-fg-secondary rounded-sm"
+              className="lead-style text-fg-secondary relative rounded-sm pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5 pointer-coarse:after:content-['']"
             >
               {shortDate(viewer.joinedAt)}
             </span>
@@ -207,8 +207,8 @@ function CallingSection() {
           <Button
             type="submit"
             variant="secondary"
-            size="control"
-            className="h-9 px-4"
+            size="md"
+            className="pointer-coarse:h-11"
             disabled={value.trim() === saved}
             loading={saving}
           >
@@ -338,8 +338,8 @@ function NameField({ name }: { name: string }) {
           <Button
             type="submit"
             variant={dirty ? "primary" : "secondary"}
-            size="control"
-            className="h-9 px-4"
+            size="md"
+            className="pointer-coarse:h-11"
             disabled={!dirty}
             loading={saving}
           >

@@ -115,9 +115,8 @@ export default function TeamPage() {
   const inviteButton = isAdmin && (
     <Button
       variant="primary"
-      size="sm"
+      size="toolbar"
       onClick={() => setInviteParam("1")}
-      className="h-control-md py-0"
     >
       <UserPlusIcon aria-hidden className="size-3" />
       Invite

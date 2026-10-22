@@ -74,7 +74,7 @@ export default function NodePanel({ issues }: NodePanelProps) {
       aria-label={`${meta.label} step`}
       data-canvas-overlay
       onPointerDown={(event) => event.stopPropagation()}
-      className="bg-popover shadow-overlay border-border absolute top-3 right-3 bottom-3 z-30 flex w-[min(440px,calc(100%-24px))] flex-col overflow-clip rounded-2xl border transition-[opacity,translate] duration-200 motion-reduce:transition-none max-sm:top-2 max-sm:right-2 max-sm:bottom-2 max-sm:w-[calc(100%-16px)] starting:translate-x-3 starting:opacity-0"
+      className="bg-popover shadow-overlay absolute top-3 right-3 bottom-3 z-30 flex w-[min(440px,calc(100%-24px))] flex-col overflow-clip rounded-2xl transition-[opacity,translate] duration-200 motion-reduce:transition-none max-sm:top-2 max-sm:right-2 max-sm:bottom-2 max-sm:w-[calc(100%-16px)] starting:translate-x-3 starting:opacity-0"
     >
       <div className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-3">
         <div className="flex min-w-0 flex-1 flex-col">

@@ -96,7 +96,7 @@ export default function InlineText({
           onBlur={() => void commit()}
           onKeyDown={onKeyDown}
           className={cn(
-            "bg-background ring-foreground/15 aria-invalid:ring-danger/40 -mx-1.5 h-7 min-w-0 rounded-lg px-1.5 text-sm leading-none ring-2 outline-none",
+            "bg-background ring-ring aria-invalid:ring-danger/40 -mx-1.5 h-7 min-w-0 rounded-lg px-1.5 text-sm leading-none ring-2 outline-none",
             inputClassName,
           )}
         />

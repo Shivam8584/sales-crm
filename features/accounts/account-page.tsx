@@ -43,6 +43,7 @@ import FeedbackSection from "@/features/surveys/feedback-section";
 import RecordTasks from "@/features/tasks/record-tasks";
 import Timeline from "@/features/timeline/timeline";
 import { usePinAction } from "@/features/pins/use-pins";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import type { LifecycleStage } from "@/lib/domain/enums";
 import { readError } from "@/lib/errors";
@@ -62,7 +63,7 @@ import {
   ASIDE_SECTION,
   AccountSummary,
   ActivityTrend,
-  LIFTED_SECTION,
+  WELL_SECTION,
   PipelineHealth,
 } from "./account-insights";
 import ActivationPath from "./activation-path";
@@ -122,6 +123,7 @@ function AccountView({ account }: { account: Account }) {
     done: "none",
   });
   const archived = Boolean(account.archivedAt);
+  useDocumentTitle(account.name);
   useTitleShortcut();
 
   const addPerson = () => setCreate({ type: "person", accountId: account._id });
@@ -273,7 +275,7 @@ function AccountView({ account }: { account: Account }) {
             <PipelineHealth
               accountId={account._id}
               deals={deals}
-              className={LIFTED_SECTION}
+              className={WELL_SECTION}
               divider={false}
             />
             <AccountBrief accountId={account._id} />

@@ -109,11 +109,11 @@ function NodeCard({
         onDoubleClick={() => onOpen(node.id)}
         onKeyDown={onKeyDown}
         className={cn(
-          "bg-card border-border duration-fast ease-power3-out focus-visible:ring-ring relative flex flex-col gap-1.5 rounded-xl border px-4 py-3 transition-[border-color,box-shadow] outline-none focus-visible:ring-2",
+          "bg-well ring-ring duration-fast ease-power3-out relative flex flex-col gap-1.5 rounded-2xl px-4 py-3 transition-shadow outline-none focus-visible:ring-2",
           readOnly
             ? "cursor-pointer"
             : "cursor-grab group-data-dragging/node:cursor-grabbing",
-          "group-data-dragging/node:shadow-overlay group-data-selected/node:border-ring group-data-targeted/node:border-ring group-data-[run=active]/node:border-ring group-data-[run=done]/node:border-ring",
+          "group-data-dragging/node:shadow-overlay group-data-selected/node:ring-2 group-data-targeted/node:ring-2 group-data-[run=active]/node:ring-1 group-data-[run=done]/node:ring-1",
         )}
       >
         {runMark === "active" && (

@@ -505,7 +505,7 @@ export default function LeadsPage() {
                 }
                 action={
                   <Button
-                    variant="primary"
+                    variant="well"
                     size="sm"
                     onClick={() => setCreate({ type: "lead" })}
                   >

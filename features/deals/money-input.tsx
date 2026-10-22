@@ -126,7 +126,7 @@ export default function MoneyInput({
   return (
     <div
       className={cn(
-        "bg-well duration-fast ease-power3-out focus-within:ring-foreground/15 flex h-10 w-full min-w-0 items-center rounded-xl transition-[background-color,box-shadow] focus-within:ring-2",
+        "bg-well shadow-field duration-fast ease-power3-out focus-within:ring-ring flex h-10 w-full min-w-0 items-center rounded-xl transition-[background-color,box-shadow] focus-within:ring-2",
         invalid && "border-danger",
         className,
       )}

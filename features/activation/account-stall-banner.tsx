@@ -100,11 +100,8 @@ export default function AccountStallBanner({
           >
             {stuckFor(stall.since)}
           </time>
-          .{" "}
-          <span className="opacity-70" title={rule.playbook}>
-            {firstSentence(rule.playbook)}
-          </span>
-          <span className="opacity-70"> · {status}</span>
+          . <span title={rule.playbook}>{firstSentence(rule.playbook)}</span>
+          <span> · {status}</span>
         </span>
       </p>
       <div className="flex shrink-0 flex-wrap items-center gap-1">
@@ -114,7 +111,7 @@ export default function AccountStallBanner({
               variant="ghost"
               size="sm"
               onClick={snooze}
-              className="hover:bg-foreground/5 text-current/70 hover:text-current"
+              className="hover:bg-foreground/5 text-current hover:text-current"
             >
               Snooze 1 day
             </Button>
@@ -122,7 +119,7 @@ export default function AccountStallBanner({
               variant="ghost"
               size="sm"
               onClick={() => task && void setDone(task, true)}
-              className="hover:bg-foreground/5 text-current/70 hover:text-current"
+              className="hover:bg-foreground/5 text-current hover:text-current"
             >
               Mark done
             </Button>
@@ -130,7 +127,7 @@ export default function AccountStallBanner({
         )}
         {(task || stall.canOpenTask) && (
           <Button
-            variant={live ? "primary" : "secondary"}
+            variant={live ? "well" : "secondary"}
             size="sm"
             loading={creating}
             onClick={() => void openTask()}

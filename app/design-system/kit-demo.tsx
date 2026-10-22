@@ -276,7 +276,7 @@ function KitDemoContent() {
       <div className="flex flex-col gap-3">
         <h3 className="text-fg-secondary">Sidebar</h3>
         <div className="border-border bg-sidebar flex w-63.5 flex-col overflow-hidden rounded-xl border">
-          <div className="border-sidebar-border bg-sidebar-accent flex h-14.5 items-center gap-2 border-b px-3">
+          <div className="border-sidebar-border bg-sidebar flex h-14.5 items-center gap-2 border-b px-3">
             <Logo aria-hidden className="size-8 shrink-0 overflow-visible" />
             <span className="flex min-w-0 flex-col gap-1">
               <span className="lead-style font-medium tracking-[-0.01em]">

@@ -152,10 +152,13 @@ export function SettingsRowSkeleton() {
   return (
     <div
       aria-hidden
-      className="border-border flex h-13 items-center gap-3 border-t"
+      className="border-border flex flex-col gap-3 border-t py-4 sm:flex-row sm:items-center sm:gap-6"
     >
-      <Skeleton className="h-3 w-40" />
-      <Skeleton className="ml-auto h-3 w-16" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <Skeleton className="my-1.5 h-3 w-40" />
+        <Skeleton className="my-1 h-3 w-56 max-w-full" />
+      </div>
+      <Skeleton className="h-8 w-24 rounded-full" />
     </div>
   );
 }
@@ -163,21 +166,12 @@ export function SettingsRowSkeleton() {
 export function SettingsSkeleton({ rows = 2 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
-      <div className="flex flex-col gap-2 pb-3">
-        <Skeleton className="h-3 w-28" />
-        <Skeleton className="h-2.5 w-48 max-w-full" />
+      <div className="flex flex-col gap-1.5 pb-3">
+        <Skeleton className="my-1.5 h-3 w-28" />
+        <Skeleton className="my-1 h-3 w-48 max-w-full" />
       </div>
       {Array.from({ length: rows }, (_, index) => (
-        <div
-          key={index}
-          className="border-border flex h-14 items-center gap-3 border-t"
-        >
-          <span className="flex flex-1 flex-col gap-2">
-            <Skeleton className="h-3 w-32" />
-            <Skeleton className="h-2.5 w-56 max-w-full" />
-          </span>
-          <Skeleton className="h-8 w-24 rounded-full" />
-        </div>
+        <SettingsRowSkeleton key={index} />
       ))}
     </div>
   );
@@ -227,11 +221,7 @@ export function ConfiguredTag({ on, label }: { on: boolean; label?: string }) {
 }
 
 export function Code({ children }: { children: ReactNode }) {
-  return (
-    <code className="text-fg-secondary font-mono text-[0.95em]">
-      {children}
-    </code>
-  );
+  return <code className="text-fg-secondary font-mono">{children}</code>;
 }
 
 async function writeClipboard(text: string) {
@@ -280,7 +270,7 @@ export function CopyField({
       currentTarget: HTMLInputElement | HTMLTextAreaElement;
     }) => event.currentTarget.select(),
     className:
-      "bg-well text-fg-secondary focus-visible:ring-foreground/15 duration-fast w-full min-w-0 rounded-xl px-3 font-mono text-xs transition-[background-color,box-shadow] outline-none focus-visible:ring-2",
+      "bg-well text-fg-secondary shadow-field focus-visible:ring-ring duration-fast w-full min-w-0 rounded-xl px-3 font-mono text-xs transition-[background-color,box-shadow] outline-none focus-visible:ring-2",
   };
 
   return (
@@ -295,12 +285,18 @@ export function CopyField({
           )}
         />
       ) : (
-        <input {...shared} className={cn(shared.className, "h-9")} />
+        <input
+          {...shared}
+          className={cn(shared.className, "h-8 pointer-coarse:min-h-11")}
+        />
       )}
       <Button
         variant="secondary"
         size="control"
-        className={cn("w-18 px-3", multiline && "self-end")}
+        className={cn(
+          "w-18 px-3",
+          multiline ? "self-end" : "pointer-coarse:h-11",
+        )}
         onClick={() => void copy()}
         aria-label={`Copy ${label.toLowerCase()}`}
       >

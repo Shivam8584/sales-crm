@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import Skeleton from "@/components/_ui/skeleton";
 import NpsTile from "@/features/surveys/nps-tile";
 import type { Report } from "@/convex/lib/reports";
 import {
@@ -11,11 +10,9 @@ import {
   totals,
   trend,
 } from "./format";
-import { Delta, MetricTile } from "./section";
+import { Delta, MetricTile, MetricTileSkeleton } from "./section";
 
 const GRID =
-  "bg-well grid grid-cols-2 gap-1 rounded-3xl p-1 sm:grid-cols-3 xl:grid-cols-6";
-const GRID_WITH_NPS =
   "bg-well grid grid-cols-2 gap-1 rounded-3xl p-1 sm:grid-cols-4 xl:grid-cols-7";
 
 const pts = (current: number | null, previous: number | null) =>
@@ -39,7 +36,7 @@ export default function Kpis({ report }: { report: Report }) {
       : null;
 
   return (
-    <div className={GRID_WITH_NPS}>
+    <div className={GRID}>
       <MetricTile
         label="New leads"
         value={count(leads)}
@@ -124,15 +121,11 @@ export default function Kpis({ report }: { report: Report }) {
   );
 }
 
-export function KpisSkeleton({ tiles = 6 }: { tiles?: number }) {
+export function KpisSkeleton() {
   return (
-    <div className={tiles > 6 ? GRID_WITH_NPS : GRID}>
-      {Array.from({ length: tiles }, (_, index) => (
-        <div key={index} className="flex flex-col gap-2 px-4 py-3.5">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-6 w-10" />
-          <Skeleton className="h-3 w-24" />
-        </div>
+    <div className={GRID}>
+      {Array.from({ length: 7 }, (_, index) => (
+        <MetricTileSkeleton key={index} />
       ))}
     </div>
   );

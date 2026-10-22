@@ -22,6 +22,7 @@ import AccountLogo from "@/features/accounts/account-logo";
 import { SlaCell } from "@/features/leads/sla";
 import { StageTag } from "@/features/accounts/stage";
 import { useRefreshNextActions } from "@/features/ai/next-action";
+import { COARSE_HIT } from "@/features/tasks/task-chips";
 import TaskComposer from "@/features/tasks/task-composer";
 import {
   byUrgency,
@@ -389,7 +390,6 @@ export default function TodayPage() {
               defaultDueDate={today}
               label="New task due today"
               onClose={() => setComposing(false)}
-              className="bg-well shadow-none"
             />
           </div>
         )}
@@ -473,7 +473,7 @@ export default function TodayPage() {
                     count: section.items?.length,
                   })),
               ]}
-              className="h-10 max-w-full overflow-x-auto"
+              className="h-10 max-w-full overflow-x-auto pointer-coarse:h-[44px]"
             />
             <p className="text-fg-tertiary hidden shrink-0 items-center gap-1.5 text-xs xl:flex">
               <Kbd>J</Kbd>
@@ -486,7 +486,7 @@ export default function TodayPage() {
             <div className="mt-8 grid items-stretch gap-x-8 gap-y-6 lg:grid-cols-12">
               <div className="rise min-w-0 [--i:2] lg:col-span-8">
                 {!loaded ? (
-                  <Skeleton className="h-60 w-full rounded-4xl" />
+                  <Skeleton className="h-60 w-full rounded-3xl" />
                 ) : spotlight ? (
                   <FocusCard
                     item={spotlight}
@@ -552,7 +552,7 @@ function FocusCard({
   if (item.kind === "lead") {
     const { lead } = item;
     return (
-      <section className="bg-well flex h-full flex-col justify-between gap-8 rounded-4xl p-6 sm:p-7">
+      <section className="bg-well flex h-full flex-col justify-between gap-8 rounded-3xl p-6 sm:p-7">
         <div className="flex items-start gap-4 sm:gap-5">
           <Avatar
             name={lead.name}
@@ -568,7 +568,7 @@ function FocusCard({
               <ClockIcon aria-hidden className="size-3.5 shrink-0" />
               Waiting for a first reply · <SlaCell lead={lead} slaMs={slaMs} />
             </p>
-            <h2 className="mt-2 text-xl leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-2xl">
+            <p className="mt-2 text-xl leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-2xl">
               {lead.name}
               {lead.companyName && (
                 <span className="text-fg-secondary">
@@ -576,7 +576,7 @@ function FocusCard({
                   from {lead.companyName}
                 </span>
               )}
-            </h2>
+            </p>
             <p className="text-body text-fg-secondary mt-2 max-w-[48ch] text-pretty">
               {LEAD_KIND_LABEL[lead.kind]} lead, arrived{" "}
               {relativeTime(lead._creationTime)}.
@@ -605,9 +605,9 @@ function FocusCard({
   const record =
     task.account?.name ?? task.deal?.title ?? task.lead?.name ?? null;
   return (
-    <section className="bg-well flex h-full flex-col justify-between gap-8 rounded-4xl p-6 sm:p-7">
+    <section className="bg-well flex h-full flex-col justify-between gap-8 rounded-3xl p-6 sm:p-7">
       <div className="flex items-start gap-4 sm:gap-5">
-        <span className="bg-background text-fg-secondary shadow-tile grid size-12 shrink-0 place-items-center rounded-2xl sm:size-14">
+        <span className="bg-background text-fg-secondary grid size-12 shrink-0 place-items-center rounded-2xl sm:size-14">
           <CheckSquareIcon aria-hidden className="size-5" />
         </span>
         <div className="min-w-0">
@@ -622,9 +622,9 @@ function FocusCard({
               ? `Overdue since ${formatDay(task.dueDate)}`
               : "Due today"}
           </p>
-          <h2 className="mt-2 text-xl leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-2xl">
+          <p className="mt-2 text-xl leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-2xl">
             {task.title}
-          </h2>
+          </p>
           {record && (
             <p className="text-body text-fg-secondary mt-2">{record}</p>
           )}
@@ -656,15 +656,15 @@ function CaughtUp({
   onPlan: () => void;
 }) {
   return (
-    <section className="bg-well flex h-full flex-col justify-between gap-6 rounded-4xl p-6 sm:p-7">
+    <section className="bg-well flex h-full flex-col justify-between gap-6 rounded-3xl p-6 sm:p-7">
       <div className="flex items-start gap-4">
-        <span className="bg-background text-success shadow-tile grid size-12 shrink-0 place-items-center rounded-full">
+        <span className="bg-background text-success grid size-12 shrink-0 place-items-center rounded-full">
           <CheckCircleIcon aria-hidden className="size-5" />
         </span>
         <div className="min-w-0">
-          <h2 className="title-style">
+          <p className="title-style">
             {empty ? "You're all caught up" : "Nothing urgent"}
-          </h2>
+          </p>
           <p className="text-fg-secondary mt-1 text-sm text-pretty">
             {empty
               ? "No leads waiting and nothing due. New work shows up here."
@@ -673,13 +673,17 @@ function CaughtUp({
           {trend && <p className="text-fg-tertiary mt-3 text-xs">{trend}</p>}
         </div>
       </div>
-      {empty && (
-        <div className="sm:pl-16">
-          <Button variant="primary" size="md" onClick={onPlan}>
+      <div className="sm:pl-16">
+        {empty ? (
+          <Button variant="well" size="md" onClick={onPlan}>
             Plan a follow-up
           </Button>
-        </div>
-      )}
+        ) : (
+          <Button variant="well" size="md" href={routes.tasks}>
+            See all tasks
+          </Button>
+        )}
+      </div>
     </section>
   );
 }
@@ -697,12 +701,12 @@ function SectionHead({
 }) {
   return (
     <div className="flex h-7 items-center gap-1.5">
-      <h3 className="title-style">{title}</h3>
+      <h2 className="title-style">{title}</h2>
       {count !== undefined && count > 0 && (
         <span
           className={cn(
             "text-title font-medium tabular-nums",
-            danger ? "text-danger" : "text-fg-disabled",
+            danger ? "text-danger" : "text-fg-tertiary",
           )}
         >
           {count}
@@ -713,8 +717,7 @@ function SectionHead({
   );
 }
 
-const SECTION_LINK =
-  "text-fg-secondary hover:text-foreground hover:bg-well focus-visible:ring-ring -mr-2 rounded-full px-2 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-2";
+const SECTION_LINK = `${COARSE_HIT} text-fg-secondary hover:text-foreground hover:bg-well focus-visible:ring-ring -mr-2 rounded-full px-2 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-2`;
 const ROWS = "mt-2 flex flex-col";
 
 function CockpitCard({

@@ -49,7 +49,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "group text-body text-fg-tertiary duration-base hover:text-foreground focus-visible:text-foreground focus-visible:decoration-ring data-[state=active]:text-foreground relative grid cursor-pointer py-3 text-center leading-5 transition-[color] ease-out outline-none select-none focus-visible:underline focus-visible:underline-offset-4",
+        "group text-body text-fg-tertiary duration-base hover:text-foreground focus-visible:text-foreground focus-visible:decoration-ring data-[state=active]:text-foreground relative grid cursor-pointer py-3 text-center leading-5 transition-[color] ease-out outline-none select-none focus-visible:underline focus-visible:underline-offset-4 pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1.5 pointer-coarse:after:inset-y-0 pointer-coarse:after:content-['']",
         className,
       )}
       value={value}

@@ -38,7 +38,7 @@ export default function FilterMenu({
       <DropdownMenuTrigger asChild>
         <Button
           variant="well"
-          size="md"
+          size="toolbar"
           className={cn(
             "group data-[state=open]:bg-well-hover gap-1.5 px-4 font-normal",
             className,
@@ -49,7 +49,7 @@ export default function FilterMenu({
             {current?.label ?? value}
             <ChevronDownIcon
               aria-hidden
-              className="text-fg-disabled duration-settle ease-out-hd size-3 transition-transform group-data-[state=open]:rotate-180"
+              className="text-fg-tertiary duration-settle ease-out-hd size-3 transition-transform group-data-[state=open]:rotate-180"
             />
           </span>
         </Button>

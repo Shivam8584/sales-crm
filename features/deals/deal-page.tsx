@@ -39,6 +39,7 @@ import RecordTasks from "@/features/tasks/record-tasks";
 import { TaskChecklistSkeleton } from "@/features/tasks/task-checklist";
 import ProposalTab from "@/features/proposals/proposal-tab";
 import Timeline from "@/features/timeline/timeline";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { personName } from "@/lib/domain/labels";
 import { dateTime, relativeTime } from "@/lib/time";
 import { useUiStore } from "@/stores/ui-store";
@@ -103,6 +104,7 @@ function DealView({
 }: {
   deal: NonNullable<FunctionReturnType<typeof api.deals.get>>;
 }) {
+  useDocumentTitle(deal.title);
   const save = useDealSave(deal);
   const remove = useDeleteDeal();
   const setCreate = useUiStore((state) => state.setCreate);

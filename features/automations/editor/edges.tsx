@@ -62,7 +62,7 @@ function PortLabel({ point, port }: { point: Point; port: PortId }) {
   return (
     <span
       style={at(point)}
-      className="border-border bg-card text-fg-secondary pointer-events-none absolute [top:var(--point-y)] [left:var(--point-x)] flex h-5 -translate-x-1/2 -translate-y-1/2 items-center rounded-full border px-2 text-xs leading-none"
+      className="bg-well text-fg-secondary pointer-events-none absolute [top:var(--point-y)] [left:var(--point-x)] flex h-5 -translate-x-1/2 -translate-y-1/2 items-center rounded-full px-2 text-xs leading-none"
     >
       {PORT_LABEL[port]}
     </span>

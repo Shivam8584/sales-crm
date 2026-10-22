@@ -432,7 +432,7 @@ function ProposalTerms({
                 terms.trim() !== proposal.terms &&
                 void actions.update(proposal, { terms }, "Terms")
               }
-              className="bg-well text-foreground placeholder:text-fg-tertiary focus-visible:ring-foreground/15 duration-fast field-sizing-content max-h-80 min-h-24 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-relaxed transition-[background-color,box-shadow] outline-none focus-visible:ring-2"
+              className="bg-well shadow-field text-foreground placeholder:text-fg-tertiary focus-visible:ring-ring duration-fast field-sizing-content max-h-80 min-h-24 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-relaxed transition-[background-color,box-shadow] outline-none focus-visible:ring-2"
             />
           ) : (
             <p

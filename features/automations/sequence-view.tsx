@@ -10,6 +10,7 @@ import {
   PageHeader,
   PageViews,
 } from "@/components/shell/page";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useUrlState } from "@/hooks/use-url-state";
 import {
   NODE_LABEL,
@@ -38,6 +39,7 @@ export default function SequenceView({
 }: {
   automation: AutomationDoc;
 }) {
+  useDocumentTitle(automation.name);
   const id = automation._id;
   const activate = useMutation(api.automations.activate);
   const pause = useMutation(api.automations.pause);

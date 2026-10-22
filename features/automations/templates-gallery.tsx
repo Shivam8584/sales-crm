@@ -78,9 +78,9 @@ export default function TemplatesGallery({
                 className="border-border flex flex-col gap-3 border-t py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
               >
                 <div className="flex min-w-0 flex-col gap-1">
-                  <h3 className="text-sm font-medium text-balance">
+                  <h2 className="text-sm font-medium text-balance">
                     {template.name}
-                  </h3>
+                  </h2>
                   <p
                     lang={copy.language === "hi" ? "hi" : undefined}
                     className="text-fg-secondary line-clamp-2 text-sm"

@@ -28,9 +28,8 @@ type Deal = FunctionReturnType<typeof api.deals.list>[number];
 /** Detail sections in a record page sidebar sit flush with the column. */
 export const ASIDE_SECTION = "-mb-2 px-0 pt-0 pb-5";
 
-/** The one lifted card in a record sidebar. */
-export const LIFTED_SECTION =
-  "bg-background shadow-card relative overflow-hidden rounded-4xl p-6";
+/** The one well in a record sidebar. */
+export const WELL_SECTION = "bg-well relative overflow-hidden rounded-3xl p-6";
 
 type SectionProps = { className?: string; divider?: boolean };
 

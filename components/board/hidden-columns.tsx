@@ -215,13 +215,13 @@ export function HiddenColumnsToggle({
           belowLg ? prefs.setSheetOpen(!open) : prefs.setPanelOpen(!open)
         }
         className={cn(
-          "aria-pressed:bg-muted aria-pressed:text-foreground relative shrink-0",
+          "size-control-lg aria-pressed:bg-well aria-pressed:text-foreground relative shrink-0",
           className,
         )}
       >
         <SidebarIcon aria-hidden className="size-3.5 -scale-x-100" />
         {count > 0 && (
-          <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] leading-none font-medium tabular-nums">
+          <span className="bg-primary text-primary-foreground text-2xs absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full leading-none font-medium tabular-nums">
             {count}
           </span>
         )}

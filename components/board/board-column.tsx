@@ -145,7 +145,7 @@ export default function BoardColumn<T extends { id: string }>({
             <h2 className="truncate text-sm leading-5 font-semibold">
               {column.name}
             </h2>
-            <span className="text-fg-disabled text-sm tabular-nums">
+            <span className="text-fg-tertiary text-sm tabular-nums">
               {items.length}
             </span>
           </div>
@@ -214,7 +214,7 @@ export default function BoardColumn<T extends { id: string }>({
           </div>
         </div>
         {column.summary && (
-          <div className="text-fg-secondary pl-4 text-[13px] leading-4 font-medium tabular-nums">
+          <div className="text-fg-secondary pl-4 text-xs font-medium tabular-nums">
             {column.summary}
           </div>
         )}

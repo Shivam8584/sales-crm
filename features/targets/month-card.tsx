@@ -13,8 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatFigure } from "./format";
 
-const LIFTED =
-  "bg-background shadow-card relative flex h-full flex-col overflow-hidden rounded-4xl p-6";
+const WELL = "bg-well flex h-full flex-col rounded-3xl p-6";
 
 /** The viewer's month on Today: won take in rose against the target, then the other goals as a ledger. */
 export default function MonthCard({ className }: { className?: string }) {
@@ -22,7 +21,7 @@ export default function MonthCard({ className }: { className?: string }) {
 
   if (!data) {
     return (
-      <section aria-busy className={cn(LIFTED, className)}>
+      <section aria-busy className={cn(WELL, className)}>
         <Skeleton className="h-4 w-28" />
         <Skeleton className="mt-3 h-10 w-36" />
         <Skeleton className="mt-6 h-1.5 w-full" />
@@ -38,25 +37,18 @@ export default function MonthCard({ className }: { className?: string }) {
   const rest = TARGET_METRICS.filter((metric) => metric !== "won_take");
 
   return (
-    <section
-      aria-labelledby="month-card-title"
-      className={cn(LIFTED, className)}
-    >
-      <span
-        aria-hidden
-        className="bg-rose/[0.07] pointer-events-none absolute -top-24 -right-24 size-60 rounded-full blur-3xl"
-      />
-      <h2 id="month-card-title" className="text-fg-secondary relative text-sm">
+    <section aria-labelledby="month-card-title" className={cn(WELL, className)}>
+      <p id="month-card-title" className="text-fg-secondary text-sm">
         Won this month
-      </h2>
-      <p className="text-rose relative mt-1 text-[2.75rem] leading-none font-semibold tracking-[-0.035em] max-lg:text-4xl">
+      </p>
+      <p className="text-rose mt-1 text-[2.75rem] leading-none font-semibold tracking-[-0.035em] max-lg:text-4xl">
         <CountUp
           value={won.actual}
           format={(value) => formatFigure("won_take", value)}
         />
       </p>
       {won.target !== null && (
-        <div className="relative mt-4">
+        <div className="mt-4">
           <SegmentBar
             percent={won.pct ?? 0}
             segmentClassName="bg-rose"
@@ -68,7 +60,7 @@ export default function MonthCard({ className }: { className?: string }) {
           </p>
         </div>
       )}
-      <dl className="border-border relative mt-5 flex flex-col gap-3 border-t pt-4 text-sm tabular-nums">
+      <dl className="border-border mt-5 flex flex-col gap-3 border-t pt-4 text-sm tabular-nums">
         {rest.map((metric) => {
           const cell = data.mine[metric];
           return (

@@ -100,6 +100,7 @@ export function TaskItem({ task, ...row }: RowProps & { task: TaskRow }) {
           <button
             type="button"
             onClick={() => setEdit({ type: "task", id: task._id })}
+            title={task.title}
             className={cn(
               TITLE_LINK,
               "cursor-pointer",
@@ -135,12 +136,18 @@ export function LeadItem({
     <RowShell id={lead._id} {...row} className="max-sm:flex-wrap">
       <Avatar name={lead.name} className="size-11 text-sm" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <Link href={routes.lead(lead._id)} className={TITLE_LINK}>
+        <Link
+          href={routes.lead(lead._id)}
+          title={lead.name}
+          className={TITLE_LINK}
+        >
           {lead.name}
         </Link>
         <span className={META}>
           <StatusDot tone={lead.slaBreachedAt ? "danger" : "warning"} />
-          <span className="truncate">{lead.companyName}</span>
+          <span className="truncate" title={lead.companyName ?? undefined}>
+            {lead.companyName}
+          </span>
           <Dot />
           <span className="shrink-0">{LEAD_KIND_LABEL[lead.kind]}</span>
         </span>
@@ -167,12 +174,18 @@ export function StuckItem({ row: item, ...row }: RowProps & { row: StuckRow }) {
         className="size-10 rounded-xl text-sm"
       />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <Link href={routes.account(item._id)} className={TITLE_LINK}>
+        <Link
+          href={routes.account(item._id)}
+          title={item.account.name}
+          className={TITLE_LINK}
+        >
           {item.account.name}
         </Link>
         <span className={META} title={firstSentence(item.playbook)}>
           <StatusDot tone="warning" />
-          <span className="truncate">{item.label}</span>
+          <span className="truncate" title={item.label}>
+            {item.label}
+          </span>
           <Dot />
           <span className="shrink-0 tabular-nums">{stuckFor(item.since)}</span>
         </span>
@@ -207,7 +220,11 @@ export function DealItem({ deal, ...row }: RowProps & { deal: DealRow }) {
       )}
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex min-w-0 items-center justify-between gap-3">
-          <Link href={routes.deal(deal._id)} className={TITLE_LINK}>
+          <Link
+            href={routes.deal(deal._id)}
+            title={deal.title}
+            className={TITLE_LINK}
+          >
             {deal.title}
           </Link>
           <span className="text-body shrink-0 font-semibold">
@@ -220,7 +237,10 @@ export function DealItem({ deal, ...row }: RowProps & { deal: DealRow }) {
         <span className="flex min-w-0 items-center justify-between gap-3">
           <span className="flex min-w-0 items-center gap-1.5">
             <DealStageTag stage={deal.stage} />
-            <span className="text-fg-tertiary truncate text-sm">
+            <span
+              className="text-fg-tertiary truncate text-sm"
+              title={deal.account?.name}
+            >
               {deal.account?.name ?? "No account"}
             </span>
           </span>

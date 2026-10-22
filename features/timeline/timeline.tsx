@@ -113,7 +113,7 @@ export default function Timeline({
         <div
           role="group"
           aria-label="Show"
-          className="scrollbar-none -mx-1 -mb-1 flex gap-1 overflow-x-auto px-1 py-1"
+          className="scrollbar-none -mx-1 -mb-1 flex gap-1 overflow-x-auto px-1 py-1 pointer-coarse:py-2"
         >
           {FILTERS.map((item) => {
             const count =
@@ -128,7 +128,7 @@ export default function Timeline({
                 aria-pressed={active}
                 onClick={() => setFilter(item.id)}
                 className={cn(
-                  "caption-style text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 transition-colors outline-none focus-visible:ring-2",
+                  "caption-style text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:ring-ring duration-fast relative flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 transition-colors outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2 pointer-coarse:after:content-['']",
                   active && "bg-overlay-2 text-foreground hover:bg-overlay-2",
                 )}
               >
@@ -164,7 +164,7 @@ export default function Timeline({
           <button
             type="button"
             onClick={() => setFilter("all")}
-            className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2"
+            className="text-fg-secondary hover:text-foreground focus-visible:ring-ring relative rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3 pointer-coarse:after:content-['']"
           >
             Show everything
           </button>
@@ -575,7 +575,7 @@ function LoggedItem({
                 }
               }}
               aria-label="Edit entry"
-              className="border-line-strong focus-visible:border-selected field-sizing-content min-h-16 w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm leading-snug outline-none"
+              className="bg-well focus-visible:ring-ring field-sizing-content min-h-16 w-full resize-none rounded-xl px-3 py-2 text-sm leading-snug outline-none focus-visible:ring-2"
             />
             <div className="flex justify-end gap-2">
               <Button
@@ -585,7 +585,7 @@ function LoggedItem({
               >
                 Cancel
               </Button>
-              <Button variant="primary" size="xs" onClick={() => void onSave()}>
+              <Button variant="well" size="xs" onClick={() => void onSave()}>
                 Save
               </Button>
             </div>

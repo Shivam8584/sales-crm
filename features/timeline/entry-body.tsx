@@ -28,7 +28,7 @@ export default function EntryBody({
       <span
         key={index}
         className={cn(
-          "rounded-[5px] px-1 py-px font-medium whitespace-nowrap",
+          "rounded-md px-1 py-px font-medium whitespace-nowrap",
           self
             ? "bg-(--tag-amber-bg) text-(--tag-amber-text)"
             : "bg-info-surface text-info-foreground",

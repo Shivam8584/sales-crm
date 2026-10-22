@@ -204,7 +204,7 @@ function DateField({
         onChange={(event) => setDraft(event.target.value)}
         onBlur={(event) => commit(event.currentTarget.validity.badInput)}
         onKeyDown={onKeyDown}
-        className="border-selected ring-selected/20 bg-secondary -mx-1.5 h-7 min-w-0 rounded-md border px-1.5 text-sm leading-none tabular-nums ring-3 outline-none"
+        className="bg-background ring-ring -mx-1.5 h-7 min-w-0 rounded-lg px-1.5 text-sm leading-none tabular-nums ring-2 outline-none"
       />
     );
   }

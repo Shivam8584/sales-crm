@@ -529,8 +529,8 @@ function HotSlaForm({ settings }: { settings: Settings }) {
             <Button
               type="submit"
               variant={dirty ? "primary" : "secondary"}
-              size="control"
-              className="h-9 px-4"
+              size="md"
+              className="pointer-coarse:h-11"
               disabled={!dirty}
               loading={saving}
             >

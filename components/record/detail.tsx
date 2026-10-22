@@ -49,12 +49,12 @@ export function DetailSection({
       >
         <section>
           <div className="min-h-control-md flex items-center justify-between gap-2">
-            <h3 className="flex min-w-0 flex-1">
-              <CollapsibleTrigger className="title-style hover:text-fg-secondary focus-visible:ring-ring duration-fast -mx-1 flex max-w-full cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+            <h2 className="flex min-w-0 flex-1">
+              <CollapsibleTrigger className="title-style hover:text-fg-secondary focus-visible:ring-ring duration-fast relative -mx-1 flex max-w-full cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2 pointer-coarse:after:content-['']">
                 <span className="truncate">{title}</span>
                 <CollapsibleChevron className="opacity-60" />
               </CollapsibleTrigger>
-            </h3>
+            </h2>
             {action}
           </div>
           <CollapsibleContent className="-mx-1 flex min-w-0 flex-col gap-[inherit] px-1">
@@ -67,7 +67,7 @@ export function DetailSection({
   return (
     <section className={classes}>
       <div className="min-h-control-md flex items-center justify-between gap-2">
-        <h3 className="title-style">{title}</h3>
+        <h2 className="title-style">{title}</h2>
         {action}
       </div>
       {children}

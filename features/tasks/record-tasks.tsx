@@ -74,7 +74,6 @@ export default function RecordTasks({
           {...target}
           label="New task"
           onClose={() => setComposing(false)}
-          className="border-border border shadow-none"
         />
       )}
     </>

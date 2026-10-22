@@ -10,6 +10,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
+import SegmentedControl from "@/components/_ui/segmented-control";
 import Skeleton from "@/components/_ui/skeleton";
 import Tag from "@/components/_ui/tag";
 import FilterMenu from "@/components/_common/filter-menu";
@@ -35,7 +36,6 @@ import {
   PageToolbar,
 } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
-import Segmented from "@/features/tasks/segmented";
 import SavedViewsMenu from "@/features/views/saved-views-menu";
 import { useCsvExport } from "@/hooks/use-csv-export";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -251,7 +251,7 @@ export default function DealsPage() {
 
   const renderColumnTop = (stage: string) =>
     drafting === stage ? (
-      <div className="bg-card shadow-card rounded-2xl p-4">
+      <div className="bg-background shadow-tile rounded-2xl p-4">
         <DealQuickAdd
           stage={drafting}
           accountId={draftAccount}
@@ -353,7 +353,7 @@ export default function DealsPage() {
       description="Track each opportunity from first call to a live campaign."
       action={
         <Button
-          variant="primary"
+          variant="well"
           size="sm"
           onClick={() => setCreate({ type: "deal" })}
         >
@@ -403,12 +403,12 @@ export default function DealsPage() {
         }
         actions={
           <>
-            <Segmented
+            <SegmentedControl
               label="View"
               value={listView ? LIST : BOARD}
               onChange={(next) => setView(next)}
               compact
-              options={[
+              segments={[
                 {
                   value: BOARD,
                   label: "Board",
@@ -793,7 +793,7 @@ function BoardSkeleton({ columns }: { columns: number }) {
           {Array.from({ length: 3 - (column % 2) }, (_, card) => (
             <div
               key={card}
-              className="bg-card shadow-card flex flex-col gap-3 rounded-2xl p-4"
+              className="bg-background shadow-tile flex flex-col gap-3 rounded-2xl p-4"
             >
               <Skeleton className="h-3.5 w-3/4" />
               <Skeleton className="h-3 w-1/2" />

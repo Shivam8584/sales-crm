@@ -32,7 +32,7 @@ export function PanelSection({
   return (
     <section className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-col gap-1">
-        <h3 className="text-fg-tertiary text-xs leading-4">{title}</h3>
+        <h2 className="text-fg-tertiary text-xs leading-4">{title}</h2>
         {description && (
           <p className="caption-style text-fg-tertiary leading-snug">
             {description}
@@ -152,7 +152,7 @@ export function TemplateInput({
         <textarea
           {...common}
           rows={rows}
-          className="bg-well text-foreground placeholder:text-fg-tertiary focus-visible:ring-foreground/15 hover:bg-well-hover aria-invalid:ring-danger/40 duration-fast w-full resize-y rounded-xl px-3 py-2 text-sm leading-relaxed transition-[background-color,box-shadow] outline-none focus-visible:ring-2 disabled:opacity-60 aria-invalid:ring-2"
+          className="bg-well shadow-field text-foreground placeholder:text-fg-tertiary focus-visible:ring-ring hover:bg-well-hover aria-invalid:ring-danger/40 duration-fast w-full resize-y rounded-xl px-3 py-2 text-sm leading-relaxed transition-[background-color,box-shadow] outline-none focus-visible:ring-2 disabled:opacity-60 aria-invalid:ring-2"
         />
       ) : (
         <Input {...common} className="aria-invalid:border-danger" />

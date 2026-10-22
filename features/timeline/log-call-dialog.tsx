@@ -196,7 +196,7 @@ export default function LogCallDialog({
                   onChange={(value) =>
                     value && setOutcome(value as CallOutcome)
                   }
-                  className="bg-well mx-0 h-10 px-3"
+                  className="bg-well shadow-field mx-0 h-10 px-3"
                 />
               </div>
               <Field
@@ -235,7 +235,7 @@ export default function LogCallDialog({
                 }}
                 rows={4}
                 placeholder="What was discussed? Type @ to mention a teammate."
-                className="bg-well text-foreground duration-fast ease-power3-out placeholder:text-fg-tertiary hover:bg-well-hover focus-visible:ring-foreground/15 aria-invalid:ring-danger/40 field-sizing-content max-h-40 min-h-24 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-snug transition-[background-color,box-shadow] outline-none focus-visible:ring-2 aria-invalid:ring-2 pointer-coarse:text-base"
+                className="bg-well text-foreground duration-fast ease-power3-out placeholder:text-fg-tertiary hover:bg-well-hover focus-visible:ring-ring aria-invalid:ring-danger/40 field-sizing-content max-h-40 min-h-24 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-snug transition-[background-color,box-shadow] outline-none focus-visible:ring-2 aria-invalid:ring-2 pointer-coarse:text-base"
               />
             </Field>
             {aiEnabled && draft.text.trim().length >= SUMMARY_MIN && (

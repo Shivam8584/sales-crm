@@ -4,7 +4,7 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium leading-none outline-none select-none transition-[background-color,color,box-shadow,scale] duration-base hover:duration-[120ms] ease-out active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:inset-y-[min(0px,calc((100%-44px)/2))] pointer-coarse:after:content-['']",
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium leading-none outline-none select-none transition-[background-color,color,scale] duration-base hover:duration-[120ms] ease-out active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 pointer-coarse:after:absolute pointer-coarse:after:inset-x-[min(0px,calc((100%-44px)/2))] pointer-coarse:after:inset-y-[min(0px,calc((100%-44px)/2))] pointer-coarse:after:content-['']",
   {
     variants: {
       variant: {
@@ -18,15 +18,16 @@ export const buttonVariants = cva(
       },
       size: {
         xs: "h-control-sm px-2.5 text-xs leading-none",
-        sm: "h-8 px-3 text-[13px] leading-none",
-        control: "h-8 px-3 text-[13px] leading-none",
+        sm: "h-8 px-3 text-sm leading-none",
+        control: "h-8 px-3 text-sm leading-none",
+        toolbar: "h-control-lg px-3.5 text-sm leading-none",
         avatar:
-          "h-10 gap-2 py-0.5 pr-3 pl-0.5 text-sm leading-none font-medium",
+          "h-10 gap-2 py-0.5 pr-3 pl-0.5 text-sm leading-none font-medium pointer-coarse:after:-inset-x-2",
         md: "h-10 px-4 text-sm leading-none",
         lg: "h-11 px-5 text-sm leading-none",
         icon: "relative size-control-md p-0 pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']",
         "icon-xs":
-          "relative size-control-xs p-0 after:absolute after:-inset-1.5 after:content-['']",
+          "relative size-control-xs p-0 after:absolute after:-inset-1.5 after:content-[''] pointer-coarse:after:-inset-3.5",
         "icon-sm":
           "relative size-control-sm p-0 pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5 pointer-coarse:after:content-['']",
         none: "p-0",

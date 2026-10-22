@@ -31,7 +31,7 @@ export default function SidebarPins({
   if (!pins?.length) return null;
   return (
     <div className="pt-6">
-      <p className="text-fg-disabled collapsed:sr-only px-7 pb-1 text-xs">
+      <p className="text-fg-tertiary collapsed:sr-only px-7 pb-1 text-xs">
         Pinned
       </p>
       <ul aria-label="Pinned" className="flex flex-col gap-0.5 px-3">

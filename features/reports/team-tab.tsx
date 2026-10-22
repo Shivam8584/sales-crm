@@ -33,10 +33,10 @@ import {
   ChartSkeleton,
   Delta,
   MetricTile,
+  MetricTileSkeleton,
   Reloading,
   ReportSection,
 } from "./section";
-import { KpisSkeleton } from "./kpis";
 import { useLatest } from "./use-report";
 import { routes } from "@/lib/routes";
 
@@ -266,7 +266,11 @@ export default function TeamTab({ period }: { period: Period }) {
         description="Against the period before."
       >
         {!team ? (
-          <KpisSkeleton />
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 xl:grid-cols-6">
+            {Array.from({ length: 6 }, (_, index) => (
+              <MetricTileSkeleton key={index} />
+            ))}
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 xl:grid-cols-6">
             <MetricTile

@@ -3,9 +3,18 @@ import { extendTailwindMerge } from "tailwind-merge";
 
 const twMerge = extendTailwindMerge({
   extend: {
-    theme: { text: ["display"] },
+    theme: {
+      text: ["display", "hero", "body", "title", "2xs"],
+      spacing: [
+        "control-xs",
+        "control-sm",
+        "control-md",
+        "control-lg",
+        "touch",
+        "row",
+      ],
+    },
     classGroups: {
-      "font-size": [{ text: ["display"] }],
       z: [{ z: ["sticky", "sticky-header", "floating", "overlay", "toast"] }],
       duration: [{ duration: ["fast", "base", "slow", "panel"] }],
     },

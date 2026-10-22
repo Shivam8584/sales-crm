@@ -103,7 +103,7 @@ export default function TimelineComposer({
       <div
         role="tablist"
         aria-label="Entry type"
-        className="scrollbar-none flex gap-1 overflow-x-auto p-1 pb-2 max-sm:mask-r-from-[calc(100%-1.5rem)] max-sm:pr-6"
+        className="scrollbar-none flex gap-1 overflow-x-auto p-1 pb-2 max-sm:mask-r-from-[calc(100%-1.5rem)] max-sm:pr-6 pointer-coarse:pt-1.5 pointer-coarse:pb-2.5"
       >
         {LOGGABLE_KINDS.map((value) => {
           const meta = KIND_META[value];
@@ -115,7 +115,7 @@ export default function TimelineComposer({
               aria-selected={kind === value}
               onClick={() => setKind(value)}
               className={cn(
-                "text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-base flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-[color,background-color,scale] outline-none focus-visible:ring-2 active:scale-[0.97]",
+                "text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-base relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-[color,background-color,scale] outline-none focus-visible:ring-2 active:scale-[0.97] pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1.5 pointer-coarse:after:content-['']",
                 kind === value &&
                   "bg-background text-foreground shadow-capsule",
               )}
@@ -126,7 +126,7 @@ export default function TimelineComposer({
           );
         })}
       </div>
-      <div className="bg-background shadow-tile rounded-[1.25rem]">
+      <div className="bg-background shadow-field focus-within:ring-ring rounded-2xl focus-within:ring-2">
         <label htmlFor={bodyId} className="sr-only">
           {KIND_META[kind].label}
         </label>
@@ -136,7 +136,7 @@ export default function TimelineComposer({
           onKeyDown={onKeyDown}
           placeholder={PLACEHOLDER[kind]}
           rows={2}
-          className="placeholder:text-fg-tertiary text-body block field-sizing-content max-h-60 min-h-18 w-full resize-none rounded-t-[1.25rem] bg-transparent px-4 pt-3.5 pb-2 outline-none"
+          className="placeholder:text-fg-tertiary text-body block field-sizing-content max-h-60 min-h-18 w-full resize-none rounded-t-2xl bg-transparent px-4 pt-3.5 pb-2 outline-none"
         />
         <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
           {kind === "call" && (
@@ -148,11 +148,11 @@ export default function TimelineComposer({
                 value,
                 label: CALL_OUTCOME_LABEL[value],
               }))}
-              className="border-border h-control-sm mx-0 border px-2 text-xs"
+              className="bg-well h-control-sm mx-0 rounded-full px-2.5 text-xs"
             />
           )}
           {(kind === "call" || kind === "meeting") && (
-            <label className="caption-style text-fg-tertiary border-border h-control-sm flex items-center gap-1.5 rounded-md border px-2">
+            <label className="caption-style text-fg-tertiary bg-well h-control-sm flex items-center gap-1.5 rounded-full px-2.5">
               <input
                 type="number"
                 min={0}
@@ -178,7 +178,7 @@ export default function TimelineComposer({
           </span>
           <Button
             type="submit"
-            variant="primary"
+            variant="well"
             size="xs"
             className="max-sm:ml-auto"
             disabled={!canSubmit}

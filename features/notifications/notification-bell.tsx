@@ -185,7 +185,10 @@ function NotificationRow({
           {item.title}
         </span>
         {item.body && (
-          <span className="caption-style text-fg-tertiary truncate leading-snug">
+          <span
+            className="caption-style text-fg-tertiary truncate leading-snug"
+            title={item.body}
+          >
             {item.body}
           </span>
         )}

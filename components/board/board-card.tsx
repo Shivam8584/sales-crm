@@ -129,7 +129,7 @@ export default function BoardCard({
       >
         <CardSurface
           invisible={hidden}
-          className="duration-base ease-out-hd transition-[translate,box-shadow,scale] group-hover/card:-translate-y-0.5 group-hover/card:shadow-[0_6px_18px_-8px_rgb(10_11_13/0.18),0_0_0_1px_rgb(10_11_13/0.08)] group-active/card:scale-[0.985] motion-reduce:group-hover/card:translate-y-0 dark:group-hover/card:shadow-[0_6px_18px_-8px_rgb(0_0_0/0.6),0_0_0_1px_rgb(255_255_255/0.12)]"
+          className="duration-base ease-out-hd group-hover/card:shadow-lift transition-[translate,box-shadow,scale] group-hover/card:-translate-y-0.5 group-active/card:scale-[0.985] motion-reduce:group-hover/card:translate-y-0"
         >
           {children}
         </CardSurface>

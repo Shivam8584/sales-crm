@@ -27,6 +27,7 @@ import PlaybookPicker from "@/features/playbook/playbook-picker";
 import AskRecord from "@/features/ai/ask-record";
 import { useDraftAction } from "@/features/ai/use-draft-action";
 import { usePinAction } from "@/features/pins/use-pins";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { useViewer } from "@/hooks/use-viewer";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
@@ -102,6 +103,7 @@ function LeadView({ lead }: { lead: Lead }) {
   const [converting, setConverting] = useState(false);
   const [playbookOpen, setPlaybookOpen] = useState(false);
   const converted = lead.status === "converted";
+  useDocumentTitle(lead.name);
 
   async function runConvert() {
     setConverting(true);
@@ -240,7 +242,10 @@ function LeadView({ lead }: { lead: Lead }) {
                   <SourceTag utm={lead.utm} channel={lead.channel} />
                   {lead.demoAt && <DemoTag at={lead.demoAt} />}
                 </span>
-                <span className="min-w-0 truncate">
+                <span
+                  className="min-w-0 truncate"
+                  title={`${lead.companyName} · ${LEAD_KIND_LABEL[lead.kind]}`}
+                >
                   {lead.companyName}
                   <span className="text-fg-tertiary">
                     {" "}

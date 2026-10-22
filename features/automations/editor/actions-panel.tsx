@@ -48,7 +48,7 @@ function ActionItem({
       data-dragging={dragging || undefined}
       onPointerDown={(event) => onPointerDown(kind, event)}
       onKeyDown={onKeyDown}
-      className="group/item hover:bg-overlay-2 focus-visible:bg-overlay-2 focus-visible:ring-ring duration-fast flex h-9 w-full cursor-grab touch-none items-center gap-2.5 rounded-lg px-2 transition-[background-color,opacity] outline-none select-none focus-visible:ring-2 active:cursor-grabbing data-dragging:opacity-50"
+      className="group/item hover:bg-overlay-2 focus-visible:bg-overlay-2 focus-visible:ring-ring duration-fast flex h-9 w-full cursor-grab touch-none items-center gap-2.5 rounded-lg px-2 transition-[background-color,opacity] outline-none select-none focus-visible:ring-2 active:cursor-grabbing data-dragging:opacity-50 pointer-coarse:h-11"
     >
       <meta.Icon aria-hidden className="text-fg-tertiary size-4 shrink-0" />
       <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
@@ -77,7 +77,7 @@ export default function ActionsPanel({
       aria-label="Steps"
       data-canvas-overlay
       onPointerDown={(event) => event.stopPropagation()}
-      className="bg-popover shadow-overlay border-border absolute top-3 left-3 z-20 flex max-h-[calc(100%-24px)] w-[min(264px,calc(100%-24px))] flex-col overflow-clip rounded-xl border"
+      className="bg-popover shadow-overlay absolute top-3 left-3 z-20 flex max-h-[calc(100%-24px)] w-[min(264px,calc(100%-24px))] flex-col overflow-clip rounded-2xl"
     >
       <div className="flex h-11 shrink-0 items-center justify-between pr-1.5 pl-4">
         <span className="text-sm font-medium">Steps</span>
@@ -109,9 +109,9 @@ export default function ActionsPanel({
                 aria-label={group.label}
                 className="mt-1"
               >
-                <h3 className="text-fg-tertiary px-2 py-1.5 text-xs">
+                <h2 className="text-fg-tertiary px-2 py-1.5 text-xs">
                   {group.label}
-                </h3>
+                </h2>
                 <ul className="flex flex-col gap-0.5">
                   {group.kinds.map((kind) => (
                     <ActionItem
@@ -157,7 +157,7 @@ export function ActionGhost({
     >
       <div
         data-snapped={snapped || undefined}
-        className="bg-popover shadow-overlay border-border duration-fast flex h-9 w-60 items-center gap-2.5 rounded-lg border px-2 transition-[opacity,scale] data-snapped:scale-[0.96] data-snapped:opacity-60 starting:scale-[0.96] starting:opacity-0"
+        className="bg-popover shadow-overlay duration-fast flex h-9 w-60 items-center gap-2.5 rounded-lg px-2 transition-[opacity,scale] data-snapped:scale-[0.96] data-snapped:opacity-60 starting:scale-[0.96] starting:opacity-0"
       >
         <meta.Icon aria-hidden className="text-fg-tertiary size-4" />
         <span className="flex-1 text-sm font-medium">{meta.label}</span>

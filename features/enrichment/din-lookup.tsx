@@ -89,7 +89,7 @@ export default function DinLookup({
       size="md"
       loading={busy}
       disabled={!valid || loading || unconfigured || running}
-      className="h-9 px-3.5"
+      className="pointer-coarse:min-h-11"
     >
       Look up
     </Button>
@@ -108,7 +108,7 @@ export default function DinLookup({
     >
       {loading ? (
         <div aria-busy className="flex flex-col gap-2.5">
-          <Skeleton className="h-9 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-xl" />
           <Skeleton className="h-3 w-48" />
         </div>
       ) : (

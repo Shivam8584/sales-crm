@@ -33,7 +33,10 @@ export default function BoardDisplay({
             variant="secondary"
             size="icon"
             aria-label="Display options"
-            className={cn("data-[state=open]:bg-muted shrink-0", className)}
+            className={cn(
+              "size-control-lg data-[state=open]:bg-well shrink-0",
+              className,
+            )}
           >
             <SettingsIcon aria-hidden className="size-3.5" />
           </Button>

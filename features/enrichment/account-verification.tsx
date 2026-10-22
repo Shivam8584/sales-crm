@@ -422,7 +422,7 @@ function GstinForm({
       size="md"
       loading={busy}
       disabled={!check.ok || unconfigured || running}
-      className="h-9 px-3.5"
+      className="pointer-coarse:min-h-11"
     >
       {reverify ? "Re-verify" : "Verify"}
     </Button>

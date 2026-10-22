@@ -79,7 +79,7 @@ export default function UserMenu() {
           <span className="max-w-32 truncate max-sm:hidden">{viewer.name}</span>
           <ChevronDownIcon
             aria-hidden
-            className="text-fg-disabled size-3 max-sm:hidden"
+            className="text-fg-tertiary size-3 max-sm:hidden"
           />
         </Button>
       </DropdownMenuTrigger>

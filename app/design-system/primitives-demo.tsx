@@ -5,7 +5,6 @@ import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import { Card, CardHeader } from "@/components/_ui/card";
 import { Checkbox } from "@/components/_ui/checkbox";
-import { CollapsibleSection } from "@/components/_ui/collapsible";
 import CountBadge from "@/components/_ui/count-badge";
 import {
   Dialog,
@@ -26,7 +25,6 @@ import {
 } from "@/components/_ui/dropdown-menu";
 import EmptyState from "@/components/_ui/empty-state";
 import Field from "@/components/_ui/field";
-import IconBadge from "@/components/_ui/icon-badge";
 import { Input } from "@/components/_ui/input";
 import Kbd from "@/components/_ui/kbd";
 import SegmentedControl from "@/components/_ui/segmented-control";
@@ -36,12 +34,10 @@ import { Switch } from "@/components/_ui/switch";
 import Tag, { type TagTone } from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { toast } from "@/stores/toast-store";
-import BellIcon from "@/public/assets/icons/bell.svg";
 import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
 import FilterIcon from "@/public/assets/icons/filter.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
-import UsersIcon from "@/public/assets/icons/users.svg";
 
 const BUTTON_VARIANTS = ["primary", "secondary", "ghost"] as const;
 const TAG_TONES: TagTone[] = [
@@ -56,14 +52,6 @@ const TAG_TONES: TagTone[] = [
   "yellow",
   "neutral",
 ];
-const ICON_TONES = [
-  "neutral",
-  "brand",
-  "info",
-  "success",
-  "warning",
-  "danger",
-] as const;
 const STATES = [
   {
     label: "Info",
@@ -179,14 +167,6 @@ export default function PrimitivesDemo() {
 
       <Divider />
 
-      <Row label="IconBadge · tones × sizes">
-        {ICON_TONES.map((tone) => (
-          <IconBadge key={tone} icon={BellIcon} tone={tone} size="md" />
-        ))}
-        <IconBadge icon={UsersIcon} size="sm" />
-        <IconBadge icon={UsersIcon} size="lg" />
-      </Row>
-
       <Row label="Field · Input · SelectField">
         <div className="grid w-full gap-3 sm:grid-cols-2">
           <Field label="Company" htmlFor="ds-company" hint="As registered.">
@@ -246,7 +226,7 @@ export default function PrimitivesDemo() {
 
       <Divider />
 
-      <Row label="Card · CardHeader · Collapsible">
+      <Row label="Card · CardHeader">
         <Card className="w-full">
           <CardHeader
             title="Round-robin"
@@ -257,14 +237,6 @@ export default function PrimitivesDemo() {
               </Button>
             }
           />
-          <div className="flex flex-col gap-4 px-4 py-4 sm:px-5">
-            <CollapsibleSection title="Details">
-              <p className="caption-style text-fg-secondary leading-snug">
-                Collapsible content animates its height and respects reduced
-                motion.
-              </p>
-            </CollapsibleSection>
-          </div>
         </Card>
         <Card className="w-full">
           <CardHeader

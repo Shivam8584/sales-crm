@@ -123,7 +123,7 @@ function SyncCard({ overview }: { overview: Overview }) {
           <Tooltip content={dateTime(overview.lastRunAt)}>
             <span
               tabIndex={0}
-              className="lead-style text-fg-secondary rounded-sm"
+              className="lead-style text-fg-secondary relative rounded-sm pointer-coarse:after:absolute pointer-coarse:after:-inset-3.5 pointer-coarse:after:content-['']"
             >
               {relativeTime(overview.lastRunAt)}
             </span>

@@ -331,7 +331,7 @@ export default function DemoForm() {
           aria-expanded={detailsOpen}
           aria-controls="demo-details"
           onClick={() => setDetailsOpen((open) => !open)}
-          className="lead-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast -mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded-md px-1.5 py-2 text-left transition-colors outline-none focus-visible:ring-2"
+          className="lead-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast relative -mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded-md px-1.5 py-2 text-left transition-colors outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2 pointer-coarse:after:content-['']"
         >
           <span>
             Help us prepare <span className="text-fg-tertiary">(optional)</span>
@@ -396,7 +396,7 @@ export default function DemoForm() {
               {ORDER_BANDS.map((band, index) => (
                 <label
                   key={band.value}
-                  className="bg-well text-fg-secondary hover:text-foreground has-checked:ring-foreground has-checked:bg-background has-checked:text-foreground has-focus-visible:ring-foreground/15 duration-fast flex h-8 cursor-pointer items-center rounded-full px-3 text-xs leading-none transition-[color,border-color,background-color,box-shadow] select-none has-checked:ring-2 has-checked:ring-inset has-focus-visible:ring-2"
+                  className="bg-well text-fg-secondary hover:text-foreground has-checked:ring-foreground has-checked:bg-background has-checked:text-foreground has-focus-visible:ring-ring duration-fast flex h-8 cursor-pointer items-center rounded-full px-3 text-xs leading-none transition-[color,border-color,background-color,box-shadow] select-none has-checked:ring-2 has-checked:ring-inset has-focus-visible:ring-2"
                 >
                   <input
                     id={`demo-orders-${index}`}

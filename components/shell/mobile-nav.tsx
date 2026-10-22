@@ -24,11 +24,10 @@ import SidebarPins from "./sidebar/sidebar-pins";
 import SidebarSection from "./sidebar/sidebar-section";
 import { useNavCounts } from "./use-nav-counts";
 
-const GLASS =
-  "bg-background/80 shadow-[0_8px_30px_-8px_rgb(10_11_13/0.22),0_0_0_1px_rgb(10_11_13/0.06)] backdrop-blur-xl dark:shadow-[0_8px_30px_-8px_rgb(0_0_0/0.6),0_0_0_1px_rgb(255_255_255/0.08)]";
+const GLASS = "bg-background/80 shadow-capsule backdrop-blur-xl";
 
 const TAB =
-  "text-fg-tertiary data-[active=true]:bg-overlay-3 data-[active=true]:text-foreground focus-visible:ring-ring relative flex h-full w-full flex-col items-center justify-center gap-1 rounded-full text-[11px] leading-none font-medium outline-none transition-[background-color,color,scale] duration-base active:scale-[0.97] focus-visible:ring-2";
+  "text-fg-tertiary data-[active=true]:bg-overlay-3 data-[active=true]:text-foreground focus-visible:ring-ring relative flex h-full min-h-11 w-full flex-col items-center justify-center gap-1 rounded-full text-2xs leading-none font-medium outline-none transition-[background-color,color,scale] duration-base active:scale-[0.97] focus-visible:ring-2";
 
 /** Phone and tablet navigation: a floating tab bar plus a sheet holding everything else. */
 export default function MobileNav() {

@@ -97,7 +97,11 @@ function EntityFields({ entity }: { entity: CustomFieldEntity }) {
         <SettingsRow
           label="No custom fields yet"
           description={`A field you add shows on every ${entity}.`}
-        />
+        >
+          <Button variant="secondary" size="xs" onClick={() => setAdding(true)}>
+            Add the first field
+          </Button>
+        </SettingsRow>
       ) : (
         fields.map((field, index) => (
           <SettingsRow

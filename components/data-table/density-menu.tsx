@@ -39,7 +39,7 @@ export default function DensityMenu({
             className={cn(
               variant === "ghost"
                 ? "data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground"
-                : "data-[state=open]:bg-muted",
+                : "size-control-lg data-[state=open]:bg-well",
               className,
             )}
           >

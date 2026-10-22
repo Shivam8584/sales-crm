@@ -84,6 +84,7 @@ export default function TasksBoard({
         status={composing}
         assigneeId={assigneeId}
         onClose={() => setComposing(null)}
+        className="bg-background shadow-tile"
       />
     ) : null;
 
@@ -129,7 +130,7 @@ export function TasksBoardSkeleton() {
           {Array.from({ length: count }, (_, index) => (
             <div
               key={index}
-              className="bg-card shadow-card flex flex-col rounded-2xl"
+              className="bg-background shadow-tile flex flex-col rounded-2xl"
             >
               <div className="flex flex-col gap-3 p-4">
                 <Skeleton className="h-3.5 w-3/4" />

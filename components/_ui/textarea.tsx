@@ -12,7 +12,7 @@ function Textarea({
       data-slot="textarea"
       rows={rows}
       className={cn(
-        "bg-well text-foreground duration-base placeholder:text-fg-tertiary hover:bg-well-hover focus-visible:bg-background focus-visible:ring-foreground/15 aria-invalid:ring-danger/40 text-body field-sizing-content max-h-40 min-h-18 w-full resize-none rounded-xl px-3.5 py-2.5 leading-snug transition-[background-color,box-shadow] ease-out outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:ring-2 pointer-coarse:text-base",
+        "bg-well text-foreground duration-base placeholder:text-fg-tertiary hover:bg-well-hover focus-visible:bg-background shadow-field focus-visible:ring-ring aria-invalid:ring-danger text-body field-sizing-content max-h-40 min-h-18 w-full resize-none rounded-xl px-3.5 py-2.5 leading-snug transition-[background-color] ease-out outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:ring-2 pointer-coarse:text-base",
         className,
       )}
       {...props}

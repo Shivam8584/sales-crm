@@ -34,6 +34,7 @@ const RECORDS = [
   { value: "deals", label: "Deals" },
   { value: "tasks", label: "Tasks" },
 ];
+const DATE_INPUT = "h-control-lg w-36 rounded-full";
 const DELETED_TYPES = RECORDS.filter(
   (item) => item.value !== ANY && item.value !== "leads",
 );
@@ -146,7 +147,7 @@ function AuditLog() {
               value={from}
               max={to || undefined}
               onChange={(event) => setFrom(event.target.value)}
-              className="h-control-md w-36"
+              className={DATE_INPUT}
             />
             <Input
               type="date"
@@ -154,10 +155,10 @@ function AuditLog() {
               value={to}
               min={from || undefined}
               onChange={(event) => setTo(event.target.value)}
-              className="h-control-md w-36"
+              className={DATE_INPUT}
             />
             {filtered && (
-              <Button variant="ghost" size="xs" onClick={clear}>
+              <Button variant="ghost" size="toolbar" onClick={clear}>
                 Clear
               </Button>
             )}

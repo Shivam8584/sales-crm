@@ -220,7 +220,7 @@ function DecideDialog({
                 aria-describedby={
                   error ? "approval-reason-error" : "approval-reason-hint"
                 }
-                className="bg-well text-foreground placeholder:text-fg-tertiary focus-visible:ring-foreground/15 duration-fast aria-invalid:ring-danger/40 field-sizing-content max-h-60 min-h-22 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-snug transition-[background-color,box-shadow] outline-none focus-visible:ring-2 aria-invalid:ring-2"
+                className="bg-well shadow-field text-foreground placeholder:text-fg-tertiary focus-visible:ring-ring duration-fast aria-invalid:ring-danger/40 field-sizing-content max-h-60 min-h-22 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-snug transition-[background-color,box-shadow] outline-none focus-visible:ring-2 aria-invalid:ring-2"
               />
             </Field>
           </div>

@@ -522,10 +522,15 @@ function AutomationCardBody({ row }: { row: Row }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-sm font-medium">{row.name}</span>
+        <span className="truncate text-sm font-medium" title={row.name}>
+          {row.name}
+        </span>
         <StatusTag status={row.status} />
       </div>
-      <span className="caption-style text-fg-tertiary truncate">
+      <span
+        className="caption-style text-fg-tertiary truncate"
+        title={`${row.stats.enrolled} enrolled · ${row.stats.active} active · ${row.stats.completed} completed`}
+      >
         {row.stats.enrolled} enrolled · {row.stats.active} active ·{" "}
         {row.stats.completed} completed
       </span>
@@ -574,7 +579,10 @@ function AutomationsGrid({
               {row.description || row.trigger}
             </span>
             <span className="caption-style text-fg-tertiary mt-auto flex items-center justify-between gap-3 pt-1 tabular-nums">
-              <span className="min-w-0 truncate">
+              <span
+                className="min-w-0 truncate"
+                title={`${row.stats.enrolled} enrolled · ${row.stats.active} active · ${row.stats.completed} completed`}
+              >
                 {row.stats.enrolled} enrolled · {row.stats.active} active ·{" "}
                 {row.stats.completed} completed
               </span>

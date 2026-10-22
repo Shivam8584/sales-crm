@@ -75,15 +75,17 @@ export function CardSafe({
 
 export type ChipSize = "sm" | "md";
 
-const CHIP_BASE =
-  "text-fg-secondary duration-fast ease-power3-out hover:bg-overlay-2 hover:text-foreground data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground focus-visible:ring-ring inline-flex min-w-0 cursor-pointer items-center rounded-full whitespace-nowrap outline-none transition-colors focus-visible:ring-2";
+export const COARSE_HIT =
+  "relative pointer-coarse:after:absolute pointer-coarse:after:inset-[min(0px,calc((100%-44px)/2))] pointer-coarse:after:content-['']";
+
+const CHIP_BASE = `text-fg-secondary ${COARSE_HIT} duration-fast ease-power3-out hover:bg-overlay-2 hover:text-foreground data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground focus-visible:ring-ring inline-flex min-w-0 cursor-pointer items-center rounded-full whitespace-nowrap outline-none transition-colors focus-visible:ring-2`;
 
 /** Pill used for task properties: `md` on cards, `sm` in dense rows. */
 export function chipClass(size: ChipSize = "sm") {
   return cn(
     CHIP_BASE,
     size === "md"
-      ? "h-7 gap-1.5 px-2.5 text-[13px] leading-none"
+      ? "h-7 gap-1.5 px-2.5 text-xs leading-none"
       : "caption-style h-6 gap-1 px-2",
   );
 }

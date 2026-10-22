@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
+import SegmentedControl from "@/components/_ui/segmented-control";
 import FilterMenu from "@/components/_common/filter-menu";
 import BoardDisplay from "@/components/board/board-display";
 import { useBoardPrefs } from "@/components/board/board-prefs";
@@ -31,7 +32,6 @@ import { useUiStore } from "@/stores/ui-store";
 import ListIcon from "@/public/assets/icons/list.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import PasteTasksDialog from "./paste-tasks-dialog";
-import Segmented from "./segmented";
 import TaskBulkBar from "./task-bulk-bar";
 import { TASK_CARD_FIELDS } from "./task-card";
 import TasksBoard, { TasksBoardSkeleton } from "./tasks-board";
@@ -192,11 +192,11 @@ export default function TasksPage() {
           </>
         }
       >
-        <Segmented
+        <SegmentedControl
           label="Whose tasks"
           value={mine ? "mine" : "all"}
           onChange={setScope}
-          options={[
+          segments={[
             { value: "mine", label: "My tasks" },
             { value: "all", label: "All tasks" },
           ]}
@@ -265,21 +265,21 @@ export default function TasksPage() {
             ]}
           />
         )}
-        <Segmented
+        <SegmentedControl
           label="View"
           value={view === "list" ? "list" : "board"}
           onChange={setView}
           compact
-          options={[
+          segments={[
             {
               value: "board",
               label: "Board",
-              icon: <ClipboardIcon aria-hidden className="size-3.5" />,
+              icon: <ClipboardIcon aria-hidden className="size-3" />,
             },
             {
               value: "list",
               label: "List",
-              icon: <ListIcon aria-hidden className="size-3.5" />,
+              icon: <ListIcon aria-hidden className="size-3" />,
             },
           ]}
           className={view === "list" ? "max-sm:ml-auto" : "ml-auto"}

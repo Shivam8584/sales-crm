@@ -19,6 +19,7 @@ import {
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import {
@@ -113,8 +114,8 @@ function EditorSkeleton() {
       />
       <div className="flex flex-1 items-start justify-center pt-24">
         <div className="flex w-80 flex-col items-center gap-16">
-          <Skeleton className="h-26 w-80 rounded-xl" />
-          <Skeleton className="h-26 w-80 rounded-xl" />
+          <Skeleton className="h-26 w-80 rounded-2xl" />
+          <Skeleton className="h-26 w-80 rounded-2xl" />
         </div>
       </div>
     </Page>
@@ -123,6 +124,7 @@ function EditorSkeleton() {
 
 function Editor({ automation }: { automation: AutomationDoc }) {
   const router = useRouter();
+  useDocumentTitle(automation.name);
   const id = automation._id as Id<"automations">;
   const catalog = useQuery(api.automations.catalog, {});
   const nodeStats = useQuery(api.automations.nodeStats, { id });
@@ -423,12 +425,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
 
   const primary =
     active && !changed ? (
-      <Button
-        variant="secondary"
-        size="sm"
-        className="h-control-md py-0"
-        onClick={() => void onPause()}
-      >
+      <Button variant="secondary" size="md" onClick={() => void onPause()}>
         Pause
       </Button>
     ) : (
@@ -443,8 +440,7 @@ function Editor({ automation }: { automation: AutomationDoc }) {
       >
         <Button
           variant="primary"
-          size="sm"
-          className="h-control-md py-0"
+          size="md"
           loading={busy}
           onClick={() => void onActivate()}
         >

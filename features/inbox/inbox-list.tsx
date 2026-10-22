@@ -15,6 +15,7 @@ import {
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
 import { isUrgentKind, KindIcon } from "@/features/notifications/kinds";
+import { COARSE_HIT } from "@/features/tasks/task-chips";
 import { parseRecordKey, type RecordType } from "@/lib/domain/notifications";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -92,7 +93,10 @@ export function GroupHeader({ group }: { group: Group }) {
         <Link
           href={record.href}
           title={record.name}
-          className="caption-style text-foreground focus-visible:ring-ring min-w-0 truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
+          className={cn(
+            COARSE_HIT,
+            "caption-style text-foreground focus-visible:ring-ring min-w-0 truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2",
+          )}
         >
           {record.name}
         </Link>
@@ -211,14 +215,14 @@ export function InboxRow({
         <Tooltip content={archived ? "Move to inbox" : "Archive"} shortcut="E">
           <Button
             variant="ghost"
-            size="icon-xs"
+            size="icon"
             aria-label={archived ? "Move to inbox" : "Archive"}
             onClick={() => actions.archive([item], !archived)}
           >
             {archived ? (
-              <InboxIcon aria-hidden className="size-3" />
+              <InboxIcon aria-hidden className="size-3.5" />
             ) : (
-              <ArchiveIcon aria-hidden className="size-3" />
+              <ArchiveIcon aria-hidden className="size-3.5" />
             )}
           </Button>
         </Tooltip>
@@ -240,7 +244,7 @@ function RowMenu({ item, actions }: { item: InboxItem; actions: RowActions }) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon-xs"
+          size="icon"
           aria-label={`Actions for ${item.title}`}
           className="data-[state=open]:bg-overlay-2"
         >

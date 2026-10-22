@@ -20,13 +20,11 @@ export default function SearchInput({
   className,
 }: SearchInputProps) {
   return (
-    <label
-      className={cn(
-        "bg-well hover:bg-well-hover focus-within:bg-background focus-within:ring-foreground/15 duration-base flex h-10 w-full min-w-0 items-center gap-2.5 rounded-full pr-2 pl-4 transition-[background-color,box-shadow] focus-within:ring-2 sm:w-64",
-        className,
-      )}
-    >
-      <SearchIcon aria-hidden className="text-fg-tertiary size-3.5 shrink-0" />
+    <div className={cn("relative w-full min-w-0 sm:w-64", className)}>
+      <SearchIcon
+        aria-hidden
+        className="text-fg-tertiary pointer-events-none absolute top-1/2 left-4 size-3.5 -translate-y-1/2"
+      />
       <input
         data-list-search
         type="search"
@@ -40,20 +38,22 @@ export default function SearchInput({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="placeholder:text-fg-tertiary min-w-0 flex-1 bg-transparent text-sm leading-none outline-none pointer-coarse:text-base [&::-webkit-search-cancel-button]:hidden"
+        className="bg-well shadow-field hover:bg-well-hover focus-visible:bg-background focus-visible:ring-ring duration-base placeholder:text-fg-tertiary h-9 w-full min-w-0 rounded-full pr-10 pl-10 text-sm leading-none transition-[background-color] outline-none focus-visible:ring-2 pointer-coarse:h-11 pointer-coarse:text-base [&::-webkit-search-cancel-button]:hidden"
       />
       {value ? (
         <button
           type="button"
           aria-label="Clear search"
           onClick={() => onChange("")}
-          className="text-fg-tertiary hover:text-foreground hover:bg-overlay-3 grid size-6 place-items-center rounded-full"
+          className="text-fg-tertiary hover:text-foreground hover:bg-overlay-3 absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded-full pointer-coarse:after:absolute pointer-coarse:after:-inset-3 pointer-coarse:after:content-['']"
         >
           <XIcon aria-hidden className="size-3" />
         </button>
       ) : (
-        <Kbd className="max-sm:hidden">/</Kbd>
+        <Kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 max-sm:hidden">
+          /
+        </Kbd>
       )}
-    </label>
+    </div>
   );
 }

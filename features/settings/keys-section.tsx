@@ -242,7 +242,7 @@ function History({ events }: { events: Status["history"] }) {
   if (events.length === 0) return null;
   return (
     <Collapsible className="group/collapsible flex flex-col">
-      <CollapsibleTrigger className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex w-fit cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+      <CollapsibleTrigger className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast relative -mx-1 flex w-fit cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3 pointer-coarse:after:content-['']">
         Recent changes
         <CollapsibleChevron />
       </CollapsibleTrigger>

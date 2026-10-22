@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import Button from "@/components/_ui/button";
 import FilterMenu from "@/components/_common/filter-menu";
 import { Input } from "@/components/_ui/input";
 import {
@@ -71,9 +72,22 @@ export default function TargetsSettings() {
       ) : (
         <>
           {rows.length === 0 && (
-            <p className="caption-style text-fg-tertiary">
-              No targets set for {monthName(period)}.
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="caption-style text-fg-tertiary">
+                No targets set for {monthName(period)}.
+              </p>
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() =>
+                  document
+                    .querySelector<HTMLInputElement>("input[aria-label^=Team]")
+                    ?.focus()
+                }
+              >
+                Set a goal
+              </Button>
+            </div>
           )}
           {TARGET_METRICS.map((metric) => (
             <SettingsSection

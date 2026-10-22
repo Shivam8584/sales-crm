@@ -838,7 +838,7 @@ export default function Canvas({
       aria-label="Automation canvas"
       style={style}
       onPointerDown={onCanvasPointerDown}
-      className="relative min-h-0 flex-1 touch-none overflow-clip [background-color:color-mix(in_srgb,var(--background)_70%,var(--card))] select-none"
+      className="bg-background relative min-h-0 flex-1 touch-none overflow-clip select-none"
     >
       <div className="absolute top-0 left-1/2 origin-top-left [transform:translate(var(--view-x),var(--view-y))_scale(var(--view-zoom))]">
         <Edges
@@ -868,7 +868,7 @@ export default function Canvas({
                 height: NODE_HEIGHT,
               } as CSSProperties
             }
-            className="border-ring pointer-events-none absolute top-0 left-0 [translate:var(--node-x)_var(--node-y)] rounded-xl border border-dashed opacity-70 transition-opacity starting:opacity-0"
+            className="border-ring pointer-events-none absolute top-0 left-0 [translate:var(--node-x)_var(--node-y)] rounded-2xl border border-dashed opacity-70 transition-opacity starting:opacity-0"
           />
         )}
 

@@ -79,23 +79,34 @@ export default function ApiTokens() {
         title="AI assistants (MCP)"
         description="Let Claude or another MCP client use your CRM. A token acts as you, with your permissions, and its changes show on timelines as done via MCP. Revoke it any time."
         action={
-          <Button
-            variant="secondary"
-            size="xs"
-            disabled={
-              active.filter((token) => !token.expired).length >= MAX_LIVE_TOKENS
-            }
-            onClick={() => setCreating(true)}
-          >
-            Create token
-          </Button>
+          active.length > 0 && (
+            <Button
+              variant="secondary"
+              size="xs"
+              disabled={
+                active.filter((token) => !token.expired).length >=
+                MAX_LIVE_TOKENS
+              }
+              onClick={() => setCreating(true)}
+            >
+              Create token
+            </Button>
+          )
         }
       >
         {active.length === 0 ? (
           <SettingsRow
             label="No tokens yet"
             description="Create one, then paste its config into your MCP client."
-          />
+          >
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={() => setCreating(true)}
+            >
+              Create token
+            </Button>
+          </SettingsRow>
         ) : (
           active.map((token) => <TokenRow key={token._id} token={token} />)
         )}
@@ -268,7 +279,7 @@ function CreateDialog({
             <DialogFooter>
               <DialogClose asChild>
                 <Button variant="primary" size="sm">
-                  Done
+                  Close
                 </Button>
               </DialogClose>
             </DialogFooter>

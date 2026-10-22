@@ -67,8 +67,8 @@ export default function SavedViewsMenu() {
       <PopoverTrigger asChild>
         <Button
           variant="secondary"
-          size="sm"
-          className="h-control-md max-sm:w-control-md data-[state=open]:bg-muted py-0 max-sm:px-0"
+          size="toolbar"
+          className="max-sm:w-control-md data-[state=open]:bg-muted max-sm:px-0"
           aria-label="Saved views"
         >
           <FilterIcon aria-hidden className="size-3" />
