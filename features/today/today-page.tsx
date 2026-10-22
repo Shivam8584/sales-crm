@@ -10,23 +10,37 @@ import Button from "@/components/_ui/button";
 import Kbd from "@/components/_ui/kbd";
 import SegmentedControl from "@/components/_ui/segmented-control";
 import Skeleton from "@/components/_ui/skeleton";
-import { CreateButton, Page, PageHeader } from "@/components/shell/page";
+import Avatar from "@/components/_ui/avatar";
+import {
+  CreateButton,
+  MetaSeparator,
+  Page,
+  PageHeader,
+  PageStatus,
+} from "@/components/shell/page";
+import AccountLogo from "@/features/accounts/account-logo";
+import { SlaCell } from "@/features/leads/sla";
 import { StageTag } from "@/features/accounts/stage";
 import { useRefreshNextActions } from "@/features/ai/next-action";
 import TaskComposer from "@/features/tasks/task-composer";
 import {
   byUrgency,
   dayFromToday,
+  formatDay,
   type TaskRow,
 } from "@/features/tasks/task-meta";
 import { useTaskActions } from "@/features/tasks/use-task-actions";
-import MonthStrip from "@/features/targets/month-strip";
+import MonthCard from "@/features/targets/month-card";
 import { useViewer } from "@/hooks/use-viewer";
 import { isEditableTarget } from "@/lib/keyboard";
 import { relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
+import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
+import ClockIcon from "@/public/assets/icons/clock.svg";
+import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
 import {
   DealItem,
   LeadItem,
@@ -199,6 +213,14 @@ export default function TodayPage() {
     ];
   }, [tasks, waiting, stuck, deals, viewer, today, weekAhead]);
 
+  const spotlight = useMemo((): Item | null => {
+    const lead = waiting?.leads[0];
+    if (lead) return { kind: "lead", id: lead._id, lead };
+    const overdue = sections.find((section) => section.id === "overdue");
+    const dueToday = sections.find((section) => section.id === "today");
+    return overdue?.items?.[0] ?? dueToday?.items?.[0] ?? null;
+  }, [waiting, sections]);
+
   const { main, aside } = useMemo(() => {
     if (focus) {
       return {
@@ -206,11 +228,24 @@ export default function TodayPage() {
         aside: [],
       };
     }
+    // The spotlit item sits in the focus card, so its list doesn't repeat it.
+    const rest = sections
+      .map((section) => ({
+        ...section,
+        items: section.items?.filter((item) => item.id !== spotlight?.id),
+      }))
+      .filter(
+        (section) =>
+          section.id === "today" ||
+          section.id === "upcoming" ||
+          section.items === undefined ||
+          section.items.length > 0,
+      );
     return {
-      main: sections.filter((section) => !section.aside),
-      aside: sections.filter((section) => section.aside),
+      main: rest.filter((section) => !section.aside),
+      aside: rest.filter((section) => section.aside),
     };
-  }, [sections, focus]);
+  }, [sections, focus, spotlight]);
   const navigable = useMemo(
     () => [...main, ...aside].flatMap((section) => section.items ?? []),
     [main, aside],
@@ -329,10 +364,10 @@ export default function TodayPage() {
           section.id === "today" && !composing ? (
             <Button
               variant="ghost"
-              size="xs"
+              size="sm"
               onClick={() => setComposing(true)}
             >
-              <PlusIcon aria-hidden className="size-2.5" />
+              <PlusIcon aria-hidden className="size-3" />
               Add for today
             </Button>
           ) : undefined
@@ -344,19 +379,17 @@ export default function TodayPage() {
           <ul className={ROWS}>{section.items.map(renderItem)}</ul>
         ) : (
           !composer && (
-            <p className="caption-style text-fg-tertiary px-4 pb-4 sm:px-5">
-              {section.empty}
-            </p>
+            <p className="text-fg-tertiary mt-2 text-sm">{section.empty}</p>
           )
         )}
         {composer && (
-          <div className="px-3 pb-3 sm:px-4">
+          <div className="mt-2">
             <TaskComposer
               assigneeId={viewer._id}
               defaultDueDate={today}
               label="New task due today"
               onClose={() => setComposing(false)}
-              className="bg-overlay-1 shadow-none"
+              className="bg-well shadow-none"
             />
           </div>
         )}
@@ -365,89 +398,134 @@ export default function TodayPage() {
   }
 
   const firstName = viewer.name.trim().split(/\s+/)[0];
+  const counts = Object.fromEntries(
+    sections.map((section) => [section.id, section.items?.length ?? 0]),
+  ) as Record<SectionId, number>;
+  const urgent = counts.leads + counts.overdue;
 
   return (
     <Page>
       <PageHeader
-        title="Today"
+        title={`${greeting(now.getHours())}, ${firstName}`}
         meta={
-          <span className="caption-style text-fg-tertiary">
-            {FULL_DATE.format(now)}
-          </span>
+          <>
+            <span>{FULL_DATE.format(now)}</span>
+            {loaded && (
+              <>
+                <MetaSeparator />
+                {urgent > 0 ? (
+                  <PageStatus tone="warning">
+                    <span className="text-warning font-medium">
+                      {counts.leads > 0
+                        ? `${counts.leads} ${counts.leads === 1 ? "lead" : "leads"} waiting`
+                        : `${counts.overdue} overdue`}
+                    </span>
+                  </PageStatus>
+                ) : (
+                  <span>Nothing urgent</span>
+                )}
+                <MetaSeparator />
+                <span>{counts.today} due today</span>
+                {counts.stuck > 0 && (
+                  <>
+                    <MetaSeparator />
+                    <span className="max-sm:hidden">
+                      {counts.stuck} stuck{" "}
+                      {counts.stuck === 1 ? "brand" : "brands"}
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+          </>
         }
         actions={
-          <CreateButton onClick={() => setCreate({ type: "task" })}>
+          <CreateButton
+            quiet={Boolean(spotlight)}
+            onClick={() => setCreate({ type: "task" })}
+          >
             New task
           </CreateButton>
         }
       />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 sm:px-6 lg:py-7">
-          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-            <div className="flex min-w-0 flex-col gap-1">
-              <h2 className="text-xl leading-tight font-medium tracking-[-0.01em]">
-                {greeting(now.getHours())}, {firstName}
-              </h2>
-              {tasks !== undefined && (
-                <p className="caption-style text-fg-tertiary">
-                  {completed === 0
-                    ? "Nothing completed in the last 14 days."
-                    : `${doneToday} done today · ${completed} in the last ${TREND_DAYS} days`}
-                </p>
-              )}
-              <MonthStrip />
-            </div>
-            <p className="caption-style text-fg-tertiary hidden items-center gap-1.5 lg:flex">
+        <div className="flex w-full flex-col px-(--page-x) pb-16">
+          <div className="rise flex items-center justify-between gap-6 [--i:1]">
+            <SegmentedControl
+              label="Focus on one section"
+              value={focus ?? "all"}
+              onChange={(next) =>
+                setFocus(next === "all" ? null : (next as SectionId))
+              }
+              segments={[
+                {
+                  value: "all",
+                  label: "All",
+                  count: loaded ? total : undefined,
+                },
+                ...sections
+                  .filter(
+                    (section) => section.items?.length || section.id === focus,
+                  )
+                  .map((section) => ({
+                    value: section.id,
+                    label: section.title,
+                    count: section.items?.length,
+                  })),
+              ]}
+              className="h-10 max-w-full overflow-x-auto"
+            />
+            <p className="text-fg-tertiary hidden shrink-0 items-center gap-1.5 text-xs xl:flex">
               <Kbd>J</Kbd>
               <Kbd>K</Kbd> to move · <Kbd>X</Kbd> to complete · <Kbd>Enter</Kbd>{" "}
               to open
             </p>
           </div>
 
-          <SegmentedControl
-            label="Focus on one section"
-            value={focus ?? "all"}
-            onChange={(next) =>
-              setFocus(next === "all" ? null : (next as SectionId))
-            }
-            segments={[
-              { value: "all", label: "All", count: loaded ? total : undefined },
-              ...sections
-                .filter(
-                  (section) => section.items?.length || section.id === focus,
-                )
-                .map((section) => ({
-                  value: section.id,
-                  label: section.title,
-                  count: section.items?.length,
-                })),
-            ]}
-            className="max-w-full self-start overflow-x-auto"
-          />
+          {!focus && (
+            <div className="mt-8 grid items-stretch gap-x-8 gap-y-6 lg:grid-cols-12">
+              <div className="rise min-w-0 [--i:2] lg:col-span-8">
+                {!loaded ? (
+                  <Skeleton className="h-60 w-full rounded-4xl" />
+                ) : spotlight ? (
+                  <FocusCard
+                    item={spotlight}
+                    slaMs={waiting?.slaMs ?? 0}
+                    onDone={(task) => void setDone(task, true)}
+                    onOpenTask={(id) => setEdit({ type: "task", id })}
+                  />
+                ) : (
+                  <CaughtUp
+                    empty={total === 0}
+                    onPlan={() => setCreate({ type: "task" })}
+                    trend={
+                      tasks === undefined
+                        ? undefined
+                        : completed === 0
+                          ? "Nothing completed in the last 14 days."
+                          : `${doneToday} done today · ${completed} in the last ${TREND_DAYS} days`
+                    }
+                  />
+                )}
+              </div>
+              <div className="rise min-w-0 [--i:3] lg:col-span-4">
+                <MonthCard />
+              </div>
+            </div>
+          )}
 
-          {loaded && total === 0 && !focus ? (
-            <p className="text-fg-tertiary flex flex-wrap items-center gap-3 py-6">
-              All clear. Nothing due and no leads waiting.
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setCreate({ type: "task" })}
-              >
-                Plan a follow-up
-              </Button>
-            </p>
-          ) : (
+          {!(loaded && total === 0 && !focus) && (
             <div
               className={cn(
-                "grid items-start gap-5",
-                !focus && "lg:grid-cols-[minmax(0,1fr)_23rem]",
+                "mt-12 grid items-start gap-x-8 gap-y-12",
+                !focus && "lg:grid-cols-12",
               )}
             >
-              <div className="flex min-w-0 flex-col gap-5">
+              <div className="flex min-w-0 flex-col gap-10 lg:col-span-8">
                 {main.map(renderSection)}
               </div>
               {!focus && (
-                <div className="flex min-w-0 flex-col gap-5">
+                <div className="flex min-w-0 flex-col gap-10 lg:col-span-4">
                   {aside.map(renderSection)}
                   <RecentAccounts accounts={accounts} />
                 </div>
@@ -457,6 +535,152 @@ export default function TodayPage() {
         </div>
       </div>
     </Page>
+  );
+}
+
+function FocusCard({
+  item,
+  slaMs,
+  onDone,
+  onOpenTask,
+}: {
+  item: Item;
+  slaMs: number;
+  onDone: (task: TaskRow) => void;
+  onOpenTask: (id: string) => void;
+}) {
+  if (item.kind === "lead") {
+    const { lead } = item;
+    return (
+      <section className="bg-well flex h-full flex-col justify-between gap-8 rounded-4xl p-6 sm:p-7">
+        <div className="flex items-start gap-4 sm:gap-5">
+          <Avatar
+            name={lead.name}
+            className="size-12 text-sm sm:size-14 sm:text-base"
+          />
+          <div className="min-w-0">
+            <p
+              className={cn(
+                "flex items-center gap-1.5 text-sm font-medium",
+                lead.slaBreachedAt ? "text-danger" : "text-warning",
+              )}
+            >
+              <ClockIcon aria-hidden className="size-3.5 shrink-0" />
+              Waiting for a first reply · <SlaCell lead={lead} slaMs={slaMs} />
+            </p>
+            <h2 className="mt-2 text-xl leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-2xl">
+              {lead.name}
+              {lead.companyName && (
+                <span className="text-fg-secondary">
+                  {" "}
+                  from {lead.companyName}
+                </span>
+              )}
+            </h2>
+            <p className="text-body text-fg-secondary mt-2 max-w-[48ch] text-pretty">
+              {LEAD_KIND_LABEL[lead.kind]} lead, arrived{" "}
+              {relativeTime(lead._creationTime)}.
+              {lead.demoAt && " A demo is booked."}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:pl-19">
+          <Button href={routes.lead(lead._id)} variant="primary" size="lg">
+            Open lead
+          </Button>
+          <Button
+            href={`${routes.leads}?owner=mine`}
+            variant="secondary"
+            size="lg"
+          >
+            All leads
+          </Button>
+        </div>
+      </section>
+    );
+  }
+  if (item.kind !== "task") return null;
+  const { task } = item;
+  const overdue = Boolean(task.dueDate && task.dueDate < dayFromToday(0));
+  const record =
+    task.account?.name ?? task.deal?.title ?? task.lead?.name ?? null;
+  return (
+    <section className="bg-well flex h-full flex-col justify-between gap-8 rounded-4xl p-6 sm:p-7">
+      <div className="flex items-start gap-4 sm:gap-5">
+        <span className="bg-background text-fg-secondary shadow-tile grid size-12 shrink-0 place-items-center rounded-2xl sm:size-14">
+          <CheckSquareIcon aria-hidden className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <p
+            className={cn(
+              "flex items-center gap-1.5 text-sm font-medium",
+              overdue ? "text-danger" : "text-warning",
+            )}
+          >
+            <ClockIcon aria-hidden className="size-3.5 shrink-0" />
+            {overdue && task.dueDate
+              ? `Overdue since ${formatDay(task.dueDate)}`
+              : "Due today"}
+          </p>
+          <h2 className="mt-2 text-xl leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-2xl">
+            {task.title}
+          </h2>
+          {record && (
+            <p className="text-body text-fg-secondary mt-2">{record}</p>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:pl-19">
+        <Button variant="primary" size="lg" onClick={() => onDone(task)}>
+          Mark done
+        </Button>
+        <Button
+          variant="secondary"
+          size="lg"
+          onClick={() => onOpenTask(task._id)}
+        >
+          Open task
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function CaughtUp({
+  empty,
+  trend,
+  onPlan,
+}: {
+  empty: boolean;
+  trend?: string;
+  onPlan: () => void;
+}) {
+  return (
+    <section className="bg-well flex h-full flex-col justify-between gap-6 rounded-4xl p-6 sm:p-7">
+      <div className="flex items-start gap-4">
+        <span className="bg-background text-success shadow-tile grid size-12 shrink-0 place-items-center rounded-full">
+          <CheckCircleIcon aria-hidden className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="title-style">
+            {empty ? "You're all caught up" : "Nothing urgent"}
+          </h2>
+          <p className="text-fg-secondary mt-1 text-sm text-pretty">
+            {empty
+              ? "No leads waiting and nothing due. New work shows up here."
+              : "No leads waiting and nothing overdue or due today."}
+          </p>
+          {trend && <p className="text-fg-tertiary mt-3 text-xs">{trend}</p>}
+        </div>
+      </div>
+      {empty && (
+        <div className="sm:pl-16">
+          <Button variant="primary" size="md" onClick={onPlan}>
+            Plan a follow-up
+          </Button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -472,26 +696,26 @@ function SectionHead({
   children?: ReactNode;
 }) {
   return (
-    <div className="min-h-control-md flex items-center gap-2 px-4 sm:px-5">
-      <h3 className="lead-style font-medium">{title}</h3>
+    <div className="flex h-7 items-center gap-1.5">
+      <h3 className="title-style">{title}</h3>
       {count !== undefined && count > 0 && (
         <span
           className={cn(
-            "caption-style tabular-nums",
-            danger ? "text-danger" : "text-fg-tertiary",
+            "text-title font-medium tabular-nums",
+            danger ? "text-danger" : "text-fg-disabled",
           )}
         >
           {count}
         </span>
       )}
-      <span className="ml-auto flex items-center gap-2">{children}</span>
+      <span className="ml-auto flex items-center gap-1">{children}</span>
     </div>
   );
 }
 
 const SECTION_LINK =
-  "caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2";
-const ROWS = "divide-border border-border flex flex-col divide-y border-t";
+  "text-fg-secondary hover:text-foreground hover:bg-well focus-visible:ring-ring -mr-2 rounded-full px-2 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-2";
+const ROWS = "mt-2 flex flex-col";
 
 function CockpitCard({
   section,
@@ -504,7 +728,7 @@ function CockpitCard({
 }) {
   const count = section.items?.length;
   return (
-    <section className="min-w-0">
+    <section className="rise min-w-0">
       <SectionHead
         title={section.title}
         count={count}
@@ -529,10 +753,12 @@ function RowsSkeleton() {
   return (
     <div className={ROWS}>
       {[0, 1].map((index) => (
-        <div key={index} className="flex h-13 items-center gap-3 px-4 sm:px-5">
-          <Skeleton className="size-4 rounded-sm" />
-          <Skeleton className="h-3 w-48" />
-          <Skeleton className="ml-auto h-3 w-14" />
+        <div key={index} className="flex h-17 items-center gap-4">
+          <Skeleton className="size-11 rounded-xl" />
+          <span className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-4 w-3/5" />
+            <Skeleton className="h-3 w-2/5" />
+          </span>
         </div>
       ))}
     </div>
@@ -545,7 +771,7 @@ function RecentAccounts({
   accounts: FunctionReturnType<typeof api.accounts.page>["page"] | undefined;
 }) {
   return (
-    <section className="min-w-0">
+    <section className="rise min-w-0">
       <SectionHead title="Recently touched">
         <Link href={`${routes.accounts}?view=mine`} className={SECTION_LINK}>
           My accounts
@@ -554,22 +780,25 @@ function RecentAccounts({
       {recent === undefined ? (
         <RowsSkeleton />
       ) : recent.length === 0 ? (
-        <p className="caption-style text-fg-tertiary px-4 pb-4 sm:px-5">
-          No accounts yet.
-        </p>
+        <p className="text-fg-tertiary mt-2 text-sm">No accounts yet.</p>
       ) : (
         <ul className={ROWS}>
           {recent.map((account) => (
             <li key={account._id}>
               <Link
                 href={routes.account(account._id)}
-                className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
+                className="hover:bg-well focus-visible:ring-ring duration-base -mx-3 flex items-center gap-3.5 rounded-2xl px-3 py-2.5 transition-[background-color,scale] outline-none hover:duration-[120ms] focus-visible:ring-2 active:scale-[0.985]"
               >
-                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="lead-style truncate leading-5 font-medium">
+                <AccountLogo
+                  account={account}
+                  size="md"
+                  className="size-10 rounded-xl text-sm"
+                />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-body truncate font-medium">
                     {account.name}
                   </span>
-                  <span className="caption-style text-fg-tertiary truncate">
+                  <span className="text-fg-tertiary truncate text-sm">
                     {account.lastActivityAt
                       ? relativeTime(account.lastActivityAt)
                       : "No activity yet"}

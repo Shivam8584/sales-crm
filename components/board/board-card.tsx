@@ -27,9 +27,9 @@ export function CardSurface({
   return (
     <div
       className={cn(
-        "border-border border relative flex w-full flex-col overflow-clip rounded-xl",
+        "bg-background shadow-tile relative flex w-full flex-col overflow-clip rounded-2xl",
         lifted &&
-          "shadow-overlay animate-card-lift -rotate-4 motion-reduce:animate-none",
+          "shadow-overlay animate-card-lift -rotate-2 motion-reduce:animate-none",
         invisible && "invisible",
         className,
       )}
@@ -129,7 +129,7 @@ export default function BoardCard({
       >
         <CardSurface
           invisible={hidden}
-          className="duration-fast ease-power3-out group-hover/card:bg-raised transition-[translate,background-color] group-hover/card:-translate-y-0.5 motion-reduce:group-hover/card:translate-y-0"
+          className="duration-base ease-out-hd transition-[translate,box-shadow,scale] group-hover/card:-translate-y-0.5 group-hover/card:shadow-[0_6px_18px_-8px_rgb(10_11_13/0.18),0_0_0_1px_rgb(10_11_13/0.08)] group-active/card:scale-[0.985] motion-reduce:group-hover/card:translate-y-0 dark:group-hover/card:shadow-[0_6px_18px_-8px_rgb(0_0_0/0.6),0_0_0_1px_rgb(255_255_255/0.12)]"
         >
           {children}
         </CardSurface>

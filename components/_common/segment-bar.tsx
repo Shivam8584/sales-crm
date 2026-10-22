@@ -11,55 +11,45 @@ type SegmentBarProps = {
   trackClassName?: string;
 };
 
-const TONE_CLASS: Record<Exclude<SegmentTone, "auto">, string> = {
-  danger: "bg-danger",
+const TONE_CLASS: Record<SegmentTone, string> = {
+  auto: "bg-foreground",
+  success: "bg-foreground",
   warning: "bg-warning",
-  success: "bg-success",
+  danger: "bg-danger",
 };
 
-function autoTone(index: number, filled: number) {
-  const red = Math.floor(filled / 3);
-  const amber = Math.ceil(filled / 3);
-  if (index < red) return TONE_CLASS.danger;
-  if (index < red + amber) return TONE_CLASS.warning;
-  return TONE_CLASS.success;
-}
-
+/** A thin rounded progress bar on an ink-6% track. */
 export default function SegmentBar({
   percent,
-  segments = 17,
   tone = "auto",
   className,
   segmentClassName,
   trackClassName = "bg-track",
 }: SegmentBarProps) {
-  const filled = Math.round((percent / 100) * segments);
-
+  const value = Math.max(0, Math.min(100, percent));
   return (
     <span
       role="meter"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
-      className={cn(
-        "bg-overlay-3 flex h-3.5 items-center gap-0.5 overflow-hidden rounded-xs px-0.5",
-        className,
-      )}
+      className={cn("flex h-3.5 items-center", className)}
     >
-      {Array.from({ length: segments }, (_, index) => (
+      <span
+        className={cn(
+          "block h-1.5 w-full overflow-hidden rounded-full",
+          trackClassName,
+        )}
+      >
         <span
-          key={index}
           className={cn(
-            "h-2.5 min-w-px flex-1 rounded-xs",
+            "ease-out-hd block h-full rounded-full transition-[width] duration-[420ms]",
+            TONE_CLASS[tone],
             segmentClassName,
-            index < filled
-              ? tone === "auto"
-                ? autoTone(index, filled)
-                : TONE_CLASS[tone]
-              : trackClassName,
           )}
+          style={{ width: `${value}%` }}
         />
-      ))}
+      </span>
     </span>
   );
 }

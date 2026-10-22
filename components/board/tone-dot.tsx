@@ -1,7 +1,9 @@
 import type { TagTone } from "@/components/_ui/tag";
 import { cn } from "@/lib/utils";
 
-const DOT_BG: Record<TagTone, string> = {
+type DotTone = TagTone | "info" | "success" | "warning" | "danger";
+
+const DOT_BG: Record<DotTone, string> = {
   blue: "bg-(--tag-blue-text)",
   purple: "bg-(--tag-purple-text)",
   green: "bg-(--tag-green-text)",
@@ -11,14 +13,18 @@ const DOT_BG: Record<TagTone, string> = {
   amber: "bg-(--tag-amber-text)",
   teal: "bg-(--tag-teal-text)",
   yellow: "bg-(--tag-yellow-text)",
-  neutral: "bg-(--tag-neutral-text)",
+  neutral: "bg-fg-disabled",
+  info: "bg-info",
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
 };
 
 export default function ToneDot({
   tone,
   className,
 }: {
-  tone: TagTone;
+  tone: DotTone;
   className?: string;
 }) {
   return (

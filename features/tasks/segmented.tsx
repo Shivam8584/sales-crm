@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 export type Segment<T extends string> = {
@@ -31,6 +32,7 @@ export default function Segmented<T extends string>({
   className,
 }: SegmentedProps<T>) {
   const ref = useRef<HTMLDivElement>(null);
+  const id = useId();
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const step =
@@ -56,7 +58,7 @@ export default function Segmented<T extends string>({
       aria-label={label}
       onKeyDown={onKeyDown}
       className={cn(
-        "bg-overlay-2 inline-flex shrink-0 items-center gap-0.5 rounded-full p-0.5",
+        "bg-well inline-flex shrink-0 items-center rounded-full p-1",
         className,
       )}
     >
@@ -72,13 +74,28 @@ export default function Segmented<T extends string>({
             tabIndex={checked ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={cn(
-              "text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast ease-power3-out relative inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full text-xs leading-none whitespace-nowrap transition-[color,background-color,box-shadow] outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2 pointer-coarse:after:content-['']",
-              size === "sm" ? "h-6.5 px-2" : "h-8 px-3",
-              checked && "bg-raised text-foreground shadow-raised font-medium",
+              "text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-base relative inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full text-[13px] leading-none font-medium whitespace-nowrap transition-[color,scale] ease-out outline-none focus-visible:ring-2 active:scale-[0.97] motion-reduce:active:scale-100 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2 pointer-coarse:after:content-['']",
+              size === "sm" ? "h-7 px-2.5" : "h-8 px-3.5",
+              checked && "text-foreground",
             )}
           >
-            {option.icon}
-            <span className={cn(compact && option.icon && "max-sm:sr-only")}>
+            {checked && (
+              <motion.span
+                aria-hidden
+                layoutId={`${id}-thumb`}
+                transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+                className="bg-background shadow-capsule absolute inset-0 rounded-full"
+              />
+            )}
+            <span className="relative contents [&>svg]:relative">
+              {option.icon}
+            </span>
+            <span
+              className={cn(
+                "relative",
+                compact && option.icon && "max-sm:sr-only",
+              )}
+            >
               {option.label}
             </span>
           </button>

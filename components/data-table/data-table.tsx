@@ -82,7 +82,7 @@ type DataTableProps<T> = {
 const SKELETON_WIDTHS = ["w-36", "w-28", "w-44", "w-32", "w-24", "w-40"];
 
 const ROW_TINT =
-  "bg-background group-data-[cursor=true]/row:bg-row-hover group-data-[selected=true]/row:bg-row-selected";
+  "bg-background group-hover/row:bg-row-hover group-data-[cursor=true]/row:bg-row-hover group-data-[selected=true]/row:bg-row-selected";
 
 /**
  * The list view used by every record type: sortable columns, row selection,
@@ -398,19 +398,19 @@ export default function DataTable<T>({
         data-density={density}
         style={{ "--checkbox-track": CHECKBOX_TRACK } as CSSProperties}
         onScroll={(event) => measure(event.currentTarget)}
-        className="group/table scrollbar-none relative min-h-0 flex-1 overflow-auto [--row-height:42px] data-[density=compact]:[--row-height:34px]"
+        className="group/table scrollbar-none relative mx-(--page-x) min-h-0 flex-1 overflow-auto [--row-height:48px] data-[density=compact]:[--row-height:36px]"
       >
         <div className="min-w-fit">
           <div
             role="row"
             style={template}
-            className="border-border bg-background z-sticky-header h-row sticky top-0 grid border-b"
+            className="border-border bg-background z-sticky-header sticky top-0 grid h-10 border-b"
           >
             {selectable && (
               <div
                 role="columnheader"
                 className={cn(
-                  "bg-background flex items-center pl-4",
+                  "bg-background flex items-center pl-2",
                   stickyFirstColumn && "z-sticky sticky left-0",
                 )}
               >
@@ -534,7 +534,7 @@ export default function DataTable<T>({
                     activeCursor !== rowIndex && setCursor(rowIndex)
                   }
                   onClick={(event) => openRow(row, event)}
-                  className="group/row border-border data-[cursor=true]:bg-row-hover data-[selected=true]:bg-row-selected h-row relative grid cursor-pointer scroll-mt-11 scroll-mb-12 border-b"
+                  className="group/row border-border data-[cursor=true]:bg-row-hover data-[selected=true]:bg-row-selected h-row duration-base hover:bg-row-hover relative grid cursor-pointer scroll-mt-11 scroll-mb-12 border-b transition-colors hover:duration-[120ms]"
                 >
                   {selectable && (
                     <div
@@ -544,7 +544,7 @@ export default function DataTable<T>({
                         if (event.target === event.currentTarget) toggle(id);
                       }}
                       className={cn(
-                        "flex items-center pl-4",
+                        "flex items-center pl-2",
                         cursorBar,
                         stickyFirstColumn &&
                           cn(ROW_TINT, "z-sticky sticky left-0"),
@@ -564,7 +564,7 @@ export default function DataTable<T>({
                       className={cn(
                         "lead-style flex min-w-0 items-center px-3",
                         column.align === "end" && "justify-end tabular-nums",
-                        index === 0 && !selectable && cn("pl-4", cursorBar),
+                        index === 0 && !selectable && cn("pl-2", cursorBar),
                         stickyFirstColumn && index === 0 && ROW_TINT,
                         firstSticky(index),
                       )}
@@ -572,7 +572,7 @@ export default function DataTable<T>({
                       {index === 0 ? (
                         <Link
                           href={getHref(row)}
-                          className="focus-visible:ring-ring -mx-1 flex min-w-0 items-center gap-2.5 rounded-sm px-1 py-1 font-medium outline-none focus-visible:ring-2"
+                          className="focus-visible:ring-ring text-body -mx-1 flex min-w-0 items-center gap-3 rounded-md px-1 py-1 font-medium outline-none focus-visible:ring-2"
                         >
                           {column.cell(row)}
                         </Link>
@@ -607,7 +607,7 @@ export default function DataTable<T>({
                         actionColumn ? "right-12" : "right-3",
                       )}
                     >
-                      <div className="bg-popover shadow-overlay flex items-center gap-0.5 rounded-lg p-0.5">
+                      <div className="bg-popover shadow-overlay flex items-center gap-0.5 rounded-full p-1">
                         {actions}
                       </div>
                     </div>
@@ -762,7 +762,7 @@ function TableFooter({
     <div
       role="group"
       aria-label="Totals for this view"
-      className="caption-style border-border bg-background flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-t px-4 py-3"
+      className="text-fg-tertiary flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 px-(--page-x) py-3.5 text-sm"
     >
       {stats.map((stat) => (
         <div key={stat.label} className="flex min-w-0 items-center gap-2">
@@ -801,9 +801,9 @@ function HeaderCell<T>({
         active ? (sort.dir === "asc" ? "ascending" : "descending") : undefined
       }
       className={cn(
-        "caption-style text-fg-tertiary flex min-w-0 items-center px-3",
+        "text-fg-tertiary flex min-w-0 items-center px-3 text-xs",
         column.align === "end" && "justify-end",
-        first && "pl-4",
+        first && "pl-2",
         className,
       )}
     >

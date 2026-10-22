@@ -291,6 +291,15 @@ export function PageStatus({
   );
 }
 
+/** The quiet slash between items of a head's meta line. */
+export function MetaSeparator() {
+  return (
+    <span aria-hidden className="text-fg-disabled/60">
+      /
+    </span>
+  );
+}
+
 export type PageView = {
   id: string;
   label: string;

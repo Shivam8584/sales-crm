@@ -484,7 +484,7 @@ export default function Board<T extends { id: string }>({
             ref={scrollerRef}
             layoutScroll
             className={cn(
-              "scrollbar-none flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden lg:snap-none",
+              "scrollbar-none flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-(--page-x) pb-4 lg:snap-none",
               !snapping && "snap-none",
             )}
           >
@@ -511,9 +511,7 @@ export default function Board<T extends { id: string }>({
             ))}
             {visibleColumns.length === 0 && (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-                <h2 className="lead-style font-medium">
-                  Every column is hidden
-                </h2>
+                <h2 className="title-style">Every column is hidden</h2>
                 <p className="caption-style text-fg-tertiary max-w-64 leading-snug">
                   Bring a column back from the hidden columns panel.
                 </p>
@@ -528,14 +526,14 @@ export default function Board<T extends { id: string }>({
           <div
             aria-hidden
             className={cn(
-              "from-selected/15 z-sticky-header duration-fast pointer-events-none absolute inset-y-0 left-0 w-16 bg-linear-to-r to-transparent transition-opacity",
+              "from-foreground/[0.06] z-sticky-header duration-fast pointer-events-none absolute inset-y-0 left-0 w-16 bg-linear-to-r to-transparent transition-opacity",
               edgeDir === -1 ? "opacity-100" : "opacity-0",
             )}
           />
           <div
             aria-hidden
             className={cn(
-              "from-selected/15 z-sticky-header duration-fast pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent transition-opacity",
+              "from-foreground/[0.06] z-sticky-header duration-fast pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent transition-opacity",
               edgeDir === 1 ? "opacity-100" : "opacity-0",
             )}
           />
