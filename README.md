@@ -166,7 +166,7 @@ Staff sign in with Hypedrive SSO: the Logto app "Hypedrive Sales CRM" (Tradition
 
 ### Monitoring
 
-`GET https://sales.hypedrive.app/api/health` returns 200 `{"ok":true,"convex":true}` when the app is up and Convex answers a query, else 503; point UptimeRobot at it. The web container's own Docker healthcheck stays on `/demo` so a Convex outage doesn't make Traefik drop the app. With `SENTRY_DSN` in `.env` (a GlitchTip project on errors.hypedrive.app), Next server errors and screens that crash in the browser are reported; rebuild the web image after setting it. For Convex function errors, add the same DSN as a log stream:
+`GET https://sales.hypedrive.app/api/health` returns 200 `{"ok":true,"convex":true}` when the app is up and Convex answers a query, else 503; point UptimeRobot at it. The web container's own Docker healthcheck stays on `/demo` so a Convex outage doesn't make Traefik drop the app. With `SENTRY_DSN` in `.env` (a project on the team GlitchTip at errors.hypedrive.app), Next server errors and screens that crash in the browser are reported; rebuild the web image after setting it. For Convex function errors, add the same DSN as a log stream:
 
 ```bash
 curl -X POST "$CONVEX_SELF_HOSTED_URL/api/v1/create_log_stream" -H "Authorization: Convex $CONVEX_SELF_HOSTED_ADMIN_KEY" \
