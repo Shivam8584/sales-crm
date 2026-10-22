@@ -72,7 +72,7 @@ export default function Segmented<T extends string>({
             tabIndex={checked ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={cn(
-              "text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast ease-power3-out inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full text-xs leading-none whitespace-nowrap transition-[color,background-color,box-shadow] outline-none focus-visible:ring-2",
+              "text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast ease-power3-out relative inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full text-xs leading-none whitespace-nowrap transition-[color,background-color,box-shadow] outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2 pointer-coarse:after:content-['']",
               size === "sm" ? "h-6.5 px-2" : "h-8 px-3",
               checked && "bg-raised text-foreground shadow-raised font-medium",
             )}
