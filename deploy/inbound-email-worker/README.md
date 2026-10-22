@@ -7,20 +7,19 @@ Cloudflare Email Worker that parses the message and posts it, HMAC-signed, to
 Use a subdomain, not the root domain: `hypedrive.app` already has its own MX
 (`mail.hypedrive.app`), and Email Routing replaces a domain's MX records.
 
-The Worker `hypedrive-crm-inbound-email` is already deployed (no public URL) with
-`INBOUND_EMAIL_SECRET` set. To redeploy after editing it:
-`npm install && npx wrangler deploy` here (`npx wrangler login` first if needed).
-What is left is Cloudflare dashboard work:
+The Worker `hypedrive-crm-inbound-email` is deployed (no public URL) with
+`INBOUND_EMAIL_SECRET` set. `replies.hypedrive.app` has Cloudflare Email Routing
+and a rule sends `reply@replies.hypedrive.app` to the Worker; production sets
+`EMAIL_REPLY_TO` to that address. The root domain's own mail (`mail.hypedrive.app`)
+is untouched.
 
-1. `hypedrive.app` → Email → Email Routing → Settings → add the subdomain
-   `replies.hypedrive.app` (Cloudflare adds its MX and SPF records for that
-   subdomain only).
-2. Email Routing → Routing rules → add `reply@replies.hypedrive.app` → action
-   "Send to a Worker" → `hypedrive-crm-inbound-email`.
-3. Send a test mail to `reply@replies.hypedrive.app`; an unknown sender is
-   answered with `unmatched` by the webhook (check `npx convex logs`).
-4. Only then point sequence emails at it:
-   ```bash
-   npx convex env set EMAIL_REPLY_TO "Hypedrive <reply@replies.hypedrive.app>"
-   ```
-   (Setting it earlier would send replies to an address that bounces.)
+To redeploy after editing the Worker: `npm install && npx wrangler deploy` here.
+To rebuild the routing from scratch (token needs `zone:read` and `email_routing:write`):
+
+```bash
+# enable the subdomain, then route one address to the Worker
+curl -X POST -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+  https://api.cloudflare.com/client/v4/zones/$ZONE/email/routing/dns -d '{"name":"replies.hypedrive.app"}'
+curl -X POST -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+  https://api.cloudflare.com/client/v4/zones/$ZONE/email/routing/rules -d '{"name":"CRM replies","enabled":true,"matchers":[{"type":"literal","field":"to","value":"reply@replies.hypedrive.app"}],"actions":[{"type":"worker","value":["hypedrive-crm-inbound-email"]}]}'
+```
