@@ -14,7 +14,7 @@ async function sign(secret, text) {
   return hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(text)));
 }
 
-export default {
+const worker = {
   async email(message, env) {
     const mail = await PostalMime.parse(message.raw);
     const body = JSON.stringify({
@@ -43,3 +43,5 @@ export default {
     }
   },
 };
+
+export default worker;
