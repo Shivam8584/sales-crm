@@ -29,7 +29,7 @@ export default function SidebarPins({
   const pins = useQuery(api.pins.mine, {});
   if (!pins?.length) return null;
   return (
-    <SidebarSection title="Pinned" className="border-sidebar-border border-t">
+    <SidebarSection title="Pinned">
       {pins.map((pin) => (
         <SidebarNavItem
           key={pin._id}

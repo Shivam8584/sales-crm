@@ -7,7 +7,6 @@ import Button from "@/components/_ui/button";
 import Tooltip from "@/components/_ui/tooltip";
 import { useViewer } from "@/hooks/use-viewer";
 import { readError } from "@/lib/errors";
-import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import EyeIcon from "@/public/assets/icons/eye.svg";
 
@@ -68,10 +67,7 @@ export default function FollowButton({ target }: { target: Followable }) {
         aria-pressed={following}
         disabled={state === undefined}
         onClick={() => void toggle()}
-        className={cn(
-          "h-control-md max-sm:w-control-md gap-1.5 max-sm:px-0",
-          following && "text-info-foreground",
-        )}
+        className="h-control-md max-sm:w-control-md gap-1.5 max-sm:px-0"
       >
         <EyeIcon aria-hidden className="size-3.5" />
         <span className="max-sm:sr-only">

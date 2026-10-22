@@ -4,9 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
-import Avatar from "@/components/_ui/avatar";
 import Tag from "@/components/_ui/tag";
-import AccountLogo from "@/features/accounts/account-logo";
 import { NextAction } from "@/features/ai/next-action";
 import {
   ActivationCell,
@@ -27,10 +25,8 @@ import {
   type TaskRow,
 } from "@/features/tasks/task-meta";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
-import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import CalendarIcon from "@/public/assets/icons/calendar.svg";
 import { routes } from "@/lib/routes";
 
 export type WaitingLead = FunctionReturnType<
@@ -98,25 +94,17 @@ export function TaskItem({ task, ...row }: RowProps & { task: TaskRow }) {
           >
             {task.title}
           </button>
-          <span className={META}>
-            <span className="shrink-0 whitespace-nowrap">
-              Created {shortDate(task._creationTime)}
-            </span>
-            {hasRecord && (
-              <>
-                <Dot />
-                <RecordChip
-                  task={task}
-                  meta
-                  className="z-sticky relative min-w-0"
-                />
-              </>
-            )}
-          </span>
+          {hasRecord && (
+            <RecordChip
+              task={task}
+              meta
+              className="caption-style z-sticky relative min-w-0"
+            />
+          )}
         </span>
         <div className="z-sticky relative flex min-w-0 flex-wrap items-center gap-1.5 sm:shrink-0 sm:flex-nowrap">
           {task.automated && <AutoTag />}
-          <PriorityChip task={task} />
+          {task.priority !== "normal" && <PriorityChip task={task} />}
           <DueChip task={task} hideEmpty />
         </div>
       </div>
@@ -131,7 +119,6 @@ export function LeadItem({
 }: RowProps & { lead: WaitingLead; slaMs: number }) {
   return (
     <RowShell id={lead._id} {...row} className="max-sm:flex-wrap">
-      <Avatar name={lead.name} size="sm" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={routes.lead(lead._id)} className={TITLE_LINK}>
           {lead.name}
@@ -143,7 +130,7 @@ export function LeadItem({
         </span>
         <NextAction type="leads" id={lead._id} />
       </span>
-      <span className="caption-style flex shrink-0 items-center gap-3 max-sm:basis-full max-sm:justify-between max-sm:pl-9">
+      <span className="caption-style flex shrink-0 items-center gap-3 max-sm:basis-full max-sm:justify-between">
         {lead.demoAt && <DemoTag at={lead.demoAt} />}
         <span className="flex justify-end sm:w-36">
           <SlaCell lead={lead} slaMs={slaMs} />
@@ -158,7 +145,6 @@ export function StuckItem({ row: item, ...row }: RowProps & { row: StuckRow }) {
   const task = item.task;
   return (
     <RowShell id={item._id} {...row}>
-      <AccountLogo account={item.account} size="sm" />
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <span className="flex min-w-0 items-center justify-between gap-3">
           <Link href={routes.account(item._id)} className={TITLE_LINK}>
@@ -201,11 +187,6 @@ export function DealItem({ deal, ...row }: RowProps & { deal: DealRow }) {
   const late = deal.closeDate !== null && deal.closeDate < dayFromToday(0);
   return (
     <RowShell id={deal._id} {...row}>
-      {deal.account ? (
-        <AccountLogo account={deal.account} size="sm" />
-      ) : (
-        <span className="size-6 shrink-0" />
-      )}
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <span className="flex min-w-0 items-center justify-between gap-3">
           <Link href={routes.deal(deal._id)} className={TITLE_LINK}>
@@ -229,15 +210,9 @@ export function DealItem({ deal, ...row }: RowProps & { deal: DealRow }) {
             <span
               className={cn(
                 "caption-style flex shrink-0 items-center gap-1 tabular-nums",
-                late ? "text-danger" : "text-fg-secondary",
+                late ? "text-danger" : "text-fg-tertiary",
               )}
             >
-              {!late && (
-                <CalendarIcon
-                  aria-hidden
-                  className="text-fg-tertiary size-3.5"
-                />
-              )}
               {late
                 ? `Was due ${dayPhrase(deal.closeDate)}`
                 : formatDay(deal.closeDate)}

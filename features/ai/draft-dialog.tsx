@@ -176,7 +176,7 @@ function DraftForm({ target }: { target: Target }) {
       </div>
       <DialogFooter className="flex-wrap">
         <DialogClose asChild>
-          <Button variant="subtle" size="sm">
+          <Button variant="secondary" size="sm">
             Close
           </Button>
         </DialogClose>

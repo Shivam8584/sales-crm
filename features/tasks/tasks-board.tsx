@@ -135,11 +135,6 @@ export function TasksBoardSkeleton() {
                 <Skeleton className="h-3.5 w-3/4" />
                 <Skeleton className="h-3 w-1/3" />
               </div>
-              <div className="border-border flex gap-2 border-t px-4 py-3">
-                <Skeleton className="h-7 w-18 rounded-full" />
-                <Skeleton className="h-7 w-18 rounded-full" />
-                <Skeleton className="h-7 w-16 rounded-full" />
-              </div>
             </div>
           ))}
         </div>

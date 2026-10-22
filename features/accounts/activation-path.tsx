@@ -21,7 +21,7 @@ export default function ActivationPath({
   const data = useQuery(api.platform.forAccount, { accountId });
 
   if (data === undefined) {
-    return <Skeleton aria-busy className="h-12 w-full rounded-xl" />;
+    return <Skeleton aria-busy className="h-12 w-full" />;
   }
   if (data.orgId === null) return null;
 
@@ -30,7 +30,7 @@ export default function ActivationPath({
   const current = [...steps].reverse().find((step) => step.done);
 
   return (
-    <div className="bg-card shadow-card flex flex-col gap-2.5 rounded-2xl px-4 py-3">
+    <div className="flex flex-col gap-2.5">
       <p className="caption-style text-fg-tertiary flex items-center justify-between gap-3">
         <span>Activation</span>
         <span className="tabular-nums">

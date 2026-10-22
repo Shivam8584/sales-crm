@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
-import { Page, PageHeader, PageViews } from "@/components/shell/page";
+import {
+  Page,
+  PageActions,
+  PageHeader,
+  PageViews,
+} from "@/components/shell/page";
 import { useUrlState } from "@/hooks/use-url-state";
 import {
   NODE_LABEL,
@@ -73,6 +78,16 @@ export default function SequenceView({
     }
   }
 
+  const toggle = () =>
+    run(async () => {
+      if (active) {
+        await pause({ id });
+        return `${automation.name} paused`;
+      }
+      await activate({ id });
+      return `${automation.name} is live. Add ${SUBJECT_LABEL[automation.subjectKind][1]} with “Add to sequence”.`;
+    });
+
   return (
     <Page>
       <PageHeader
@@ -85,50 +100,34 @@ export default function SequenceView({
           </>
         }
         actions={
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setExporting(true)}
-            >
-              Export…
-            </Button>
-            {hasEmail && (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
+          <PageActions
+            label="Automation actions"
+            primary={
+              automation.mine && (
+                <Button
+                  variant={active ? "secondary" : "primary"}
+                  size="sm"
+                  loading={busy}
+                  disabled={Boolean(reason)}
+                  onClick={() => void toggle()}
+                >
+                  {active ? "Pause" : "Activate"}
+                </Button>
+              )
+            }
+            actions={[
+              hasEmail && {
+                label: "Email me a test",
+                disabled: busy,
+                onSelect: () =>
                   void run(
                     async () =>
                       `Test email on its way to ${await sendTest({ id })}`,
-                  )
-                }
-              >
-                Email me a test
-              </Button>
-            )}
-            {automation.mine && (
-              <Button
-                variant={active ? "secondary" : "primary"}
-                size="sm"
-                loading={busy}
-                disabled={Boolean(reason)}
-                onClick={() =>
-                  void run(async () => {
-                    if (active) {
-                      await pause({ id });
-                      return `${automation.name} paused`;
-                    }
-                    await activate({ id });
-                    return `${automation.name} is live. Add ${SUBJECT_LABEL[automation.subjectKind][1]} with “Add to sequence”.`;
-                  })
-                }
-              >
-                {active ? "Pause" : "Activate"}
-              </Button>
-            )}
-          </>
+                  ),
+              },
+              { label: "Export…", onSelect: () => setExporting(true) },
+            ]}
+          />
         }
       />
       <PageViews
@@ -149,7 +148,7 @@ export default function SequenceView({
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex max-w-2xl flex-col gap-4 p-4 sm:p-6">
+          <div className="flex max-w-2xl flex-col gap-5 p-4 sm:p-6">
             <p className="caption-style text-fg-tertiary leading-snug">
               {automation.trigger.kind === "manual"
                 ? `Runs on ${SUBJECT_LABEL[automation.subjectKind][1]} you add by hand.`
@@ -161,7 +160,7 @@ export default function SequenceView({
                 Can’t activate yet: {reason}
               </p>
             )}
-            <ol className="bg-card shadow-card flex flex-col overflow-hidden rounded-xl">
+            <ol className="flex flex-col">
               {steps.map((node, index) => {
                 const { title, detail } = describeStep(
                   node,
@@ -172,7 +171,7 @@ export default function SequenceView({
                 return (
                   <li
                     key={node.id}
-                    className="border-border flex items-baseline gap-3 px-4 py-3 not-last:border-b"
+                    className="border-border flex items-baseline gap-3 border-t py-3"
                   >
                     <span className="caption-style text-fg-tertiary w-4 shrink-0 tabular-nums">
                       {index + 1}

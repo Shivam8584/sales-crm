@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionArgs } from "convex/server";
 import { api } from "@/convex/_generated/api";
-import Avatar from "@/components/_ui/avatar";
 import Kbd from "@/components/_ui/kbd";
 import {
   Command,
@@ -17,7 +16,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/_ui/command";
-import AccountLogo from "@/features/accounts/account-logo";
 import {
   CaptureDialog,
   type CaptureRequest,
@@ -45,13 +43,10 @@ import {
   useToastStore,
 } from "@/stores/toast-store";
 import { useUiStore, type CreateDialog } from "@/stores/ui-store";
-import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
 import PinIcon from "@/public/assets/icons/pin.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import SidebarIcon from "@/public/assets/icons/sidebar.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
 import { routes } from "@/lib/routes";
 import { toggleSidebarCollapsed } from "@/lib/sidebar-collapse";
 import {
@@ -349,9 +344,6 @@ function Palette({
                   value={`undo:${entry.id}`}
                   onSelect={() => run(() => undoEntry(entry))}
                 >
-                  <ItemIcon>
-                    <ClockIcon aria-hidden className="size-3.5" />
-                  </ItemIcon>
                   <span className="truncate">Undo: {entry.message}</span>
                 </CommandItem>
               ))}
@@ -366,19 +358,6 @@ function Palette({
                   value={`recent:${item.type}:${item.id}`}
                   onSelect={() => go(RECORD_HREF[item.type](item.id))}
                 >
-                  {item.account ? (
-                    <AccountLogo account={item.account} size="xs" />
-                  ) : item.type === "person" ? (
-                    <Avatar name={item.title} />
-                  ) : (
-                    <ItemIcon>
-                      {item.type === "lead" ? (
-                        <TargetIcon aria-hidden className="size-3" />
-                      ) : (
-                        <ClipboardIcon aria-hidden className="size-3" />
-                      )}
-                    </ItemIcon>
-                  )}
                   <span className="truncate">{item.title}</span>
                   <Hint>{item.hint}</Hint>
                 </CommandItem>
@@ -394,7 +373,6 @@ function Palette({
                   value={`account:${account._id}`}
                   onSelect={() => go(routes.account(account._id))}
                 >
-                  <AccountLogo account={account} size="xs" />
                   <span className="truncate">{account.name}</span>
                   <Hint>{account.domain}</Hint>
                 </CommandItem>
@@ -410,7 +388,6 @@ function Palette({
                   value={`person:${person._id}`}
                   onSelect={() => go(routes.person(person._id))}
                 >
-                  <Avatar name={personName(person)} />
                   <span className="truncate">{personName(person)}</span>
                   <Hint>{person.account?.name}</Hint>
                 </CommandItem>
@@ -426,9 +403,6 @@ function Palette({
                   value={`lead:${lead._id}`}
                   onSelect={() => go(routes.lead(lead._id))}
                 >
-                  <ItemIcon>
-                    <TargetIcon aria-hidden className="size-3" />
-                  </ItemIcon>
                   <span className="truncate">{lead.name}</span>
                   <Hint>
                     {lead.companyName} · {LEAD_STATUS_LABEL[lead.status]}
@@ -446,9 +420,6 @@ function Palette({
                   value={`deal:${deal._id}`}
                   onSelect={() => go(routes.deal(deal._id))}
                 >
-                  <ItemIcon>
-                    <ClipboardIcon aria-hidden className="size-3" />
-                  </ItemIcon>
                   <span className="truncate">{deal.title}</span>
                   <Hint>
                     {deal.account?.name ? `${deal.account.name} · ` : ""}
@@ -467,9 +438,6 @@ function Palette({
                   value={`create:${item.dialog.type}`}
                   onSelect={() => run(() => setCreate(item.dialog))}
                 >
-                  <ItemIcon>
-                    <PlusIcon aria-hidden className="size-3" />
-                  </ItemIcon>
                   {item.label}
                 </CommandItem>
               ))}
@@ -512,9 +480,6 @@ function Palette({
           {canCapture && (
             <CommandGroup>
               <CommandItem value="ai:capture" onSelect={startCapture}>
-                <ItemIcon>
-                  <PlusIcon aria-hidden className="size-3" />
-                </ItemIcon>
                 <span className="truncate">Add with AI: “{typed}”</span>
               </CommandItem>
             </CommandGroup>
@@ -529,10 +494,6 @@ function Palette({
           <span className="flex items-center gap-1.5">
             <Kbd>↵</Kbd>
             to open
-          </span>
-          <span className="ml-auto flex items-center gap-1.5 max-sm:hidden">
-            <Kbd>Esc</Kbd>
-            to close
           </span>
         </CommandFooter>
       </Command>

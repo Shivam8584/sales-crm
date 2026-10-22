@@ -6,7 +6,6 @@ import EmptyState from "@/components/_ui/empty-state";
 import SegmentBar from "@/components/_common/segment-bar";
 import type { SourceRow } from "@/convex/lib/reports";
 import { useUrlState } from "@/hooks/use-url-state";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
 import { count, duration, percent, rate } from "./format";
 
 const DEFAULT_SORT: SortState = { id: "leads", dir: "desc" };
@@ -142,7 +141,7 @@ export default function SourceTable({
       renderCard={(row) => (
         <span className="flex flex-col gap-2">
           <span className="flex items-baseline justify-between gap-3">
-            <span className="lead-style truncate font-medium">{row.label}</span>
+            <span className="lead-style truncate">{row.label}</span>
             <span className="caption-style text-fg-secondary shrink-0 tabular-nums">
               {count(row.leads)} {row.leads === 1 ? "lead" : "leads"}
             </span>
@@ -158,14 +157,13 @@ export default function SourceTable({
       )}
       empty={
         <EmptyState
-          icon={TargetIcon}
           className="mx-auto max-w-lg"
           title={
             filtered
               ? "No leads match these filters"
               : "No leads in this period"
           }
-          description="Each source appears here once a lead arrives with UTM tags or through a form, Cal.com or a platform signup."
+          description="Sources appear once leads arrive."
         />
       }
     />

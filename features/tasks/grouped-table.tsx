@@ -25,7 +25,6 @@ export type RowGroup<T> = {
   label: string;
   rows: T[];
   /** Shown after the count, e.g. a dot or a one-line explanation. */
-  icon?: ReactNode;
   description?: ReactNode;
   tone?: "danger";
   defaultCollapsed?: boolean;
@@ -211,7 +210,7 @@ export default function GroupedTable<T>({
     return (
       <div
         className={cn(
-          "border-border bg-muted z-sticky flex h-9 items-center gap-2 border-b pr-4",
+          "border-border bg-background z-sticky flex h-9 items-center gap-2 border-b pr-4",
           selectable && !belowSm ? "pl-0" : "pl-4",
           sticky,
         )}
@@ -248,7 +247,6 @@ export default function GroupedTable<T>({
               closed && "-rotate-90",
             )}
           />
-          {group.icon}
           <span
             className={cn(
               "lead-style truncate font-medium",
@@ -402,7 +400,7 @@ export default function GroupedTable<T>({
 function DesktopSkeleton({ template }: { template: CSSProperties }) {
   return (
     <div aria-busy>
-      <div className="border-border bg-muted flex h-9 items-center border-b px-4">
+      <div className="border-border flex h-9 items-center border-b px-4">
         <Skeleton className="h-3 w-20" />
       </div>
       {Array.from({ length: 6 }, (_, row) => (

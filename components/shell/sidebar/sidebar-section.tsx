@@ -13,12 +13,12 @@ export default function SidebarSection({
   return (
     <div
       className={cn(
-        "collapsed:items-center collapsed:px-2 flex flex-col gap-1 p-3",
+        "collapsed:items-center collapsed:px-2 flex flex-col gap-1 px-3 py-2",
         className,
       )}
     >
       {title && (
-        <h2 className="eyebrow-style text-fg-tertiary collapsed:sr-only block px-2 py-1 font-medium">
+        <h2 className="caption-style text-fg-tertiary collapsed:sr-only block px-2 py-1">
           {title}
         </h2>
       )}

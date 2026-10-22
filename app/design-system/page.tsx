@@ -65,12 +65,6 @@ const SHADOWS = [
   { name: "raised", className: "bg-secondary shadow-raised" },
   { name: "card", className: "bg-card shadow-card" },
   { name: "tile", className: "bg-card shadow-tile" },
-  { name: "badge", className: "bg-raised shadow-badge" },
-  { name: "well", className: "bg-overlay-1 shadow-well" },
-  {
-    name: "brand",
-    className: "bg-primary text-primary-foreground shadow-brand",
-  },
   { name: "overlay", className: "bg-popover shadow-overlay" },
 ];
 

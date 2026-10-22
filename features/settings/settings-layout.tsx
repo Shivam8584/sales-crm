@@ -1,13 +1,13 @@
 "use client";
 
-import type { ComponentType, ReactNode, SVGProps } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { buttonVariants } from "@/components/_ui/button";
 import CountBadge from "@/components/_ui/count-badge";
-import { Page, PageHeader, PageStatus } from "@/components/shell/page";
+import { Page, PageHeader } from "@/components/shell/page";
 import {
   SETTINGS_PAGES,
   canOpenSetting,
@@ -16,27 +16,9 @@ import {
 import { useViewer } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { cn } from "@/lib/utils";
-import UserIcon from "@/public/assets/icons/kanban/user-03.svg";
-import UsersIcon from "@/public/assets/icons/users.svg";
-import BuildingIcon from "@/public/assets/icons/building.svg";
-import LinkIcon from "@/public/assets/icons/link.svg";
-import ActivityIcon from "@/public/assets/icons/activity.svg";
-import ListIcon from "@/public/assets/icons/list.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
 import { routes } from "@/lib/routes";
 
 type SettingsHref = (typeof SETTINGS_PAGES)[number]["href"];
-
-const ICONS: Record<SettingsHref, ComponentType<SVGProps<SVGSVGElement>>> = {
-  [routes.profile]: UserIcon,
-  [routes.team]: UsersIcon,
-  [routes.workspace]: BuildingIcon,
-  [routes.fields]: ListIcon,
-  [routes.targets]: TargetIcon,
-  [routes.duplicates]: UsersIcon,
-  [routes.integrations]: LinkIcon,
-  [routes.system]: ActivityIcon,
-};
 
 const GROUPS: { title: string; hrefs: SettingsHref[] }[] = [
   { title: "Personal", hrefs: [routes.profile] },
@@ -75,7 +57,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       <PageHeader
         crumbs={[{ label: "Settings" }]}
         title={current?.label ?? "Settings"}
-        meta={<PageStatus>{ROLE_LABEL[viewer.role]}</PageStatus>}
+        meta={
+          <span className="caption-style text-fg-tertiary">
+            {ROLE_LABEL[viewer.role]}
+          </span>
+        }
       />
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <nav
@@ -115,20 +101,14 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             })}
           </ul>
           <div className="flex flex-col max-md:hidden">
-            {GROUPS.map((group, index) => {
+            {GROUPS.map((group) => {
               const items = pages.filter((page) =>
                 group.hrefs.includes(page.href),
               );
               if (items.length === 0) return null;
               return (
-                <div
-                  key={group.title}
-                  className={cn(
-                    "flex flex-col gap-1 p-3",
-                    index < GROUPS.length - 1 && "border-border border-b",
-                  )}
-                >
-                  <h2 className="eyebrow-style text-fg-tertiary px-2 py-1 font-medium">
+                <div key={group.title} className="flex flex-col gap-1 p-3">
+                  <h2 className="caption-style text-fg-tertiary px-2 py-1">
                     {group.title}
                   </h2>
                   <ul className="flex flex-col gap-px">
@@ -137,7 +117,6 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
                         key={page.href}
                         href={page.href}
                         label={page.label}
-                        icon={ICONS[page.href]}
                         count={counts[page.href]}
                         active={isActive(pathname, page.href)}
                       />
@@ -152,7 +131,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         ) : (
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-6 pb-16 sm:px-8 md:pt-8">
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 pt-6 pb-16 sm:px-8 md:pt-8">
               {children}
             </div>
           </div>
@@ -165,13 +144,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
 function NavItem({
   href,
   label,
-  icon: Icon,
   count,
   active,
 }: {
   href: string;
   label: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
   count?: number;
   active: boolean;
 }) {
@@ -183,13 +160,9 @@ function NavItem({
         aria-current={active ? "page" : undefined}
         className={cn(
           buttonVariants({ variant: "nav", size: "md" }),
-          "group h-8 gap-1.5 py-0 font-normal",
+          "h-8 gap-1.5 py-0 font-normal",
         )}
       >
-        <Icon
-          aria-hidden
-          className="text-fg-tertiary group-hover:text-icon group-data-[active=true]:text-icon duration-fast ease-power3-out size-3.5 shrink-0 transition-colors"
-        />
         <span className="min-w-0 flex-1 truncate text-left">{label}</span>
         {count !== undefined && count > 0 && <CountBadge>{count}</CountBadge>}
       </Link>

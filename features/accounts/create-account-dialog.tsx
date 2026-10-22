@@ -15,6 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/_ui/dialog";
+import {
+  Collapsible,
+  CollapsibleChevron,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/_ui/collapsible";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import OptionPicker from "@/components/fields/option-picker";
@@ -51,6 +57,7 @@ export default function CreateAccountDialog({
   const [ownerId, setOwnerId] = useState<string>(viewer._id);
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
+  const [more, setMore] = useState(false);
   const preview = normalizeDomain(domain);
 
   function reset() {
@@ -60,6 +67,7 @@ export default function CreateAccountDialog({
     setOwnerId(viewer._id);
     setErrors({});
     logo.clear();
+    setMore(false);
   }
 
   async function submit(event: FormEvent) {
@@ -109,8 +117,8 @@ export default function CreateAccountDialog({
         <form onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>New account</DialogTitle>
-            <DialogDescription>
-              A brand or seller you want to work with.
+            <DialogDescription className="sr-only">
+              Add a brand or seller
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 px-6 py-5">
@@ -145,11 +153,6 @@ export default function CreateAccountDialog({
             <Field
               label="Website"
               htmlFor="account-domain"
-              hint={
-                errors.domain
-                  ? undefined
-                  : "Used for the logo and to spot duplicates."
-              }
               error={errors.domain}
             >
               <Input
@@ -164,69 +167,91 @@ export default function CreateAccountDialog({
                 className="aria-invalid:border-danger"
               />
             </Field>
-            <Field
-              label="Logo"
-              htmlFor="account-logo"
-              hint="Optional. PNG, JPEG or WebP, up to 1 MB."
+            <Collapsible
+              open={more}
+              onOpenChange={setMore}
+              className="group/collapsible flex flex-col"
             >
-              <div className="flex items-center gap-2">
-                <input
-                  ref={logoInput}
-                  aria-hidden
-                  tabIndex={-1}
-                  type="file"
-                  hidden
-                  accept={LOGO_ACCEPT}
-                  onChange={(event) => {
-                    logo.pick(event.target.files?.[0]);
-                    event.target.value = "";
-                  }}
-                />
-                <Button
-                  id="account-logo"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => logoInput.current?.click()}
-                >
-                  {logo.picked ? "Choose another" : "Choose image"}
-                </Button>
-                {logo.picked && (
-                  <>
-                    <span
-                      title={logo.picked.file.name}
-                      className="caption-style text-fg-secondary min-w-0 truncate"
-                    >
-                      {logo.picked.file.name}
-                    </span>
-                    <Button variant="ghost" size="xs" onClick={logo.clear}>
-                      Remove
-                    </Button>
-                  </>
-                )}
-              </div>
-            </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-2">
-                <span className="caption-style text-fg-secondary">Stage</span>
-                <OptionPicker
-                  value={stage}
-                  label="Stage"
-                  options={STAGE_OPTIONS}
-                  onChange={(value) =>
-                    value && setStage(value as LifecycleStage)
-                  }
-                  className="border-input bg-secondary mx-0 h-9 border px-3"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <span className="caption-style text-fg-secondary">Owner</span>
-                <MemberPicker
-                  value={ownerId}
-                  onChange={setOwnerId}
-                  className="border-input bg-secondary mx-0 h-9 border px-3"
-                />
-              </div>
-            </div>
+              <CollapsibleTrigger className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex w-fit cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+                More options
+                <CollapsibleChevron />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="flex flex-col gap-4 pt-4">
+                  <Field
+                    label="Logo"
+                    htmlFor="account-logo"
+                    hint="PNG, JPEG or WebP, up to 1 MB."
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={logoInput}
+                        aria-hidden
+                        tabIndex={-1}
+                        type="file"
+                        hidden
+                        accept={LOGO_ACCEPT}
+                        onChange={(event) => {
+                          logo.pick(event.target.files?.[0]);
+                          event.target.value = "";
+                        }}
+                      />
+                      <Button
+                        id="account-logo"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => logoInput.current?.click()}
+                      >
+                        {logo.picked ? "Choose another" : "Choose image"}
+                      </Button>
+                      {logo.picked && (
+                        <>
+                          <span
+                            title={logo.picked.file.name}
+                            className="caption-style text-fg-secondary min-w-0 truncate"
+                          >
+                            {logo.picked.file.name}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={logo.clear}
+                          >
+                            Remove
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </Field>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <span className="caption-style text-fg-secondary">
+                        Stage
+                      </span>
+                      <OptionPicker
+                        value={stage}
+                        label="Stage"
+                        options={STAGE_OPTIONS}
+                        onChange={(value) =>
+                          value && setStage(value as LifecycleStage)
+                        }
+                        className="border-input bg-secondary mx-0 h-9 border px-3"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <span className="caption-style text-fg-secondary">
+                        Owner
+                      </span>
+                      <MemberPicker
+                        value={ownerId}
+                        onChange={setOwnerId}
+                        className="border-input bg-secondary mx-0 h-9 border px-3"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
             {errors.form && (
               <p role="alert" className="caption-style text-danger">
                 {errors.form}
@@ -235,7 +260,7 @@ export default function CreateAccountDialog({
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>

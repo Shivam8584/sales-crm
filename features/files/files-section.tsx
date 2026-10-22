@@ -16,7 +16,6 @@ import {
 import { readError } from "@/lib/errors";
 import { relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
-import PlusIcon from "@/public/assets/icons/plus.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 
 type Target =
@@ -120,7 +119,6 @@ export default function FilesSection({
             disabled={uploading !== null}
             onClick={() => input.current?.click()}
           >
-            <PlusIcon aria-hidden className="size-2.5" />
             Add file
           </Button>
         }
@@ -150,8 +148,7 @@ export default function FilesSection({
         ) : files.length === 0 ? (
           !uploading && (
             <p className="text-fg-tertiary text-sm">
-              Drop files here or add one. PDF, images, Word, Excel, CSV or text,
-              up to {MAX_FILE_BYTES / 1024 / 1024} MB.
+              No files yet. Drop one here.
             </p>
           )
         ) : (

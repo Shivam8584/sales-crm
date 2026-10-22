@@ -4,19 +4,13 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
-import {
-  Page,
-  PageHeader,
-  PageStatus,
-  PageViews,
-} from "@/components/shell/page";
+import { Page, PageHeader, PageViews } from "@/components/shell/page";
 import { useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import ExpansionView from "./expansion-view";
 import HealthView from "./health-view";
 import RunChecksButton from "./run-checks-button";
 import StuckView from "./stuck-view";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
 import { routes } from "@/lib/routes";
 
 const VIEWS = ["stuck", "health", "expansion"] as const;
@@ -30,9 +24,8 @@ export default function ActivationPage() {
       <Page>
         <PageHeader title="Activation" />
         <EmptyState
-          icon={TargetIcon}
           title="Your stuck brands are on Today"
-          description="The activation desk is for managers. Brands you own that stall on Hypedrive show up on Today, with the task to move them on."
+          description="The activation desk is for managers. Brands you own that stall show up on Today."
           action={
             <Button variant="secondary" size="sm" href={routes.today}>
               Open Today
@@ -60,11 +53,9 @@ function ActivationDesk() {
         title="Activation"
         meta={
           desk && (
-            <PageStatus tone={desk.rows.length > 0 ? "warning" : "success"}>
-              <span className="tabular-nums">
-                {desk.rows.length} stuck · {desk.linked} on Hypedrive
-              </span>
-            </PageStatus>
+            <span className="text-fg-tertiary text-sm tabular-nums">
+              {desk.rows.length} stuck · {desk.linked} on Hypedrive
+            </span>
           )
         }
         actions={<RunChecksButton />}

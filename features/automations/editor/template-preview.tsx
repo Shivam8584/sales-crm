@@ -108,10 +108,7 @@ export default function TemplatePreview({ node }: { node: GraphNode }) {
     BLOCKS[node.kind] ?? texts.map((_, index) => `Parameter {{${index + 1}}}`);
 
   return (
-    <PanelSection
-      title="Preview"
-      description={`How this step reads for one of your ${SUBJECT_LABEL[kind][1]}.`}
-    >
+    <PanelSection title="Preview">
       <div className="flex flex-col gap-3">
         <OptionPicker
           value={target?.id ?? null}
@@ -155,7 +152,7 @@ export default function TemplatePreview({ node }: { node: GraphNode }) {
           </p>
         )}
         {preview && (
-          <div className="border-border bg-card shadow-card flex flex-col gap-3 rounded-xl px-3.5 py-3">
+          <div className="bg-overlay-1 flex flex-col gap-3 rounded-lg px-3.5 py-3">
             {outbound && (
               <p className="caption-style text-fg-tertiary truncate">
                 To{" "}
@@ -179,7 +176,7 @@ export default function TemplatePreview({ node }: { node: GraphNode }) {
               </div>
             ))}
             {missing.length > 0 && (
-              <p className="rounded-lg border border-(--tag-amber-border) bg-(--tag-amber-bg) px-3 py-2 text-xs leading-snug text-(--tag-amber-text)">
+              <p className="rounded-lg bg-(--tag-amber-bg) px-3 py-2 text-xs leading-snug text-(--tag-amber-text)">
                 {outbound
                   ? `Would be skipped for ${preview.record}: ${missingMessage(missing)}`
                   : `${missing.map((name) => `{{${name}}}`).join(", ")} would be left blank for ${preview.record}.`}

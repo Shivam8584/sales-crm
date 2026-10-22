@@ -15,9 +15,6 @@ import { useUrlState } from "@/hooks/use-url-state";
 import { cn } from "@/lib/utils";
 import ActivityIcon from "@/public/assets/icons/activity.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
-import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
-import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import WalletIcon from "@/public/assets/icons/wallet.svg";
 import ExportButton from "./export-button";
@@ -36,7 +33,6 @@ import {
   ChartSkeleton,
   Delta,
   MetricTile,
-  Panel,
   Reloading,
   ReportSection,
 } from "./section";
@@ -267,104 +263,93 @@ export default function TeamTab({ period }: { period: Period }) {
       <ReportSection
         id="team"
         title="Team"
-        description="The whole team for the period, against the period before."
+        description="Against the period before."
       >
-        <Panel className="px-4 py-4 sm:px-5">
-          {!team ? (
-            <KpisSkeleton />
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-              <MetricTile
-                icon={UserPlusIcon}
-                label="Leads handled"
-                value={count(team.current.leads)}
-                delta={
-                  <Delta
-                    value={change(team.current.leads, team.previous.leads)}
-                    trend={trend(team.current.leads, team.previous.leads)}
-                  />
-                }
-              />
-              <MetricTile
-                icon={ClockIcon}
-                label="Speed to lead"
-                value={duration(team.current.speed.medianMs)}
-                detail={`Median · p90 ${duration(team.current.speed.p90Ms)}`}
-              />
-              <MetricTile
-                icon={ClockIcon}
-                label={`Within ${slaLabel}`}
-                value={percent(team.current.speed.withinRate)}
-                detail={`${count(team.current.speed.within)} of ${count(team.current.speed.due)} leads`}
-                delta={
-                  <Delta
-                    value={pts(
-                      team.current.speed.withinRate,
-                      team.previous.speed.withinRate,
-                    )}
-                    trend={trend(
-                      team.current.speed.withinRate,
-                      team.previous.speed.withinRate,
-                    )}
-                  />
-                }
-              />
-              <MetricTile
-                icon={CheckSquareIcon}
-                label="Tasks done"
-                value={count(team.current.tasksDone)}
-                detail={`${count(team.overdue)} overdue now`}
-                delta={
-                  <Delta
-                    value={change(
-                      team.current.tasksDone,
-                      team.previous.tasksDone,
-                    )}
-                    trend={trend(
-                      team.current.tasksDone,
-                      team.previous.tasksDone,
-                    )}
-                  />
-                }
-              />
-              <MetricTile
-                icon={PhoneCallIcon}
-                label="Calls · meetings"
-                value={`${count(team.current.calls)} · ${count(team.current.meetings)}`}
-                delta={
-                  <Delta
-                    value={change(
-                      team.current.calls + team.current.meetings,
-                      team.previous.calls + team.previous.meetings,
-                    )}
-                    trend={trend(
-                      team.current.calls + team.current.meetings,
-                      team.previous.calls + team.previous.meetings,
-                    )}
-                  />
-                }
-              />
-              <MetricTile
-                icon={WalletIcon}
-                label="Deals won"
-                value={count(team.current.won)}
-                detail={totals(team.current.wonValue, "No value yet")}
-                delta={
-                  <Delta
-                    value={change(team.current.won, team.previous.won)}
-                    trend={trend(team.current.won, team.previous.won)}
-                  />
-                }
-              />
-            </div>
-          )}
-        </Panel>
+        {!team ? (
+          <KpisSkeleton />
+        ) : (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 xl:grid-cols-6">
+            <MetricTile
+              label="Leads handled"
+              value={count(team.current.leads)}
+              delta={
+                <Delta
+                  value={change(team.current.leads, team.previous.leads)}
+                  trend={trend(team.current.leads, team.previous.leads)}
+                />
+              }
+            />
+            <MetricTile
+              label="Speed to lead"
+              value={duration(team.current.speed.medianMs)}
+              detail={`Median · p90 ${duration(team.current.speed.p90Ms)}`}
+            />
+            <MetricTile
+              label={`Within ${slaLabel}`}
+              value={percent(team.current.speed.withinRate)}
+              detail={`${count(team.current.speed.within)} of ${count(team.current.speed.due)} leads`}
+              delta={
+                <Delta
+                  value={pts(
+                    team.current.speed.withinRate,
+                    team.previous.speed.withinRate,
+                  )}
+                  trend={trend(
+                    team.current.speed.withinRate,
+                    team.previous.speed.withinRate,
+                  )}
+                />
+              }
+            />
+            <MetricTile
+              label="Tasks done"
+              value={count(team.current.tasksDone)}
+              detail={`${count(team.overdue)} overdue now`}
+              delta={
+                <Delta
+                  value={change(
+                    team.current.tasksDone,
+                    team.previous.tasksDone,
+                  )}
+                  trend={trend(team.current.tasksDone, team.previous.tasksDone)}
+                />
+              }
+            />
+            <MetricTile
+              label="Calls · meetings"
+              value={`${count(team.current.calls)} · ${count(team.current.meetings)}`}
+              delta={
+                <Delta
+                  value={change(
+                    team.current.calls + team.current.meetings,
+                    team.previous.calls + team.previous.meetings,
+                  )}
+                  trend={trend(
+                    team.current.calls + team.current.meetings,
+                    team.previous.calls + team.previous.meetings,
+                  )}
+                />
+              }
+            />
+            <MetricTile
+              label="Deals won"
+              value={count(team.current.won)}
+              detail={totals(team.current.wonValue, "No value yet")}
+              delta={
+                <Delta
+                  value={change(team.current.won, team.previous.won)}
+                  trend={trend(team.current.won, team.previous.won)}
+                />
+              }
+            />
+          </div>
+        )}
       </ReportSection>
 
       <ReportSection
         id="leaderboard"
         title="Leaderboard"
-        description="Select a rep to open their leads; the … menu opens their tasks, deals and accounts."
+        description="Select a rep to open their leads. The … menu opens their tasks, deals and accounts."
         aside={
           <ExportButton
             label="team leaderboard"
@@ -388,7 +373,7 @@ export default function TeamTab({ period }: { period: Period }) {
           </>
         }
       >
-        <Panel className="flex flex-col">
+        <div className="flex flex-col">
           {!data ? (
             <ChartSkeleton rows={4} />
           ) : (
@@ -424,7 +409,9 @@ export default function TeamTab({ period }: { period: Period }) {
                         label: "Open accounts",
                         icon: UsersIcon,
                         onSelect: () =>
-                          router.push(`${routes.accounts}?owner=${row.ownerId}`),
+                          router.push(
+                            `${routes.accounts}?owner=${row.ownerId}`,
+                          ),
                       },
                       {
                         label: "Show their funnel",
@@ -468,7 +455,7 @@ export default function TeamTab({ period }: { period: Period }) {
               renderCard={(row) => (
                 <span className="flex flex-col gap-2">
                   <span className="flex items-center justify-between gap-3">
-                    <span className="lead-style flex min-w-0 items-center gap-2 font-medium">
+                    <span className="lead-style flex min-w-0 items-center gap-2">
                       <RepCell row={row} />
                     </span>
                     <span className="caption-style text-fg-secondary shrink-0 tabular-nums">
@@ -509,9 +496,8 @@ export default function TeamTab({ period }: { period: Period }) {
               empty={
                 <EmptyState
                   className="mx-auto max-w-lg"
-                  icon={UsersIcon}
                   title="No teammates yet"
-                  description="Invite reps to see their leads, speed to lead, tasks, calls and deals side by side."
+                  description="Invite reps to compare their numbers here."
                   action={
                     <Button variant="secondary" size="sm" href={routes.team}>
                       Invite teammates
@@ -521,7 +507,7 @@ export default function TeamTab({ period }: { period: Period }) {
               }
             />
           )}
-        </Panel>
+        </div>
       </ReportSection>
     </Reloading>
   );

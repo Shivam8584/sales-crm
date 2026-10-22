@@ -21,7 +21,7 @@ export function DigestSetting() {
       <SettingsRow
         label="Daily email digest"
         htmlFor="daily-digest"
-        description="A short morning summary of what needs you. Weekdays, 9:00 IST."
+        description="What needs you, every weekday at 9:00 IST."
       >
         <Switch
           id="daily-digest"
@@ -37,7 +37,7 @@ export function DigestSetting() {
         <SettingsRow
           label="Weekly team report"
           htmlFor="weekly-report"
-          description="Leads, deals and team activity for the past week against the one before. Mondays, 9:30 IST."
+          description="Last week against the one before, Mondays at 9:30 IST."
         >
           <Switch
             id="weekly-report"

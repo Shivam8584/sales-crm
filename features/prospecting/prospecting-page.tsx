@@ -21,7 +21,6 @@ import {
 } from "@/components/data-table/types";
 import {
   CreateButton,
-  ExportButton,
   Page,
   PageActions,
   PageHeader,
@@ -32,6 +31,8 @@ import {
 import AccountLogo from "@/features/accounts/account-logo";
 import { MoneyValue, dash } from "@/features/accounts/record-cells";
 import { useUrlState } from "@/hooks/use-url-state";
+import { can } from "@/convex/lib/permissions";
+import { useViewer } from "@/hooks/use-viewer";
 import { downloadCsv } from "@/lib/csv";
 import { isEditableTarget } from "@/lib/keyboard";
 import { marketplaceName, scoreBand } from "@/lib/domain/prospecting";
@@ -40,9 +41,9 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
-import EyeIcon from "@/public/assets/icons/eye.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
+import ShareIcon from "@/public/assets/icons/share.svg";
 import AutomationIcon from "@/public/assets/icons/automation.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
@@ -422,6 +423,7 @@ export default function ProspectingPage() {
   const setDeleted = useMutation(api.prospecting.setWatchlistDeleted);
   const actions = useProspectActions();
   const router = useRouter();
+  const viewer = useViewer();
 
   const [viewParam, setView] = useUrlState("view", "prospects");
   const [search, setSearch] = useUrlState("q", "");
@@ -618,12 +620,10 @@ export default function ProspectingPage() {
   const noWatchlists = watchlists !== undefined && watchlists.length === 0;
   const firstRun = (
     <EmptyState
-      icon={EyeIcon}
       title="Find brands with a review gap"
-      description="Watch product links from Amazon, Flipkart, Myntra, Nykaa and more. Daily checks track ratings, so you can pitch brands whose listings trail their category."
+      description="Watch product links from marketplaces. Daily checks track ratings, so you can pitch brands whose listings trail their category."
       action={
         <Button variant="primary" size="sm" onClick={() => setAdding(true)}>
-          <PlusIcon aria-hidden className="size-3" />
           Watch products
         </Button>
       }
@@ -631,9 +631,7 @@ export default function ProspectingPage() {
   );
   const noMatch = (
     <EmptyState
-      icon={EyeIcon}
       title="Nothing matches"
-      description="Try another search or clear the filters."
       action={
         <Button variant="secondary" size="sm" onClick={clearFilters}>
           Clear filters
@@ -667,6 +665,13 @@ export default function ProspectingPage() {
           <PageActions
             label="Prospecting actions"
             actions={[
+              can(viewer, "record.export") && {
+                label: "Export CSV",
+                icon: ShareIcon,
+                disabled: !(view === "prospects" ? prospects : products)
+                  ?.length,
+                onSelect: exportView,
+              },
               {
                 label: "New source",
                 icon: PlusIcon,
@@ -746,10 +751,6 @@ export default function ProspectingPage() {
         actions={
           <>
             <SavedViewsMenu />
-            <ExportButton
-              disabled={!(view === "prospects" ? prospects : products)?.length}
-              onClick={exportView}
-            />
             <CreateButton onClick={() => setAdding(true)}>
               Watch products
             </CreateButton>
@@ -866,9 +867,8 @@ export default function ProspectingPage() {
                 noMatch
               ) : (
                 <EmptyState
-                  icon={EyeIcon}
                   title="No brands yet"
-                  description="Brands appear once their products are read. Check the Products view for links that are still being checked or failed."
+                  description="Brands appear once their products are read."
                   action={
                     <Button
                       variant="secondary"

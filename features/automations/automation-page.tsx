@@ -8,7 +8,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import InlineText from "@/components/fields/inline-text";
 import { useCommandActions } from "@/components/shell/command-actions";
@@ -16,6 +15,7 @@ import {
   Page,
   PageActions,
   PageHeader,
+  PageStatus,
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
@@ -50,7 +50,6 @@ import { useEditorStore } from "./editor/editor-store";
 import NodePanel from "./editor/node-panel";
 import TestRunDialog from "./editor/test-run-dialog";
 import { stopTestRun } from "./editor/test-run";
-import { STATUS_TONE } from "./node-meta";
 import { StoppedStatus } from "./automation-parts";
 import ExportDialog from "./export-dialog";
 import SequenceView from "./sequence-view";
@@ -466,76 +465,73 @@ function Editor({ automation }: { automation: AutomationDoc }) {
           title={automation.name}
           meta={
             <>
-              <Tag tone={STATUS_TONE[automation.status]} size="xs">
-                {AUTOMATION_STATUS_LABEL[automation.status]}
-                {automation.version > 0 && (
-                  <span className="opacity-70">v{automation.version}</span>
-                )}
-              </Tag>
-              {automation.settings.language &&
-                automation.settings.language !== "en" && (
-                  <Tag size="xs">
-                    {LANGUAGE_LABEL[automation.settings.language]}
-                  </Tag>
-                )}
-              {changed && (
-                <Tag tone="amber" size="xs">
-                  Unpublished changes
-                </Tag>
-              )}
+              <PageStatus
+                tone={
+                  changed
+                    ? "warning"
+                    : automation.status === "active"
+                      ? "success"
+                      : automation.status === "paused"
+                        ? "warning"
+                        : "neutral"
+                }
+              >
+                {changed
+                  ? "Unpublished changes"
+                  : [
+                      AUTOMATION_STATUS_LABEL[automation.status],
+                      automation.version > 0 && `v${automation.version}`,
+                      automation.settings.language &&
+                        automation.settings.language !== "en" &&
+                        LANGUAGE_LABEL[automation.settings.language],
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+              </PageStatus>
               <StoppedStatus />
             </>
           }
           actions={
-            <>
-              <Tooltip content="Dry-run on a record">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-control-md max-sm:w-control-md py-0 max-sm:px-0"
-                  onClick={() => setTesting(true)}
-                  aria-label="Test run"
-                >
-                  <PlayIcon aria-hidden className="size-3.5" />
-                  <span className="max-sm:sr-only">Test run</span>
-                </Button>
-              </Tooltip>
-              <PageActions
-                label="Automation actions"
-                primary={primary}
-                primaryItem={{
-                  label:
-                    active && !changed
-                      ? "Pause"
-                      : changed
-                        ? "Publish changes"
-                        : "Activate",
-                  onSelect: () =>
-                    void (active && !changed ? onPause() : onActivate()),
-                }}
-                actions={[
-                  changed && {
-                    label: "Pause",
-                    onSelect: () => void onPause(),
-                  },
-                  {
-                    label: "Duplicate",
-                    onSelect: () => void onDuplicate(),
-                  },
-                  {
-                    label: "Export…",
-                    onSelect: () => setExporting(true),
-                  },
-                  {
-                    label: "Delete",
-                    icon: TrashIcon,
-                    tone: "danger",
-                    separated: true,
-                    onSelect: () => void onDelete(),
-                  },
-                ]}
-              />
-            </>
+            <PageActions
+              label="Automation actions"
+              primary={primary}
+              primaryItem={{
+                label:
+                  active && !changed
+                    ? "Pause"
+                    : changed
+                      ? "Publish changes"
+                      : "Activate",
+                onSelect: () =>
+                  void (active && !changed ? onPause() : onActivate()),
+              }}
+              actions={[
+                {
+                  label: "Test run",
+                  icon: PlayIcon,
+                  onSelect: () => setTesting(true),
+                },
+                changed && {
+                  label: "Pause",
+                  onSelect: () => void onPause(),
+                },
+                {
+                  label: "Duplicate",
+                  onSelect: () => void onDuplicate(),
+                },
+                {
+                  label: "Export…",
+                  onSelect: () => setExporting(true),
+                },
+                {
+                  label: "Delete",
+                  icon: TrashIcon,
+                  tone: "danger",
+                  separated: true,
+                  onSelect: () => void onDelete(),
+                },
+              ]}
+            />
           }
         />
         <PageViews
@@ -574,21 +570,6 @@ function Editor({ automation }: { automation: AutomationDoc }) {
               }}
             />
           </div>
-          <dl className="flex shrink-0 items-center gap-3 text-xs max-md:hidden">
-            {(
-              [
-                ["Enrolled", stats.enrolled],
-                ["Active", stats.active],
-                ["Completed", stats.completed],
-                ["Exited", stats.exited + stats.failed],
-              ] as const
-            ).map(([label, value]) => (
-              <div key={label} className="flex items-baseline gap-1">
-                <dt className="text-fg-tertiary">{label}</dt>
-                <dd className="font-medium tabular-nums">{value}</dd>
-              </div>
-            ))}
-          </dl>
           {issues.length > 0 && (
             <Button
               variant="ghost"

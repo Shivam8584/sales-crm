@@ -18,8 +18,8 @@ import OptionPicker from "@/components/fields/option-picker";
 import type { Column, SortState } from "@/components/data-table/types";
 import {
   CreateButton,
-  ExportButton,
   Page,
+  PageActions,
   PageHeader,
   PageStatus,
   PageToolbar,
@@ -45,9 +45,9 @@ import {
 } from "@/lib/domain/enums";
 import { LEAD_KIND_LABEL, LEAD_STATUS_LABEL } from "@/lib/domain/labels";
 import { LEAD_SOURCE_LABEL } from "@/lib/domain/leads";
+import { can } from "@/convex/lib/permissions";
 import { useUiStore } from "@/stores/ui-store";
-import PlusIcon from "@/public/assets/icons/plus.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
+import ShareIcon from "@/public/assets/icons/share.svg";
 import XIcon from "@/public/assets/icons/x.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import DisqualifyDialog from "./disqualify-dialog";
@@ -306,11 +306,9 @@ export default function LeadsPage() {
         meta={
           counts && (
             <>
-              <PageStatus tone="neutral">
-                <span className="tabular-nums">
-                  {counts.open.toLocaleString("en-IN")} open
-                </span>
-              </PageStatus>
+              <span className="text-fg-tertiary text-sm tabular-nums">
+                {counts.open.toLocaleString("en-IN")} open
+              </span>
               {counts.breached > 0 && (
                 <button
                   type="button"
@@ -330,6 +328,19 @@ export default function LeadsPage() {
               )}
             </>
           )
+        }
+        actions={
+          <PageActions
+            label="Lead list actions"
+            actions={[
+              can(viewer, "record.export") && {
+                label: "Export CSV",
+                icon: ShareIcon,
+                disabled: !rows?.length || exporting,
+                onSelect: () => void exportCsv({ name: "leads", args }),
+              },
+            ]}
+          />
         }
       />
       <PageViews
@@ -364,10 +375,6 @@ export default function LeadsPage() {
         actions={
           <>
             <SavedViewsMenu />
-            <ExportButton
-              disabled={!rows?.length || exporting}
-              onClick={() => void exportCsv({ name: "leads", args })}
-            />
             <CreateButton onClick={() => setCreate({ type: "lead" })}>
               New lead
             </CreateButton>
@@ -477,9 +484,7 @@ export default function LeadsPage() {
           empty={
             hasFilters ? (
               <EmptyState
-                icon={TargetIcon}
                 title="No leads match"
-                description="Try another search or clear the filters."
                 action={
                   <Button variant="secondary" size="sm" onClick={clearFilters}>
                     Clear filters
@@ -488,7 +493,6 @@ export default function LeadsPage() {
               />
             ) : (
               <EmptyState
-                icon={TargetIcon}
                 title={
                   status === "new"
                     ? "Inbox zero"
@@ -505,7 +509,6 @@ export default function LeadsPage() {
                     size="sm"
                     onClick={() => setCreate({ type: "lead" })}
                   >
-                    <PlusIcon aria-hidden className="size-3" />
                     New lead
                   </Button>
                 }

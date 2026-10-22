@@ -5,7 +5,6 @@ import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
@@ -13,7 +12,7 @@ import type { Column, SortState } from "@/components/data-table/types";
 import { PageToolbar } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
 import { OwnerCell, dash } from "@/features/accounts/record-cells";
-import { HEALTH_TONE, HealthBadge } from "@/features/platform/health-badge";
+import { HealthBadge } from "@/features/platform/health-badge";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import {
@@ -26,7 +25,6 @@ import { ACTIVATION_STEP_LABEL } from "@/lib/domain/platform";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import ActivityIcon from "@/public/assets/icons/activity.svg";
 import { routes } from "@/lib/routes";
 
 export type HealthRow = FunctionReturnType<
@@ -304,18 +302,16 @@ export default function HealthView({
               </span>
               <span className="caption-style flex min-w-0 items-center justify-between gap-3 pl-11">
                 <Weakest row={row} />
-                <Tag tone={HEALTH_TONE[row.band]} size="xs">
+                <span className="text-fg-secondary">
                   {HEALTH_BAND_LABEL[row.band]}
-                </Tag>
+                </span>
               </span>
             </span>
           )}
           empty={
             rows && rows.length > 0 ? (
               <EmptyState
-                icon={ActivityIcon}
                 title="No brands match"
-                description="Try another band or owner."
                 action={
                   <Button
                     variant="secondary"
@@ -331,9 +327,8 @@ export default function HealthView({
               />
             ) : (
               <EmptyState
-                icon={ActivityIcon}
                 title="No brands on Hypedrive yet"
-                description="Health shows up once a brand creates its organisation on Hypedrive."
+                description="Health shows up once a brand creates its organisation."
                 action={
                   <Button variant="secondary" size="sm" href={routes.accounts}>
                     View accounts

@@ -54,7 +54,9 @@ export default function ListingList({
           className="border-border flex flex-col gap-2 border-b py-3 first:pt-0 last:border-b-0 last:pb-0"
         >
           <div className="flex min-w-0 items-start gap-2">
-            <MarketplaceTag slug={listing.marketplace} />
+            <span className="text-fg-tertiary flex w-20 shrink-0 pt-0.5 text-sm">
+              <MarketplaceTag slug={listing.marketplace} />
+            </span>
             <a
               href={listing.url}
               target="_blank"

@@ -139,11 +139,7 @@ export default function MobileNav() {
               </SheetHeader>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {more.map((section) => (
-                  <SidebarSection
-                    key={section.title}
-                    title={section.title}
-                    className="border-sidebar-border border-b"
-                  >
+                  <SidebarSection key={section.title} title={section.title}>
                     {section.items.map((item) => (
                       <SidebarNavItem
                         key={item.href}

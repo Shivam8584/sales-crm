@@ -40,13 +40,11 @@ import { TaskChecklistSkeleton } from "@/features/tasks/task-checklist";
 import ProposalTab from "@/features/proposals/proposal-tab";
 import Timeline from "@/features/timeline/timeline";
 import { personName } from "@/lib/domain/labels";
-import { formatMoney } from "@/lib/domain/money";
 import { dateTime, relativeTime } from "@/lib/time";
 import { useUiStore } from "@/stores/ui-store";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
-import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
 import MessageQuestionIcon from "@/public/assets/icons/message-question.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
@@ -85,7 +83,6 @@ function DealPageContent({ id }: { id: Id<"deals"> }) {
       <Page>
         <PageHeader crumbs={CRUMBS} title="Not found" />
         <EmptyState
-          icon={ClipboardIcon}
           title="This deal doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
@@ -231,21 +228,14 @@ function DealView({
               </span>
             }
             subtitle={
-              <>
-                <DealStageControl deal={deal} save={save} />
-                <span className="text-foreground font-medium tabular-nums">
-                  {formatMoney(deal.amount)}
-                </span>
-                {deal.account && (
-                  <Link
-                    href={routes.account(deal.account._id)}
-                    className="hover:text-foreground focus-visible:ring-ring truncate rounded-sm outline-none focus-visible:ring-2"
-                  >
-                    {deal.account.name}
-                  </Link>
-                )}
-                {deal.owner && <span>Owned by {deal.owner.name}</span>}
-              </>
+              deal.account && (
+                <Link
+                  href={routes.account(deal.account._id)}
+                  className="hover:text-foreground focus-visible:ring-ring truncate rounded-sm outline-none focus-visible:ring-2"
+                >
+                  {deal.account.name}
+                </Link>
+              )
             }
           />
         }
@@ -373,7 +363,6 @@ function DealPeople({ deal, save }: { deal: DealRow; save: SaveDeal }) {
   );
   const addButton = (
     <Button variant="ghost" size="xs">
-      <PlusIcon aria-hidden className="size-2.5" />
       Add people
     </Button>
   );
@@ -398,19 +387,17 @@ function DealPeople({ deal, save }: { deal: DealRow; save: SaveDeal }) {
           action={
             <DealPeopleMenu deal={deal} save={save}>
               <Button variant="secondary" size="sm">
-                <PlusIcon aria-hidden className="size-3" />
                 Add people
               </Button>
             </DealPeopleMenu>
           }
-          className="border-border rounded-xl border border-dashed"
         />
       ) : (
-        <ul className="border-border divide-border flex flex-col divide-y overflow-hidden rounded-xl border">
+        <ul className="divide-border flex flex-col divide-y">
           {onDeal.map((person) => (
             <li
               key={person._id}
-              className="group/row flex items-center gap-3 px-3 py-2.5"
+              className="group/row flex items-center gap-3 py-2.5"
             >
               <Avatar name={personName(person)} size="md" />
               <Link

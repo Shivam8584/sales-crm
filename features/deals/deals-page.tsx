@@ -27,10 +27,9 @@ import SearchInput from "@/components/data-table/search-input";
 import type { Column, SortState } from "@/components/data-table/types";
 import {
   CreateButton,
-  ExportButton,
   Page,
+  PageActions,
   PageHeader,
-  PageStatus,
   PageToolbar,
 } from "@/components/shell/page";
 import AccountLogo from "@/features/accounts/account-logo";
@@ -46,14 +45,14 @@ import { useUrlState } from "@/hooks/use-url-state";
 import { DEAL_STAGES, type DealStage } from "@/lib/domain/enums";
 import { DEAL_STAGE_LABEL } from "@/lib/domain/labels";
 import { DEFAULT_CURRENCY, formatMoney } from "@/lib/domain/money";
+import { can } from "@/convex/lib/permissions";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import EyeIcon from "@/public/assets/icons/eye.svg";
-import FilterIcon from "@/public/assets/icons/filter.svg";
 import ListIcon from "@/public/assets/icons/list.svg";
-import PlusIcon from "@/public/assets/icons/plus.svg";
+import ShareIcon from "@/public/assets/icons/share.svg";
 import DealCard, { DEAL_CARD_FIELDS } from "./deal-card";
 import DealQuickAdd from "./deal-quick-add";
 import { formatDay, formatTotals, today as todayDay } from "./format";
@@ -328,37 +327,41 @@ export default function DealsPage() {
     dir: sortDir === "desc" ? "desc" : "asc",
   };
 
-  const newDeal = (
-    <Button
-      variant="primary"
-      size="sm"
-      onClick={() => setCreate({ type: "deal" })}
-    >
-      <PlusIcon aria-hidden className="size-3" />
-      New deal
-    </Button>
+  const emptyState = filtered ? (
+    <EmptyState
+      title="No deals match"
+      action={
+        <Button variant="secondary" size="sm" onClick={clearFilters}>
+          Clear filters
+        </Button>
+      }
+    />
+  ) : closed === HIDE && deals?.length ? (
+    <EmptyState
+      title="No open deals"
+      action={
+        <Button variant="secondary" size="sm" onClick={() => setClosed(SHOW)}>
+          Show won & lost
+        </Button>
+      }
+    />
+  ) : (
+    <EmptyState
+      title="No deals yet"
+      description="Track each opportunity from first call to a live campaign."
+      action={
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setCreate({ type: "deal" })}
+        >
+          New deal
+        </Button>
+      }
+    />
   );
-
-  const emptyState =
-    deals && deals.length === 0 ? (
-      <EmptyState
-        icon={ClipboardIcon}
-        title="No deals yet"
-        description="Track each opportunity from first call to a live campaign."
-        action={newDeal}
-      />
-    ) : deals && visible.length === 0 && filtered ? (
-      <EmptyState
-        icon={FilterIcon}
-        title="No deals match"
-        description="Try another search or clear the filters."
-        action={
-          <Button variant="secondary" size="sm" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        }
-      />
-    ) : null;
+  const boardEmpty =
+    deals && (deals.length === 0 || (visible.length === 0 && filtered));
 
   return (
     <Page>
@@ -366,12 +369,27 @@ export default function DealsPage() {
         title="Deals"
         meta={
           deals && (
-            <PageStatus>
-              <span className="tabular-nums">
-                {deals.filter((deal) => isOpenStage(deal.stage)).length} open
-              </span>
-            </PageStatus>
+            <span className="text-fg-tertiary text-sm tabular-nums">
+              {deals.filter((deal) => isOpenStage(deal.stage)).length} open
+            </span>
           )
+        }
+        actions={
+          <PageActions
+            label="Deal list actions"
+            actions={[
+              can(viewer, "record.export") && {
+                label: "Export CSV",
+                icon: ShareIcon,
+                disabled: !visible.length || exporting,
+                onSelect: () =>
+                  void exportCsv({
+                    name: "deals",
+                    args: { ...listArgs, search: search.trim() || undefined },
+                  }),
+              },
+            ]}
+          />
         }
       />
       <PageToolbar
@@ -414,15 +432,6 @@ export default function DealsPage() {
               </>
             )}
             <SavedViewsMenu />
-            <ExportButton
-              disabled={!visible.length || exporting}
-              onClick={() =>
-                void exportCsv({
-                  name: "deals",
-                  args: { ...listArgs, search: search.trim() || undefined },
-                })
-              }
-            />
             <CreateButton onClick={() => setCreate({ type: "deal" })}>
               New deal
             </CreateButton>
@@ -487,46 +496,7 @@ export default function DealsPage() {
             onSortChange={setSortParam}
             onPeek={peek}
             onStageChange={(id, stage) => onMove(id, stage, null)}
-            empty={
-              filtered ? (
-                <EmptyState
-                  icon={FilterIcon}
-                  title="No deals match"
-                  description="Try another search or clear the filters."
-                  action={
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={clearFilters}
-                    >
-                      Clear filters
-                    </Button>
-                  }
-                />
-              ) : closed === HIDE ? (
-                <EmptyState
-                  icon={ClipboardIcon}
-                  title="No open deals"
-                  description="Won and lost deals are hidden."
-                  action={
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setClosed(SHOW)}
-                    >
-                      Show won & lost
-                    </Button>
-                  }
-                />
-              ) : (
-                <EmptyState
-                  icon={ClipboardIcon}
-                  title="No deals yet"
-                  description="Track each opportunity from first call to a live campaign."
-                  action={newDeal}
-                />
-              )
-            }
+            empty={emptyState}
           />
         ) : deals === undefined ? (
           <BoardSkeleton columns={stages.length} />
@@ -547,7 +517,7 @@ export default function DealsPage() {
             prefs={boardPrefs}
             addLabel="New deal"
             emptyLabel="No deals"
-            overlay={emptyState && <BoardMessage>{emptyState}</BoardMessage>}
+            overlay={boardEmpty && <BoardMessage>{emptyState}</BoardMessage>}
           />
         )}
       </div>
@@ -780,14 +750,12 @@ function PipelineSummary({ deals }: { deals: DealRow[] | undefined }) {
         won.map((deal) => deal.amount),
         ZERO,
       ),
-      count: String(open.length),
     };
   }, [deals]);
 
   const items = [
     { label: "Open pipeline", value: stats?.open, hint: "monthly take" },
     { label: "Won this month", value: stats?.won, hint: "monthly take" },
-    { label: "Open deals", value: stats?.count },
   ];
 
   return (
@@ -812,10 +780,8 @@ function PipelineSummary({ deals }: { deals: DealRow[] | undefined }) {
 
 function BoardMessage({ children }: { children: ReactNode }) {
   return (
-    <div className="z-sticky-header bg-background/70 absolute inset-0 flex items-start justify-center px-4 pt-[12vh] backdrop-blur-[2px]">
-      <div className="bg-card shadow-raised w-full max-w-sm rounded-xl">
-        {children}
-      </div>
+    <div className="z-sticky-header bg-background/80 absolute inset-0 flex items-start justify-center px-4 pt-[12vh]">
+      <div className="w-full max-w-sm">{children}</div>
     </div>
   );
 }
@@ -836,16 +802,13 @@ function BoardSkeleton({ columns }: { columns: number }) {
             <Skeleton className="ml-5.5 h-3 w-12" />
           </div>
           {Array.from({ length: 3 - (column % 2) }, (_, card) => (
-            <div key={card} className="bg-card shadow-card rounded-2xl">
-              <div className="flex flex-col gap-3 p-4">
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-              <div className="border-border flex gap-2 border-t px-4 py-3">
-                <Skeleton className="h-7 w-14 rounded-full" />
-                <Skeleton className="h-7 w-18 rounded-full" />
-                <Skeleton className="h-7 w-16 rounded-full" />
-              </div>
+            <div
+              key={card}
+              className="bg-card shadow-card flex flex-col gap-3 rounded-2xl p-4"
+            >
+              <Skeleton className="h-3.5 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-3 w-2/3" />
             </div>
           ))}
         </div>

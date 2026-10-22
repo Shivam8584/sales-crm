@@ -163,37 +163,42 @@ function ExportBody({
             {BLURB[format]}
           </p>
         </div>
-        <div className="flex flex-col gap-4">
-          <ToggleRow
-            label="Include rules and settings"
-            description="Trigger filters, conditions, goal, limits and sender."
-            control={(controlId) => (
-              <Switch
-                id={controlId}
-                checked={includeRules}
-                onCheckedChange={setIncludeRules}
-              />
-            )}
-          />
-          {canLog && (
+        <details>
+          <summary className="text-fg-secondary hover:text-foreground focus-visible:ring-ring w-fit cursor-pointer rounded-sm text-sm outline-none focus-visible:ring-2">
+            More options
+          </summary>
+          <div className="mt-4 flex flex-col gap-4">
             <ToggleRow
-              label="Include run log"
-              description={
-                format === "csv"
-                  ? "Not part of the steps report."
-                  : "The last 100 lines. They name recipients."
-              }
+              label="Include rules and settings"
+              description="Trigger filters, conditions, goal, limits and sender."
               control={(controlId) => (
                 <Switch
                   id={controlId}
-                  checked={includeLog && format !== "csv"}
-                  disabled={format === "csv"}
-                  onCheckedChange={setIncludeLog}
+                  checked={includeRules}
+                  onCheckedChange={setIncludeRules}
                 />
               )}
             />
-          )}
-        </div>
+            {canLog && (
+              <ToggleRow
+                label="Include run log"
+                description={
+                  format === "csv"
+                    ? "Not part of the steps report."
+                    : "The last 100 lines. They name recipients."
+                }
+                control={(controlId) => (
+                  <Switch
+                    id={controlId}
+                    checked={includeLog && format !== "csv"}
+                    disabled={format === "csv"}
+                    onCheckedChange={setIncludeLog}
+                  />
+                )}
+              />
+            )}
+          </div>
+        </details>
         <div className="flex min-w-0 flex-col gap-1.5">
           <pre
             tabIndex={0}

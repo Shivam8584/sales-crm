@@ -178,7 +178,7 @@ export default function InviteDialog({
             </fieldset>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="subtle" size="sm">
+                <Button variant="secondary" size="sm">
                   Cancel
                 </Button>
               </DialogClose>
@@ -250,7 +250,7 @@ function InviteSent({
         </Field>
       </div>
       <DialogFooter>
-        <Button variant="subtle" size="sm" onClick={onAnother}>
+        <Button variant="secondary" size="sm" onClick={onAnother}>
           Invite another
         </Button>
         <DialogClose asChild>

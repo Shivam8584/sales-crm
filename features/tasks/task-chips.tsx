@@ -76,7 +76,7 @@ export function CardSafe({
 export type ChipSize = "sm" | "md";
 
 const CHIP_BASE =
-  "text-fg-secondary shadow-hairline duration-fast ease-power3-out hover:text-foreground hover:shadow-[0_0_0_1px_var(--line-strong)] data-[state=open]:text-foreground data-[state=open]:shadow-[0_0_0_1px_var(--fg-tertiary)] focus-visible:ring-ring inline-flex min-w-0 cursor-pointer items-center rounded-full whitespace-nowrap outline-none transition-[color,box-shadow] focus-visible:ring-2";
+  "text-fg-secondary duration-fast ease-power3-out hover:bg-overlay-2 hover:text-foreground data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground focus-visible:ring-ring inline-flex min-w-0 cursor-pointer items-center rounded-full whitespace-nowrap outline-none transition-colors focus-visible:ring-2";
 
 /** Pill used for task properties: `md` on cards, `sm` in dense rows. */
 export function chipClass(size: ChipSize = "sm") {

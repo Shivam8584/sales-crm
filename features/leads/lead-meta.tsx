@@ -1,13 +1,13 @@
 import Avatar from "@/components/_ui/avatar";
-import Tag, { type TagTone } from "@/components/_ui/tag";
+import type { TagTone } from "@/components/_ui/tag";
+import ToneDot from "@/components/board/tone-dot";
 import Tooltip from "@/components/_ui/tooltip";
 import type { Option } from "@/components/fields/option-picker";
 import type { LeadStatus } from "@/lib/domain/enums";
 import { LEAD_STATUS_LABEL } from "@/lib/domain/labels";
 import { scoreBand, type LeadBand } from "@/lib/domain/scoring";
-import { cellDate, tagTone } from "@/features/accounts/record-cells";
+import { cellDate } from "@/features/accounts/record-cells";
 import { cn } from "@/lib/utils";
-import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
 
 export const STATUS_TONE: Record<LeadStatus, TagTone> = {
   new: "blue",
@@ -18,25 +18,24 @@ export const STATUS_TONE: Record<LeadStatus, TagTone> = {
   converted: "teal",
 };
 
-/** Statuses a rep picks directly; disqualify needs a reason and convert has its own action. */
-
 export function StatusTag({ status }: { status: LeadStatus }) {
   return (
-    <Tag tone={STATUS_TONE[status]} size="sm">
+    <span className="inline-flex items-center gap-1.5">
+      <ToneDot tone={STATUS_TONE[status]} />
       {LEAD_STATUS_LABEL[status]}
-    </Tag>
+    </span>
   );
 }
 
-const BAND_TONE: Record<LeadBand, TagTone> = {
-  hot: "red",
-  warm: "amber",
-  cold: "neutral",
-};
 const BAND_LABEL: Record<LeadBand, string> = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
+};
+const BAND_TEXT: Record<LeadBand, string> = {
+  hot: "text-danger",
+  warm: "text-foreground",
+  cold: "text-fg-tertiary",
 };
 
 /** "Hot 82" with the reasons behind the score in a tooltip. */
@@ -61,9 +60,9 @@ export function ScoreTag({
         </span>
       }
     >
-      <Tag tone={BAND_TONE[band]} size="sm">
+      <span className={cn("shrink-0 tabular-nums", BAND_TEXT[band])}>
         {BAND_LABEL[band]} {score}
-      </Tag>
+      </span>
     </Tooltip>
   );
 }
@@ -77,14 +76,16 @@ const DEMO_TIME = new Intl.DateTimeFormat("en-IN", {
 
 export function DemoTag({ at }: { at: number }) {
   return (
-    <Tag tone="purple" size="xs" title={`Demo on ${DEMO_TIME.format(at)}`}>
-      <CalendarIcon aria-hidden className="size-3" />
-      {DEMO_TIME.format(at)}
-    </Tag>
+    <span
+      className="text-fg-secondary tabular-nums"
+      title={`Demo on ${DEMO_TIME.format(at)}`}
+    >
+      Demo {DEMO_TIME.format(at)}
+    </span>
   );
 }
 
-/** UTM source as a coloured tag with the medium beside it; otherwise the referrer or entry point. */
+/** UTM source with the medium beside it; otherwise the referrer or entry point. */
 export function SourceTag({
   utm,
   channel,
@@ -92,25 +93,11 @@ export function SourceTag({
   utm: { source?: string; medium?: string };
   channel: string;
 }) {
-  if (!utm.source) {
-    return (
-      <Tag
-        tone="neutral"
-        size="sm"
-        title={channel}
-        className="max-w-full min-w-0"
-      >
-        <span className="truncate">{channel}</span>
-      </Tag>
-    );
-  }
   return (
-    <span className="flex min-w-0 items-center gap-1.5" title={channel}>
-      <Tag tone={tagTone(utm.source)} size="sm" className="min-w-0 shrink">
-        <span className="truncate">{utm.source}</span>
-      </Tag>
-      {utm.medium && (
-        <span className="text-fg-tertiary truncate text-sm">{utm.medium}</span>
+    <span className="flex min-w-0 items-baseline gap-1.5" title={channel}>
+      <span className="truncate">{utm.source ?? channel}</span>
+      {utm.source && utm.medium && (
+        <span className="text-fg-tertiary truncate">{utm.medium}</span>
       )}
     </span>
   );
@@ -121,21 +108,15 @@ const DEMO_CLOCK = new Intl.DateTimeFormat("en-IN", {
   minute: "2-digit",
 });
 
-/** "📅 23 Oct | 3:30 pm", muted once the demo has passed. */
+/** "23 Oct, 3:30 pm", muted once the demo has passed. */
 export function DemoCell({ at, now }: { at: number | null; now: number }) {
   if (!at) return <span className="text-fg-tertiary">—</span>;
   return (
     <span
       title={`Demo on ${DEMO_TIME.format(at)}`}
-      className={cn(
-        "flex min-w-0 items-center gap-1 tabular-nums",
-        at < now && "text-fg-tertiary",
-      )}
+      className={cn("truncate tabular-nums", at < now && "text-fg-tertiary")}
     >
-      <CalendarIcon aria-hidden className="size-3.5 shrink-0" />
-      <span className="w-12.5 shrink-0">{cellDate(at)}</span>
-      <span aria-hidden className="bg-overlay-4 mx-0.75 h-2 w-px shrink-0" />
-      <span className="truncate">{DEMO_CLOCK.format(at)}</span>
+      {cellDate(at)}, {DEMO_CLOCK.format(at)}
     </span>
   );
 }

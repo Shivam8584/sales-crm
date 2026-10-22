@@ -48,7 +48,6 @@ import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
-import PlusIcon from "@/public/assets/icons/plus.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import { ownerOptions } from "@/features/leads/lead-meta";
 import AccountLogo from "./account-logo";
@@ -143,7 +142,7 @@ const COLUMNS: Column<AccountRow>[] = [
     header: "Activation",
     width: "7.5rem",
     align: "end",
-    minViewport: 1200,
+    minViewport: 1440,
     cell: (row) => <ActivationCell steps={row.activation} />,
   },
   {
@@ -645,25 +644,15 @@ export default function AccountsPage() {
               <EmptyState
                 icon={BuildingIcon}
                 title="No accounts yet"
-                description="Accounts are the brands you sell to. Add the first one, or import a CSV from your spreadsheet."
+                description="Add the brands you sell to, or import a CSV."
                 action={
-                  <span className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setImporting(true)}
-                    >
-                      Import CSV
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => setCreate({ type: "account" })}
-                    >
-                      <PlusIcon aria-hidden className="size-3" />
-                      New account
-                    </Button>
-                  </span>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setCreate({ type: "account" })}
+                  >
+                    New account
+                  </Button>
                 }
               />
             )

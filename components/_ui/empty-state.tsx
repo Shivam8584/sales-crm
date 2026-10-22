@@ -23,11 +23,7 @@ export default function EmptyState({
         className,
       )}
     >
-      {Icon && (
-        <span className="bg-muted shadow-hairline mb-1 flex size-10 items-center justify-center rounded-full">
-          <Icon aria-hidden className="text-fg-secondary size-4" />
-        </span>
-      )}
+      {Icon && <Icon aria-hidden className="text-fg-tertiary mb-1 size-4" />}
       <span className="lead-style block font-medium text-balance">{title}</span>
       {description && (
         <span className="caption-style text-fg-tertiary block max-w-sm leading-snug text-balance">

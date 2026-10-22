@@ -56,7 +56,7 @@ export default function Segmented<T extends string>({
       aria-label={label}
       onKeyDown={onKeyDown}
       className={cn(
-        "bg-overlay-1 shadow-hairline inline-flex shrink-0 items-center gap-0.5 rounded-full p-0.5",
+        "bg-overlay-2 inline-flex shrink-0 items-center gap-0.5 rounded-full p-0.5",
         className,
       )}
     >

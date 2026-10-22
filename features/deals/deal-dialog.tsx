@@ -14,6 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/_ui/dialog";
+import {
+  Collapsible,
+  CollapsibleChevron,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/_ui/collapsible";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import OptionPicker from "@/components/fields/option-picker";
@@ -25,7 +31,6 @@ import { DEFAULT_CURRENCY, type Money } from "@/lib/domain/money";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
 import { useUiStore, type CreateDialog } from "@/stores/ui-store";
-import PlusIcon from "@/public/assets/icons/plus.svg";
 import { LostReasonChips } from "./lost-reason-dialog";
 import MoneyInput from "./money-input";
 import PeoplePicker from "./people-picker";
@@ -128,6 +133,9 @@ function DealForm({ preset, onDone }: { preset: Preset; onDone: () => void }) {
     {},
   );
   const [saving, setSaving] = useState(false);
+  const [more, setMore] = useState(
+    isStage(preset.stage) && preset.stage !== "discovery",
+  );
 
   const errors = validate(form);
   const valid = Object.keys(errors).length === 0;
@@ -197,8 +205,8 @@ function DealForm({ preset, onDone }: { preset: Preset; onDone: () => void }) {
     <form onSubmit={submit} noValidate>
       <DialogHeader>
         <DialogTitle>New deal</DialogTitle>
-        <DialogDescription>
-          An opportunity with an account, tracked through the pipeline.
+        <DialogDescription className="sr-only">
+          Create a deal for an account
         </DialogDescription>
       </DialogHeader>
 
@@ -236,99 +244,103 @@ function DealForm({ preset, onDone }: { preset: Preset; onDone: () => void }) {
           />
         </PickerField>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <PickerField label="Stage">
-            <OptionPicker
-              value={form.stage}
-              label="Stage"
-              options={DEAL_STAGE_OPTIONS}
-              onChange={(value) => value && set("stage", value as DealStage)}
-              className={PICKER_CLASS}
-            />
-          </PickerField>
-          <Field
-            label="Close date"
-            htmlFor="deal-close-date"
-            error={closeDateError}
-          >
-            <Input
-              id="deal-close-date"
-              type="date"
-              value={form.closeDate}
-              onChange={(event) => set("closeDate", event.target.value)}
-              aria-invalid={closeDateError ? true : undefined}
-              className="aria-invalid:border-danger tabular-nums"
-            />
-          </Field>
-        </div>
-
-        {form.stage === "lost" && (
-          <Field
-            label="Lost reason"
-            htmlFor="deal-lost-reason"
-            required
-            error={reasonError}
-          >
-            <Input
-              id="deal-lost-reason"
-              autoComplete="off"
-              maxLength={280}
-              value={form.lostReason}
-              onChange={(event) => set("lostReason", event.target.value)}
-              onBlur={() => touch("lostReason")}
-              placeholder="What happened?"
-              aria-invalid={reasonError ? true : undefined}
-              aria-describedby={
-                reasonError ? "deal-lost-reason-error" : undefined
-              }
-              className="aria-invalid:border-danger"
-            />
-            <LostReasonChips
-              value={form.lostReason}
-              onPick={(reason) => set("lostReason", reason)}
-            />
-          </Field>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="Amount"
-            htmlFor="deal-amount"
-            hint={amountError ? undefined : "Expected monthly take"}
-            error={amountError}
-          >
-            <MoneyInput
-              id="deal-amount"
-              value={form.amount}
-              onChange={(amount) => set("amount", amount)}
-              invalid={Boolean(amountError)}
-              describedBy={
-                amountError ? "deal-amount-error" : "deal-amount-hint"
-              }
-            />
-          </Field>
-          <PickerField label="Owner">
-            <MemberPicker
-              value={form.ownerId}
-              onChange={(ownerId) => set("ownerId", ownerId)}
-              className={PICKER_CLASS}
-            />
-          </PickerField>
-        </div>
-
         <Field
-          label="Contacts"
-          htmlFor="deal-contacts"
-          hint="People at the account you're working with on this deal."
+          label="Amount"
+          htmlFor="deal-amount"
+          hint={amountError ? undefined : "Expected monthly take"}
+          error={amountError}
         >
-          <PeoplePicker
-            id="deal-contacts"
-            accountId={form.accountId}
-            value={form.personIds}
-            onChange={(ids) => set("personIds", ids)}
-            describedBy="deal-contacts-hint"
+          <MoneyInput
+            id="deal-amount"
+            value={form.amount}
+            onChange={(amount) => set("amount", amount)}
+            invalid={Boolean(amountError)}
+            describedBy={amountError ? "deal-amount-error" : "deal-amount-hint"}
           />
         </Field>
+
+        <Collapsible
+          open={more || Boolean(closeDateError || reasonError)}
+          onOpenChange={setMore}
+          className="group/collapsible flex flex-col"
+        >
+          <CollapsibleTrigger className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex w-fit cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+            More options
+            <CollapsibleChevron />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="flex flex-col gap-4 pt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <PickerField label="Stage">
+                  <OptionPicker
+                    value={form.stage}
+                    label="Stage"
+                    options={DEAL_STAGE_OPTIONS}
+                    onChange={(value) =>
+                      value && set("stage", value as DealStage)
+                    }
+                    className={PICKER_CLASS}
+                  />
+                </PickerField>
+                <Field
+                  label="Close date"
+                  htmlFor="deal-close-date"
+                  error={closeDateError}
+                >
+                  <Input
+                    id="deal-close-date"
+                    type="date"
+                    value={form.closeDate}
+                    onChange={(event) => set("closeDate", event.target.value)}
+                    aria-invalid={closeDateError ? true : undefined}
+                    className="aria-invalid:border-danger tabular-nums"
+                  />
+                </Field>
+              </div>
+              {form.stage === "lost" && (
+                <Field
+                  label="Lost reason"
+                  htmlFor="deal-lost-reason"
+                  required
+                  error={reasonError}
+                >
+                  <Input
+                    id="deal-lost-reason"
+                    autoComplete="off"
+                    maxLength={280}
+                    value={form.lostReason}
+                    onChange={(event) => set("lostReason", event.target.value)}
+                    onBlur={() => touch("lostReason")}
+                    aria-invalid={reasonError ? true : undefined}
+                    aria-describedby={
+                      reasonError ? "deal-lost-reason-error" : undefined
+                    }
+                    className="aria-invalid:border-danger"
+                  />
+                  <LostReasonChips
+                    value={form.lostReason}
+                    onPick={(reason) => set("lostReason", reason)}
+                  />
+                </Field>
+              )}
+              <PickerField label="Owner">
+                <MemberPicker
+                  value={form.ownerId}
+                  onChange={(ownerId) => set("ownerId", ownerId)}
+                  className={PICKER_CLASS}
+                />
+              </PickerField>
+              <Field label="Contacts" htmlFor="deal-contacts">
+                <PeoplePicker
+                  id="deal-contacts"
+                  accountId={form.accountId}
+                  value={form.personIds}
+                  onChange={(ids) => set("personIds", ids)}
+                />
+              </Field>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {serverErrors.form && (
           <p role="alert" className="caption-style text-danger">
@@ -339,7 +351,7 @@ function DealForm({ preset, onDone }: { preset: Preset; onDone: () => void }) {
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button variant="subtle" size="sm">
+          <Button variant="secondary" size="sm">
             Cancel
           </Button>
         </DialogClose>
@@ -350,7 +362,6 @@ function DealForm({ preset, onDone }: { preset: Preset; onDone: () => void }) {
           loading={saving}
           disabled={!valid}
         >
-          <PlusIcon aria-hidden className="size-3" />
           Create deal
         </Button>
       </DialogFooter>

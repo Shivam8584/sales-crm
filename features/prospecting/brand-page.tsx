@@ -8,7 +8,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
@@ -115,7 +114,6 @@ function BrandView({ brand }: { brand: Brand }) {
 
   const primary = openLead ? (
     <Button variant="primary" size="sm" href={routes.lead(openLead._id)}>
-      <TargetIcon aria-hidden className="size-3" />
       Open lead
     </Button>
   ) : (
@@ -124,7 +122,6 @@ function BrandView({ brand }: { brand: Brand }) {
       size="sm"
       onClick={() => actions.createLead(brand)}
     >
-      <TargetIcon aria-hidden className="size-3" />
       Create lead
     </Button>
   );
@@ -247,9 +244,9 @@ function BrandView({ brand }: { brand: Brand }) {
                       className="hover:text-foreground focus-visible:ring-ring flex min-w-0 items-center gap-1.5 rounded-sm text-sm outline-none focus-visible:ring-2"
                     >
                       <span className="truncate">{brand.lead.name}</span>
-                      <Tag tone="neutral" size="xs">
+                      <span className="caption-style text-fg-tertiary shrink-0">
                         {LEAD_STATUS_LABEL[brand.lead.status]}
-                      </Tag>
+                      </span>
                     </Link>
                   ) : (
                     <Button
@@ -327,7 +324,7 @@ function BrandView({ brand }: { brand: Brand }) {
         }
       >
         <RecordSection title="Why this brand">
-          <div className="bg-overlay-1 shadow-hairline flex flex-col gap-4 rounded-xl p-4">
+          <div className="flex flex-col gap-4">
             {brand.talkingPoint ? (
               <div className="flex items-start gap-3">
                 <p className="text-foreground min-w-0 flex-1 text-sm leading-relaxed text-pretty">
@@ -366,8 +363,7 @@ function BrandView({ brand }: { brand: Brand }) {
             {top && (
               <p className="caption-style text-fg-tertiary">
                 Based on {top.title ?? top.identifier} on{" "}
-                {marketplaceName(top.marketplace)}, the listing with the highest
-                score.
+                {marketplaceName(top.marketplace)}, its highest-scoring listing.
               </p>
             )}
           </div>
@@ -389,11 +385,10 @@ function BrandView({ brand }: { brand: Brand }) {
               }
             />
           ) : (
-            <div className="border-border flex flex-col items-start gap-2 rounded-xl border border-dashed px-4 py-5">
-              <span className="text-sm font-medium">Not in the CRM yet</span>
-              <span className="caption-style text-fg-tertiary leading-snug">
-                Create a lead or add the brand to an account to enrol it in an
-                automation.
+            <div className="flex flex-col items-start gap-2">
+              <span className="text-fg-tertiary text-sm">
+                Not in the CRM yet. Create a lead or add the brand to an account
+                to enrol it in a sequence.
               </span>
               <Button
                 variant="secondary"
@@ -417,7 +412,7 @@ function BrandSkeleton() {
       <PageHeader crumbs={CRUMBS} title="" />
       <div
         aria-busy
-        className="mx-auto grid w-full max-w-6xl gap-x-12 gap-y-8 px-4 pt-6 sm:px-6 @4xl/page:grid-cols-[minmax(0,1fr)_19rem] lg:pt-8"
+        className="mx-auto grid w-full max-w-6xl gap-x-12 gap-y-8 px-4 pt-6 sm:px-6 lg:pt-8 @4xl/page:grid-cols-[minmax(0,1fr)_19rem]"
       >
         <div className="flex items-center gap-4 @4xl/page:col-span-2">
           <Skeleton className="size-12 rounded-xl" />

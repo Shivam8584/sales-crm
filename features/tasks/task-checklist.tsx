@@ -27,12 +27,7 @@ export default function TaskChecklist({
   className,
 }: TaskChecklistProps) {
   return (
-    <ul
-      className={cn(
-        "border-border divide-border flex flex-col divide-y overflow-hidden rounded-xl border",
-        className,
-      )}
-    >
+    <ul className={cn("divide-border -mx-3 flex flex-col divide-y", className)}>
       {tasks.map((task) => (
         <TaskChecklistRow
           key={task._id}
@@ -106,7 +101,7 @@ function TaskChecklistRow({
 
 export function TaskChecklistSkeleton({ rows = 2 }: { rows?: number }) {
   return (
-    <div className="border-border divide-border flex flex-col divide-y rounded-xl border">
+    <div className="divide-border -mx-3 flex flex-col divide-y">
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className="flex items-center gap-3 px-3 py-3">
           <Skeleton className="size-4 rounded-sm" />

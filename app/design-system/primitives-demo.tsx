@@ -43,13 +43,7 @@ import PlusIcon from "@/public/assets/icons/plus.svg";
 import SearchIcon from "@/public/assets/icons/search.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 
-const BUTTON_VARIANTS = [
-  "primary",
-  "secondary",
-  "muted",
-  "subtle",
-  "ghost",
-] as const;
+const BUTTON_VARIANTS = ["primary", "secondary", "ghost"] as const;
 const TAG_TONES: TagTone[] = [
   "blue",
   "purple",
@@ -281,7 +275,7 @@ export default function PrimitivesDemo() {
           <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
             <span className="lead-style">Archive account</span>
             <Button
-              variant="subtle"
+              variant="secondary"
               size="xs"
               className="text-danger"
               onClick={() => toast("Account archived", () => undefined)}

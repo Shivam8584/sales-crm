@@ -132,7 +132,7 @@ export function useDialer() {
               </p>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button variant="subtle" size="sm">
+                  <Button variant="secondary" size="sm">
                     Cancel
                   </Button>
                 </DialogClose>

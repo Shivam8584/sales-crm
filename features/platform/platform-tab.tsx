@@ -13,9 +13,7 @@ import EmptyState from "@/components/_ui/empty-state";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import Skeleton from "@/components/_ui/skeleton";
-import Tag, { type TagTone } from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
-import SegmentBar from "@/components/_common/segment-bar";
 import { MoneyValue } from "@/features/accounts/record-cells";
 import {
   HEALTH_BAND_LABEL,
@@ -33,8 +31,7 @@ import { dateTime, relativeTime, shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
-import LinkIcon from "@/public/assets/icons/link.svg";
-import { HEALTH_TONE, HealthRing } from "./health-badge";
+import { HealthRing } from "./health-badge";
 import { routes } from "@/lib/routes";
 
 type Data = FunctionReturnType<typeof api.account360.platform>;
@@ -100,7 +97,7 @@ function Section({
   return (
     <section aria-label={title} className="flex min-w-0 flex-col gap-4">
       <div className="min-h-control-md flex items-center justify-between gap-3">
-        <h3 className="eyebrow-style text-fg-secondary flex min-w-0 items-center gap-2 font-normal">
+        <h3 className="text-fg-secondary flex min-w-0 items-center gap-2 text-sm font-medium">
           <span className="truncate">{title}</span>
           {count !== undefined && count > 0 && <CountBadge>{count}</CountBadge>}
         </h3>
@@ -117,11 +114,7 @@ function Section({
 }
 
 function Muted({ children }: { children: ReactNode }) {
-  return (
-    <p className="caption-style text-fg-tertiary border-border rounded-xl border border-dashed px-4 py-5 text-center leading-snug">
-      {children}
-    </p>
-  );
+  return <p className="text-fg-tertiary text-sm leading-snug">{children}</p>;
 }
 
 function When({ at, className }: { at: number; className?: string }) {
@@ -161,9 +154,9 @@ function HeaderStrip({
   const weak = weakestFactors(health, 3);
 
   return (
-    <div className="bg-card shadow-card overflow-hidden rounded-2xl">
-      <div className="divide-border grid max-md:divide-y md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)] md:divide-x">
-        <div className="flex min-w-0 flex-col gap-4 p-5">
+    <div className="flex flex-col gap-6">
+      <div className="grid gap-8 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
           <div className="flex items-center gap-3.5">
             <span className="relative grid size-14 shrink-0 place-items-center">
               <HealthRing
@@ -177,12 +170,9 @@ function HeaderStrip({
                 {health.score}
               </span>
             </span>
-            <span className="flex min-w-0 flex-col gap-2">
-              <span className="flex items-center gap-2">
-                <span className="lead-style font-medium">Health</span>
-                <Tag tone={HEALTH_TONE[health.band]} size="xs">
-                  {HEALTH_BAND_LABEL[health.band]}
-                </Tag>
+            <span className="flex min-w-0 flex-col gap-1.5">
+              <span className="text-sm font-medium">
+                Health · {HEALTH_BAND_LABEL[health.band]}
               </span>
               <span className="caption-style text-fg-tertiary">
                 {health.score} of 100 from six usage factors
@@ -217,20 +207,22 @@ function HeaderStrip({
             ))}
           </ul>
           {health.signals.length > 0 && (
-            <span className="flex flex-wrap gap-1">
+            <ul className="caption-style text-fg-secondary flex flex-wrap gap-x-3 gap-y-1">
               {health.signals.map((signal) => (
-                <Tooltip key={signal.id} content={signal.detail}>
-                  <Tag tone="green" size="xs" tabIndex={0}>
-                    {signal.label}
-                  </Tag>
-                </Tooltip>
+                <li key={signal.id}>
+                  <Tooltip content={signal.detail}>
+                    <span tabIndex={0} className="rounded-sm">
+                      {signal.label}
+                    </span>
+                  </Tooltip>
+                </li>
               ))}
-            </span>
+            </ul>
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 p-5">
-          <span className="eyebrow-style text-fg-secondary">Wallet</span>
+        <div className="flex min-w-0 flex-col gap-3">
+          <span className="text-fg-secondary text-sm font-medium">Wallet</span>
           {wallet.balance ? (
             <span
               className={cn(
@@ -243,7 +235,7 @@ function HeaderStrip({
           ) : (
             <span
               className={cn(
-                "lead-style",
+                "text-sm",
                 WALLET_TONE[wallet.status] ?? "text-fg-tertiary",
               )}
             >
@@ -290,24 +282,24 @@ function SyncCell({
 }) {
   const sync = useSync(accountId);
   return (
-    <div className="flex min-w-0 flex-col gap-3 p-5">
-      <span className="eyebrow-style text-fg-secondary">Last synced</span>
+    <div className="flex min-w-0 flex-col gap-3">
+      <span className="text-fg-secondary text-sm font-medium">Last synced</span>
       {snapshot ? (
-        <span className="flex flex-wrap items-center gap-2">
+        <span className="flex flex-wrap items-center gap-2 text-sm">
           <When
             at={snapshot.fetchedAt}
-            className={cn("lead-style", snapshot.error && "text-warning")}
+            className={cn(snapshot.error && "text-warning")}
           />
           {snapshot.source === "sandbox" && (
             <Tooltip content="PLATFORM_SANDBOX is on: data derived from local events">
-              <Tag size="xs" tabIndex={0}>
+              <span tabIndex={0} className="text-fg-tertiary rounded-sm">
                 Sandbox
-              </Tag>
+              </span>
             </Tooltip>
           )}
         </span>
       ) : (
-        <span className="lead-style text-fg-tertiary">Never</span>
+        <span className="text-fg-tertiary text-sm">Never</span>
       )}
       {snapshot?.error ? (
         <p className="caption-style text-warning leading-snug">
@@ -403,7 +395,7 @@ function OrgFooter({
   }
 
   return (
-    <div className="border-border bg-overlay-1 caption-style text-fg-tertiary flex min-w-0 items-center gap-2 border-t px-5 py-2">
+    <div className="caption-style text-fg-tertiary flex min-w-0 items-center gap-2">
       <span className="shrink-0">Organisation</span>
       <span
         title={orgId}
@@ -446,13 +438,11 @@ const STATUS_ORDER: string[] = [
   "discarded",
 ];
 
-const STATUS_TONE: Partial<Record<CampaignStatus, TagTone>> = {
-  live: "green",
-  paused: "amber",
-  changes_requested: "orange",
-  pending_review: "blue",
-  scheduled: "teal",
-  rejected: "red",
+const STATUS_TEXT: Partial<Record<CampaignStatus, string>> = {
+  live: "text-success",
+  paused: "text-warning",
+  changes_requested: "text-warning",
+  rejected: "text-danger",
 };
 
 function CampaignStatusTag({ campaign }: { campaign: Campaign }) {
@@ -468,16 +458,17 @@ function CampaignStatusTag({ campaign }: { campaign: Campaign }) {
             : "Paused by the brand"
         }
       >
-        <Tag tone={starved ? "red" : "amber"} size="xs" tabIndex={0}>
+        <span
+          tabIndex={0}
+          className={cn("rounded-sm", starved ? "text-danger" : "text-warning")}
+        >
           {starved ? "Paused · no funds" : "Paused by brand"}
-        </Tag>
+        </span>
       </Tooltip>
     );
   }
   return (
-    <Tag tone={STATUS_TONE[status] ?? "neutral"} size="xs">
-      {label}
-    </Tag>
+    <span className={STATUS_TEXT[status] ?? "text-fg-secondary"}>{label}</span>
   );
 }
 
@@ -485,20 +476,7 @@ function Fill({ campaign }: { campaign: Campaign }) {
   if (campaign.fillPct === null) {
     return <span className="text-fg-tertiary">—</span>;
   }
-  const percent = Math.min(100, campaign.fillPct);
-  return (
-    <span className="flex items-center gap-2">
-      <SegmentBar
-        percent={percent}
-        segments={12}
-        tone={percent >= 100 ? "success" : "auto"}
-        className="w-18 shrink-0"
-      />
-      <span className="w-[4ch] text-right tabular-nums">
-        {Math.round(campaign.fillPct)}%
-      </span>
-    </span>
-  );
+  return <span className="tabular-nums">{Math.round(campaign.fillPct)}%</span>;
 }
 
 function Enrolled({ campaign }: { campaign: Campaign }) {
@@ -595,11 +573,11 @@ function Campaigns({ campaigns }: { campaigns: Campaign[] }) {
         </Muted>
       ) : (
         <>
-          <div className="border-border overflow-hidden rounded-xl border max-sm:hidden">
+          <div className="max-sm:hidden">
             <table className="w-full table-fixed text-sm">
               <caption className="sr-only">Campaigns on Hypedrive</caption>
               <thead>
-                <tr className="caption-style text-fg-tertiary bg-overlay-1 h-9 text-left">
+                <tr className="caption-style text-fg-tertiary h-9 text-left">
                   <th scope="col" className="px-3 font-normal">
                     Campaign
                   </th>
@@ -629,7 +607,7 @@ function Campaigns({ campaigns }: { campaigns: Campaign[] }) {
                   <tr
                     key={campaign.id}
                     className={cn(
-                      "border-border h-13 border-t",
+                      "h-13",
                       (campaign.status === "archived" ||
                         campaign.status === "ended") &&
                         "text-fg-secondary",
@@ -662,11 +640,11 @@ function Campaigns({ campaigns }: { campaigns: Campaign[] }) {
               </tbody>
             </table>
           </div>
-          <ul className="flex flex-col gap-2 sm:hidden">
+          <ul className="divide-border flex flex-col divide-y sm:hidden">
             {sorted.map((campaign) => (
               <li
                 key={campaign.id}
-                className="bg-card shadow-card flex flex-col gap-3 rounded-xl p-3.5 text-sm"
+                className="flex flex-col gap-3 py-3.5 text-sm"
               >
                 <span className="flex min-w-0 items-center justify-between gap-2">
                   <span className="truncate font-medium">{campaign.title}</span>
@@ -729,7 +707,7 @@ function Deposits({ deposits }: { deposits: Linked["deposits"] }) {
                 {stat.label}
               </dt>
               <dd className="flex min-w-0 flex-col gap-1.5">
-                <span className="font-display text-xl leading-none font-medium max-sm:text-lg">
+                <span className="font-display text-lg leading-none font-medium">
                   <MoneyValue totals={[stat.value]} />
                 </span>
                 <span className="caption-style text-fg-tertiary truncate">
@@ -813,7 +791,7 @@ function Listings({ listings }: { listings: Linked["listings"] }) {
       {listings.length === 0 ? (
         <Muted>No products listed on Hypedrive yet.</Muted>
       ) : (
-        <ul className="flex flex-wrap gap-1.5">
+        <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
           {listings.map((market) => (
             <li key={market.slug}>
               <Tooltip
@@ -821,18 +799,14 @@ function Listings({ listings }: { listings: Linked["listings"] }) {
               >
                 <span
                   tabIndex={0}
-                  className="bg-card shadow-card focus-visible:ring-ring flex h-8 items-center gap-2 rounded-full pr-1.5 pl-3 text-sm outline-none focus-visible:ring-2"
+                  className="focus-visible:ring-ring flex items-baseline gap-1.5 rounded-sm outline-none focus-visible:ring-2"
                 >
                   {market.label}
-                  <span className="caption-style text-fg-tertiary tabular-nums">
+                  <span className="text-fg-tertiary tabular-nums">
                     {market.count}
                   </span>
-                  {market.newMarketplace ? (
-                    <Tag tone="green" size="xs">
-                      New
-                    </Tag>
-                  ) : (
-                    <span aria-hidden className="w-0.5" />
+                  {market.newMarketplace && (
+                    <span className="text-success caption-style">New</span>
                   )}
                 </span>
               </Tooltip>
@@ -850,7 +824,7 @@ function Team({ members }: { members: Linked["members"] }) {
       {members.length === 0 ? (
         <Muted>Their Hypedrive team appears here after the first sync.</Muted>
       ) : (
-        <ul className="border-border divide-border flex flex-col divide-y overflow-hidden rounded-xl border">
+        <ul className="divide-border flex flex-col divide-y">
           {members.map((member) => {
             const name =
               member.person?.name ?? member.name ?? member.email ?? "Unnamed";
@@ -858,7 +832,7 @@ function Team({ members }: { members: Linked["members"] }) {
             return (
               <li
                 key={member.userId}
-                className="flex min-h-13 items-center gap-3 px-3 py-2"
+                className="flex min-h-13 items-center gap-3 py-2"
               >
                 <Avatar name={name} size="md" />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -890,15 +864,8 @@ function Team({ members }: { members: Linked["members"] }) {
                       .join(" · ")}
                   </span>
                 </span>
-                <Tag
-                  size="xs"
-                  tone={
-                    member.role === "owner"
-                      ? "purple"
-                      : member.role === "finance_manager"
-                        ? "teal"
-                        : "neutral"
-                  }
+                <span
+                  className="caption-style text-fg-tertiary shrink-0"
                   title={
                     member.roles.length > 1
                       ? member.roles
@@ -913,7 +880,7 @@ function Team({ members }: { members: Linked["members"] }) {
                   }
                 >
                   {role}
-                </Tag>
+                </span>
               </li>
             );
           })}
@@ -943,23 +910,16 @@ function Events({ events }: { events: Linked["events"] }) {
         </Muted>
       ) : (
         <ol className="flex flex-col">
-          {events.map((event, index) => (
+          {events.map((event) => (
             <li key={event._id} className="flex gap-3">
               <span
                 aria-hidden
-                className="flex w-2 shrink-0 flex-col items-center"
-              >
-                <span
-                  className={cn(
-                    "mt-[0.4rem] size-2 shrink-0 rounded-full",
-                    EVENT_DOT[event.tone],
-                  )}
-                />
-                {index < events.length - 1 && (
-                  <span className="bg-line-strong mt-1.5 -mb-[0.4rem] w-px flex-1" />
+                className={cn(
+                  "mt-[0.4rem] size-1.5 shrink-0 rounded-full",
+                  EVENT_DOT[event.tone],
                 )}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pb-4">
+              />
+              <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pb-3">
                 <span className="flex min-w-0 flex-col gap-1">
                   <span className="text-sm">{event.title}</span>
                   {event.detail && (
@@ -1028,11 +988,10 @@ function LinkOrg({
   }
 
   return (
-    <div className="border-border rounded-2xl border border-dashed">
+    <div>
       <EmptyState
-        icon={LinkIcon}
         title="Link to a Hypedrive organisation"
-        description="Paste the organisation ID from Hypedrive admin to see this brand's health, wallet, campaigns, deposits, listings and team here. Events the platform already sent for it are applied straight away."
+        description="Paste the organisation ID from Hypedrive admin to see this brand's health, wallet, campaigns and team here."
         action={
           <form
             onSubmit={(event) => void submit(event)}
@@ -1080,7 +1039,7 @@ function LinkOrg({
 function PlatformSkeleton() {
   return (
     <div aria-busy className="flex flex-col gap-10">
-      <Skeleton className="h-52 w-full rounded-2xl md:h-44" />
+      <Skeleton className="h-52 w-full rounded-xl md:h-36" />
       <div className="flex flex-col gap-4">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-40 w-full rounded-xl" />

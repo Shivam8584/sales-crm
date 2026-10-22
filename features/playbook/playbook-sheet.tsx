@@ -21,7 +21,6 @@ import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
 import XIcon from "@/public/assets/icons/x.svg";
 import type { PlaybookEntry } from "./playbook-browser";
-import { KIND_TONE } from "./playbook-meta";
 
 /** One entry, ready to copy; managers and admins also get Edit and Delete. */
 export default function PlaybookSheet({
@@ -104,16 +103,15 @@ export default function PlaybookSheet({
                 <h2 className="text-lg leading-6 font-semibold text-pretty break-words">
                   {entry.title}
                 </h2>
-                <div className="flex flex-wrap gap-1.5">
-                  <Tag tone={KIND_TONE[entry.kind]} size="sm">
-                    {PLAYBOOK_KIND_LABEL[entry.kind]}
-                  </Tag>
-                  {entry.tags.map((tag) => (
-                    <Tag key={tag} size="sm">
-                      {tag}
-                    </Tag>
-                  ))}
-                </div>
+                {entry.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {entry.tags.map((tag) => (
+                      <Tag key={tag} size="sm">
+                        {tag}
+                      </Tag>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="text-sm leading-relaxed break-words whitespace-pre-wrap">
                 {entry.body}

@@ -1,9 +1,6 @@
 "use client";
 
-import Tag, { type TagTone } from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
-import SegmentBar from "@/components/_common/segment-bar";
-import Sparkline from "@/components/_common/sparkline";
 import AccountLogo from "@/features/accounts/account-logo";
 import { dash } from "@/features/accounts/record-cells";
 import {
@@ -14,31 +11,11 @@ import {
 } from "@/lib/domain/prospecting";
 import { cn } from "@/lib/utils";
 
-const MARKETPLACE_TONE: Record<string, TagTone> = {
-  amazon: "amber",
-  flipkart: "blue",
-  myntra: "red",
-  nykaa: "purple",
-  ajio: "teal",
-  meesho: "purple",
-  purplle: "moss",
-  tatacliq: "neutral",
-  jiomart: "blue",
-  bigbasket: "green",
-  blinkit: "yellow",
-  zepto: "purple",
-  croma: "teal",
-};
-
 export function MarketplaceTag({ slug }: { slug: string }) {
-  return (
-    <Tag tone={MARKETPLACE_TONE[slug] ?? "neutral"} size="sm">
-      {marketplaceName(slug)}
-    </Tag>
-  );
+  return <span className="truncate">{marketplaceName(slug)}</span>;
 }
 
-/** At most `max` chips in all, the last one a "+N" when some don't fit. */
+/** At most `max` names in all, the last one a "+N" when some don't fit. */
 export function MarketplaceChips({
   slugs,
   max = 2,
@@ -47,25 +24,20 @@ export function MarketplaceChips({
   max?: number;
 }) {
   const room = slugs.length > max ? max - 1 : max;
-  const visible = slugs.slice(0, room);
   const hidden = slugs.slice(room);
   return (
-    <span className="flex min-w-0 items-center gap-0.75">
-      {visible.map((slug) => (
-        <MarketplaceTag key={slug} slug={slug} />
-      ))}
+    <span className="flex min-w-0 items-baseline gap-1.5">
+      <span className="truncate">
+        {slugs.slice(0, room).map(marketplaceName).join(", ")}
+      </span>
       {hidden.length > 0 && (
         <Tooltip content={hidden.map(marketplaceName).join(", ")}>
-          <Tag tone="neutral" size="sm">
-            +{hidden.length}
-          </Tag>
+          <span className="text-fg-tertiary shrink-0">+{hidden.length}</span>
         </Tooltip>
       )}
     </span>
   );
 }
-
-const BAND_TONE = { hot: "orange", warm: "amber", cool: "neutral" } as const;
 
 /** Prospect score with its band; the tooltip carries the reasons. */
 export function ScoreTag({
@@ -83,13 +55,18 @@ export function ScoreTag({
     );
   }
   const band = scoreBand(score);
-  const tag = (
-    <Tag tone={BAND_TONE[band]} size="sm" className="gap-1 tabular-nums">
-      <span className="font-medium">{score}</span>
-      <span className="opacity-80">{SCORE_BAND_LABEL[band]}</span>
-    </Tag>
+  const text = (
+    <span
+      className={cn(
+        "flex shrink-0 gap-1 tabular-nums",
+        band === "hot" ? "text-danger" : "text-foreground",
+      )}
+    >
+      {score}
+      <span className="text-fg-tertiary">{SCORE_BAND_LABEL[band]}</span>
+    </span>
   );
-  if (reasons.length === 0) return tag;
+  if (reasons.length === 0) return text;
   return (
     <Tooltip
       content={
@@ -102,12 +79,12 @@ export function ScoreTag({
         </ul>
       }
     >
-      <span className="flex">{tag}</span>
+      {text}
     </Tooltip>
   );
 }
 
-/** "105 / 2,164" with a bar for the share of the benchmark reached. */
+/** "105 / 2,164": ratings against the category benchmark. */
 export function GapCell({
   ratings,
   benchmark,
@@ -126,23 +103,15 @@ export function GapCell({
     <Tooltip
       content={`${formatCount(ratings)} ratings, ${percent}% of the ${formatCount(benchmark)} benchmark`}
     >
-      <span
-        className={cn(
-          "flex min-w-0 items-center gap-2 tabular-nums",
-          className,
-        )}
-      >
-        <SegmentBar percent={percent} segments={12} className="w-12 shrink-0" />
-        <span className="truncate">
-          {formatCount(ratings)}
-          <span className="text-fg-tertiary"> / {formatCount(benchmark)}</span>
-        </span>
+      <span className={cn("truncate tabular-nums", className)}>
+        {formatCount(ratings)}
+        <span className="text-fg-tertiary"> / {formatCount(benchmark)}</span>
       </span>
     </Tooltip>
   );
 }
 
-/** Ratings a week, then a sparkline of daily gains. */
+/** Ratings a week; the tooltip has the recent total. */
 export function VelocityCell({
   velocity,
   gains,
@@ -159,17 +128,8 @@ export function VelocityCell({
           : `${velocity} ratings a week · ${formatCount(total)} in the last ${gains.length} days`
       }
     >
-      <span className="flex items-center gap-2 tabular-nums">
-        <span
-          role="img"
-          aria-label={`${formatCount(total)} new ratings in the last ${gains.length} days`}
-          className="flex h-5 items-center"
-        >
-          <Sparkline values={gains} />
-        </span>
-        <span className="min-w-[6ch] text-right">
-          {velocity === null ? dash : `${velocity}/wk`}
-        </span>
+      <span className="tabular-nums">
+        {velocity === null ? dash : `${velocity}/wk`}
       </span>
     </Tooltip>
   );
@@ -185,7 +145,7 @@ export function RatingValue({
   if (rating === null) return dash;
   return (
     <span className="flex items-center gap-1 tabular-nums">
-      <span aria-hidden className="text-warning">
+      <span aria-hidden className="text-fg-tertiary">
         ★
       </span>
       {rating.toFixed(1)}
@@ -204,7 +164,7 @@ type Match = {
   logoUrl: string | null;
 } | null;
 
-/** The CRM account a brand maps to, its lead, or a "New" chip; `inbound` marks public review-gap checks. */
+/** The CRM account a brand maps to, its lead, or "New"; `inbound` marks public review-gap checks. */
 export function MatchCell({
   account,
   lead,
@@ -232,15 +192,11 @@ export function MatchCell({
   }
   if (lead) {
     return (
-      <Tag tone="blue" size="sm">
+      <span className="truncate">
         {inbound ? "Public check · " : ""}
         {lead.open ? "Lead" : "Lead closed"}
-      </Tag>
+      </span>
     );
   }
-  return (
-    <Tag tone="green" size="sm">
-      New
-    </Tag>
-  );
+  return <span className="text-fg-tertiary">New</span>;
 }

@@ -13,13 +13,7 @@ import {
 } from "@/components/_ui/select";
 import { EMBED_HEIGHT_MESSAGE } from "@/features/demo/embed-resizer";
 import { LEAD_LIMITS, type Utm } from "@/lib/domain/leads";
-import CursorIcon from "@/public/assets/icons/cursor-click.svg";
-import {
-  CopyField,
-  IconTile,
-  IntegrationCard,
-  SettingsBlock,
-} from "./settings-ui";
+import { CopyField, IntegrationCard, SettingsBlock } from "./settings-ui";
 
 const UTM_FIELDS = [
   { key: "source", label: "Source", placeholder: "linkedin" },
@@ -92,7 +86,6 @@ export default function DemoFormCard() {
 
   return (
     <IntegrationCard
-      visual={<IconTile icon={CursorIcon} />}
       title="Demo form"
       description="The public form at /demo creates a lead, assigns an owner and starts the SLA clock. Tag links per campaign so reports show where leads came from."
       action={
@@ -108,9 +101,7 @@ export default function DemoFormCard() {
     >
       <SettingsBlock className="gap-4">
         <div className="flex h-6 items-center gap-3">
-          <span className="lead-style min-w-0 flex-1 font-medium">
-            Campaign tags
-          </span>
+          <span className="lead-style min-w-0 flex-1">Campaign tags</span>
           {tagged && (
             <Button variant="ghost" size="xs" onClick={() => setValues({})}>
               Clear
@@ -148,7 +139,7 @@ export default function DemoFormCard() {
       <SettingsBlock>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="lead-style font-medium">Embed on a website</span>
+            <span className="lead-style">Embed on a website</span>
             <span className="caption-style text-fg-tertiary leading-snug">
               Paste where the form should appear. It resizes to fit and keeps
               the page&apos;s own UTM tags.

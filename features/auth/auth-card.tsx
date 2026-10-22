@@ -14,7 +14,7 @@ export function LogoTile({ className }: { className?: string }) {
   );
 }
 
-/** Centred card for the screens outside the app: sign-in, invites, blocked access. */
+/** Centred column for the screens outside the app: sign-in, invites, blocked access. */
 export default function AuthCard({
   title,
   description,
@@ -25,21 +25,21 @@ export default function AuthCard({
   title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
-  /** Quiet line under the card. */
+  /** Quiet line under the content. */
   footer?: ReactNode;
   visual?: ReactNode;
 }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-4 py-10">
-      <div className="bg-card border-border shadow-card flex w-full max-w-95 flex-col overflow-hidden rounded-2xl border">
-        <div className="flex flex-col items-center gap-4 px-6 pt-8 pb-6 text-center">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-10">
+      <div className="flex w-full max-w-85 flex-col gap-8">
+        <div className="flex flex-col items-center gap-4 text-center">
           {visual}
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-2">
             <h1 className="text-lg leading-tight font-medium tracking-[-0.01em] text-balance">
               {title}
             </h1>
             {description && (
-              <p className="text-fg-secondary text-balance">{description}</p>
+              <p className="text-fg-tertiary text-balance">{description}</p>
             )}
           </div>
         </div>

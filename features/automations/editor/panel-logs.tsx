@@ -56,18 +56,15 @@ export default function PanelLogs({ node }: { node: GraphNode }) {
       </div>
 
       {tested.length > 0 && (
-        <ol
-          aria-label="Test run"
-          className="bg-card shadow-card flex flex-col overflow-hidden rounded-xl"
-        >
-          <li className="caption-style text-fg-tertiary border-border border-b px-3.5 py-2 font-medium">
+        <ol aria-label="Test run" className="flex flex-col">
+          <li className="caption-style text-fg-tertiary border-border border-b pb-2">
             Dry run{run.subject ? ` · ${run.subject}` : ""} · nothing was sent
             or changed
           </li>
           {tested.map((step, index) => (
             <li
               key={`${step.nodeId}-${index}`}
-              className="border-border flex items-start gap-3 px-3.5 py-2.5 not-last:border-b"
+              className="border-border flex items-start gap-3 py-2.5 not-last:border-b"
             >
               <span
                 className={cn(
@@ -79,7 +76,7 @@ export default function PanelLogs({ node }: { node: GraphNode }) {
                       : "bg-success",
                 )}
               />
-              <span className="min-w-0 flex-1 text-[13px] leading-5">
+              <span className="min-w-0 flex-1 text-sm leading-5">
                 {step.message}
               </span>
             </li>
@@ -93,11 +90,11 @@ export default function PanelLogs({ node }: { node: GraphNode }) {
           <Skeleton className="h-10 w-full" />
         </div>
       ) : logs.length ? (
-        <ol className="bg-card shadow-card flex flex-col overflow-hidden rounded-xl">
+        <ol className="flex flex-col">
           {logs.map((log) => (
             <li
               key={log._id}
-              className="border-border flex items-start gap-3 px-3.5 py-2.5 not-last:border-b"
+              className="border-border flex items-start gap-3 py-2.5 not-last:border-b"
             >
               <span
                 className={cn(
@@ -106,7 +103,7 @@ export default function PanelLogs({ node }: { node: GraphNode }) {
                 )}
               />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[13px] leading-5 break-words">
+                <span className="text-sm leading-5 break-words">
                   {log.message}
                 </span>
                 {log.subject.href ? (
@@ -134,18 +131,12 @@ export default function PanelLogs({ node }: { node: GraphNode }) {
         </ol>
       ) : (
         tested.length === 0 && (
-          <div className="bg-card shadow-card flex flex-col items-center rounded-xl px-6 py-8 text-center">
-            <span className="text-sm font-medium">No logs yet</span>
-            <span className="caption-style text-fg-tertiary mt-1.5 max-w-[24em] leading-snug text-balance">
-              Try the automation on a real record. The dry run shows each step’s
-              decision without sending anything.
+          <div className="flex flex-col items-start gap-3 py-2">
+            <span className="caption-style text-fg-tertiary max-w-[24em] leading-snug">
+              No logs yet. A test run shows each step’s decision without sending
+              anything.
             </span>
-            <Button
-              variant="primary"
-              size="sm"
-              className="mt-4"
-              onClick={startTestRun}
-            >
+            <Button variant="secondary" size="sm" onClick={startTestRun}>
               <PlayIcon aria-hidden className="size-3.5" />
               Test run
             </Button>

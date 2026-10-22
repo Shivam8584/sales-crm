@@ -1,32 +1,16 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type ComponentType,
-  type ReactNode,
-  type SVGProps,
-} from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
-import EmptyState from "@/components/_ui/empty-state";
 import Kbd from "@/components/_ui/kbd";
 import SegmentedControl from "@/components/_ui/segmented-control";
 import Skeleton from "@/components/_ui/skeleton";
-import { DetailSection } from "@/components/record/detail";
-import {
-  CreateButton,
-  Page,
-  PageHeader,
-  PageStatus,
-} from "@/components/shell/page";
-import AccountLogo from "@/features/accounts/account-logo";
-import { TrendCell } from "@/features/accounts/record-cells";
+import { CreateButton, Page, PageHeader } from "@/components/shell/page";
 import { StageTag } from "@/features/accounts/stage";
 import { useRefreshNextActions } from "@/features/ai/next-action";
 import TaskComposer from "@/features/tasks/task-composer";
@@ -42,14 +26,7 @@ import { isEditableTarget } from "@/lib/keyboard";
 import { relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import AlertTriangleIcon from "@/public/assets/icons/alert-triangle.svg";
-import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
-import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
-import WalletIcon from "@/public/assets/icons/wallet.svg";
 import {
   DealItem,
   LeadItem,
@@ -62,8 +39,6 @@ import {
 import { routes } from "@/lib/routes";
 
 const RECENT_ACCOUNTS = 6;
-const CARD_SECTION =
-  "gap-2 px-0 pt-3 pb-0 [&>div:first-child]:px-4 sm:[&>div:first-child]:px-5";
 const TREND_DAYS = 14;
 const DAY_MS = 24 * 60 * 60_000;
 const OVERLAY = "[role=dialog], [role=menu], [role=listbox]";
@@ -84,10 +59,8 @@ type Item =
 type Section = {
   id: SectionId;
   title: string;
-  stat: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
   items: Item[] | undefined;
-  tone?: "danger" | "warning";
+  tone?: "danger";
   empty: string;
   href?: { label: string; to: string };
   /** Narrow column next to the task list on wide screens. */
@@ -167,8 +140,6 @@ export default function TodayPage() {
       {
         id: "leads",
         title: "Leads waiting",
-        stat: "Leads waiting",
-        icon: UserPlusIcon,
         items: waiting?.leads.map((lead) => ({
           kind: "lead",
           id: lead._id,
@@ -177,51 +148,41 @@ export default function TodayPage() {
         tone: waiting?.leads.some((lead) => lead.slaBreachedAt)
           ? "danger"
           : undefined,
-        empty:
-          "No new leads waiting on you. Fresh inbound leads land here with their SLA clock.",
+        empty: "No leads waiting.",
         href: { label: "All leads", to: `${routes.leads}?owner=mine` },
       },
       {
         id: "overdue",
         title: "Overdue",
-        stat: "Overdue",
-        icon: AlertTriangleIcon,
         items: taskItems((task) =>
           Boolean(task.dueDate && task.dueDate < today),
         ),
         tone: "danger",
-        empty: "Nothing overdue. You're on top of it.",
+        empty: "Nothing overdue.",
       },
       {
         id: "today",
         title: "Due today",
-        stat: "Due today",
-        icon: ClockIcon,
         items: taskItems((task) => task.dueDate === today),
-        empty: "Nothing due today. Plan a follow-up so tomorrow starts warm.",
+        empty: "Nothing due today.",
       },
       {
         id: "upcoming",
         title: "Next 7 days",
-        stat: "Next 7 days",
-        icon: CalendarIcon,
         items: taskItems((task) =>
           Boolean(
             task.dueDate && task.dueDate > today && task.dueDate <= weekAhead,
           ),
         ),
-        empty: "Nothing scheduled this week yet.",
+        empty: "Nothing scheduled.",
         href: { label: "All tasks", to: `${routes.tasks}?view=list` },
       },
       {
         id: "stuck",
-        title: "Stuck brands you own",
-        stat: "Stuck brands",
-        icon: TargetIcon,
+        title: "Stuck brands",
         aside: true,
         items: stuck?.map((row) => ({ kind: "stuck", id: row._id, row })),
-        tone: "warning",
-        empty: "Every brand you own is moving through onboarding.",
+        empty: "No stuck brands.",
         href:
           viewer.role === "rep"
             ? undefined
@@ -229,12 +190,10 @@ export default function TodayPage() {
       },
       {
         id: "deals",
-        title: "Deals closing this week",
-        stat: "Closing soon",
-        icon: WalletIcon,
+        title: "Closing this week",
         aside: true,
         items: deals?.map((deal) => ({ kind: "deal", id: deal._id, deal })),
-        empty: "No deals of yours are due to close this week.",
+        empty: "No deals closing this week.",
         href: { label: "Pipeline", to: `${routes.deals}?owner=mine` },
       },
     ];
@@ -382,12 +341,10 @@ export default function TodayPage() {
         {section.items === undefined ? (
           <RowsSkeleton />
         ) : section.items.length > 0 ? (
-          <ul className="divide-border border-border flex flex-col divide-y border-t">
-            {section.items.map(renderItem)}
-          </ul>
+          <ul className={ROWS}>{section.items.map(renderItem)}</ul>
         ) : (
           !composer && (
-            <p className="caption-style text-fg-tertiary px-4 pb-4 leading-snug sm:px-5">
+            <p className="caption-style text-fg-tertiary px-4 pb-4 sm:px-5">
               {section.empty}
             </p>
           )
@@ -399,7 +356,7 @@ export default function TodayPage() {
               defaultDueDate={today}
               label="New task due today"
               onClose={() => setComposing(false)}
-              className="bg-raised shadow-card"
+              className="bg-overlay-1 shadow-none"
             />
           </div>
         )}
@@ -413,7 +370,11 @@ export default function TodayPage() {
     <Page>
       <PageHeader
         title="Today"
-        meta={<PageStatus tone="info">{FULL_DATE.format(now)}</PageStatus>}
+        meta={
+          <span className="caption-style text-fg-tertiary">
+            {FULL_DATE.format(now)}
+          </span>
+        }
         actions={
           <CreateButton onClick={() => setCreate({ type: "task" })}>
             New task
@@ -424,13 +385,13 @@ export default function TodayPage() {
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 sm:px-6 lg:py-7">
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
             <div className="flex min-w-0 flex-col gap-1">
-              <h2 className="text-xl leading-tight font-semibold tracking-[-0.01em]">
+              <h2 className="text-xl leading-tight font-medium tracking-[-0.01em]">
                 {greeting(now.getHours())}, {firstName}
               </h2>
               {tasks !== undefined && (
                 <p className="caption-style text-fg-tertiary">
                   {completed === 0
-                    ? "Nothing closed in the last two weeks. Tick one off to start a streak."
+                    ? "Nothing completed in the last 14 days."
                     : `${doneToday} done today · ${completed} in the last ${TREND_DAYS} days`}
                 </p>
               )}
@@ -457,7 +418,7 @@ export default function TodayPage() {
                 )
                 .map((section) => ({
                   value: section.id,
-                  label: section.stat,
+                  label: section.title,
                   count: section.items?.length,
                 })),
             ]}
@@ -465,23 +426,16 @@ export default function TodayPage() {
           />
 
           {loaded && total === 0 && !focus ? (
-            <div className="border-border bg-background rounded-xl border">
-              <EmptyState
-                icon={CheckCircleIcon}
-                title="All clear"
-                description="No leads waiting, nothing due and no brand stuck. A good moment to plan the week's follow-ups."
-                action={
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setCreate({ type: "task" })}
-                  >
-                    <PlusIcon aria-hidden className="size-3" />
-                    Plan a follow-up
-                  </Button>
-                }
-              />
-            </div>
+            <p className="text-fg-tertiary flex flex-wrap items-center gap-3 py-6">
+              All clear. Nothing due and no leads waiting.
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCreate({ type: "task" })}
+              >
+                Plan a follow-up
+              </Button>
+            </p>
           ) : (
             <div
               className={cn(
@@ -506,7 +460,39 @@ export default function TodayPage() {
   );
 }
 
-/** A cockpit block in the record-detail style: eyebrow title, count, link, then rows edge to edge. */
+function SectionHead({
+  title,
+  count,
+  danger,
+  children,
+}: {
+  title: string;
+  count?: number;
+  danger?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="min-h-control-md flex items-center gap-2 px-4 sm:px-5">
+      <h3 className="lead-style font-medium">{title}</h3>
+      {count !== undefined && count > 0 && (
+        <span
+          className={cn(
+            "caption-style tabular-nums",
+            danger ? "text-danger" : "text-fg-tertiary",
+          )}
+        >
+          {count}
+        </span>
+      )}
+      <span className="ml-auto flex items-center gap-2">{children}</span>
+    </div>
+  );
+}
+
+const SECTION_LINK =
+  "caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2";
+const ROWS = "divide-border border-border flex flex-col divide-y border-t";
+
 function CockpitCard({
   section,
   action,
@@ -518,37 +504,30 @@ function CockpitCard({
 }) {
   const count = section.items?.length;
   return (
-    <div className="border-border bg-background min-w-0 overflow-hidden rounded-xl border">
-      <DetailSection
+    <section className="min-w-0">
+      <SectionHead
         title={section.title}
-        divider={false}
-        className={CARD_SECTION}
-        action={
-          <span className="flex items-center gap-2">
-            {action}
-            {section.href && (
-              <Link
-                href={section.href.to}
-                className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
-              >
-                {section.href.label}
-              </Link>
-            )}
-          </span>
-        }
+        count={count}
+        danger={section.tone === "danger"}
       >
-        <span className="sr-only">
-          {count === undefined ? "Loading" : `${count} items`}
-        </span>
-        {children}
-      </DetailSection>
-    </div>
+        {action}
+        {section.href && (
+          <Link href={section.href.to} className={SECTION_LINK}>
+            {section.href.label}
+          </Link>
+        )}
+      </SectionHead>
+      <span className="sr-only">
+        {count === undefined ? "Loading" : `${count} items`}
+      </span>
+      {children}
+    </section>
   );
 }
 
 function RowsSkeleton() {
   return (
-    <div className="divide-border border-border flex flex-col divide-y border-t">
+    <div className={ROWS}>
       {[0, 1].map((index) => (
         <div key={index} className="flex h-13 items-center gap-3 px-4 sm:px-5">
           <Skeleton className="size-4 rounded-sm" />
@@ -566,64 +545,42 @@ function RecentAccounts({
   accounts: FunctionReturnType<typeof api.accounts.page>["page"] | undefined;
 }) {
   return (
-    <div className="border-border bg-background min-w-0 overflow-hidden rounded-xl border">
-      <DetailSection
-        title="Recently touched"
-        divider={false}
-        className={CARD_SECTION}
-        action={
-          <Link
-            href={`${routes.accounts}?view=mine`}
-            className="caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring rounded-sm outline-none focus-visible:ring-2"
-          >
-            My accounts
-          </Link>
-        }
-      >
-        {recent === undefined ? (
-          <RowsSkeleton />
-        ) : recent.length === 0 ? (
-          <p className="caption-style text-fg-tertiary px-4 pb-4 leading-snug sm:px-5">
-            Accounts you own show up here.{" "}
-            <Link
-              href={routes.accounts}
-              className="text-fg-secondary hover:text-foreground underline underline-offset-2"
-            >
-              Browse accounts
-            </Link>
-          </p>
-        ) : (
-          <ul className="divide-border border-border flex flex-col divide-y border-t">
-            {recent.map((account) => {
-              const trend = account.trend;
-              return (
-                <li key={account._id}>
-                  <Link
-                    href={routes.account(account._id)}
-                    className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
-                  >
-                    <AccountLogo account={account} size="sm" />
-                    <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="lead-style truncate leading-5 font-medium">
-                        {account.name}
-                      </span>
-                      <span className="caption-style text-fg-tertiary truncate">
-                        {account.lastActivityAt
-                          ? relativeTime(account.lastActivityAt)
-                          : "No activity yet"}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 flex-col items-end gap-1.5">
-                      <StageTag stage={account.stage} />
-                      {trend && <TrendCell values={trend} />}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </DetailSection>
-    </div>
+    <section className="min-w-0">
+      <SectionHead title="Recently touched">
+        <Link href={`${routes.accounts}?view=mine`} className={SECTION_LINK}>
+          My accounts
+        </Link>
+      </SectionHead>
+      {recent === undefined ? (
+        <RowsSkeleton />
+      ) : recent.length === 0 ? (
+        <p className="caption-style text-fg-tertiary px-4 pb-4 sm:px-5">
+          No accounts yet.
+        </p>
+      ) : (
+        <ul className={ROWS}>
+          {recent.map((account) => (
+            <li key={account._id}>
+              <Link
+                href={routes.account(account._id)}
+                className="hover:bg-row-hover focus-visible:ring-ring duration-fast flex items-center gap-3 px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5"
+              >
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="lead-style truncate leading-5 font-medium">
+                    {account.name}
+                  </span>
+                  <span className="caption-style text-fg-tertiary truncate">
+                    {account.lastActivityAt
+                      ? relativeTime(account.lastActivityAt)
+                      : "No activity yet"}
+                  </span>
+                </span>
+                <StageTag stage={account.stage} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

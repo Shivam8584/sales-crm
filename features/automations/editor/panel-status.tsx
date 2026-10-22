@@ -9,7 +9,6 @@ import {
 } from "@/lib/domain/automations";
 import { relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import { NODE_META, toneVars } from "../node-meta";
 import { useEditor } from "./editor-context";
 import { useEditorStore } from "./editor-store";
 
@@ -27,7 +26,6 @@ export default function PanelStatus({ node }: { node: GraphNode }) {
   const run = useEditorStore((state) => state.run);
   const edges = useEditorStore((state) => state.edges);
   const stats = nodeStats?.[node.id];
-  const meta = NODE_META[node.kind];
   const tested = run.steps.find((step) => step.nodeId === node.id);
 
   const state =
@@ -63,19 +61,16 @@ export default function PanelStatus({ node }: { node: GraphNode }) {
   const outgoing = edges.filter((edge) => edge.source === node.id).length;
 
   return (
-    <div
-      className="flex flex-col gap-4"
-      style={toneVars(meta.tone) as CSSProperties}
-    >
-      <div className="bg-card shadow-card flex items-center gap-3 rounded-xl px-3.5 py-3">
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-3">
         <span className="relative flex size-2.5 shrink-0">
           {(run.activeNodeId === node.id || Boolean(stats?.current)) && (
-            <span className="absolute inset-0 animate-ping rounded-full bg-(--accent) opacity-60 motion-reduce:animate-none" />
+            <span className="bg-ring absolute inset-0 animate-ping rounded-full opacity-60 motion-reduce:animate-none" />
           )}
           <span
             className={cn(
               "relative size-2.5 rounded-full",
-              stats?.reached || tested ? "bg-(--accent)" : "bg-overlay-4",
+              stats?.reached || tested ? "bg-ring" : "bg-overlay-4",
             )}
           />
         </span>
@@ -90,21 +85,16 @@ export default function PanelStatus({ node }: { node: GraphNode }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <dl className="border-border grid grid-cols-3 gap-2 border-t pt-4">
         {metrics.map((metric) => (
-          <div
-            key={metric.label}
-            className="bg-card shadow-card flex flex-col gap-1 rounded-xl px-3.5 py-3"
-          >
-            <span className="caption-style text-fg-tertiary font-medium">
-              {metric.label}
-            </span>
-            <span className="font-display text-2xl leading-8 tabular-nums">
+          <div key={metric.label} className="flex flex-col gap-0.5">
+            <dt className="caption-style text-fg-tertiary">{metric.label}</dt>
+            <dd className="text-lg tabular-nums">
               {metric.value.toLocaleString("en-IN")}
-            </span>
+            </dd>
           </div>
         ))}
-      </div>
+      </dl>
 
       {(skipped > 0 || ended > 0) && (
         <p className="caption-style text-fg-tertiary leading-snug">
@@ -120,13 +110,11 @@ export default function PanelStatus({ node }: { node: GraphNode }) {
 
       {ports.length > 1 && (
         <div className="flex flex-col gap-2">
-          <span className="caption-style text-fg-tertiary font-medium">
-            Path split
-          </span>
+          <span className="caption-style text-fg-tertiary">Path split</span>
           <div className="bg-overlay-2 flex h-2 overflow-hidden rounded-full">
             {total > 0 && (
               <span
-                className="h-full w-(--split) bg-(--accent)"
+                className="bg-fg-tertiary h-full w-(--split)"
                 style={
                   {
                     "--split": `${(portCounts[0].count / total) * 100}%`,
@@ -135,11 +123,11 @@ export default function PanelStatus({ node }: { node: GraphNode }) {
               />
             )}
           </div>
-          <div className="flex justify-between text-xs leading-4 font-medium tabular-nums">
+          <div className="flex justify-between text-xs leading-4 tabular-nums">
             {portCounts.map(({ port, count }, index) => (
               <span
                 key={port}
-                className={index === 0 ? "text-(--accent)" : "text-fg-tertiary"}
+                className={index === 0 ? "text-foreground" : "text-fg-tertiary"}
               >
                 {PORT_LABEL[port] || PATH_NAME[port]} ·{" "}
                 {total ? Math.round((count / total) * 100) : 0}%{" "}

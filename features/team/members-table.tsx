@@ -2,7 +2,6 @@
 
 import { useMemo, type ReactNode } from "react";
 import Avatar from "@/components/_ui/avatar";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import DataTable from "@/components/data-table/data-table";
 import type {
@@ -12,7 +11,6 @@ import type {
   SortState,
 } from "@/components/data-table/types";
 import OptionPicker from "@/components/fields/option-picker";
-import { PageStatus } from "@/components/shell/page";
 import { ROLES, type Role } from "@/lib/domain/enums";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { dateTime, shortDate } from "@/lib/time";
@@ -21,7 +19,7 @@ import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
 import UserIcon from "@/public/assets/icons/kanban/user-03.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import CheckIcon from "@/public/assets/icons/check-circle.svg";
-import { ROLE_OPTIONS, ROLE_TONE } from "./roles";
+import { ROLE_OPTIONS } from "./roles";
 import {
   lockReason,
   useMemberActions,
@@ -81,9 +79,7 @@ export default function MembersTable({
               {row.name}
             </span>
             {row._id === viewerId && (
-              <Tag size="xs" className="font-normal">
-                You
-              </Tag>
+              <span className="caption-style text-fg-tertiary">You</span>
             )}
           </>
         ),
@@ -187,22 +183,18 @@ export default function MembersTable({
             className={cn(row.status !== "active" && "opacity-50")}
           />
           <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="lead-style flex min-w-0 items-center gap-1.5 font-medium">
+            <span className="lead-style flex min-w-0 items-center gap-1.5">
               <span className="truncate">{row.name}</span>
               {row._id === viewerId && (
-                <Tag size="xs" className="font-normal">
-                  You
-                </Tag>
+                <span className="caption-style text-fg-tertiary">You</span>
               )}
             </span>
             <span className="caption-style text-fg-tertiary truncate">
               {row.email}
             </span>
           </span>
-          <span className="flex shrink-0 flex-col items-end gap-1.5">
-            <Tag tone={ROLE_TONE[row.role]} size="xs">
-              {ROLE_LABEL[row.role]}
-            </Tag>
+          <span className="caption-style text-fg-tertiary flex shrink-0 flex-col items-end gap-1.5">
+            {ROLE_LABEL[row.role]}
             {row.status !== "active" && <StatusTag status={row.status} />}
           </span>
         </span>
@@ -223,18 +215,14 @@ function RoleCell({
   locked: string | null;
   onChange: (role: Role) => void;
 }) {
-  const tag = (
-    <Tag tone={ROLE_TONE[member.role]} size="sm">
-      {ROLE_LABEL[member.role]}
-    </Tag>
-  );
+  const tag = <span>{ROLE_LABEL[member.role]}</span>;
   if (!editable) return tag;
   if (locked) {
     return (
       <Tooltip content={locked}>
         <span
           tabIndex={0}
-          className="focus-visible:ring-ring pointer-events-auto rounded-full outline-none focus-visible:ring-2"
+          className="focus-visible:ring-ring pointer-events-auto rounded-sm outline-none focus-visible:ring-2"
         >
           {tag}
         </span>
@@ -259,9 +247,9 @@ function RoleCell({
 }
 
 export function StatusTag({ status }: { status: TeamMember["status"] }) {
-  return status === "active" ? (
-    <PageStatus>Active</PageStatus>
-  ) : (
-    <PageStatus tone="neutral">Deactivated</PageStatus>
+  return (
+    <span className={cn(status !== "active" && "text-fg-tertiary")}>
+      {status === "active" ? "Active" : "Deactivated"}
+    </span>
   );
 }

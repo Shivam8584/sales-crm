@@ -166,7 +166,7 @@ export default function GuardedContactActions({
             }
           >
             <Button
-              variant="subtle"
+              variant="secondary"
               size="xs"
               aria-disabled={!decision || undefined}
               aria-label={
@@ -220,7 +220,7 @@ export default function GuardedContactActions({
               </div>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button variant="subtle" size="sm" autoFocus>
+                  <Button variant="secondary" size="sm" autoFocus>
                     Cancel
                   </Button>
                 </DialogClose>

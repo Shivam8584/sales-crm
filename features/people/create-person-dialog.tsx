@@ -15,6 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/_ui/dialog";
+import {
+  Collapsible,
+  CollapsibleChevron,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/_ui/collapsible";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import AccountPicker from "@/features/accounts/account-picker";
@@ -45,6 +51,7 @@ export default function CreatePersonDialog({
   const [account, setAccount] = useState<string | null>(accountId ?? null);
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
+  const [more, setMore] = useState(false);
   const [seenAccountId, setSeenAccountId] = useState(accountId);
 
   if (seenAccountId !== accountId) {
@@ -59,6 +66,7 @@ export default function CreatePersonDialog({
     setPhone("");
     setTitle("");
     setErrors({});
+    setMore(false);
   }
 
   async function submit(event: FormEvent) {
@@ -109,8 +117,8 @@ export default function CreatePersonDialog({
         <form onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>New person</DialogTitle>
-            <DialogDescription>
-              Someone you talk to at a brand.
+            <DialogDescription className="sr-only">
+              Add someone you talk to at a brand
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 px-6 py-5">
@@ -167,25 +175,41 @@ export default function CreatePersonDialog({
                 />
               </Field>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Title" htmlFor="person-title">
-                <Input
-                  id="person-title"
-                  autoComplete="off"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Founder"
-                />
-              </Field>
-              <div className="flex flex-col gap-2">
-                <span className="caption-style text-fg-secondary">Account</span>
-                <AccountPicker
-                  value={account}
-                  onChange={setAccount}
-                  className="border-input bg-secondary mx-0 h-9 border px-3"
-                />
-              </div>
-            </div>
+            <Collapsible
+              open={more || Boolean(accountId)}
+              onOpenChange={setMore}
+              className="group/collapsible flex flex-col"
+            >
+              <CollapsibleTrigger className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex w-fit cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+                More options
+                <CollapsibleChevron />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Title" htmlFor="person-title">
+                      <Input
+                        id="person-title"
+                        autoComplete="off"
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                        placeholder="Founder"
+                      />
+                    </Field>
+                    <div className="flex flex-col gap-2">
+                      <span className="caption-style text-fg-secondary">
+                        Account
+                      </span>
+                      <AccountPicker
+                        value={account}
+                        onChange={setAccount}
+                        className="border-input bg-secondary mx-0 h-9 border px-3"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
             {errors.form && (
               <p role="alert" className="caption-style text-danger">
                 {errors.form}
@@ -194,7 +218,7 @@ export default function CreatePersonDialog({
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>

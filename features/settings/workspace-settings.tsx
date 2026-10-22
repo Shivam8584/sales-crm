@@ -10,22 +10,20 @@ import Button from "@/components/_ui/button";
 import { Switch } from "@/components/_ui/switch";
 import { Input } from "@/components/_ui/input";
 import Skeleton from "@/components/_ui/skeleton";
-import Tag from "@/components/_ui/tag";
 import { useMembers } from "@/hooks/use-viewer";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
-import { PageStatus } from "@/components/shell/page";
-import { ROLE_TONE } from "@/features/team/roles";
 import PrivacySettings from "@/features/consent/privacy-settings";
 import PricingPolicySettings from "@/features/proposals/pricing-policy-settings";
 import AutomationSafety from "@/features/automations/automation-safety";
 import { HotSlaRow, RoutingRules } from "./routing-rules";
 import {
   AdminOnly,
-  SettingsIntro,
   SettingsRow,
+  SettingsRowSkeleton,
   SettingsSection,
+  StatusText,
 } from "./settings-ui";
 
 const SLA_KEY = "leads.slaMinutes";
@@ -43,10 +41,6 @@ function minutes(value: number) {
 export default function WorkspaceSettings() {
   return (
     <AdminOnly>
-      <SettingsIntro>
-        Rules that apply to everyone: how fast new leads must be contacted, who
-        gets them, and who can join.
-      </SettingsIntro>
       <WorkspaceForm />
       <PricingPolicySettings />
       <AutomationSafety />
@@ -85,7 +79,7 @@ function WorkspaceForm() {
         {settings ? (
           <SlaRow key={settings[SLA_KEY]} settings={settings} />
         ) : (
-          <RowSkeleton />
+          <SettingsRowSkeleton />
         )}
         <HotSlaRow />
       </SettingsSection>
@@ -114,15 +108,13 @@ function WorkspaceForm() {
           {!environment ? (
             <Skeleton className="h-5.5 w-24 rounded-full" />
           ) : environment.allowedDomains.length > 0 ? (
-            <span className="flex flex-wrap gap-1.5 sm:justify-end">
+            <span className="text-fg-secondary flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs sm:justify-end">
               {environment.allowedDomains.map((domain) => (
-                <Tag key={domain} size="sm" className="font-mono text-xs">
-                  @{domain}
-                </Tag>
+                <span key={domain}>@{domain}</span>
               ))}
             </span>
           ) : (
-            <PageStatus tone="neutral">Invite only</PageStatus>
+            <StatusText tone="muted">Invite only</StatusText>
           )}
         </SettingsRow>
       </SettingsSection>
@@ -318,7 +310,7 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
       title="Round-robin"
       description={
         everyone
-          ? "New leads rotate through every active member, including people who join later. Switch someone off to leave them out."
+          ? "New leads rotate through every active member, including people who join later."
           : `New leads rotate through ${chosen.length} of ${members?.length ?? "…"} active members.`
       }
       action={
@@ -337,9 +329,9 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
     >
       {!settings || !members ? (
         <>
-          <RowSkeleton />
-          <RowSkeleton />
-          <RowSkeleton />
+          <SettingsRowSkeleton />
+          <SettingsRowSkeleton />
+          <SettingsRowSkeleton />
         </>
       ) : (
         <ul aria-label="Lead rotation" className="flex flex-col">
@@ -350,22 +342,15 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
               <li key={member._id}>
                 <label
                   htmlFor={id}
-                  className="border-border hover:bg-overlay-1 duration-fast flex h-13 cursor-pointer items-center gap-3 border-t px-4 transition-colors sm:px-5"
+                  className="border-border flex h-13 cursor-pointer items-center gap-3 border-t"
                 >
                   <Avatar name={member.name} size="md" />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="lead-style truncate">{member.name}</span>
                     <span className="caption-style text-fg-tertiary">
-                      {included ? "Gets new leads" : "Left out"}
+                      {ROLE_LABEL[member.role]}
                     </span>
                   </span>
-                  <Tag
-                    tone={ROLE_TONE[member.role]}
-                    size="xs"
-                    className="max-sm:hidden"
-                  >
-                    {ROLE_LABEL[member.role]}
-                  </Tag>
                   <Switch
                     id={id}
                     checked={included}
@@ -380,14 +365,5 @@ function RotationSection({ settings }: { settings: Settings | undefined }) {
         </ul>
       )}
     </SettingsSection>
-  );
-}
-
-function RowSkeleton() {
-  return (
-    <div className="border-border flex h-13 items-center gap-3 border-t px-4 sm:px-5">
-      <Skeleton className="h-3 w-40" />
-      <Skeleton className="ml-auto h-3 w-16" />
-    </div>
   );
 }

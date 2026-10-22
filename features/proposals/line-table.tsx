@@ -573,7 +573,7 @@ export default function LineTable({
   }, []);
 
   return (
-    <div className="border-border flex min-w-0 flex-col overflow-hidden rounded-xl border">
+    <div className="flex min-w-0 flex-col">
       <div
         ref={scrollRef}
         data-scrolled={scrolled}
@@ -731,7 +731,7 @@ function LineMenu({
   );
 }
 
-/** The calculation bar under the line table. */
+/** The totals under the line table. */
 export function LineFooter({
   stats,
 }: {
@@ -741,13 +741,10 @@ export function LineFooter({
     <div
       role="group"
       aria-label="Proposal totals"
-      className="caption-style border-border grid shrink-0 grid-cols-2 gap-px overflow-hidden border-t sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none"
+      className="caption-style border-border flex flex-wrap gap-x-8 gap-y-2 border-t px-2 py-3"
     >
       {stats.map((stat) => (
-        <div
-          key={stat.label}
-          className="outline-border flex min-w-0 items-center gap-2 px-4 py-3 outline-1"
-        >
+        <div key={stat.label} className="flex min-w-0 items-center gap-2">
           <span
             className={cn(
               "text-foreground flex shrink-0 items-center tabular-nums",

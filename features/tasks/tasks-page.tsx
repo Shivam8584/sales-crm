@@ -18,7 +18,6 @@ import {
   Page,
   PageActions,
   PageHeader,
-  PageStatus,
   PageToolbar,
 } from "@/components/shell/page";
 import SavedViewsMenu from "@/features/views/saved-views-menu";
@@ -29,11 +28,7 @@ import { PRIORITIES, type Priority } from "@/lib/domain/enums";
 import { PRIORITY_LABEL } from "@/lib/domain/labels";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
-import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
-import FilterIcon from "@/public/assets/icons/filter.svg";
 import ListIcon from "@/public/assets/icons/list.svg";
-import PlusIcon from "@/public/assets/icons/plus.svg";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import PasteTasksDialog from "./paste-tasks-dialog";
 import Segmented from "./segmented";
@@ -118,16 +113,13 @@ export default function TasksPage() {
       size="sm"
       onClick={() => setCreate({ type: "task" })}
     >
-      <PlusIcon aria-hidden className="size-3" />
       New task
     </Button>
   );
 
   const empty = filtered ? (
     <EmptyState
-      icon={FilterIcon}
-      title="No tasks match these filters"
-      description="Clear the search or remove a filter to see more."
+      title="No tasks match"
       action={
         <Button variant="secondary" size="sm" onClick={clearFilters}>
           Clear filters
@@ -136,9 +128,7 @@ export default function TasksPage() {
     />
   ) : mine ? (
     <EmptyState
-      icon={CheckSquareIcon}
       title="Nothing assigned to you"
-      description="Tasks assigned to you show up here. Your teammates have some."
       action={
         <Button variant="secondary" size="sm" onClick={() => setScope("all")}>
           Show all tasks
@@ -146,18 +136,13 @@ export default function TasksPage() {
       }
     />
   ) : (
-    <EmptyState
-      icon={CheckSquareIcon}
-      title="No tasks yet"
-      description="Track follow-ups like calls, demos and document chases. Link them to an account so the whole team sees them."
-      action={newTask}
-    />
+    <EmptyState title="No tasks yet" action={newTask} />
   );
 
   const boardOverlay =
     rows && rows.length === 0 && (filtered || mine) ? (
       <div className="z-sticky-header pointer-events-none absolute inset-0 flex items-start justify-center px-4 pt-20">
-        <div className="bg-popover border-line-strong shadow-overlay pointer-events-auto w-full max-w-sm rounded-xl border">
+        <div className="bg-background pointer-events-auto w-full max-w-sm rounded-xl">
           {empty}
         </div>
       </div>
@@ -169,11 +154,9 @@ export default function TasksPage() {
         title="Tasks"
         meta={
           rows && (
-            <PageStatus>
-              <span className="tabular-nums">
-                {rows.filter((task) => task.status !== "done").length} open
-              </span>
-            </PageStatus>
+            <span className="caption-style text-fg-tertiary tabular-nums">
+              {rows.filter((task) => task.status !== "done").length} open
+            </span>
           )
         }
         actions={
@@ -254,7 +237,6 @@ export default function TasksPage() {
             overdue && "text-danger bg-danger/10 hover:bg-danger/15",
           )}
         >
-          <AlertIcon aria-hidden className="size-3.5" />
           Overdue
           {overdueCount > 0 && (
             <span className="tabular-nums opacity-70">{overdueCount}</span>

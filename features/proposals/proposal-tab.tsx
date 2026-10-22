@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import Button, { buttonVariants } from "@/components/_ui/button";
+import Button from "@/components/_ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,9 +45,6 @@ import {
 } from "@/lib/domain/pricing";
 import { relativeTime, dateTime } from "@/lib/time";
 import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
-import EyeIcon from "@/public/assets/icons/eye.svg";
-import PlusIcon from "@/public/assets/icons/plus.svg";
-import WalletIcon from "@/public/assets/icons/wallet.svg";
 import { Amount, editableAmount, formatAmount, parseAmount } from "./amount";
 import ApprovalPanel from "./approval";
 import Handoff from "./handoff";
@@ -93,9 +90,8 @@ export default function ProposalTab({ deal }: { deal: { _id: Id<"deals"> } }) {
   if (proposal === null) {
     return (
       <EmptyState
-        icon={WalletIcon}
         title="No proposal yet"
-        description="Price each campaign the way the platform will: fund and cut on the order, a creator bonus, coupons. Margin and take are worked out as you type, and you choose what the brand sees."
+        description="Price each campaign the way the platform will. Margin and take update as you type."
         action={
           <Button
             variant="primary"
@@ -104,11 +100,9 @@ export default function ProposalTab({ deal }: { deal: { _id: Id<"deals"> } }) {
             loading={starting}
             onClick={start}
           >
-            <PlusIcon aria-hidden className="size-3" />
             Start proposal
           </Button>
         }
-        className="border-border rounded-xl border border-dashed"
       />
     );
   }
@@ -164,18 +158,6 @@ function ProposalEditor({
     void actions.addLine(proposal._id, line, index);
   }
 
-  const preview = (
-    <Link
-      href={`/proposals/${proposal._id}/print`}
-      target="_blank"
-      rel="noopener"
-      className={buttonVariants({ variant: "secondary", size: "sm" })}
-    >
-      <EyeIcon aria-hidden className="size-3.5" />
-      Preview
-    </Link>
-  );
-
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
@@ -193,7 +175,6 @@ function ProposalEditor({
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {preview}
           {draft && (
             <Tooltip
               content={
@@ -218,13 +199,6 @@ function ProposalEditor({
           )}
           {proposal.status === "sent" && (
             <>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void actions.edit(proposal)}
-              >
-                Edit proposal
-              </Button>
               <Button
                 variant="primary"
                 size="sm"
@@ -251,12 +225,28 @@ function ProposalEditor({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-44">
-              {proposal.status === "sent" && (
-                <DropdownMenuItem
-                  onSelect={() => void actions.reject(proposal)}
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/proposals/${proposal._id}/print`}
+                  target="_blank"
+                  rel="noopener"
                 >
-                  Mark rejected
-                </DropdownMenuItem>
+                  Preview
+                </Link>
+              </DropdownMenuItem>
+              {proposal.status === "sent" && (
+                <>
+                  <DropdownMenuItem
+                    onSelect={() => void actions.edit(proposal)}
+                  >
+                    Edit proposal
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => void actions.reject(proposal)}
+                  >
+                    Mark rejected
+                  </DropdownMenuItem>
+                </>
               )}
               {(proposal.status === "accepted" ||
                 proposal.status === "rejected") && (
@@ -297,7 +287,6 @@ function ProposalEditor({
           proposal.lines.length > 0 &&
           proposal.lines.length < MAX_LINES && (
             <Button variant="ghost" size="xs" onClick={() => addLine()}>
-              <PlusIcon aria-hidden className="size-2.5" />
               Add line
             </Button>
           )
@@ -310,12 +299,10 @@ function ProposalEditor({
             action={
               draft && (
                 <Button variant="secondary" size="sm" onClick={() => addLine()}>
-                  <PlusIcon aria-hidden className="size-3" />
                   Add line
                 </Button>
               )
             }
-            className="border-border rounded-xl border border-dashed"
           />
         ) : (
           <LineTable

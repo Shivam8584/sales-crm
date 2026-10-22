@@ -69,7 +69,7 @@ export default function Pills<T extends string>({
             className={cn(
               chipClass("md"),
               "max-w-full",
-              "text-fg-tertiary aria-checked:text-foreground aria-checked:shadow-[0_0_0_1px_var(--foreground)]",
+              "text-fg-tertiary aria-checked:bg-overlay-2 aria-checked:text-foreground",
             )}
           >
             {option.icon}

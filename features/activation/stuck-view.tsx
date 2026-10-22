@@ -6,7 +6,6 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
@@ -23,7 +22,7 @@ import {
 } from "@/features/accounts/record-cells";
 import { StageTag } from "@/features/accounts/stage";
 import { chipClass } from "@/features/tasks/task-chips";
-import { PriorityIcon, StatusIcon } from "@/features/tasks/task-meta";
+import { StatusIcon } from "@/features/tasks/task-meta";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { ACTIVATION_STAGES } from "@/lib/domain/platform";
@@ -33,8 +32,6 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
-import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import ListIcon from "@/public/assets/icons/list.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import XIcon from "@/public/assets/icons/x.svg";
@@ -107,15 +104,15 @@ const DEFAULT_SORT: SortState = { id: "since", dir: "asc" };
 
 function StallTag({ rule, title }: { rule: Rule; title?: string }) {
   return (
-    <Tag
-      tone={rule.priority === "urgent" ? "red" : "amber"}
-      size="sm"
+    <span
       title={title ?? firstSentence(rule.playbook)}
-      className="max-w-full min-w-0 gap-1"
+      className={cn(
+        "max-w-full min-w-0 truncate",
+        rule.priority === "urgent" && "text-danger",
+      )}
     >
-      <PriorityIcon priority={rule.priority} className="size-3" />
-      <span className="truncate">{rule.label}</span>
-    </Tag>
+      {rule.label}
+    </span>
   );
 }
 
@@ -123,11 +120,8 @@ function LastEventCell({ at }: { at: number | null }) {
   if (!at) return dash;
   return (
     <Tooltip content={dateTime(at)}>
-      <span className="text-fg-secondary flex min-w-0 items-center gap-1">
-        <CalendarIcon aria-hidden className="size-3.5 shrink-0" />
-        <span className="w-12.5 shrink-0 tabular-nums">{cellDate(at)}</span>
-        <span aria-hidden className="bg-overlay-4 mx-0.75 h-2 w-px shrink-0" />
-        <span className="truncate">{relativeTime(at)}</span>
+      <span className="text-fg-secondary truncate">
+        {cellDate(at)}, {relativeTime(at)}
       </span>
     </Tooltip>
   );
@@ -470,7 +464,6 @@ export default function StuckView({ desk }: { desk: Desk | undefined }) {
           empty={
             all && all.length > 0 ? (
               <EmptyState
-                icon={CheckCircleIcon}
                 title={
                   onlyMine
                     ? "None of your brands are stuck"
@@ -479,7 +472,7 @@ export default function StuckView({ desk }: { desk: Desk | undefined }) {
                 description={
                   onlyMine
                     ? `${all.length} ${all.length === 1 ? "brand is" : "brands are"} stuck across the team.`
-                    : "Try another step, view or owner."
+                    : undefined
                 }
                 action={
                   <Button variant="secondary" size="sm" onClick={showEveryone}>
@@ -489,7 +482,6 @@ export default function StuckView({ desk }: { desk: Desk | undefined }) {
               />
             ) : (
               <EmptyState
-                icon={CheckCircleIcon}
                 title={
                   desk?.linked === 0
                     ? "No brands on Hypedrive yet"

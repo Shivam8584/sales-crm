@@ -3,29 +3,24 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
-import Tag from "@/components/_ui/tag";
-import { BigNumber, DetailSection, MeterRow } from "@/components/record/detail";
+import { DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
-import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import BuildingIcon from "@/public/assets/icons/building-sm.svg";
 import MailIcon from "@/public/assets/icons/mail-03.svg";
 import PhoneIcon from "@/public/assets/icons/phone.svg";
-import UsersIcon from "@/public/assets/icons/users.svg";
 import LeadContactButtons from "./lead-contact";
 import {
   LeadConsents,
   LeadOwnerPicker,
-  LeadStatusControl,
   Value,
   When,
   attributionRows,
   type Lead,
 } from "./lead-fields";
 import { compactSpan } from "./lead-meta";
-import { countdown, isSlaOpen, slaMeter, slaState, useNow } from "./sla";
+import { countdown, isSlaOpen, slaState, useNow } from "./sla";
 import { routes } from "@/lib/routes";
 
 type SectionProps = { className?: string; divider?: boolean };
@@ -103,88 +98,40 @@ export function SpeedToLead({
 }: SectionProps & { lead: Lead }) {
   const now = useNow(isSlaOpen(lead), 1000);
   const state = slaState(lead, lead.slaMs, now);
-  const meter = slaMeter(state, lead.slaMs);
   const sla = compactSpan(lead.slaMs);
 
-  let body: ReactNode;
+  let value: ReactNode = null;
+  let caption: ReactNode;
   switch (state.kind) {
     case "pending":
-      body =
-        state.remainingMs > lead.slaMs ? (
-          <BigNumber
-            value="09:00"
-            caption={`Arrived out of hours. The ${sla} SLA clock starts at 09:00 IST; reaching out sooner still counts.`}
-          />
-        ) : (
-          <>
-            <BigNumber
-              value={countdown(state.remainingMs)}
-              caption={`Left to reach out · ${sla} SLA. Calling, emailing or messaging from here stops the clock.`}
-            />
-            <MeterRow
-              label="SLA used"
-              percent={meter!.percent}
-              tone={meter!.tone}
-              value={`${compactSpan(lead.slaMs - state.remainingMs)} of ${sla}`}
-            />
-          </>
-        );
+      value =
+        state.remainingMs > lead.slaMs ? "09:00" : countdown(state.remainingMs);
+      caption =
+        state.remainingMs > lead.slaMs
+          ? `Arrived out of hours. The ${sla} SLA clock starts at 09:00 IST.`
+          : `Left to reach out · ${sla} SLA. Calling, emailing or messaging stops the clock.`;
       break;
     case "replied":
-      body = (
+      value = compactSpan(state.tookMs);
+      caption = (
         <>
-          <BigNumber
-            value={compactSpan(state.tookMs)}
-            caption={
-              <>
-                To first touch,{" "}
-                <time
-                  dateTime={new Date(lead.firstTouchedAt!).toISOString()}
-                  title={dateTime(lead.firstTouchedAt!)}
-                >
-                  {relativeTime(lead.firstTouchedAt!, now)}
-                </time>{" "}
-                · {state.late ? "after" : "within"} the {sla} SLA
-              </>
-            }
-          />
-          <MeterRow
-            label="SLA used"
-            percent={meter!.percent}
-            tone={meter!.tone}
-            value={
-              state.late
-                ? `${compactSpan(state.tookMs - lead.slaMs)} over`
-                : `${compactSpan(state.tookMs)} of ${sla}`
-            }
-          />
+          To first touch,{" "}
+          <time
+            dateTime={new Date(lead.firstTouchedAt!).toISOString()}
+            title={dateTime(lead.firstTouchedAt!)}
+          >
+            {relativeTime(lead.firstTouchedAt!, now)}
+          </time>{" "}
+          · {state.late ? "after" : "within"} the {sla} SLA
         </>
       );
       break;
     case "breached":
-      body = (
-        <>
-          <BigNumber
-            value={
-              <span className="text-danger">{compactSpan(state.overMs)}</span>
-            }
-            caption={`Past the ${sla} SLA and nobody has reached out yet`}
-          />
-          <MeterRow
-            label="SLA used"
-            percent={100}
-            tone="danger"
-            value="Breached"
-          />
-        </>
-      );
+      value = <span className="text-danger">{compactSpan(state.overMs)}</span>;
+      caption = `Past the ${sla} SLA and nobody has reached out yet`;
       break;
     default:
-      body = (
-        <p className="caption-style text-fg-secondary">
-          Closed before anyone reached out.
-        </p>
-      );
+      caption = "Closed before anyone reached out.";
   }
 
   return (
@@ -193,12 +140,15 @@ export function SpeedToLead({
       className={className}
       divider={divider}
     >
-      <div className="flex flex-col gap-4">{body}</div>
+      <p className="flex flex-col gap-1 text-sm tabular-nums">
+        {value && <span className="font-medium">{value}</span>}
+        <span className="text-fg-tertiary">{caption}</span>
+      </p>
     </DetailSection>
   );
 }
 
-/** Status, owner, kind and timing as editable rows. */
+/** Owner and timing as rows. */
 export function LeadDetails({
   lead,
   className,
@@ -211,14 +161,8 @@ export function LeadDetails({
       divider={divider}
     >
       <Properties>
-        <Property label="Status">
-          <LeadStatusControl lead={lead} />
-        </Property>
         <Property label="Owner">
           <LeadOwnerPicker lead={lead} />
-        </Property>
-        <Property label="Kind">
-          <Value>{LEAD_KIND_LABEL[lead.kind]}</Value>
         </Property>
         <Property label="Received">
           <When at={lead._creationTime} />
@@ -310,13 +254,11 @@ export function LeadConsent({
 }
 
 function ConvertRow({
-  icon: Icon,
   name,
   href,
   existing,
   onNavigate,
 }: {
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
   name: string;
   href?: string;
   existing: boolean | null;
@@ -324,9 +266,6 @@ function ConvertRow({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <span className="bg-overlay-2 text-icon flex size-6 shrink-0 items-center justify-center rounded-md">
-        <Icon aria-hidden className="size-3.5" />
-      </span>
       {href ? (
         <Button
           variant="link"
@@ -341,9 +280,9 @@ function ConvertRow({
         <span className="min-w-0 truncate text-sm">{name}</span>
       )}
       {existing !== null && (
-        <Tag tone={existing ? "blue" : "green"} size="xs" className="ml-auto">
+        <span className="caption-style text-fg-tertiary ml-auto">
           {existing ? "Existing" : "New"}
-        </Tag>
+        </span>
       )}
     </div>
   );
@@ -376,7 +315,6 @@ export function LeadConversion({
         <div className="flex flex-col gap-2.5">
           {lead.account && (
             <ConvertRow
-              icon={BuildingIcon}
               name={lead.account.name}
               href={routes.account(lead.account._id)}
               existing={null}
@@ -385,7 +323,6 @@ export function LeadConversion({
           )}
           {lead.person && (
             <ConvertRow
-              icon={UsersIcon}
               name={lead.person.name}
               href={routes.person(lead.person._id)}
               existing={null}
@@ -405,14 +342,12 @@ export function LeadConversion({
     >
       <div className="flex flex-col gap-2.5">
         <ConvertRow
-          icon={BuildingIcon}
           name={account?.name ?? lead.companyName}
           href={account ? routes.account(account._id) : undefined}
           existing={Boolean(account)}
           onNavigate={onNavigate}
         />
         <ConvertRow
-          icon={UsersIcon}
           name={person?.name ?? lead.name}
           href={person ? routes.person(person._id) : undefined}
           existing={Boolean(person)}

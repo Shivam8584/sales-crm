@@ -71,7 +71,7 @@ export function SendingFields({ automation }: { automation: AutomationDoc }) {
       <Field
         label="Sender name"
         htmlFor={`sender-name-${id}`}
-        hint="Shown as the From name. The address stays the workspace's."
+        hint="Shown as the From name."
         error={error?.field === "senderName" ? error.message : undefined}
       >
         <Input
@@ -86,7 +86,7 @@ export function SendingFields({ automation }: { automation: AutomationDoc }) {
       <Field
         label="Reply-to address"
         htmlFor={`reply-to-${id}`}
-        hint="Replies go here instead of the workspace's reply address."
+        hint="Replies go here instead of the workspace address."
         error={error?.field === "replyTo" ? error.message : undefined}
       >
         <Input
@@ -135,7 +135,7 @@ export function SendingSection({ automation }: { automation: AutomationDoc }) {
   return (
     <SettingsSection
       title="Sending"
-      description="How this sequence's emails appear to the people who get them."
+      description="How this sequence's emails appear to recipients."
     >
       <SettingsBlock>
         <SendingFields

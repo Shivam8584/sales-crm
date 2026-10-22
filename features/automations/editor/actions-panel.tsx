@@ -11,7 +11,7 @@ import type { NodeKind } from "@/lib/domain/automations";
 import { cn } from "@/lib/utils";
 import DragIcon from "@/public/assets/icons/automations/drag.svg";
 import ExpandIcon from "@/public/assets/icons/automations/expand.svg";
-import { ACTION_GROUPS, NODE_META, toneVars } from "../node-meta";
+import { ACTION_GROUPS, NODE_META } from "../node-meta";
 
 type ActionsPanelProps = {
   ref?: Ref<HTMLElement>;
@@ -46,12 +46,11 @@ function ActionItem({
       aria-label={`Add ${meta.label}`}
       title={meta.hint}
       data-dragging={dragging || undefined}
-      style={toneVars(meta.tone) as CSSProperties}
       onPointerDown={(event) => onPointerDown(kind, event)}
       onKeyDown={onKeyDown}
       className="group/item hover:bg-overlay-2 focus-visible:bg-overlay-2 focus-visible:ring-ring duration-fast flex h-9 w-full cursor-grab touch-none items-center gap-2.5 rounded-lg px-2 transition-[background-color,opacity] outline-none select-none focus-visible:ring-2 active:cursor-grabbing data-dragging:opacity-50"
     >
-      <meta.Icon aria-hidden className="size-4 shrink-0 text-(--accent)" />
+      <meta.Icon aria-hidden className="text-fg-tertiary size-4 shrink-0" />
       <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
         {meta.label}
       </span>
@@ -103,14 +102,14 @@ export default function ActionsPanel({
         className="duration-slow ease-power3-out grid min-h-0 grid-rows-[0fr] transition-[grid-template-rows] data-open:grid-rows-[1fr] motion-reduce:transition-none"
       >
         <div className="flex min-h-0 flex-col overflow-hidden">
-          <div className="border-border min-h-0 overflow-y-auto border-t px-2 pt-2 pb-3">
+          <div className="min-h-0 overflow-y-auto px-2 pb-3">
             {ACTION_GROUPS.map((group) => (
               <section
                 key={group.label}
                 aria-label={group.label}
                 className="mt-1"
               >
-                <h3 className="text-fg-tertiary px-2 py-1.5 text-[11px] leading-4 font-medium tracking-wide uppercase">
+                <h3 className="text-fg-tertiary px-2 py-1.5 text-xs">
                   {group.label}
                 </h3>
                 <ul className="flex flex-col gap-0.5">
@@ -150,7 +149,6 @@ export function ActionGhost({
       aria-hidden
       style={
         {
-          ...toneVars(meta.tone),
           "--ghost-x": `${x}px`,
           "--ghost-y": `${y}px`,
         } as CSSProperties
@@ -161,7 +159,7 @@ export function ActionGhost({
         data-snapped={snapped || undefined}
         className="bg-popover shadow-overlay border-border duration-fast flex h-9 w-60 items-center gap-2.5 rounded-lg border px-2 transition-[opacity,scale] data-snapped:scale-[0.96] data-snapped:opacity-60 starting:scale-[0.96] starting:opacity-0"
       >
-        <meta.Icon aria-hidden className="size-4 text-(--accent)" />
+        <meta.Icon aria-hidden className="text-fg-tertiary size-4" />
         <span className="flex-1 text-sm font-medium">{meta.label}</span>
         <DragIcon aria-hidden className="text-fg-tertiary size-4" />
       </div>

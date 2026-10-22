@@ -8,9 +8,6 @@ import EmptyState from "@/components/_ui/empty-state";
 import type { FunnelStepKey, Period } from "@/convex/lib/reports";
 import { STAGE_PROBABILITY_BPS } from "@/lib/domain/forecast";
 import { DEAL_STAGE_LABEL } from "@/lib/domain/labels";
-import ActivityIcon from "@/public/assets/icons/activity.svg";
-import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
-import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import ActivationChart from "./activation-section";
 import ExportButton from "./export-button";
 import { csvFilename, csvRows } from "./export";
@@ -19,7 +16,7 @@ import FunnelChart from "./funnel-chart";
 import Kpis, { KpisSkeleton } from "./kpis";
 import { PERIOD_LABEL } from "./periods";
 import PipelineChart from "./pipeline-chart";
-import { ChartSkeleton, Panel, Reloading, ReportSection } from "./section";
+import { ChartSkeleton, Reloading, ReportSection } from "./section";
 import SourceTable from "./source-table";
 import { routes } from "@/lib/routes";
 
@@ -63,11 +60,10 @@ function NoLeads({
   return (
     <EmptyState
       className="mx-auto max-w-lg"
-      icon={BarChartIcon}
       title={
         filtered ? "No leads match these filters" : "No leads in this period"
       }
-      description="Leads from the demo form, Cal.com bookings and platform signups are counted here. Each step fills in as reps make contact, book demos and brands go live on Hypedrive."
+      description="Demo form, Cal.com and platform signups are counted here."
       action={
         filtered ? (
           <Button variant="secondary" size="sm" onClick={clearFilters}>
@@ -98,14 +94,12 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
       <ReportSection
         id="overview"
         title="Overview"
-        description={`${PERIOD_LABEL[period].long}, each figure against the period before.`}
+        description={`${PERIOD_LABEL[period].long}, against the period before.`}
       >
-        <Panel className="px-4 py-4 sm:px-5">
-          {report ? <Kpis report={report} /> : <KpisSkeleton tiles={7} />}
-        </Panel>
+        {report ? <Kpis report={report} /> : <KpisSkeleton tiles={7} />}
       </ReportSection>
 
-      <div className="grid items-stretch gap-5 lg:grid-cols-2">
+      <div className="grid items-stretch gap-10 lg:grid-cols-2">
         <ReportSection
           id="pipeline"
           title="Pipeline"
@@ -120,7 +114,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
             />
           }
         >
-          <Panel className="flex-1">
+          <div className="flex-1">
             {!report ? (
               <ChartSkeleton rows={4} />
             ) : report.pipeline.open.every((stage) => stage.count === 0) &&
@@ -128,9 +122,8 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
               report.pipeline.lost.count === 0 ? (
               <EmptyState
                 className="mx-auto max-w-lg"
-                icon={ClipboardIcon}
                 title="No deals in play"
-                description="Open deals appear here by stage, with won and lost deals for the period. Create a deal from an account to start the pipeline."
+                description="Create a deal from an account to start the pipeline."
                 action={
                   <Button variant="secondary" size="sm" href={routes.deals}>
                     Open deals
@@ -143,7 +136,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
                 previousWon={report.previousWon}
               />
             )}
-          </Panel>
+          </div>
         </ReportSection>
 
         <ReportSection
@@ -160,15 +153,14 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
             />
           }
         >
-          <Panel className="flex-1">
+          <div className="flex-1">
             {!report ? (
               <ChartSkeleton rows={4} />
             ) : !report.hasPlatformEvents ? (
               <EmptyState
                 className="mx-auto max-w-lg"
-                icon={ActivityIcon}
                 title="No platform events yet"
-                description="Hypedrive sends signup, organisation, funding, campaign and approval events to the CRM. Once brands move through those steps, the median time for each one shows here."
+                description="Medians appear once brands move through the platform steps."
                 action={
                   <Button
                     variant="secondary"
@@ -182,7 +174,7 @@ export function OverviewTab({ report, loading, period }: LeadTabProps) {
             ) : (
               <ActivationChart activation={report.activation} />
             )}
-          </Panel>
+          </div>
         </ReportSection>
       </div>
     </Reloading>
@@ -208,7 +200,7 @@ export function FunnelTab(props: LeadTabProps) {
       <ReportSection
         id="funnel"
         title="Funnel"
-        description="Where leads created in this period stopped. Select a step to open that list."
+        description="Where leads created in this period stopped. Select a step to open its list."
         aside={
           <ExportButton
             label="funnel"
@@ -229,7 +221,7 @@ export function FunnelTab(props: LeadTabProps) {
           </>
         }
       >
-        <Panel>
+        <div>
           {!report ? (
             <ChartSkeleton rows={10} />
           ) : report.funnel.steps[0].count === 0 ? (
@@ -241,9 +233,9 @@ export function FunnelTab(props: LeadTabProps) {
               hrefFor={hrefFor}
             />
           )}
-        </Panel>
+        </div>
         {report && report.direct.accounts > 0 && (
-          <p className="lead-style text-fg-secondary border-border border-t px-4 py-3 leading-snug sm:px-5">
+          <p className="lead-style text-fg-secondary leading-snug">
             Plus {count(report.direct.accounts)}{" "}
             {report.direct.accounts === 1 ? "account" : "accounts"} added
             directly, not from a lead:{" "}
@@ -258,7 +250,7 @@ export function FunnelTab(props: LeadTabProps) {
       <ReportSection
         id="sources"
         title="By source"
-        description="Which channels bring brands that go on to activate. Select a source to filter the funnel."
+        description="Which channels bring brands that activate. Select a source to filter the funnel."
         aside={
           <ExportButton
             label="sources"
@@ -277,7 +269,7 @@ export function FunnelTab(props: LeadTabProps) {
           </>
         }
       >
-        <Panel className="flex flex-col">
+        <div className="flex flex-col">
           {report ? (
             <SourceTable
               filtered={filtered}
@@ -287,7 +279,7 @@ export function FunnelTab(props: LeadTabProps) {
           ) : (
             <ChartSkeleton rows={4} />
           )}
-        </Panel>
+        </div>
       </ReportSection>
     </Reloading>
   );

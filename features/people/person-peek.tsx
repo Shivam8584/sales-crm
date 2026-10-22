@@ -14,7 +14,6 @@ import {
   SheetTitle,
 } from "@/components/_ui/sheet";
 import InlineText from "@/components/fields/inline-text";
-import Tag, { tagVariants } from "@/components/_ui/tag";
 import { DetailHero, DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
 import AccountLogo from "@/features/accounts/account-logo";
@@ -29,7 +28,6 @@ import Timeline from "@/features/timeline/timeline";
 import { useRecordUpdate } from "@/hooks/use-record-update";
 import { personName } from "@/lib/domain/labels";
 import { formatPhone } from "@/lib/domain/normalize";
-import { cn } from "@/lib/utils";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import UsersIcon from "@/public/assets/icons/users.svg";
 import XIcon from "@/public/assets/icons/x.svg";
@@ -105,19 +103,11 @@ function PeekBody({
   return (
     <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
       <DetailHero visual={<Avatar name={name} size="xl" />} title={name}>
-        {person.title && (
-          <Tag tone="neutral" size="sm">
-            {person.title}
-          </Tag>
-        )}
         {person.account && (
           <Link
             href={routes.account(person.account._id)}
             onClick={onClose}
-            className={cn(
-              tagVariants({ tone: "neutral", size: "sm" }),
-              "hover:text-foreground focus-visible:ring-ring min-w-0 gap-1 pl-0.5 outline-none focus-visible:ring-2",
-            )}
+            className="text-fg-secondary hover:text-foreground focus-visible:ring-ring caption-style flex min-w-0 items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2"
           >
             <AccountLogo
               account={person.account}
@@ -128,11 +118,6 @@ function PeekBody({
           </Link>
         )}
         <StageAndTags tags={person.tags} max={3} wrap />
-        {!person.title && !person.account && person.tags.length === 0 && (
-          <span className="caption-style text-fg-tertiary">
-            No title or account yet
-          </span>
-        )}
       </DetailHero>
 
       <DetailSection title="Contact" className="gap-2">

@@ -48,7 +48,7 @@ function CollapsibleChevron({ className }: { className?: string }) {
 }
 
 /**
- * A titled block that folds away: eyebrow title with a chevron, an optional
+ * A titled block that folds away: title with a chevron, an optional
  * control on the right, and its content. Used in record sidebars and long settings.
  */
 function CollapsibleSection({
@@ -78,7 +78,7 @@ function CollapsibleSection({
       className={cn("group/collapsible flex min-w-0 flex-col", className)}
     >
       <div className="min-h-control-md flex items-center justify-between gap-2">
-        <CollapsibleTrigger className="eyebrow-style text-foreground hover:text-fg-secondary focus-visible:ring-ring duration-fast -mx-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+        <CollapsibleTrigger className="eyebrow-style text-foreground hover:text-fg-secondary focus-visible:ring-ring duration-fast -mx-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 font-medium transition-colors outline-none focus-visible:ring-2">
           <span className="truncate">{title}</span>
           <CollapsibleChevron />
         </CollapsibleTrigger>

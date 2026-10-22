@@ -607,7 +607,7 @@ export default function DataTable<T>({
                         actionColumn ? "right-12" : "right-3",
                       )}
                     >
-                      <div className="bg-popover shadow-raised flex items-center gap-0.5 rounded-full p-0.5">
+                      <div className="bg-popover shadow-overlay flex items-center gap-0.5 rounded-lg p-0.5">
                         {actions}
                       </div>
                     </div>
@@ -703,7 +703,7 @@ function RowMenu({
           variant="ghost"
           size="icon-sm"
           aria-label={`Actions for ${label}`}
-          className="data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground group-data-[cursor=true]/row:text-foreground"
+          className="data-[state=open]:bg-overlay-2 data-[state=open]:text-foreground group-data-[cursor=true]/row:text-foreground pointer-fine:opacity-0 pointer-fine:group-focus-within/row:opacity-100 pointer-fine:group-data-[cursor=true]/row:opacity-100 pointer-fine:data-[state=open]:opacity-100"
         >
           <DotsIcon aria-hidden className="size-3.5" />
         </Button>
@@ -762,13 +762,10 @@ function TableFooter({
     <div
       role="group"
       aria-label="Totals for this view"
-      className="caption-style border-border bg-background grid shrink-0 grid-cols-2 gap-px overflow-hidden border-t sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none"
+      className="caption-style border-border bg-background flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-t px-4 py-3"
     >
       {stats.map((stat) => (
-        <div
-          key={stat.label}
-          className="outline-border flex min-w-0 items-center gap-2 px-4 py-3 outline-1"
-        >
+        <div key={stat.label} className="flex min-w-0 items-center gap-2">
           {loading ? (
             <Skeleton className="h-3 w-10" />
           ) : (

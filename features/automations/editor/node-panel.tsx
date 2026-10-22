@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import Button from "@/components/_ui/button";
 import {
   DropdownMenu,
@@ -14,7 +13,7 @@ import type { Issue } from "@/lib/domain/automations";
 import RowInsertIcon from "@/public/assets/icons/automations/row-insert.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import XIcon from "@/public/assets/icons/x.svg";
-import { ACTION_GROUPS, NODE_META, toneVars } from "../node-meta";
+import { ACTION_GROUPS, NODE_META } from "../node-meta";
 import { useCanvasApi } from "./canvas";
 import { useEditor } from "./editor-context";
 import { useEditorStore, type InspectorTab } from "./editor-store";
@@ -75,13 +74,9 @@ export default function NodePanel({ issues }: NodePanelProps) {
       aria-label={`${meta.label} step`}
       data-canvas-overlay
       onPointerDown={(event) => event.stopPropagation()}
-      style={toneVars(meta.tone) as CSSProperties}
       className="bg-popover shadow-overlay border-border absolute top-3 right-3 bottom-3 z-30 flex w-[min(440px,calc(100%-24px))] flex-col overflow-clip rounded-2xl border transition-[opacity,translate] duration-200 motion-reduce:transition-none max-sm:top-2 max-sm:right-2 max-sm:bottom-2 max-sm:w-[calc(100%-16px)] starting:translate-x-3 starting:opacity-0"
     >
-      <div className="flex shrink-0 items-center gap-3 px-4 pt-3.5 pb-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-(--accent-border) bg-(--accent-surface)">
-          <meta.Icon aria-hidden className="size-4 text-(--accent)" />
-        </span>
+      <div className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-3">
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-medium">{meta.label}</span>
           <span className="caption-style text-fg-tertiary truncate">
@@ -157,20 +152,17 @@ export default function NodePanel({ issues }: NodePanelProps) {
               <DropdownMenuContent side="top" align="end" className="w-60">
                 {ACTION_GROUPS.map((group) => (
                   <div key={group.label}>
-                    <DropdownMenuLabel className="uppercase">
-                      {group.label}
-                    </DropdownMenuLabel>
+                    <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
                     {group.kinds.map((kind) => {
                       const option = NODE_META[kind];
                       return (
                         <DropdownMenuItem
                           key={kind}
-                          style={toneVars(option.tone) as CSSProperties}
                           onSelect={() => onAppend(node.id, kind)}
                         >
                           <option.Icon
                             aria-hidden
-                            className="size-4 text-(--accent)"
+                            className="text-fg-tertiary size-4"
                           />
                           {option.label}
                         </DropdownMenuItem>

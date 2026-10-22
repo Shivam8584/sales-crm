@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { slaClockStart } from "@/lib/domain/day";
 import type { LeadStatus } from "@/lib/domain/enums";
-import SegmentBar from "@/components/_common/segment-bar";
 import { cn } from "@/lib/utils";
 import { compactSpan } from "./lead-meta";
 
@@ -94,7 +93,7 @@ export function slaMeter(
   }
 }
 
-/** Table cell: a small meter of the SLA used, then the countdown, reply time or overrun. */
+/** Table cell: the countdown, reply time or overrun. */
 export function SlaCell({
   lead,
   slaMs: sharedMs,
@@ -134,24 +133,12 @@ export function SlaCell({
   return (
     <span
       title={title}
-      className="flex min-w-0 items-center gap-2 whitespace-nowrap tabular-nums"
+      className={cn(
+        "truncate whitespace-nowrap tabular-nums",
+        meter.tone === "danger" && "text-danger",
+      )}
     >
-      <SegmentBar
-        percent={meter.percent}
-        segments={8}
-        tone={meter.tone}
-        className="h-3 w-11 shrink-0 px-px"
-        segmentClassName="h-2"
-      />
-      <span
-        className={cn(
-          "truncate",
-          state.kind === "breached" && "text-danger",
-          state.kind === "pending" && meter.tone === "danger" && "text-danger",
-        )}
-      >
-        {text} <span className="text-fg-tertiary">{muted}</span>
-      </span>
+      {text} <span className="text-fg-tertiary">{muted}</span>
     </span>
   );
 }

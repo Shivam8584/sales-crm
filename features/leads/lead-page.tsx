@@ -37,7 +37,6 @@ import BuildingIcon from "@/public/assets/icons/building.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
 import LinkIcon from "@/public/assets/icons/link.svg";
 import MessageQuestionIcon from "@/public/assets/icons/message-question.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import { ASIDE_SECTION } from "@/features/accounts/account-insights";
 import FilesSection from "@/features/files/files-section";
@@ -49,7 +48,6 @@ import {
   LeadConsent,
   LeadConversion,
   LeadDetails,
-  LeadSummary,
   SpeedToLead,
 } from "./lead-sections";
 import { useLeadActions } from "./use-lead-actions";
@@ -75,7 +73,6 @@ function LeadPageContent({ id }: { id: Id<"leads"> }) {
       <Page>
         <PageHeader crumbs={CRUMBS} title="Not found" />
         <EmptyState
-          icon={TargetIcon}
           title="This lead doesn't exist"
           description="It may have been deleted, or the link is wrong."
           action={
@@ -257,11 +254,6 @@ function LeadView({ lead }: { lead: Lead }) {
         }
         aside={
           <>
-            <LeadSummary
-              lead={lead}
-              actions={false}
-              className={ASIDE_SECTION}
-            />
             <AskRecord
               target={{ leadId: lead._id }}
               noun="lead"

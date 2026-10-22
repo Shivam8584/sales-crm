@@ -28,10 +28,9 @@ import { cn } from "@/lib/utils";
 import FitIcon from "@/public/assets/icons/automations/fit-view.svg";
 import ZoomInIcon from "@/public/assets/icons/automations/zoom-in.svg";
 import ZoomOutIcon from "@/public/assets/icons/automations/zoom-out.svg";
-import { NODE_META, toneVars } from "../node-meta";
 import ActionsPanel, { ActionGhost } from "./actions-panel";
 import { newNode } from "./defaults";
-import Edges, { accentOf, portKey, type EdgePreview } from "./edges";
+import Edges, { portKey, type EdgePreview } from "./edges";
 import { useEditorStore, type View } from "./editor-store";
 import {
   GRID_SIZE,
@@ -802,16 +801,12 @@ export default function Canvas({
     preview = {
       from: outputPoint(linkSource, nodeHeight(linkSource, sizes)),
       to: target ? inputPoint(target) : link.pointer,
-      fromColor: accentOf(linkSource),
-      toColor: target ? accentOf(target) : "var(--fg-tertiary)",
     };
   } else if (palette?.snap && palette.placement) {
     const source = palette.snap.source;
     preview = {
       from: outputPoint(source, nodeHeight(source, sizes)),
       to: { x: palette.placement.x + NODE_WIDTH / 2, y: palette.placement.y },
-      fromColor: accentOf(source),
-      toColor: `var(--tag-${NODE_META[palette.kind].tone}-text)`,
     };
   }
 
@@ -867,14 +862,13 @@ export default function Canvas({
             aria-hidden
             style={
               {
-                ...toneVars(NODE_META[palette.kind].tone),
                 "--node-x": `${palette.placement.x}px`,
                 "--node-y": `${palette.placement.y}px`,
                 width: NODE_WIDTH,
                 height: NODE_HEIGHT,
               } as CSSProperties
             }
-            className="pointer-events-none absolute top-0 left-0 [translate:var(--node-x)_var(--node-y)] rounded-xl border border-dashed border-(--accent) bg-(--accent-surface) opacity-70 transition-opacity starting:opacity-0"
+            className="border-ring pointer-events-none absolute top-0 left-0 [translate:var(--node-x)_var(--node-y)] rounded-xl border border-dashed opacity-70 transition-opacity starting:opacity-0"
           />
         )}
 

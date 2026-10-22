@@ -12,7 +12,6 @@ import { usePagedList } from "@/hooks/use-paged-list";
 import { useMembers, useViewer } from "@/hooks/use-viewer";
 import { dayStart, istDay, istToday } from "@/lib/domain/day";
 import { shortDate } from "@/lib/time";
-import ClockIcon from "@/public/assets/icons/clock.svg";
 import {
   ActivityRow,
   ActivitySkeleton,
@@ -165,15 +164,7 @@ export default function ActivityPage() {
           <ActivitySkeleton />
         ) : rows.length === 0 && paging.status === "Exhausted" ? (
           <EmptyState
-            icon={ClockIcon}
-            title={
-              filtered ? "No activity matches" : "Nothing has happened yet"
-            }
-            description={
-              filtered
-                ? "Try a different type or person, or widen the dates."
-                : "Field changes, logged calls and notes from the whole team show up here as they happen."
-            }
+            title={filtered ? "No activity matches" : "No activity yet"}
             action={
               filtered && (
                 <Button variant="secondary" size="sm" onClick={reset}>
@@ -189,7 +180,7 @@ export default function ActivityPage() {
           >
             {groups.map((group) => (
               <section key={group.key} aria-label={group.label}>
-                <h2 className="bg-background/95 border-border caption-style text-foreground z-sticky sticky top-0 flex h-9 items-center border-b px-4 font-medium backdrop-blur-sm">
+                <h2 className="bg-background/95 caption-style text-fg-tertiary z-sticky sticky top-0 flex h-9 items-center px-4 backdrop-blur-sm">
                   {group.label}
                 </h2>
                 <ul>

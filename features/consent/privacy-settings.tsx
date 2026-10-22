@@ -63,7 +63,7 @@ export default function PrivacySettings() {
             {privacy.requests.map((request) => (
               <li
                 key={request.personId}
-                className="border-border flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-5"
+                className="border-border flex flex-col gap-3 border-t py-3 sm:flex-row sm:items-center sm:gap-6"
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <Link
@@ -83,7 +83,7 @@ export default function PrivacySettings() {
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <Button
-                    variant="subtle"
+                    variant="secondary"
                     size="xs"
                     onClick={() =>
                       setDismiss({ id: request.personId, name: request.name })
@@ -92,7 +92,7 @@ export default function PrivacySettings() {
                     Dismiss
                   </Button>
                   <Button
-                    variant="subtle"
+                    variant="secondary"
                     size="xs"
                     className="text-danger"
                     onClick={() =>
@@ -319,7 +319,7 @@ function ReviewSection({
           {privacy.stale.map((row) => (
             <li
               key={row.id}
-              className="border-border flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-5"
+              className="border-border flex flex-col gap-3 border-t py-3 sm:flex-row sm:items-center sm:gap-6"
             >
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="flex min-w-0 items-center gap-2">
@@ -350,14 +350,14 @@ function ReviewSection({
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Button
-                  variant="subtle"
+                  variant="secondary"
                   size="xs"
                   onClick={() => void keepRow(row)}
                 >
                   Keep
                 </Button>
                 <Button
-                  variant="subtle"
+                  variant="secondary"
                   size="xs"
                   className="text-danger"
                   onClick={() =>
@@ -382,7 +382,7 @@ function ReviewSection({
             </li>
           ))}
           {total > privacy.stale.length && (
-            <li className="caption-style text-fg-tertiary border-border border-t px-4 py-3 sm:px-5">
+            <li className="caption-style text-fg-tertiary border-border border-t py-3">
               Showing the {privacy.stale.length} oldest of {total}.
             </li>
           )}
@@ -394,7 +394,7 @@ function ReviewSection({
 
 function EmptyRow({ children }: { children: string }) {
   return (
-    <p className="caption-style text-fg-tertiary border-border flex min-h-12 items-center border-t px-4 sm:px-5">
+    <p className="caption-style text-fg-tertiary border-border flex min-h-12 items-center border-t">
       {children}
     </p>
   );
@@ -402,7 +402,7 @@ function EmptyRow({ children }: { children: string }) {
 
 function RowSkeleton() {
   return (
-    <div className="border-border flex h-12 items-center gap-3 border-t px-4 sm:px-5">
+    <div className="border-border flex h-12 items-center gap-3 border-t">
       <Skeleton className="h-3 w-40" />
       <Skeleton className="ml-auto h-3 w-16" />
     </div>

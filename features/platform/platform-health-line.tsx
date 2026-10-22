@@ -5,13 +5,12 @@ import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { HEALTH_BAND_LABEL, weakestFactors } from "@/lib/domain/health";
 import { formatMoney } from "@/lib/domain/money";
 import { cn } from "@/lib/utils";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
-import { HEALTH_TONE, HealthRing } from "./health-badge";
+import { HealthRing } from "./health-badge";
 import { routes } from "@/lib/routes";
 
 type Linked = Extract<
@@ -54,9 +53,9 @@ export default function PlatformHealthLine({
         >
           <HealthRing score={health.score} band={health.band} />
           <span className="font-medium">{health.score}</span>
-          <Tag tone={HEALTH_TONE[health.band]} size="xs">
+          <span className="text-fg-secondary">
             {HEALTH_BAND_LABEL[health.band]}
-          </Tag>
+          </span>
         </span>
       </Tooltip>
       <span aria-hidden className="bg-border h-4 w-px shrink-0" />

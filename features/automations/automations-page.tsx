@@ -18,7 +18,6 @@ import {
   CreateButton,
   Page,
   PageHeader,
-  PageStatus,
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
@@ -32,7 +31,7 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import AutomationIcon from "@/public/assets/icons/automation.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
-import { StatusTag, StepIcons, StoppedStatus } from "./automation-parts";
+import { StatusTag, StoppedStatus } from "./automation-parts";
 import NewAutomationDialog from "./new-automation-dialog";
 import TemplatesGallery from "./templates-gallery";
 import { routes } from "@/lib/routes";
@@ -59,10 +58,8 @@ const COLUMNS: Column<Row>[] = [
     width: "minmax(14rem,2fr)",
     sortValue: (row) => row.name,
     cell: (row) => (
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate" title={row.name}>
-          {row.name}
-        </span>
+      <span className="truncate" title={row.name}>
+        {row.name}
       </span>
     ),
   },
@@ -71,7 +68,7 @@ const COLUMNS: Column<Row>[] = [
     header: "Status",
     width: "7.5rem",
     sortValue: (row) => row.status,
-    cell: (row) => <StatusTag status={row.status} version={row.version} />,
+    cell: (row) => <StatusTag status={row.status} />,
   },
   {
     id: "trigger",
@@ -83,15 +80,6 @@ const COLUMNS: Column<Row>[] = [
       <span className="text-fg-secondary truncate" title={row.trigger}>
         {row.trigger}
       </span>
-    ),
-  },
-  {
-    id: "steps",
-    header: "Steps",
-    width: "minmax(9rem,1fr)",
-    minViewport: 1200,
-    cell: (row) => (
-      <StepIcons steps={row.steps} max={5} size="sm" className="flex-nowrap" />
     ),
   },
   {
@@ -224,18 +212,6 @@ export default function AutomationsPage() {
     } as Record<View, number | undefined>;
   }, [automations, catalog]);
 
-  const totals = useMemo(() => {
-    if (!automations) return undefined;
-    return automations.reduce(
-      (sum, row) => ({
-        active: sum.active + row.stats.active,
-        completed: sum.completed + row.stats.completed,
-        exited: sum.exited + row.stats.exited + row.stats.failed,
-      }),
-      { active: 0, completed: 0, exited: 0 },
-    );
-  }, [automations]);
-
   const rows = useMemo(() => {
     if (!automations) return undefined;
     return automations.filter(
@@ -319,10 +295,10 @@ export default function AutomationsPage() {
       title={`No ${view === "draft" ? "drafts" : `${view} sequences`}`}
       description={
         view === "active"
-          ? "Activate a draft to start adding records."
+          ? "Activate a draft to start enrolling records."
           : view === "paused"
-            ? "Paused sequences hold their runs until you activate them again."
-            : "New sequences start as drafts until you activate them."
+            ? "Paused sequences hold their runs until you activate them."
+            : "New sequences start as drafts."
       }
       action={
         <Button variant="secondary" size="sm" onClick={() => setView("all")}>
@@ -334,7 +310,7 @@ export default function AutomationsPage() {
     <EmptyState
       icon={AutomationIcon}
       title="No sequences yet"
-      description="A sequence follows up for you with a few emails and call tasks, spaced out and sent only to people who agreed to hear from you. Start from a template."
+      description="Follow up automatically with emails and call tasks. Start from a template."
       action={
         <span className="flex gap-2">
           <Button
@@ -360,19 +336,7 @@ export default function AutomationsPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Sequences"
-        meta={
-          <>
-            {counts && (
-              <PageStatus tone={counts.active ? "success" : "neutral"}>
-                <span className="tabular-nums">{counts.active} active</span>
-              </PageStatus>
-            )}
-            <StoppedStatus />
-          </>
-        }
-      />
+      <PageHeader title="Sequences" meta={<StoppedStatus />} />
       <PageViews
         value={view}
         onChange={setView}
@@ -380,14 +344,11 @@ export default function AutomationsPage() {
       />
       {view === "templates" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-5 p-4 sm:p-6">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-base font-medium">Start from a template</h2>
-              <p className="caption-style text-fg-tertiary max-w-2xl leading-snug">
-                Each template opens as your own draft. Nothing is sent until you
-                activate it, and only to people who agreed to hear from us.
-              </p>
-            </div>
+          <div className="flex max-w-3xl flex-col gap-4 p-4 sm:p-6">
+            <p className="caption-style text-fg-tertiary">
+              Each template opens as your own draft. Nothing is sent until you
+              activate it.
+            </p>
             <TemplatesGallery templates={catalog?.templates} />
           </div>
         </div>
@@ -458,33 +419,6 @@ export default function AutomationsPage() {
               </Button>
             )}
           </PageToolbar>
-          {automations?.length !== 0 && (
-            <dl
-              aria-label="Sequences summary"
-              className="flex shrink-0 flex-wrap gap-x-6 gap-y-3 px-4 pt-3 pb-1 max-sm:hidden sm:gap-x-10"
-            >
-              {(
-                [
-                  [
-                    "Live sequences",
-                    counts && `${counts.active} of ${counts.all}`,
-                  ],
-                  ["Records in progress", totals?.active],
-                  ["Completed runs", totals?.completed],
-                  ["Exited early", totals?.exited],
-                ] as const
-              ).map(([label, value]) => (
-                <div key={label} className="flex min-w-0 flex-col gap-1">
-                  <dt className="caption-style text-fg-tertiary truncate">
-                    {label}
-                  </dt>
-                  <dd className="lead-style font-medium tabular-nums">
-                    {value ?? <Skeleton className="my-1 h-3 w-10" />}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
           {grid ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
               <AutomationsGrid rows={sortedRows} empty={empty} />
@@ -588,56 +522,43 @@ function AutomationsGrid({
   rows: Row[] | undefined;
   empty: React.ReactNode;
 }) {
+  const grid =
+    "grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-3";
   if (rows === undefined) {
     return (
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-4">
+      <ul className={grid}>
         {Array.from({ length: 3 }, (_, index) => (
           <li
             key={index}
-            className="bg-card shadow-card flex h-52 flex-col gap-4 rounded-2xl p-5"
+            className="border-border flex h-28 flex-col gap-3 rounded-xl border p-4"
           >
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-full" />
           </li>
         ))}
       </ul>
     );
   }
-  if (rows.length === 0)
-    return <div className="bg-card shadow-card rounded-2xl">{empty}</div>;
+  if (rows.length === 0) return empty;
   return (
-    <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-4">
+    <ul className={grid}>
       {rows.map((row) => (
         <li key={row._id}>
           <Link
             href={routes.sequence(row._id)}
-            className="bg-card shadow-card focus-visible:ring-ring hover:bg-raised duration-base ease-power3-out group flex h-full flex-col gap-4 rounded-2xl p-5 transition-[background-color,translate] outline-none hover:-translate-y-px focus-visible:ring-2 motion-reduce:hover:translate-y-0"
+            className="border-border focus-visible:ring-ring hover:bg-row-hover duration-fast flex h-full flex-col gap-2 rounded-xl border p-4 transition-colors outline-none focus-visible:ring-2"
           >
             <span className="flex items-start justify-between gap-3">
-              <span className="text-base leading-6 font-medium">
-                {row.name}
-              </span>
-              <StatusTag status={row.status} version={row.version} />
+              <span className="text-sm font-medium">{row.name}</span>
+              <StatusTag status={row.status} />
             </span>
-            <span className="text-fg-tertiary line-clamp-2 min-h-10 text-sm leading-5">
+            <span className="text-fg-tertiary line-clamp-2 text-sm">
               {row.description || row.trigger}
             </span>
-            <StepIcons steps={row.steps} />
-            <span className="caption-style text-fg-tertiary mt-auto flex items-center justify-between gap-3 tabular-nums">
+            <span className="caption-style text-fg-tertiary mt-auto flex items-center justify-between gap-3 pt-1 tabular-nums">
               <span className="min-w-0 truncate">
-                <span className="text-foreground font-medium">
-                  {row.stats.enrolled}
-                </span>{" "}
-                enrolled ·{" "}
-                <span className="text-foreground font-medium">
-                  {row.stats.active}
-                </span>{" "}
-                active ·{" "}
-                <span className="text-foreground font-medium">
-                  {row.stats.completed}
-                </span>{" "}
-                completed
+                {row.stats.enrolled} enrolled · {row.stats.active} active ·{" "}
+                {row.stats.completed} completed
               </span>
               <span className="shrink-0" title={dateTime(row.updatedAt)}>
                 {relativeTime(row.updatedAt)}

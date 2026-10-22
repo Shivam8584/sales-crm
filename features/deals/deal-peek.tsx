@@ -98,7 +98,7 @@ function PeekBody({ deal, onClose }: { deal: DealRow; onClose: () => void }) {
       <div className="flex items-start gap-3.5 px-6 pt-6 pb-5">
         {deal.account && <AccountLogo account={deal.account} size="lg" />}
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h2 className="text-lg leading-6 font-semibold text-pretty break-words">
+          <h2 className="text-lg leading-6 font-medium text-pretty break-words">
             {deal.title}
           </h2>
           {deal.account && (

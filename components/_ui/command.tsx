@@ -27,11 +27,11 @@ function CommandDialog({
   return (
     <DialogPrimitive.Root data-slot="command-dialog" {...props}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:ease-power3-out z-overlay bg-scrim duration-base data-[state=closed]:duration-fast fixed inset-0 backdrop-blur-[6px]" />
+        <DialogPrimitive.Overlay className="data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:ease-power3-out z-overlay bg-scrim duration-base data-[state=closed]:duration-fast fixed inset-0" />
         <DialogPrimitive.Content
           onCloseAutoFocus={onCloseAutoFocus}
           className={cn(
-            "border-line-strong bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-base data-[state=closed]:duration-fast fixed top-[12dvh] left-1/2 w-[calc(100%-2rem)] max-w-140 -translate-x-1/2 overflow-hidden rounded-xl border outline-none",
+            "bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] data-[state=open]:ease-power3-out z-overlay shadow-overlay duration-base data-[state=closed]:duration-fast fixed top-[12dvh] left-1/2 w-[calc(100%-2rem)] max-w-140 -translate-x-1/2 overflow-hidden rounded-xl outline-none",
             className,
           )}
         >
@@ -70,7 +70,7 @@ function CommandInput({ className, trailing, ...props }: CommandInputProps) {
   return (
     <div
       data-slot="command-input-wrapper"
-      className="border-line-strong flex h-12 items-center gap-2.5 border-b px-4"
+      className="border-border flex h-12 items-center gap-2.5 border-b px-4"
     >
       <SearchIcon aria-hidden className="text-fg-tertiary size-3.5 shrink-0" />
       <CommandPrimitive.Input
@@ -159,7 +159,7 @@ function CommandSeparator({
   return (
     <CommandPrimitive.Separator
       data-slot="command-separator"
-      className={cn("bg-line-strong -mx-1.5 my-1.5 h-px", className)}
+      className={cn("bg-border -mx-1.5 my-1.5 h-px", className)}
       {...props}
     />
   );
@@ -170,7 +170,7 @@ function CommandFooter({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="command-footer"
       className={cn(
-        "caption-style border-line-strong text-fg-tertiary flex h-10 items-center gap-4 border-t px-4",
+        "caption-style border-border text-fg-tertiary flex h-10 items-center gap-4 border-t px-4",
         className,
       )}
       {...props}

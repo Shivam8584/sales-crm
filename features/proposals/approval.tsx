@@ -22,16 +22,13 @@ import {
 } from "@/lib/domain/pricing";
 import { relativeTime, dateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
-import CheckIcon from "@/public/assets/icons/check-circle.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
 import type { ProposalActions, ProposalRow } from "./use-proposals";
 
 const TONE = {
-  required: "border-danger/40 bg-danger/8",
-  requested: "border-warning/40 bg-warning/8",
-  approved: "border-success/40 bg-success/8",
-  declined: "border-danger/40 bg-danger/8",
+  required: "text-danger",
+  requested: "text-warning",
+  approved: "text-success",
+  declined: "text-danger",
 } as const;
 
 /**
@@ -55,12 +52,6 @@ export default function ApprovalPanel({
   const approval = proposal.approval;
   const state = approval?.state ?? "required";
   const reasons = approvalReasons(pricing, policy);
-  const Icon =
-    state === "approved"
-      ? CheckIcon
-      : state === "requested"
-        ? ClockIcon
-        : AlertIcon;
 
   const title =
     state === "approved"
@@ -83,24 +74,10 @@ export default function ApprovalPanel({
   return (
     <div
       role={state === "required" || state === "declined" ? "alert" : "status"}
-      className={cn(
-        "flex flex-wrap items-start gap-x-3 gap-y-3 rounded-xl border px-4 py-3.5",
-        TONE[state],
-      )}
+      className="border-border flex flex-wrap items-start gap-x-3 gap-y-3 border-b pb-4"
     >
-      <Icon
-        aria-hidden
-        className={cn(
-          "mt-0.5 size-4 shrink-0",
-          state === "approved"
-            ? "text-success"
-            : state === "requested"
-              ? "text-warning"
-              : "text-danger",
-        )}
-      />
       <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
-        <span className="text-sm font-medium">
+        <span className={cn("text-sm font-medium", TONE[state])}>
           {title}
           {decidedAt && (
             <span
@@ -125,7 +102,7 @@ export default function ApprovalPanel({
           <>
             {state !== "declined" && (
               <Button
-                variant="subtle"
+                variant="secondary"
                 size="sm"
                 onClick={() => setDeciding("decline")}
               >
@@ -249,7 +226,7 @@ function DecideDialog({
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>

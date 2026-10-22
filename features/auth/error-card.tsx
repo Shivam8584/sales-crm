@@ -24,10 +24,10 @@ export default function ErrorCard({
   return (
     <AuthCard
       title="Something went wrong"
-      description="This screen hit an error. Try again, or head back to Today."
+      description="Try again, or head back to Today."
       footer={error.digest ? `Error ID ${error.digest}` : undefined}
     >
-      <div className="border-border flex flex-col gap-2 border-t px-6 py-5">
+      <div className="flex flex-col gap-2">
         <Button variant="primary" size="md" onClick={retry} className="w-full">
           Try again
         </Button>

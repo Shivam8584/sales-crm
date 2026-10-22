@@ -6,7 +6,7 @@ import {
 
 const TONE: Record<ProposalStatus, TagTone> = {
   draft: "neutral",
-  sent: "blue",
+  sent: "neutral",
   accepted: "green",
   rejected: "red",
 };

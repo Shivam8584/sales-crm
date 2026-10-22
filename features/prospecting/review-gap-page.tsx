@@ -8,7 +8,6 @@ import { Checkbox } from "@/components/_ui/checkbox";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import Tag, { type TagTone } from "@/components/_ui/tag";
-import SegmentBar from "@/components/_common/segment-bar";
 import {
   captureAttribution,
   type Attribution,
@@ -24,8 +23,6 @@ import {
 } from "@/lib/domain/prospecting";
 import { cn } from "@/lib/utils";
 import Logo from "@/public/assets/images/_common/logo.svg";
-import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 
 type Report = FunctionReturnType<typeof internal.prospecting.recordAudit>;
 type Submitted = { report: Report };
@@ -79,10 +76,10 @@ export default function ReviewGapPage() {
       </header>
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-10 px-5 pt-6 pb-16 sm:px-8 sm:pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:grid-rows-[auto_1fr] lg:gap-x-20 lg:gap-y-12 lg:pt-16">
         <div className="flex flex-col gap-5">
-          <p className="eyebrow-style text-fg-tertiary">
+          <p className="text-fg-tertiary text-sm">
             Free for marketplace sellers
           </p>
-          <h1 className="text-display font-semibold tracking-[-0.025em] text-balance sm:text-[2.5rem] sm:leading-[1.1]">
+          <h1 className="text-display font-medium tracking-[-0.025em] text-balance sm:text-[2.5rem] sm:leading-[1.1]">
             How far behind is your listing?
           </h1>
           <p className="text-fg-secondary max-w-[34rem] text-base leading-relaxed text-pretty">
@@ -103,13 +100,10 @@ export default function ReviewGapPage() {
             )}
           </div>
         </div>
-        <ol className="flex flex-col gap-3.5">
-          {STEPS.map((step, index) => (
-            <li key={step} className="flex items-center gap-3.5">
-              <span className="caption-style bg-muted text-fg-secondary shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full tabular-nums">
-                {index + 1}
-              </span>
-              <p className="text-fg-secondary">{step}</p>
+        <ol className="text-fg-secondary flex list-decimal flex-col gap-2 pl-5 marker:tabular-nums">
+          {STEPS.map((step) => (
+            <li key={step} className="pl-1">
+              {step}
             </li>
           ))}
         </ol>
@@ -218,22 +212,17 @@ function CheckForm({ onDone }: { onDone: (submitted: Submitted) => void }) {
       onSubmit={submit}
       noValidate
       aria-labelledby="gap-form-title"
-      className="bg-card shadow-card relative flex flex-col gap-5 rounded-2xl p-5 sm:p-7"
+      className="relative flex flex-col gap-5"
     >
-      <div className="flex flex-col gap-2.5">
-        <h2 id="gap-form-title" className="text-lg leading-6 font-semibold">
-          Check a listing
-        </h2>
-        <p className="text-fg-secondary">
-          Takes a few seconds. The report shows up right here.
-        </p>
-      </div>
+      <h2 id="gap-form-title" className="text-lg leading-6 font-medium">
+        Check a listing
+      </h2>
 
       <Field
         label="Product link"
         htmlFor="gap-url"
         required
-        hint="From Amazon, Flipkart, Myntra, Nykaa, Meesho and other Indian marketplaces."
+        hint="Amazon, Flipkart, Myntra, Nykaa, Meesho and more."
         error={errors.url}
       >
         <Input
@@ -424,30 +413,25 @@ function ReportCard({
     return (
       <section
         aria-labelledby="gap-report-title"
-        className="bg-card shadow-card flex flex-col gap-5 rounded-2xl p-5 sm:p-7"
+        className="flex flex-col gap-5"
       >
-        <div className="flex items-start gap-3">
-          <span className="bg-muted shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full">
-            <AlertIcon aria-hidden className="text-warning size-3.5" />
-          </span>
-          <div className="flex flex-col gap-2 pt-0.5">
-            <h2
-              id="gap-report-title"
-              ref={heading}
-              tabIndex={-1}
-              className="text-lg leading-6 font-semibold outline-none"
-            >
-              {report
-                ? "We need more of your category to compare"
-                : "We couldn't read that listing right now"}
-            </h2>
-            <p className="text-fg-secondary leading-relaxed">
-              {report
-                ? `Your listing has ${formatCount(report.ratingsCount ?? 0)} ratings. We don't track enough products in its category yet to say where the leaders are.`
-                : "Marketplaces sometimes block automated reads."}{" "}
-              A specialist will send you the full comparison.
-            </p>
-          </div>
+        <div className="flex flex-col gap-2">
+          <h2
+            id="gap-report-title"
+            ref={heading}
+            tabIndex={-1}
+            className="text-lg leading-6 font-medium outline-none"
+          >
+            {report
+              ? "We need more of your category to compare"
+              : "We couldn't read that listing right now"}
+          </h2>
+          <p className="text-fg-secondary leading-relaxed">
+            {report
+              ? `Your listing has ${formatCount(report.ratingsCount ?? 0)} ratings. We don't track enough products in its category yet to say where the leaders are.`
+              : "Marketplaces sometimes block automated reads."}{" "}
+            A specialist will send you the full comparison.
+          </p>
         </div>
         {actions}
       </section>
@@ -460,10 +444,7 @@ function ReportCard({
   const verdict = VERDICT[report.band ?? "cool"];
 
   return (
-    <section
-      aria-labelledby="gap-report-title"
-      className="bg-card shadow-card flex flex-col gap-6 rounded-2xl p-5 sm:p-7"
-    >
+    <section aria-labelledby="gap-report-title" className="flex flex-col gap-6">
       <div className="flex flex-col gap-2.5">
         <span className="flex flex-wrap items-center gap-2">
           <Tag tone={verdict.tone} size="sm">
@@ -479,7 +460,7 @@ function ReportCard({
           id="gap-report-title"
           ref={heading}
           tabIndex={-1}
-          className="text-lg leading-6 font-semibold text-balance outline-none"
+          className="text-lg leading-6 font-medium text-balance outline-none"
         >
           {report.title}
         </h2>
@@ -492,29 +473,18 @@ function ReportCard({
       </div>
 
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted flex flex-col gap-1 rounded-xl px-4 py-3">
-            <span className="caption-style text-fg-tertiary">Your ratings</span>
-            <span className="text-2xl font-semibold tabular-nums">
-              {formatCount(ratings)}
-            </span>
+        <dl className="grid grid-cols-2 gap-4 tabular-nums">
+          <div className="flex flex-col gap-1">
+            <dt className="caption-style text-fg-tertiary">Your ratings</dt>
+            <dd className="text-2xl font-medium">{formatCount(ratings)}</dd>
           </div>
-          <div className="bg-muted flex flex-col gap-1 rounded-xl px-4 py-3">
-            <span className="caption-style text-fg-tertiary">
-              Category leaders
-            </span>
-            <span className="text-2xl font-semibold tabular-nums">
+          <div className="flex flex-col gap-1">
+            <dt className="caption-style text-fg-tertiary">Category leaders</dt>
+            <dd className="text-2xl font-medium">
               {formatCount(benchmark.ratings)}
-            </span>
+            </dd>
           </div>
-        </div>
-        <SegmentBar
-          percent={percent}
-          segments={40}
-          className="border-overlay-1 h-3 w-full border px-px"
-          segmentClassName="h-2"
-          trackClassName="bg-overlay-3"
-        />
+        </dl>
         <p className="caption-style text-fg-secondary tabular-nums">
           {score.gap > 0
             ? `${percent}% of the way: ${formatCount(score.gap)} ratings behind`
@@ -522,15 +492,9 @@ function ReportCard({
         </p>
       </div>
 
-      <ul className="flex flex-col gap-2.5">
+      <ul className="text-fg-secondary flex flex-col gap-2 leading-snug">
         {score.reasons.map((reason) => (
-          <li key={reason} className="flex items-start gap-2.5">
-            <CheckCircleIcon
-              aria-hidden
-              className="text-fg-tertiary mt-0.5 size-3.5 shrink-0"
-            />
-            <span className="text-fg-secondary leading-snug">{reason}.</span>
-          </li>
+          <li key={reason}>{reason}.</li>
         ))}
       </ul>
 

@@ -11,7 +11,7 @@ import { hasInput, type GraphNode } from "@/lib/domain/automations";
 import { cn } from "@/lib/utils";
 import DragIcon from "@/public/assets/icons/automations/drag.svg";
 import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
-import { NODE_META, toneVars } from "../node-meta";
+import { NODE_META } from "../node-meta";
 import { NODE_WIDTH } from "./geometry";
 
 export type RunMark = "active" | "done" | "skipped" | "idle";
@@ -37,7 +37,7 @@ type NodeCardProps = {
 };
 
 const handle =
-  "absolute left-1/2 size-2 -translate-x-1/2 rounded-full bg-(--accent) shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]";
+  "absolute left-1/2 size-2 -translate-x-1/2 rounded-full bg-fg-tertiary";
 
 const RUN_LABEL: Record<Exclude<RunMark, "idle">, string> = {
   active: "Running",
@@ -94,7 +94,6 @@ function NodeCard({
       data-run={runMark === "idle" ? undefined : runMark}
       style={
         {
-          ...toneVars(meta.tone),
           "--node-x": `${node.x}px`,
           "--node-y": `${node.y}px`,
           width: NODE_WIDTH,
@@ -110,29 +109,26 @@ function NodeCard({
         onDoubleClick={() => onOpen(node.id)}
         onKeyDown={onKeyDown}
         className={cn(
-          "duration-fast ease-power3-out focus-visible:ring-ring relative flex flex-col gap-[3px] rounded-xl border border-(--accent-border) bg-(--accent-surface) px-[5px] pt-[5px] pb-[7px] transition-[border-color,box-shadow] outline-none focus-visible:ring-2",
+          "bg-card border-border duration-fast ease-power3-out focus-visible:ring-ring relative flex flex-col gap-1.5 rounded-xl border px-4 py-3 transition-[border-color,box-shadow] outline-none focus-visible:ring-2",
           readOnly
             ? "cursor-pointer"
             : "cursor-grab group-data-dragging/node:cursor-grabbing",
-          "group-data-dragging/node:shadow-overlay group-data-selected/node:border-(--accent) group-data-targeted/node:border-(--accent) group-data-targeted/node:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]",
-          "group-data-[run=active]/node:border-(--accent) group-data-[run=active]/node:shadow-[0_0_28px_color-mix(in_srgb,var(--accent)_28%,transparent)] group-data-[run=done]/node:border-(--accent)",
+          "group-data-dragging/node:shadow-overlay group-data-selected/node:border-ring group-data-targeted/node:border-ring group-data-[run=active]/node:border-ring group-data-[run=done]/node:border-ring",
         )}
       >
         {runMark === "active" && (
           <span
             aria-hidden
-            className="pointer-events-none absolute -inset-px animate-pulse rounded-[inherit] shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_55%,transparent)] motion-reduce:animate-none"
+            className="ring-ring/50 pointer-events-none absolute -inset-px animate-pulse rounded-[inherit] ring-2 motion-reduce:animate-none"
           />
         )}
-        <div className="flex h-8 items-center gap-2 px-1.5">
-          <meta.Icon aria-hidden className="size-4 shrink-0 text-(--accent)" />
-          <span className="min-w-0 flex-1 truncate text-sm leading-5 font-medium text-(--accent)">
-            {meta.label}
-          </span>
+        <div className="text-fg-tertiary flex h-5 items-center gap-2 text-xs">
+          <meta.Icon aria-hidden className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">{meta.label}</span>
           {issues.length > 0 && runMark === "idle" && (
             <span
               title={issues[0]}
-              className="text-warning flex shrink-0 items-center gap-1 text-xs leading-none font-medium"
+              className="text-warning flex shrink-0 items-center gap-1"
             >
               <AlertIcon aria-hidden className="size-3.5" />
               {issues.length > 1 ? issues.length : "Fix"}
@@ -141,59 +137,45 @@ function NodeCard({
           {live > 0 && runMark === "idle" && (
             <span
               title={`${live} ${live === 1 ? "record is" : "records are"} on this step now`}
-              className="flex h-5 shrink-0 items-center gap-1 rounded-full bg-(--accent)/12 px-2 text-xs leading-none font-medium text-(--accent) tabular-nums"
+              className="flex shrink-0 items-center gap-1 tabular-nums"
             >
-              <span className="size-1.5 rounded-full bg-(--accent)" />
+              <span className="bg-ring size-1.5 rounded-full" />
               {live}
             </span>
           )}
-          {runMark !== "idle" ? (
-            <span
-              key={runMark}
-              className="flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-(--accent)/12 px-2 text-xs leading-none font-medium text-(--accent)"
-            >
+          {runMark !== "idle" && (
+            <span key={runMark} className="flex shrink-0 items-center gap-1.5">
               <span
                 className={cn(
-                  "size-1.5 rounded-full bg-(--accent)",
+                  "bg-ring size-1.5 rounded-full",
                   runMark === "active" && "animate-pulse",
-                  runMark === "skipped" &&
-                    "bg-transparent ring-1 ring-(--accent)",
+                  runMark === "skipped" && "ring-ring bg-transparent ring-1",
                 )}
               />
               {RUN_LABEL[runMark]}
             </span>
-          ) : (
-            node.kind === "trigger" && (
-              <span className="flex h-5 shrink-0 items-center rounded-full bg-(--accent)/15 px-2 text-xs leading-none font-semibold text-(--accent)">
-                WHEN
-              </span>
-            )
           )}
           {!readOnly && runMark === "idle" && (
             <DragIcon
               aria-hidden
-              className="text-fg-tertiary duration-fast size-4 shrink-0 opacity-0 transition-opacity group-hover/node:opacity-100"
+              className="duration-fast size-4 shrink-0 opacity-0 transition-opacity group-hover/node:opacity-100"
             />
           )}
         </div>
-        <div className="bg-card shadow-card flex flex-col gap-1 rounded-[9px] px-3.5 py-3 text-sm leading-5">
-          <span className="text-foreground line-clamp-2 font-medium">
-            {title}
-          </span>
+        <div className="flex flex-col gap-0.5 text-sm leading-5">
+          <span className="line-clamp-2 font-medium">{title}</span>
           {detail && (
             <span className="text-fg-tertiary line-clamp-2">{detail}</span>
           )}
         </div>
         {reached > 0 && runMark === "idle" && (
-          <div className="flex h-5 items-center gap-1.5 px-1.5 pt-1 text-xs leading-4 font-medium text-(--accent) tabular-nums">
+          <div className="text-fg-tertiary flex items-center gap-1.5 text-xs tabular-nums">
             <span title="Runs that reached this step">
               {reached.toLocaleString("en-IN")} reached
             </span>
             {node.kind !== "exit" && (
               <>
-                <span aria-hidden className="opacity-50">
-                  ·
-                </span>
+                <span aria-hidden>·</span>
                 <span title="Runs that went on from this step">
                   {(counts?.passed ?? 0).toLocaleString("en-IN")} passed
                 </span>

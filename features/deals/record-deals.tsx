@@ -74,7 +74,7 @@ export default function RecordDeals({
       }
     >
       {sorted === undefined ? (
-        <div className="border-border divide-border flex flex-col divide-y rounded-xl border">
+        <div className="divide-border flex flex-col divide-y">
           {[0, 1].map((index) => (
             <div key={index} className="flex items-center gap-3 px-3 py-3">
               <Skeleton className="h-3 w-40" />
@@ -83,11 +83,11 @@ export default function RecordDeals({
           ))}
         </div>
       ) : sorted.length === 0 ? (
-        <p className="border-border caption-style text-fg-tertiary rounded-xl border border-dashed px-4 py-5 text-center">
+        <p className="caption-style text-fg-tertiary">
           No deals with this account yet.
         </p>
       ) : (
-        <ul className="border-border divide-border flex flex-col divide-y overflow-hidden rounded-xl border">
+        <ul className="divide-border flex flex-col divide-y">
           {sorted.map((deal) => {
             const open = isOpenStage(deal.stage);
             const overdue =
@@ -102,7 +102,7 @@ export default function RecordDeals({
                       setPeek({ type: "deal", id: deal._id });
                     }
                   }}
-                  className="hover:bg-overlay-1 focus-visible:ring-ring flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                  className="hover:bg-overlay-1 focus-visible:ring-ring -mx-3 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
                 >
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span

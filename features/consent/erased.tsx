@@ -17,9 +17,9 @@ export function ErasedTag({ erasedAt }: { erasedAt: number }) {
 
 export function ErasedNotice() {
   return (
-    <p className="bg-card shadow-card text-fg-secondary rounded-xl px-4 py-3 text-sm leading-relaxed">
-      This person&apos;s personal data was erased on request. The record stays
-      as proof of consent and erasure, and can&apos;t be edited.
+    <p className="text-fg-secondary text-sm">
+      Personal data erased on request. The record stays as proof of consent and
+      erasure, and can&apos;t be edited.
     </p>
   );
 }

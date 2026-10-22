@@ -90,7 +90,7 @@ function describedBy(id: string, error?: string, hint?: boolean) {
 }
 
 /** The public demo request form; after submitting it becomes the booking step. */
-export default function DemoForm({ embed = false }: { embed?: boolean }) {
+export default function DemoForm() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [errors, setErrors] = useState<LeadFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -191,7 +191,7 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
     }
   }
 
-  if (submitted) return <DemoBooking lead={submitted} embed={embed} />;
+  if (submitted) return <DemoBooking lead={submitted} />;
 
   const contactError = errors.contact;
 
@@ -200,19 +200,13 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
       onSubmit={handleSubmit}
       noValidate
       aria-labelledby="demo-form-title"
-      className={cn(
-        "relative flex flex-col gap-5",
-        !embed && "bg-card shadow-card rounded-2xl p-5 sm:p-7",
-      )}
+      className="relative flex flex-col gap-5"
     >
       <div className="flex flex-col gap-2.5">
         <h2 id="demo-form-title" className="text-lg leading-6 font-semibold">
           Book a demo
         </h2>
-        <p className="text-fg-secondary">
-          Takes under a minute. Fields marked{" "}
-          <span className="whitespace-nowrap">* are required.</span>
-        </p>
+        <p className="text-fg-tertiary">Takes under a minute. * is required.</p>
       </div>
 
       <Field label="Your name" htmlFor="demo-name" required error={errors.name}>
@@ -395,7 +389,7 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
           </Field>
 
           <fieldset className="flex flex-col gap-2.5">
-            <legend className="caption-style text-fg-secondary mb-2.5 font-medium">
+            <legend className="caption-style text-fg-secondary mb-2.5">
               Monthly orders
             </legend>
             <div className="flex flex-wrap gap-2">
@@ -506,7 +500,7 @@ export default function DemoForm({ embed = false }: { embed?: boolean }) {
           Request a demo
         </Button>
         <p className="caption-style text-fg-tertiary text-center leading-snug">
-          A specialist replies within one business hour. No spam.
+          A specialist replies within one business hour.
         </p>
       </div>
     </form>

@@ -21,7 +21,7 @@ import {
 import MentionTextarea, { useMentionDraft } from "./mention-textarea";
 
 const PLACEHOLDER: Record<LoggableKind, string> = {
-  note: "Write a note…",
+  note: "Write a note. @ to mention a teammate.",
   call: "What was discussed on the call?",
   meeting: "Meeting notes…",
   email: "Summary of the email…",
@@ -101,7 +101,7 @@ export default function TimelineComposer({
   return (
     <form
       onSubmit={submit}
-      className="bg-card shadow-card focus-within:ring-line-strong duration-fast rounded-xl ring-1 ring-transparent transition-shadow"
+      className="border-border focus-within:border-line-strong duration-fast rounded-xl border transition-colors"
     >
       <div
         role="tablist"
@@ -119,7 +119,7 @@ export default function TimelineComposer({
               onClick={() => setKind(value)}
               className={cn(
                 "caption-style text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 transition-colors outline-none focus-visible:ring-2",
-                kind === value && "bg-raised text-foreground shadow-hairline",
+                kind === value && "bg-overlay-2 text-foreground",
               )}
             >
               <meta.icon aria-hidden className="size-3" />
@@ -174,8 +174,6 @@ export default function TimelineComposer({
           </span>
         )}
         <span className="caption-style text-fg-tertiary ml-auto flex items-center gap-1 max-sm:hidden">
-          <Kbd>@</Kbd>
-          <span className="mr-2">to mention</span>
           <Kbd>{MOD_KEY}</Kbd>
           <Kbd>↵</Kbd>
         </span>

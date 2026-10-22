@@ -1,37 +1,19 @@
 "use client";
 
-import {
-  useId,
-  useState,
-  type ComponentType,
-  type ReactNode,
-  type SVGProps,
-} from "react";
+import { useId, useState, type ReactNode } from "react";
 import Button from "@/components/_ui/button";
-import { Card, CardHeader } from "@/components/_ui/card";
-import EmptyState from "@/components/_ui/empty-state";
-import IconBadge from "@/components/_ui/icon-badge";
 import Skeleton from "@/components/_ui/skeleton";
-import { PageStatus } from "@/components/shell/page";
 import { useViewer } from "@/hooks/use-viewer";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
-import SettingsIcon from "@/public/assets/icons/settings.svg";
 import { routes } from "@/lib/routes";
 
 /** One-paragraph context under the page header of a settings page. */
 export function SettingsIntro({ children }: { children: ReactNode }) {
-  return <p className="text-fg-secondary max-w-prose">{children}</p>;
+  return <p className="text-fg-tertiary max-w-prose">{children}</p>;
 }
 
-const CARD =
-  "bg-card border-border shadow-card flex min-w-0 flex-col overflow-hidden rounded-xl border";
-
-type Icon = ComponentType<SVGProps<SVGSVGElement>>;
-
-const BODY = "flex min-w-0 flex-col";
-
-/** A settings card: eyebrow title and a short note, then its rows. */
+/** A titled group of rows, separated from its neighbours by whitespace. */
 export function SettingsSection({
   title,
   description,
@@ -49,16 +31,62 @@ export function SettingsSection({
 }) {
   const id = `settings-${useId()}`;
   return (
-    <Card aria-labelledby={id} className={className}>
-      <CardHeader
+    <section
+      aria-labelledby={id}
+      className={cn("flex min-w-0 flex-col", className)}
+    >
+      <SectionHeader
         id={id}
         title={title}
         description={description}
         action={action}
         tone={tone}
       />
-      <div className={BODY}>{children}</div>
-    </Card>
+      <div className="flex min-w-0 flex-col">{children}</div>
+    </section>
+  );
+}
+
+function SectionHeader({
+  id,
+  title,
+  meta,
+  description,
+  action,
+  tone = "default",
+}: {
+  id: string;
+  title: string;
+  meta?: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  tone?: "default" | "danger";
+}) {
+  return (
+    <header className="flex min-w-0 items-start gap-3 pb-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <h2
+            id={id}
+            className={cn(
+              "text-sm leading-5 font-medium",
+              tone === "danger" && "text-danger",
+            )}
+          >
+            {title}
+          </h2>
+          {meta}
+        </div>
+        {description && (
+          <p className="caption-style text-fg-tertiary max-w-prose leading-snug">
+            {description}
+          </p>
+        )}
+      </div>
+      {action && (
+        <div className="flex shrink-0 items-center gap-2">{action}</div>
+      )}
+    </header>
   );
 }
 
@@ -80,12 +108,12 @@ export function SettingsRow({
   return (
     <div
       className={cn(
-        "border-border flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:gap-6 sm:px-5",
+        "border-border flex flex-col gap-3 border-t py-3.5 sm:flex-row sm:items-center sm:gap-6",
         className,
       )}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <Label htmlFor={htmlFor} className="lead-style font-medium">
+        <Label htmlFor={htmlFor} className="lead-style">
           {label}
         </Label>
         {description && (
@@ -103,7 +131,7 @@ export function SettingsRow({
   );
 }
 
-/** A plain block inside a settings card, for content that isn't a label/control pair. */
+/** A plain block inside a section, for content that isn't a label/control pair. */
 export function SettingsBlock({
   children,
   className,
@@ -114,7 +142,7 @@ export function SettingsBlock({
   return (
     <div
       className={cn(
-        "border-border flex flex-col gap-3 border-t px-4 py-4 sm:px-5",
+        "border-border flex flex-col gap-3 border-t py-3.5",
         className,
       )}
     >
@@ -123,20 +151,29 @@ export function SettingsBlock({
   );
 }
 
+export function SettingsRowSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="border-border flex h-13 items-center gap-3 border-t"
+    >
+      <Skeleton className="h-3 w-40" />
+      <Skeleton className="ml-auto h-3 w-16" />
+    </div>
+  );
+}
+
 export function SettingsSkeleton({ rows = 2 }: { rows?: number }) {
   return (
-    <div aria-hidden className={cn(CARD, "gap-0")}>
-      <div className="flex flex-col gap-2 px-4 py-4 sm:px-6">
+    <div aria-hidden className="flex flex-col">
+      <div className="flex flex-col gap-2 pb-3">
         <Skeleton className="h-3 w-28" />
         <Skeleton className="h-2.5 w-48 max-w-full" />
       </div>
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}
-          className={cn(
-            "border-border flex h-16 items-center gap-3 px-4 sm:px-5",
-            index > 0 && "border-t",
-          )}
+          className="border-border flex h-14 items-center gap-3 border-t"
         >
           <span className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3 w-32" />
@@ -152,23 +189,43 @@ export function SettingsSkeleton({ rows = 2 }: { rows?: number }) {
 export type Health = "connected" | "sandbox" | "partial" | "off";
 
 const HEALTH = {
-  connected: { tone: "success", label: "Connected" },
-  sandbox: { tone: "warning", label: "Sandbox" },
-  partial: { tone: "warning", label: "Incomplete" },
-  off: { tone: "neutral", label: "Not configured" },
+  connected: { className: "text-fg-secondary", label: "Connected" },
+  sandbox: { className: "text-warning", label: "Sandbox" },
+  partial: { className: "text-warning", label: "Incomplete" },
+  off: { className: "text-fg-tertiary", label: "Not configured" },
 } as const;
 
 function HealthTag({ health }: { health: Health }) {
-  const { tone, label } = HEALTH[health];
-  return <PageStatus tone={tone}>{label}</PageStatus>;
+  const { className, label } = HEALTH[health];
+  return <span className={cn("caption-style", className)}>{label}</span>;
 }
 
-/** Whether a secret or setting is present, as a status pill. */
+const STATUS_TONE = {
+  neutral: "text-fg-secondary",
+  muted: "text-fg-tertiary",
+  warning: "text-warning",
+  danger: "text-danger",
+} as const;
+
+/** Status as coloured text; colour only for states that need attention. */
+export function StatusText({
+  tone = "neutral",
+  children,
+}: {
+  tone?: keyof typeof STATUS_TONE;
+  children: ReactNode;
+}) {
+  return (
+    <span className={cn("lead-style", STATUS_TONE[tone])}>{children}</span>
+  );
+}
+
+/** Whether a secret or setting is present. */
 export function ConfiguredTag({ on, label }: { on: boolean; label?: string }) {
   return (
-    <PageStatus tone={on ? "success" : "neutral"}>
+    <StatusText tone={on ? "neutral" : "muted"}>
       {label ?? (on ? "Set" : "Not set")}
-    </PageStatus>
+    </StatusText>
   );
 }
 
@@ -261,43 +318,25 @@ export function AdminOnly({ children }: { children: ReactNode }) {
   const viewer = useViewer();
   if (viewer.role === "admin") return <>{children}</>;
   return (
-    <Card className="py-6">
-      <EmptyState
-        icon={SettingsIcon}
-        title="Only admins can change this"
-        description="Ask an admin on your team if something here needs to change."
-        action={
-          <Button variant="secondary" size="sm" href={routes.profile}>
-            Back to your profile
-          </Button>
-        }
-      />
-    </Card>
+    <div className="flex flex-col items-start gap-3 py-6">
+      <p className="text-fg-tertiary">
+        Only admins can change this. Ask an admin on your team.
+      </p>
+      <Button variant="secondary" size="sm" href={routes.profile}>
+        Back to your profile
+      </Button>
+    </div>
   );
 }
 
-/** Raised icon tile, the visual for integrations. */
-export function IconTile({
-  icon,
-  className,
-}: {
-  icon: Icon;
-  className?: string;
-}) {
-  return <IconBadge icon={icon} size="lg" className={className} />;
-}
-
-/** A card per integration: icon tile, name, what it does and its health or main action, then its details. */
+/** A section per integration: name and health, what it does, then its details. */
 export function IntegrationCard({
-  visual,
   title,
   description,
   health,
   action,
   children,
 }: {
-  /** Usually an `IconTile`. */
-  visual: ReactNode;
   title: string;
   description: ReactNode;
   health?: Health;
@@ -306,16 +345,15 @@ export function IntegrationCard({
 }) {
   const id = `integration-${useId()}`;
   return (
-    <Card aria-labelledby={id}>
-      <CardHeader
+    <section aria-labelledby={id} className="flex min-w-0 flex-col">
+      <SectionHeader
         id={id}
-        visual={visual}
         title={title}
         meta={health && <HealthTag health={health} />}
         description={description}
         action={action}
       />
-      <div className={BODY}>{children}</div>
-    </Card>
+      <div className="flex min-w-0 flex-col">{children}</div>
+    </section>
   );
 }

@@ -32,8 +32,7 @@ import {
   ActivityTrend,
   PipelineHealth,
 } from "./account-insights";
-import { StageAndTags } from "./record-cells";
-import { STAGE_OPTIONS } from "./stage";
+import { STAGE_OPTIONS, StageTag } from "./stage";
 import { routes } from "@/lib/routes";
 
 type Account = NonNullable<FunctionReturnType<typeof api.accounts.get>>;
@@ -108,7 +107,17 @@ function PeekBody({
         visual={<AccountLogo account={account} size="lg" />}
         title={account.name}
       >
-        <StageAndTags stage={account.stage} tags={account.tags} max={6} wrap />
+        <OptionPicker
+          value={account.stage}
+          label="Stage"
+          options={STAGE_OPTIONS}
+          onChange={(stage) =>
+            stage && void save({ stage: stage as LifecycleStage }, "Stage")
+          }
+          className="mx-0 h-auto rounded-full px-0 hover:bg-transparent data-[state=open]:bg-transparent"
+        >
+          <StageTag stage={account.stage} />
+        </OptionPicker>
         {account.domain && (
           <a
             href={`https://${account.domain}`}
@@ -121,21 +130,11 @@ function PeekBody({
         )}
       </DetailHero>
       <PlatformHealthLine accountId={account._id} onNavigate={onClose} />
-      <AccountSummary account={account} people={people} />
+      <AccountSummary people={people} />
       <PipelineHealth accountId={account._id} deals={deals} />
       <ActivityTrend target={{ accountId: account._id }} />
       <DetailSection title="Details" className="gap-2">
         <Properties>
-          <Property label="Stage">
-            <OptionPicker
-              value={account.stage}
-              label="Stage"
-              options={STAGE_OPTIONS}
-              onChange={(stage) =>
-                stage && void save({ stage: stage as LifecycleStage }, "Stage")
-              }
-            />
-          </Property>
           <Property label="Owner">
             <MemberPicker
               value={account.ownerId}

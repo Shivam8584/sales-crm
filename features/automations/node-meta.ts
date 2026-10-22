@@ -22,7 +22,6 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 export type NodeMeta = {
   label: string;
   hint: string;
-  tone: Exclude<TagTone, "neutral"> | "neutral";
   Icon: Icon;
 };
 
@@ -30,72 +29,54 @@ export const NODE_META: Record<NodeKind, NodeMeta> = {
   trigger: {
     label: NODE_LABEL.trigger,
     hint: "What enrols a record",
-    tone: "purple",
     Icon: BoltIcon,
   },
   wait: {
     label: NODE_LABEL.wait,
     hint: "A delay, a weekday time or an event",
-    tone: "amber",
     Icon: HistoryIcon,
   },
   condition: {
     label: NODE_LABEL.condition,
     hint: "Split into YES and NO",
-    tone: "teal",
     Icon: BranchIcon,
   },
   create_task: {
     label: NODE_LABEL.create_task,
     hint: "Give a teammate something to do",
-    tone: "orange",
     Icon: CheckSquareIcon,
   },
   send_email: {
     label: NODE_LABEL.send_email,
     hint: "A templated email, consent checked",
-    tone: "blue",
     Icon: MailIcon,
   },
   send_whatsapp: {
     label: NODE_LABEL.send_whatsapp,
     hint: "An approved Meta template",
-    tone: "green",
     Icon: WhatsAppIcon,
   },
   notify: {
     label: NODE_LABEL.notify,
     hint: "An in-app notification",
-    tone: "yellow",
     Icon: BellIcon,
   },
   update_field: {
     label: NODE_LABEL.update_field,
     hint: "Stage, status, owner or tags",
-    tone: "moss",
     Icon: RotateIcon,
   },
   automation: {
     label: NODE_LABEL.automation,
     hint: "Add to or remove from one",
-    tone: "neutral",
     Icon: UsersPlusIcon,
   },
   exit: {
     label: NODE_LABEL.exit,
     hint: "End the run here",
-    tone: "red",
     Icon: LogOutIcon,
   },
 };
-
-/** CSS variables for a node's accent, from the tag palette so both themes work. */
-export const toneVars = (tone: NodeMeta["tone"]) =>
-  ({
-    "--accent": `var(--tag-${tone}-text)`,
-    "--accent-border": `var(--tag-${tone}-border)`,
-    "--accent-surface": `var(--tag-${tone}-bg)`,
-  }) as Record<string, string>;
 
 export const ACTION_GROUPS: { label: string; kinds: NodeKind[] }[] = [
   { label: "Messages", kinds: ["send_email", "send_whatsapp"] },
@@ -111,9 +92,9 @@ export const STATUS_TONE: Record<AutomationStatus, TagTone> = {
 };
 
 export const ENROLLMENT_TONE: Record<EnrollmentStatus, TagTone> = {
-  running: "blue",
-  waiting: "amber",
-  completed: "green",
+  running: "neutral",
+  waiting: "neutral",
+  completed: "neutral",
   exited: "neutral",
   failed: "red",
 };

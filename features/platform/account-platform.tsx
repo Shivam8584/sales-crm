@@ -7,7 +7,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
@@ -26,7 +25,7 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
-import { HEALTH_TONE, HealthRing } from "./health-badge";
+import { HealthRing } from "./health-badge";
 
 type Linked = Extract<
   FunctionReturnType<typeof api.platform.forAccount>,
@@ -159,16 +158,13 @@ function HealthSummary({ data }: { data: Linked }) {
             stroke={4}
             className="absolute inset-0"
           />
-          <span className="text-sm font-semibold tabular-nums">
+          <span className="text-sm font-medium tabular-nums">
             {health.score}
           </span>
         </span>
         <span className="flex min-w-0 flex-col gap-1">
-          <span className="flex items-center gap-2">
-            <span className="lead-style font-medium">Health</span>
-            <Tag tone={HEALTH_TONE[health.band]} size="xs">
-              {HEALTH_BAND_LABEL[health.band]}
-            </Tag>
+          <span className="lead-style font-medium">
+            Health · {HEALTH_BAND_LABEL[health.band]}
           </span>
           <span className="caption-style text-fg-tertiary truncate">
             {weak.length
@@ -218,12 +214,12 @@ function HealthSummary({ data }: { data: Linked }) {
           <span className="caption-style text-fg-tertiary">
             Expansion signals
           </span>
-          <span className="flex flex-wrap gap-1">
+          <span className="caption-style text-fg-secondary flex flex-wrap gap-x-3 gap-y-1">
             {health.signals.map((signal) => (
               <Tooltip key={signal.id} content={signal.detail}>
-                <Tag tone="green" size="xs" tabIndex={0}>
+                <span tabIndex={0} className="rounded-sm">
                   {signal.label}
-                </Tag>
+                </span>
               </Tooltip>
             ))}
           </span>
@@ -243,15 +239,10 @@ const STATUS_ORDER: string[] = [
   "ended",
 ];
 
-const STATUS_TONE: Partial<
-  Record<CampaignStatus, Parameters<typeof Tag>[0]["tone"]>
-> = {
-  live: "green",
-  paused: "amber",
-  changes_requested: "amber",
-  pending_review: "blue",
-  scheduled: "blue",
-  ended: "neutral",
+const STATUS_TEXT: Partial<Record<CampaignStatus, string>> = {
+  live: "text-success",
+  paused: "text-warning",
+  changes_requested: "text-warning",
 };
 
 function campaignTitle(campaign: Campaign) {
@@ -288,9 +279,13 @@ function Campaigns({ campaigns }: { campaigns: Campaign[] }) {
                   {Math.round(campaign.fillPct)}%
                 </span>
               )}
-              <Tag
-                tone={starved ? "red" : (STATUS_TONE[status] ?? "neutral")}
-                size="xs"
+              <span
+                className={cn(
+                  "caption-style",
+                  starved
+                    ? "text-danger"
+                    : (STATUS_TEXT[status] ?? "text-fg-secondary"),
+                )}
                 title={
                   starved
                     ? "Paused for insufficient funds; it won't resume on its own"
@@ -300,7 +295,7 @@ function Campaigns({ campaigns }: { campaigns: Campaign[] }) {
                 {starved
                   ? "No funds"
                   : (CAMPAIGN_STATUS_LABEL[status] ?? status)}
-              </Tag>
+              </span>
             </span>
           </li>
         );
@@ -402,16 +397,17 @@ function PlatformDetails({ data }: { data: Linked }) {
       )}
       <Property label="Marketplaces">
         {data.marketplaces.length ? (
-          <span className="flex min-w-0 flex-wrap gap-1 py-1.5">
+          <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 py-1.5 text-sm">
             {data.marketplaces.map((market) => (
-              <Tag
+              <span
                 key={market.slug}
-                size="xs"
                 title={`${market.count} ${market.count === 1 ? "listing" : "listings"}`}
               >
-                {market.label}
-                <span className="text-fg-tertiary">{market.count}</span>
-              </Tag>
+                {market.label}{" "}
+                <span className="text-fg-tertiary tabular-nums">
+                  {market.count}
+                </span>
+              </span>
             ))}
           </span>
         ) : (
@@ -450,9 +446,12 @@ function PlatformDetails({ data }: { data: Linked }) {
                 {relativeTime(snapshot.fetchedAt)}
               </time>
               {snapshot.source === "sandbox" && (
-                <Tag size="xs" title="PLATFORM_SANDBOX is on: local test data">
+                <span
+                  className="caption-style text-fg-tertiary"
+                  title="PLATFORM_SANDBOX is on: local test data"
+                >
                   Sandbox
-                </Tag>
+                </span>
               )}
               {snapshot.error && (
                 <Tooltip content={`Last sync failed: ${snapshot.error}`}>

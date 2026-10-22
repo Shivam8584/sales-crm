@@ -1,47 +1,42 @@
 "use client";
 
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
-import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import Kbd from "@/components/_ui/kbd";
+import SegmentedControl from "@/components/_ui/segmented-control";
 import { Switch } from "@/components/_ui/switch";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
-import { Card, CardHeader } from "@/components/_ui/card";
-import { Properties, Property } from "@/components/record";
-import { PageStatus } from "@/components/shell/page";
 import { useInstallPrompt } from "@/features/pwa/use-install-prompt";
 import { usePush } from "@/features/pwa/use-push";
-import { ROLE_DESCRIPTION, ROLE_TONE } from "@/features/team/roles";
 import { useViewer } from "@/hooks/use-viewer";
+import { ROLE_DESCRIPTION } from "@/features/team/roles";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { cleanText, formatPhone, normalizePhone } from "@/lib/domain/normalize";
 import { readError } from "@/lib/errors";
 import { MOD_KEY } from "@/lib/keyboard";
-import { setThemePreference, useThemePreference } from "@/lib/theme";
+import {
+  setThemePreference,
+  useThemePreference,
+  type ThemePreference,
+} from "@/lib/theme";
 import { dateTime, shortDate } from "@/lib/time";
-import { cn } from "@/lib/utils";
 import { DigestSetting } from "@/features/notifications/digest-setting";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
-import MonitorIcon from "@/public/assets/icons/monitor.svg";
-import MoonIcon from "@/public/assets/icons/moon.svg";
-import SunIcon from "@/public/assets/icons/sun.svg";
 import ApiTokens from "./api-tokens";
 import { SettingsRow, SettingsSection } from "./settings-ui";
 
 const MAX_NAME = 80;
 
-const THEMES = [
-  { value: "system", label: "System", icon: MonitorIcon },
-  { value: "light", label: "Light", icon: SunIcon },
-  { value: "dark", label: "Dark", icon: MoonIcon },
-] as const;
+const THEMES: { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
 const SHORTCUTS = [
   { keys: [MOD_KEY, "K"], label: "Search and run commands" },
@@ -49,7 +44,6 @@ const SHORTCUTS = [
   { keys: ["C"], label: "Create a record" },
   { keys: [MOD_KEY, "Z"], label: "Undo the last action" },
   { keys: ["J", "K"], label: "Move through a list" },
-  { keys: ["?"], label: "Show every shortcut" },
 ];
 
 /** /settings/profile: your name, theme, shortcuts and sign out. */
@@ -57,68 +51,50 @@ export default function ProfileSettings() {
   const viewer = useViewer();
   const { signOut } = useAuthActions();
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen);
+  const theme = useThemePreference();
 
   return (
     <>
-      <Card aria-labelledby="profile-title">
-        <CardHeader
-          id="profile-title"
-          visual={
-            <Avatar name={viewer.name} size="lg" className="rounded-xl" />
-          }
-          title={viewer.name}
-          meta={
-            <>
-              <Tag tone={ROLE_TONE[viewer.role]} size="xs">
-                {ROLE_LABEL[viewer.role]}
-              </Tag>
-              <PageStatus>Active</PageStatus>
-            </>
-          }
-          description={viewer.email}
-        />
-        <div className="flex flex-col gap-5 px-4 py-5 sm:px-5">
-          <NameField key={viewer.name} name={viewer.name} />
-          <Properties>
-            <Property label="Email">
-              <span
-                className="text-fg-secondary truncate text-sm"
-                title={viewer.email}
-              >
-                {viewer.email}
-              </span>
-            </Property>
-            <Property label="Role">
-              <span className="text-fg-secondary truncate text-sm">
-                {ROLE_DESCRIPTION[viewer.role]}
-              </span>
-            </Property>
-            <Property label="Member since">
-              <Tooltip content={dateTime(viewer.joinedAt)}>
-                <span tabIndex={0} className="rounded-sm text-sm">
-                  {shortDate(viewer.joinedAt)}
-                </span>
-              </Tooltip>
-            </Property>
-          </Properties>
-        </div>
-      </Card>
+      <SettingsSection title="Profile">
+        <NameField key={viewer.name} name={viewer.name} />
+        <SettingsRow label="Email">
+          <span className="lead-style text-fg-secondary truncate">
+            {viewer.email}
+          </span>
+        </SettingsRow>
+        <SettingsRow label="Role" description={ROLE_DESCRIPTION[viewer.role]}>
+          <span className="lead-style text-fg-secondary">
+            {ROLE_LABEL[viewer.role]}
+          </span>
+        </SettingsRow>
+        <SettingsRow label="Member since">
+          <Tooltip content={dateTime(viewer.joinedAt)}>
+            <span
+              tabIndex={0}
+              className="lead-style text-fg-secondary rounded-sm"
+            >
+              {shortDate(viewer.joinedAt)}
+            </span>
+          </Tooltip>
+        </SettingsRow>
+      </SettingsSection>
 
-      <SettingsSection
-        title="Appearance"
-        description="How the CRM looks on this device."
-      >
+      <SettingsSection title="Appearance">
         <SettingsRow
           label="Theme"
-          description="System follows your device's light or dark setting."
+          description="System follows your device's setting."
         >
-          <ThemePicker />
+          <SegmentedControl
+            label="Theme"
+            value={theme}
+            onChange={(next) => setThemePreference(next as ThemePreference)}
+            segments={THEMES}
+          />
         </SettingsRow>
       </SettingsSection>
 
       <SettingsSection
         title="Keyboard shortcuts"
-        description="The few worth learning first."
         action={
           <Button
             variant="secondary"
@@ -134,7 +110,7 @@ export default function ProfileSettings() {
           {SHORTCUTS.map((item) => (
             <li
               key={item.label}
-              className="border-border flex h-11 items-center justify-between gap-4 border-t px-4 sm:px-5"
+              className="border-border flex h-11 items-center justify-between gap-4 border-t"
             >
               <span className="lead-style text-fg-secondary truncate">
                 {item.label}
@@ -149,7 +125,7 @@ export default function ProfileSettings() {
         </ul>
       </SettingsSection>
 
-      <SettingsSection title="Notifications & app">
+      <SettingsSection title="Notifications">
         <PushRow />
         <InstallRow />
         <DigestSetting />
@@ -160,10 +136,7 @@ export default function ProfileSettings() {
       <ApiTokens />
 
       <SettingsSection title="Session">
-        <SettingsRow
-          label="Sign out"
-          description="Ends your session in this browser."
-        >
+        <SettingsRow label="Sign out on this device">
           <Button variant="secondary" size="sm" onClick={() => void signOut()}>
             Sign out
           </Button>
@@ -325,11 +298,18 @@ function NameField({ name }: { name: string }) {
 
   return (
     <form onSubmit={submit} noValidate>
-      <Field
+      <SettingsRow
         label="Display name"
         htmlFor="profile-name"
-        error={error}
-        hint="Shown on records you own, in the timeline and in mentions."
+        description={
+          error ? (
+            <span id="profile-name-error" role="alert" className="text-danger">
+              {error}
+            </span>
+          ) : (
+            "Shown on records you own, in the timeline and in mentions."
+          )
+        }
       >
         <div className="flex gap-2">
           <Input
@@ -349,9 +329,7 @@ function NameField({ name }: { name: string }) {
               }
             }}
             aria-invalid={error ? true : undefined}
-            aria-describedby={
-              error ? "profile-name-error" : "profile-name-hint"
-            }
+            aria-describedby={error ? "profile-name-error" : undefined}
             className="aria-invalid:border-danger"
           />
           <Button
@@ -365,60 +343,7 @@ function NameField({ name }: { name: string }) {
             Save
           </Button>
         </div>
-      </Field>
+      </SettingsRow>
     </form>
-  );
-}
-
-function ThemePicker() {
-  const theme = useThemePreference();
-
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const step =
-      event.key === "ArrowRight" || event.key === "ArrowDown"
-        ? 1
-        : event.key === "ArrowLeft" || event.key === "ArrowUp"
-          ? -1
-          : 0;
-    if (!step) return;
-    event.preventDefault();
-    const index = THEMES.findIndex((option) => option.value === theme);
-    const next = (index + step + THEMES.length) % THEMES.length;
-    setThemePreference(THEMES[next].value);
-    event.currentTarget
-      .querySelectorAll<HTMLButtonElement>("[role=radio]")
-      [next]?.focus();
-  }
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Theme"
-      onKeyDown={onKeyDown}
-      className="flex w-full flex-wrap gap-1.5 sm:w-auto"
-    >
-      {THEMES.map((option) => {
-        const checked = theme === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={checked}
-            tabIndex={checked ? 0 : -1}
-            onClick={() => setThemePreference(option.value)}
-            className={cn(
-              "focus-visible:ring-ring duration-fast ease-power3-out flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full border px-3 text-xs leading-none font-medium transition-[background-color,border-color,color] outline-none focus-visible:ring-2 sm:flex-none",
-              checked
-                ? "border-selected bg-overlay-1 text-foreground"
-                : "border-input text-fg-secondary hover:bg-overlay-1 hover:text-foreground",
-            )}
-          >
-            <option.icon aria-hidden className="size-3.5" />
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }

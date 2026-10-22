@@ -69,10 +69,10 @@ export default function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="secondary"
+          variant="ghost"
           size="avatar"
           aria-label={`Account menu for ${viewer.name}`}
-          className="data-[state=open]:bg-muted max-sm:size-control-md max-sm:p-0"
+          className="text-foreground data-[state=open]:bg-overlay-2 max-sm:size-control-md max-sm:p-0"
         >
           <Avatar name={viewer.name} />
           <span className="max-w-32 truncate max-sm:hidden">{viewer.name}</span>
@@ -81,11 +81,11 @@ export default function UserMenu() {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-[min(18.5rem,calc(100vw-1rem))] rounded-2xl"
+        className="w-[min(18.5rem,calc(100vw-1rem))]"
         contentClassName="p-0"
       >
         <div className="flex items-center gap-3 p-3">
-          <Avatar name={viewer.name} size="lg" className="rounded-xl" />
+          <Avatar name={viewer.name} size="lg" />
           <span className="flex min-w-0 flex-col gap-1">
             <span className="lead-style truncate font-medium">
               {viewer.name}
@@ -129,7 +129,7 @@ export default function UserMenu() {
         </div>
         <Divider />
         <div className="p-2">
-          <div className="bg-overlay-1 shadow-well flex flex-col gap-1.5 rounded-xl p-1.5">
+          <div className="bg-overlay-1 flex flex-col gap-1.5 rounded-xl p-1.5">
             <span
               id={themeLabel}
               className="caption-style text-fg-tertiary px-1.5 pt-1 font-medium"
@@ -149,7 +149,7 @@ export default function UserMenu() {
                   key={option.value}
                   value={option.value}
                   onSelect={(event) => event.preventDefault()}
-                  className="caption-style text-fg-secondary data-[highlighted]:bg-overlay-2 data-[highlighted]:text-foreground data-[state=checked]:bg-secondary data-[state=checked]:text-foreground data-[state=checked]:shadow-raised duration-fast flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg font-medium transition-colors outline-none select-none pointer-coarse:h-11"
+                  className="caption-style text-fg-secondary data-[highlighted]:bg-overlay-2 data-[highlighted]:text-foreground data-[state=checked]:bg-background data-[state=checked]:text-foreground duration-fast flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg font-medium transition-colors outline-none select-none pointer-coarse:h-11"
                 >
                   <option.icon aria-hidden className="size-3.5" />
                   {option.label}

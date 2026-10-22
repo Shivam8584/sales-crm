@@ -8,7 +8,6 @@ import Button from "@/components/_ui/button";
 import { Input } from "@/components/_ui/input";
 import Skeleton from "@/components/_ui/skeleton";
 import { Switch } from "@/components/_ui/switch";
-import { PageStatus } from "@/components/shell/page";
 import { SettingsRow, SettingsSection } from "@/features/settings/settings-ui";
 import { FREQUENCY_WINDOW_DAYS } from "@/lib/domain/automations";
 import { readError } from "@/lib/errors";
@@ -27,7 +26,7 @@ export default function AutomationSafety() {
     <SettingsSection
       tone={safety?.killSwitch ? "danger" : "default"}
       title="Sequence safety"
-      description="Limits that apply to every sequence, whoever built it."
+      description="Limits for every sequence."
     >
       {safety ? (
         <>
@@ -46,7 +45,7 @@ export default function AutomationSafety() {
 
 function RowSkeleton() {
   return (
-    <div className="border-border flex h-18 items-center gap-3 border-t px-4 sm:px-5">
+    <div className="border-border flex h-18 items-center gap-3 border-t">
       <span className="flex flex-1 flex-col gap-2">
         <Skeleton className="h-3 w-36" />
         <Skeleton className="h-2.5 w-64 max-w-full" />
@@ -94,7 +93,7 @@ function KillSwitchRow({ safety }: { safety: Safety }) {
       description={
         stopped && safety.killSwitch ? (
           <>
-            <span className="text-danger font-medium">
+            <span className="text-danger">
               Stopped by {safety.killSwitch.by}{" "}
               <time title={dateTime(safety.killSwitch.at)}>
                 {relativeTime(safety.killSwitch.at)}
@@ -104,23 +103,19 @@ function KillSwitchRow({ safety }: { safety: Safety }) {
             {safety.held
               ? `${safety.held} ${safety.held === 1 ? "run is" : "runs are"} held. `
               : ""}
-            Nothing enrols or sends until you turn this off; held runs then
-            carry on from where they stopped.
+            Held runs carry on once you turn this off.
           </>
         ) : (
-          "An emergency stop for every sequence: runs hold where they are, nothing new enrols and no message goes out until you turn it off."
+          "Holds every run and sends nothing until you turn it off."
         )
       }
     >
-      <span className="flex items-center gap-3">
-        {stopped && <PageStatus tone="danger">Stopped</PageStatus>}
-        <Switch
-          id="automations-kill-switch"
-          checked={stopped}
-          disabled={saving}
-          onCheckedChange={(on) => void toggle(on)}
-        />
-      </span>
+      <Switch
+        id="automations-kill-switch"
+        checked={stopped}
+        disabled={saving}
+        onCheckedChange={(on) => void toggle(on)}
+      />
     </SettingsRow>
   );
 }
@@ -177,9 +172,8 @@ function FrequencyRow({ safety }: { safety: Safety }) {
         htmlFor="automations-frequency-cap"
         description={
           <>
-            The most automated emails and WhatsApp messages one person gets in
-            any {FREQUENCY_WINDOW_DAYS} days, across all sequences. Further
-            messages wait until they’re under the cap.{" "}
+            Most automated messages one person gets in any{" "}
+            {FREQUENCY_WINDOW_DAYS} days, across all sequences.{" "}
             {safety.frequencyCapIsDefault
               ? "Using the default."
               : `Default is ${messages(safety.frequencyCapLimits.default)}.`}

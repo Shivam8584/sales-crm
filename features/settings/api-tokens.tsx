@@ -16,7 +16,6 @@ import {
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
-import Tag from "@/components/_ui/tag";
 import OptionPicker from "@/components/fields/option-picker";
 import { MAX_LIVE_TOKENS, type TokenAccess } from "@/lib/domain/mcp";
 import { readError } from "@/lib/errors";
@@ -72,7 +71,7 @@ export default function ApiTokens() {
   return (
     <SettingsSection
       title="AI assistants (MCP)"
-      description="Connect Claude or another MCP client to look up accounts, deals, tasks and sequences, and optionally add tasks and notes. A token acts as you, with your permissions and no more. Revoke it any time."
+      description="Let Claude or another MCP client look up your CRM data. A token acts as you, with your permissions. Revoke it any time."
       action={
         <Button
           variant="secondary"
@@ -89,7 +88,7 @@ export default function ApiTokens() {
       {active.length === 0 ? (
         <SettingsRow
           label="No tokens yet"
-          description="Create one, then paste the config it shows into your MCP client."
+          description="Create one, then paste its config into your MCP client."
         />
       ) : (
         active.map((token) => <TokenRow key={token._id} token={token} />)
@@ -119,21 +118,10 @@ function TokenRow({ token }: { token: Token }) {
 
   return (
     <SettingsRow
-      label={
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate">{token.name}</span>
-          <Tag tone={token.access === "write" ? "amber" : "blue"} size="xs">
-            {token.access === "write" ? "Read & write" : "Read only"}
-          </Tag>
-          {expired && (
-            <Tag tone="neutral" size="xs">
-              Expired
-            </Tag>
-          )}
-        </span>
-      }
+      label={token.name}
       description={[
         `${token.prefix}…`,
+        token.access === "write" ? "Read & write" : "Read only",
         token.lastUsedAt
           ? `used ${relativeTime(token.lastUsedAt)}`
           : "never used",
@@ -204,8 +192,7 @@ function CreateDialog({
             <DialogHeader>
               <DialogTitle>Token created</DialogTitle>
               <DialogDescription>
-                Copy it now. It can&apos;t be shown again, so if you lose it,
-                revoke it and create another.
+                Copy it now. It can&apos;t be shown again.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 px-6 py-5">
@@ -282,7 +269,7 @@ function CreateDialog({
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="subtle" size="sm">
+                <Button variant="secondary" size="sm">
                   Cancel
                 </Button>
               </DialogClose>

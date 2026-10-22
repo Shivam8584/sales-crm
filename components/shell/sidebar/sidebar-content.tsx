@@ -10,7 +10,6 @@ import {
   toggleSidebarCollapsed,
   useSidebarCollapsed,
 } from "@/lib/sidebar-collapse";
-import { cn } from "@/lib/utils";
 import { routes } from "@/lib/routes";
 import Logo from "@/public/assets/images/_common/logo.svg";
 import SidebarIcon from "@/public/assets/icons/sidebar.svg";
@@ -31,7 +30,7 @@ export default function SidebarContent() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-sidebar-border bg-sidebar-accent collapsed:justify-center collapsed:px-2 flex h-14.5 shrink-0 items-center gap-2 border-b px-3">
+      <div className="border-sidebar-border collapsed:justify-center collapsed:px-2 flex h-14.5 shrink-0 items-center gap-2 border-b px-3">
         {collapsed ? (
           <Tooltip content="Expand sidebar" shortcut="[" side="right">
             <button
@@ -58,13 +57,8 @@ export default function SidebarContent() {
               className="focus-visible:ring-ring -m-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg p-1 outline-none focus-visible:ring-2"
             >
               <Logo aria-hidden className="size-8 shrink-0 overflow-visible" />
-              <span className="flex min-w-0 flex-col gap-1">
-                <span className="lead-style block truncate font-medium tracking-[-0.01em]">
-                  Hypedrive
-                </span>
-                <span className="caption-style text-fg-tertiary block truncate">
-                  Brand pipeline
-                </span>
+              <span className="lead-style block min-w-0 truncate font-medium">
+                Hypedrive
               </span>
             </Link>
             <Tooltip content="Collapse sidebar" shortcut="[">
@@ -85,14 +79,8 @@ export default function SidebarContent() {
 
       <ScrollArea className="min-h-0 flex-1">
         <nav aria-label="Primary" data-tour="nav">
-          {sections.map((section, index) => (
-            <SidebarSection
-              key={section.title}
-              title={section.title}
-              className={cn(
-                index < sections.length - 1 && "border-sidebar-border border-b",
-              )}
-            >
+          {sections.map((section) => (
+            <SidebarSection key={section.title} title={section.title}>
               {section.items.map((item) => (
                 <SidebarNavItem
                   key={item.href}

@@ -3,10 +3,8 @@
 import Link from "next/link";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
-import Avatar from "@/components/_ui/avatar";
 import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
-import { KIND_META } from "@/features/timeline/kinds";
 import { dateTime, relativeTime } from "@/lib/time";
 
 export type ActivityEntry = FunctionReturnType<
@@ -41,7 +39,6 @@ function Shift({ change }: { change: Change }) {
 }
 
 export function ActivityRow({ entry }: { entry: ActivityEntry }) {
-  const meta = KIND_META[entry.kind];
   const record = entry.record;
   const changes = entry.kind === "change" ? (entry.changes ?? []) : [];
   const actor =
@@ -61,17 +58,7 @@ export function ActivityRow({ entry }: { entry: ActivityEntry }) {
       : entry.subject;
 
   return (
-    <li className="border-border hover:bg-row-hover flex items-start gap-3 border-b px-4 py-2.5 last:border-b-0">
-      {entry.actor ? (
-        <Avatar name={entry.actor.name} size="md" className="mt-px" />
-      ) : (
-        <span
-          aria-hidden
-          className="bg-muted shadow-hairline text-fg-secondary mt-px flex size-7 shrink-0 items-center justify-center rounded-full"
-        >
-          <meta.icon className="size-3.5" />
-        </span>
-      )}
+    <li className="hover:bg-row-hover flex items-start gap-3 px-4 py-2.5">
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex min-w-0 items-baseline gap-2 text-sm leading-5">
           <p className="text-fg-secondary min-w-0 flex-1 break-words">
@@ -81,7 +68,7 @@ export function ActivityRow({ entry }: { entry: ActivityEntry }) {
                 {" on "}
                 <Link
                   href={record.href}
-                  className="text-foreground focus-visible:ring-ring rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
+                  className="text-foreground focus-visible:ring-ring rounded-sm outline-none hover:underline focus-visible:ring-2"
                 >
                   {record.name}
                 </Link>
@@ -128,16 +115,12 @@ export function ActivityRow({ entry }: { entry: ActivityEntry }) {
 export function ActivitySkeleton() {
   return (
     <div aria-busy className="flex flex-col">
-      <div className="border-border flex h-9 items-center border-b px-4">
+      <div className="flex h-9 items-center px-4">
         <Skeleton className="h-3 w-16" />
       </div>
       {Array.from({ length: 8 }, (_, index) => (
-        <div
-          key={index}
-          className="border-border flex items-start gap-3 border-b px-4 py-2.5"
-        >
-          <Skeleton className="size-7 rounded-full" />
-          <span className="flex flex-1 flex-col gap-2 pt-1">
+        <div key={index} className="flex items-start gap-3 px-4 py-2.5">
+          <span className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3 w-3/5" />
             <Skeleton className="h-2.5 w-2/5" />
           </span>

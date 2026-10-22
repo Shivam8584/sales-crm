@@ -90,10 +90,7 @@
   --shadow-raised: var(--elevation-raised);
   --shadow-card: var(--elevation-card);
   --shadow-tile: var(--elevation-tile);
-  --shadow-brand: var(--elevation-brand);
   --shadow-overlay: var(--elevation-overlay);
-  --shadow-well: var(--elevation-well);
-  --shadow-badge: var(--elevation-badge);
 
   --spacing-row: var(--row-height);
 }
@@ -231,36 +228,17 @@
   --warning: #fbbf24;
   --danger: #f97373;
   --switch-track: #3a3a3f;
-  --divider-shade: rgb(0 0 0 / 0.45);
-  --divider-light: rgb(255 255 255 / 0.05);
   --danger-wash: rgb(249 115 115 / 0.08);
   --status: #16c89e;
   --trend: #00b562;
   --trend-muted: #395e4d;
   --track: #3a3a3a;
 
-  --elevation-raised:
-    0 0 0 1px rgb(0 0 0 / 0.4), inset 0 1px 0 0 rgb(255 255 255 / 0.1),
-    inset 0 0 0 1px rgb(255 255 255 / 0.06);
-  --elevation-card:
-    0 4px 4px 0 rgb(42 42 42 / 0.32), 0 0 0 1px #0e0e0e,
-    inset 0 1px 0 0 rgb(255 255 255 / 0.08),
-    inset 0 0 0 1px rgb(255 255 255 / 0.08);
-  --elevation-tile: 0 6px 6px 0 rgb(15 15 15 / 0.24), 0 0 0 1.5px var(--border);
-  --elevation-brand:
-    0 4px 4px 0 rgb(42 42 42 / 0.32), 0 0 0 1px #0e0e0e,
-    inset 0 4px 6px 0 rgb(255 255 255 / 0.2),
-    inset 0 0 0 1px rgb(255 255 255 / 0.15),
-    inset 0 -8px 14px 0 rgb(0 0 0 / 0.15);
-  --elevation-overlay: 0 16px 40px 0 rgb(0 0 0 / 0.5), 0 0 0 1px #0e0e0e;
-  --elevation-well:
-    inset 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(0 0 0 / 0.24),
-    0 1px 0 rgb(255 255 255 / 0.04);
-  --elevation-badge:
-    0 4px 8px rgb(0 0 0 / 0.08), 0 2px 4px rgb(0 0 0 / 0.12),
-    0 1px 2px rgb(0 0 0 / 0.16), 0 0 0 1px #0e0e0e,
-    inset 0 1px 0 rgb(255 255 255 / 0.08),
-    inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  --elevation-raised: 0 0 0 1px var(--line-strong);
+  --elevation-card: 0 0 #0000;
+  --elevation-tile: 0 0 0 1px var(--border);
+  --elevation-overlay:
+    0 12px 32px 0 rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.12);
 
   --tag-blue-bg: #1d2b3e;
   --tag-blue-border: #37475d;
@@ -331,8 +309,6 @@
   --overlay-4: rgb(0 0 0 / 0.12);
   --scrim: rgb(17 17 19 / 0.24);
   --switch-track: #cdcdd3;
-  --divider-shade: var(--border);
-  --divider-light: rgb(255 255 255 / 0.9);
   --danger-wash: rgb(201 34 34 / 0.05);
 
   --info: #0d5fea;
@@ -344,20 +320,11 @@
   --trend-muted: #8cc7a6;
   --track: #e4e4e7;
 
-  --elevation-raised:
-    0 0 0 1px rgb(0 0 0 / 0.08), 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --elevation-card: 0 0 0 1px rgb(0 0 0 / 0.06), 0 2px 4px 0 rgb(0 0 0 / 0.04);
-  --elevation-tile: 0 2px 4px 0 rgb(0 0 0 / 0.06), 0 0 0 1px var(--border);
-  --elevation-brand:
-    0 1px 2px 0 rgb(0 0 0 / 0.12), 0 0 0 1px #3418e6,
-    inset 0 1px 0 0 rgb(255 255 255 / 0.2);
+  --elevation-raised: 0 0 0 1px var(--line-strong);
+  --elevation-card: 0 0 #0000;
+  --elevation-tile: 0 0 0 1px var(--border);
   --elevation-overlay:
-    0 16px 40px -8px rgb(0 0 0 / 0.16), 0 0 0 1px rgb(0 0 0 / 0.08);
-  --elevation-well:
-    inset 0 1px 2px rgb(0 0 0 / 0.08), 0 0 0 1px rgb(0 0 0 / 0.04);
-  --elevation-badge:
-    0 1px 2px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.08),
-    inset 0 -1px 0 rgb(0 0 0 / 0.04);
+    0 12px 32px -8px rgb(0 0 0 / 0.16), 0 0 0 1px rgb(0 0 0 / 0.1);
 
   --tag-blue-bg: #eff6ff;
   --tag-blue-border: #dbeafe;
@@ -425,7 +392,7 @@
 
   h2,
   .h2-style {
-    @apply text-base leading-none font-semibold;
+    @apply text-base leading-none font-medium;
   }
 
   h3,
@@ -460,7 +427,7 @@
   }
 
   .eyebrow-style {
-    @apply text-xs leading-none font-normal tracking-[0.08em] uppercase;
+    @apply text-xs leading-none font-normal;
   }
 
   kbd {

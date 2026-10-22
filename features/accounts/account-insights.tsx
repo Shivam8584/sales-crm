@@ -9,12 +9,8 @@ import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
 import FilterMenu from "@/components/_common/filter-menu";
-import {
-  BigNumber,
-  DetailSection,
-  MeterRow,
-  StatTile,
-} from "@/components/record/detail";
+import Sparkline from "@/components/_common/sparkline";
+import { DetailSection } from "@/components/record/detail";
 import { useDialer, type Dial } from "@/features/calls/use-dialer";
 import type { TimelineTarget } from "@/features/timeline/kinds";
 import { DEAL_STAGES, type DealStage } from "@/lib/domain/enums";
@@ -22,15 +18,10 @@ import { DEAL_STAGE_LABEL, personName } from "@/lib/domain/labels";
 import { formatMoney } from "@/lib/domain/money";
 import { formatPhone } from "@/lib/domain/normalize";
 import { useUiStore } from "@/stores/ui-store";
-import CalendarIcon from "@/public/assets/icons/calendar-sm.svg";
 import MailIcon from "@/public/assets/icons/mail-03.svg";
-import NoteIcon from "@/public/assets/icons/note.svg";
-import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 import PhoneIcon from "@/public/assets/icons/phone.svg";
-import PlusIcon from "@/public/assets/icons/plus.svg";
 import { MoneyValue, rankTotals } from "./record-cells";
 
-type Account = NonNullable<FunctionReturnType<typeof api.accounts.get>>;
 type Person = FunctionReturnType<typeof api.people.list>[number];
 type Deal = FunctionReturnType<typeof api.deals.list>[number];
 
@@ -82,68 +73,47 @@ function primaryContact(people: Person[] | undefined) {
   )[0];
 }
 
-/** Owner with their email, then the primary contact with email and phone. */
+/** The primary contact with email and phone. */
 export function AccountSummary({
-  account,
   people,
   className,
   divider,
-}: SectionProps & { account: Account; people: Person[] | undefined }) {
+}: SectionProps & { people: Person[] | undefined }) {
   const setPeek = useUiStore((state) => state.setPeek);
   const contact = primaryContact(people);
   return (
-    <DetailSection
-      title="Account summary"
-      className={className}
-      divider={divider}
-    >
-      <div className="flex flex-col gap-3">
+    <DetailSection title="Contact" className={className} divider={divider}>
+      {people === undefined ? (
+        <Skeleton className="h-4 w-56" />
+      ) : contact ? (
         <div className="lead-style flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="flex min-w-0 items-center gap-1.5 font-medium">
-            <Avatar name={account.owner?.name ?? "?"} />
-            <span className="truncate">
-              {account.owner?.name ?? "No owner"}
-            </span>
+          <button
+            type="button"
+            onClick={() => setPeek({ type: "person", id: contact._id })}
+            className="hover:bg-overlay-2 focus-visible:ring-ring -mx-1.5 -my-1 flex min-w-0 items-center gap-1.5 rounded-full px-1.5 py-1 font-medium outline-none focus-visible:ring-2"
+          >
+            <Avatar name={personName(contact)} />
+            <span className="truncate">{personName(contact)}</span>
             <span className="caption-style text-fg-tertiary font-normal">
-              Owner
+              {contact.title ?? "Contact"}
             </span>
-          </span>
-          <ContactLine email={account.owner?.email} />
+          </button>
+          <ContactLine
+            email={contact.email}
+            call={
+              contact.phone
+                ? {
+                    target: { personId: contact._id },
+                    name: personName(contact),
+                    phone: contact.phone,
+                  }
+                : undefined
+            }
+          />
         </div>
-        {people === undefined ? (
-          <Skeleton className="h-4 w-56" />
-        ) : contact ? (
-          <div className="lead-style flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-            <button
-              type="button"
-              onClick={() => setPeek({ type: "person", id: contact._id })}
-              className="hover:bg-overlay-2 focus-visible:ring-ring -mx-1.5 -my-1 flex min-w-0 items-center gap-1.5 rounded-full px-1.5 py-1 font-medium outline-none focus-visible:ring-2"
-            >
-              <Avatar name={personName(contact)} />
-              <span className="truncate">{personName(contact)}</span>
-              <span className="caption-style text-fg-tertiary font-normal">
-                {contact.title ?? "Contact"}
-              </span>
-            </button>
-            <ContactLine
-              email={contact.email}
-              call={
-                contact.phone
-                  ? {
-                      target: { personId: contact._id },
-                      name: personName(contact),
-                      phone: contact.phone,
-                    }
-                  : undefined
-              }
-            />
-          </div>
-        ) : (
-          <p className="caption-style text-fg-tertiary">
-            No contact on this account yet.
-          </p>
-        )}
-      </div>
+      ) : (
+        <p className="caption-style text-fg-tertiary">No contact yet</p>
+      )}
     </DetailSection>
   );
 }
@@ -151,15 +121,6 @@ export function AccountSummary({
 const OPEN_STAGES = DEAL_STAGES.filter(
   (stage) => stage !== "won" && stage !== "lost",
 );
-const STAGE_METER_TONE: Record<
-  (typeof OPEN_STAGES)[number],
-  "danger" | "warning" | "success"
-> = {
-  discovery: "danger",
-  demo: "warning",
-  proposal: "warning",
-  onboarding: "success",
-};
 
 /** Open pipeline in the account's main currency, split by deal stage. */
 export function PipelineHealth({
@@ -179,15 +140,10 @@ export function PipelineHealth({
   const won = deals?.filter((deal) => deal.stage === "won").length ?? 0;
 
   return (
-    <DetailSection
-      title="Pipeline health"
-      className={className}
-      divider={divider}
-    >
+    <DetailSection title="Pipeline" className={className} divider={divider}>
       {deals === undefined ? (
         <div aria-busy className="flex flex-col gap-3">
-          <Skeleton className="h-7 w-28" />
-          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-5 w-28" />
           <Skeleton className="h-3 w-full" />
         </div>
       ) : !main ? (
@@ -197,41 +153,46 @@ export function PipelineHealth({
             {won > 0 && ` · ${won} won`}
           </p>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="xs"
             onClick={() => setCreate({ type: "deal", accountId })}
           >
-            <PlusIcon aria-hidden className="size-2.5" />
             New deal
           </Button>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <BigNumber
-            value={<MoneyValue totals={totals} className="gap-1" />}
-            caption={`Open pipeline across ${open!.length} ${open!.length === 1 ? "deal" : "deals"}${won ? ` · ${won} won` : ""}`}
-          />
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <MoneyValue totals={totals} className="text-sm font-medium" />
+            <p className="caption-style text-fg-secondary">
+              {open!.length} open {open!.length === 1 ? "deal" : "deals"}
+              {won > 0 && ` · ${won} won`}
+            </p>
+          </div>
+          <dl className="flex flex-col gap-1.5">
             {OPEN_STAGES.map((stage) => {
               const amount = inMain
                 .filter((deal) => deal.stage === stage)
                 .reduce((sum, deal) => sum + deal.amount.amount, 0);
-              const percent = main.amount ? (amount / main.amount) * 100 : 0;
+              if (amount === 0) return null;
               return (
-                <MeterRow
+                <div
                   key={stage}
-                  label={DEAL_STAGE_LABEL[stage]}
-                  percent={percent}
-                  tone={STAGE_METER_TONE[stage]}
-                  value={
-                    amount > 0
-                      ? `${formatMoney({ amount, currency: main.currency }, { compact: true })} · ${Math.round(percent)}%`
-                      : "0%"
-                  }
-                />
+                  className="caption-style flex items-center justify-between gap-2 tabular-nums"
+                >
+                  <dt className="text-fg-secondary">
+                    {DEAL_STAGE_LABEL[stage]}
+                  </dt>
+                  <dd>
+                    {formatMoney(
+                      { amount, currency: main.currency },
+                      { compact: true },
+                    )}
+                  </dd>
+                </div>
               );
             })}
-          </div>
+          </dl>
         </div>
       )}
     </DetailSection>
@@ -254,6 +215,14 @@ export function ActivityTrend({
   const days = Number(range) as 7 | 30 | 90;
   const data = useQuery(api.timeline.activity, { target, days });
   const label = WINDOWS.find((item) => item.value === range)!.label;
+  const kinds = data
+    ? [
+        ["email", "emails", data.emails],
+        ["meeting", "meetings", data.meetings],
+        ["call", "calls", data.calls],
+        ["note", "notes", data.notes],
+      ].filter(([, , count]) => count !== 0)
+    : [];
 
   return (
     <DetailSection
@@ -271,31 +240,29 @@ export function ActivityTrend({
     >
       {data === undefined ? (
         <div aria-busy className="flex flex-col gap-3">
-          <Skeleton className="h-7 w-24" />
-          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-8 w-full" />
         </div>
       ) : (
-        <div className="@container flex flex-col gap-3">
-          <BigNumber
-            size="md"
-            value={data.touches}
-            trend={data.buckets}
-            caption={
-              data.touches === 0
-                ? `No calls, emails, meetings or notes in the ${label.toLowerCase()}`
-                : `${data.touches === 1 ? "Touch" : "Touches"} in the ${label.toLowerCase()}${data.bucketDays > 1 ? `, ${data.bucketDays} days per bar` : ""}`
-            }
-          />
-          <div className="grid grid-cols-2 gap-2 @sm:grid-cols-4">
-            <StatTile icon={MailIcon} label="Emails" value={data.emails} />
-            <StatTile
-              icon={CalendarIcon}
-              label="Meetings"
-              value={data.meetings}
-            />
-            <StatTile icon={PhoneCallIcon} label="Calls" value={data.calls} />
-            <StatTile icon={NoteIcon} label="Notes" value={data.notes} />
+        <div className="flex flex-col gap-2">
+          <div className="flex items-end justify-between gap-3">
+            <span className="text-sm font-medium tabular-nums">
+              {data.touches}
+            </span>
+            {data.touches > 0 && (
+              <Sparkline values={data.buckets} className="h-5.5" />
+            )}
           </div>
+          <p className="caption-style text-fg-secondary tabular-nums">
+            {data.touches === 0
+              ? `Nothing logged in the ${label.toLowerCase()}`
+              : kinds
+                  .map(
+                    ([one, many, count]) =>
+                      `${count} ${count === 1 ? one : many}`,
+                  )
+                  .join(" · ")}
+          </p>
         </div>
       )}
     </DetailSection>

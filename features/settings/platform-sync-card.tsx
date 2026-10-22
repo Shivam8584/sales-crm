@@ -7,14 +7,12 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import Tooltip from "@/components/_ui/tooltip";
-import { PageStatus } from "@/components/shell/page";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime } from "@/lib/time";
+import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
-import ActivityIcon from "@/public/assets/icons/activity.svg";
 import {
   Code,
-  IconTile,
   IntegrationCard,
   SettingsRow,
   SettingsSkeleton,
@@ -73,7 +71,6 @@ function SyncCard({ overview }: { overview: Overview }) {
 
   return (
     <IntegrationCard
-      visual={<IconTile icon={ActivityIcon} />}
       title="Platform sync"
       description="Reads balance, campaigns, deposits, listings, review backlog and team for every linked account from the Hypedrive admin API. Account health is scored from it."
       health={health}
@@ -92,7 +89,7 @@ function SyncCard({ overview }: { overview: Overview }) {
       }
     >
       {overview.mode !== "live" && (
-        <p className="caption-style border-border bg-overlay-1 text-fg-secondary border-t px-4 py-3.5 leading-relaxed sm:px-5">
+        <p className="caption-style border-border text-fg-tertiary border-t py-3.5 leading-relaxed">
           {overview.mode === "sandbox" ? (
             <>
               <Code>PLATFORM_SANDBOX=1</Code> answers from each org&apos;s own
@@ -105,17 +102,18 @@ function SyncCard({ overview }: { overview: Overview }) {
         </p>
       )}
       <SettingsRow label="Mode" description={overview.schedule}>
-        <PageStatus
-          tone={
-            overview.mode === "live"
-              ? "success"
+        <span
+          className={cn(
+            "lead-style",
+            overview.mode === "sandbox"
+              ? "text-warning"
               : overview.mode
-                ? "warning"
-                : "neutral"
-          }
+                ? "text-fg-secondary"
+                : "text-fg-tertiary",
+          )}
         >
           {overview.mode ? MODE_LABEL[overview.mode] : "Off"}
-        </PageStatus>
+        </span>
       </SettingsRow>
       <SettingsRow
         label="Last run"
@@ -135,10 +133,8 @@ function SyncCard({ overview }: { overview: Overview }) {
         )}
       </SettingsRow>
       <div className="border-border flex flex-col border-t">
-        <div className="flex flex-col gap-1.5 px-4 py-4 sm:px-5">
-          <span className="lead-style font-medium">
-            Accounts needing attention
-          </span>
+        <div className="flex flex-col gap-1.5 py-3.5">
+          <span className="lead-style">Accounts needing attention</span>
           <span className="caption-style text-fg-tertiary leading-snug">
             {issues.length === 0
               ? "Every linked account synced on its last attempt."
@@ -162,18 +158,23 @@ function SyncCard({ overview }: { overview: Overview }) {
 
 function IssueRow({ issue }: { issue: Issue }) {
   return (
-    <li className="border-border flex min-h-10.5 items-center gap-3 border-t px-4 py-2 sm:px-5">
+    <li className="border-border flex min-h-10.5 items-center gap-3 border-t py-2">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span className="flex min-w-0 items-center gap-2">
           <Link
             href={`${routes.account(issue.accountId)}?tab=platform`}
-            className="lead-style focus-visible:ring-ring truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2"
+            className="lead-style focus-visible:ring-ring truncate rounded-sm outline-none hover:underline focus-visible:ring-2"
           >
             {issue.name}
           </Link>
-          <PageStatus tone={issue.error ? "danger" : "neutral"}>
+          <span
+            className={cn(
+              "caption-style",
+              issue.error ? "text-danger" : "text-fg-tertiary",
+            )}
+          >
             {issue.error ? "Failed" : "Never synced"}
-          </PageStatus>
+          </span>
         </span>
         <span
           className="caption-style text-fg-tertiary truncate"

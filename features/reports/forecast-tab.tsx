@@ -14,17 +14,10 @@ import { OPEN_DEAL_STAGES, STAGE_PROBABILITY_BPS } from "@/lib/domain/forecast";
 import { DEAL_STAGE_LABEL } from "@/lib/domain/labels";
 import { DEFAULT_CURRENCY, formatMoney } from "@/lib/domain/money";
 import { useUrlState } from "@/hooks/use-url-state";
-import ClipboardIcon from "@/public/assets/icons/clipboard.svg";
 import ExportButton from "./export-button";
 import { csvFilename, forecastCsv } from "./export";
 import { count } from "./format";
-import {
-  ChartSkeleton,
-  MetricTile,
-  Panel,
-  Reloading,
-  ReportSection,
-} from "./section";
+import { ChartSkeleton, MetricTile, Reloading, ReportSection } from "./section";
 import { useLatest } from "./use-report";
 import { routes } from "@/lib/routes";
 
@@ -190,49 +183,46 @@ export default function ForecastTab({
         }
         footnote={`Commit: open deals at Proposal or later closing from today to the end of this month. Best case: every open deal closing this month or next. Weighted: amount × the stage's chance to close (${ODDS}), a working assumption rather than a measured win rate. Expected landing: won this month plus weighted commit. Slipped deals are open with a close date before today and sit outside commit and best case. Amounts stay in their own currency.`}
       >
-        <Panel className="px-4 py-4 sm:px-5">
-          {!data ? (
-            <ChartSkeleton rows={2} />
-          ) : !selected ? (
-            <EmptyState
-              className="mx-auto max-w-lg"
-              icon={ClipboardIcon}
-              title="No open deals"
-              description="Open deals with an amount and a close date make up the forecast. Create a deal from an account to start one."
-              action={
-                <Button variant="secondary" size="sm" href={routes.deals}>
-                  Open deals
-                </Button>
+        {!data ? (
+          <ChartSkeleton rows={2} />
+        ) : !selected ? (
+          <EmptyState
+            className="mx-auto max-w-lg"
+            title="No open deals"
+            description="Open deals with an amount and a close date make up the forecast."
+            action={
+              <Button variant="secondary" size="sm" href={routes.deals}>
+                Open deals
+              </Button>
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">
+            <MetricTile
+              label="Won this month"
+              value={money(selected.wonSoFar)}
+            />
+            <MetricTile
+              label="Commit"
+              value={money(selected.commit.amount)}
+              detail={`${deals(selected.commit.count)} · ${money(selected.commit.weighted)} weighted`}
+            />
+            <MetricTile
+              label="Expected landing"
+              value={money(selected.landing)}
+              detail={
+                goal
+                  ? `${Math.round((selected.landing / goal) * 100)}% of the ${money(goal)} goal`
+                  : "Won plus weighted commit"
               }
             />
-          ) : (
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-              <MetricTile
-                label="Won this month"
-                value={money(selected.wonSoFar)}
-              />
-              <MetricTile
-                label="Commit"
-                value={money(selected.commit.amount)}
-                detail={`${deals(selected.commit.count)} · ${money(selected.commit.weighted)} weighted`}
-              />
-              <MetricTile
-                label="Expected landing"
-                value={money(selected.landing)}
-                detail={
-                  goal
-                    ? `${Math.round((selected.landing / goal) * 100)}% of the ${money(goal)} goal`
-                    : "Won plus weighted commit"
-                }
-              />
-              <MetricTile
-                label="Best case"
-                value={money(selected.bestCase.amount)}
-                detail={deals(selected.bestCase.count)}
-              />
-            </div>
-          )}
-        </Panel>
+            <MetricTile
+              label="Best case"
+              value={money(selected.bestCase.amount)}
+              detail={deals(selected.bestCase.count)}
+            />
+          </div>
+        )}
       </ReportSection>
 
       {selected && (
@@ -241,7 +231,7 @@ export default function ForecastTab({
           title="Open pipeline"
           description="Every open deal by stage, whatever its close date."
         >
-          <Panel className="flex flex-col">
+          <div className="flex flex-col">
             <DataTable
               label="Open pipeline by stage"
               keyboard={false}
@@ -285,7 +275,7 @@ export default function ForecastTab({
               )}
               empty={null}
             />
-          </Panel>
+          </div>
         </ReportSection>
       )}
 
@@ -300,7 +290,7 @@ export default function ForecastTab({
             </Button>
           }
         >
-          <Panel className="flex flex-col">
+          <div className="flex flex-col">
             <DataTable
               label="Slipped deals"
               keyboard={false}
@@ -319,9 +309,7 @@ export default function ForecastTab({
               renderCard={(row) => (
                 <span className="flex flex-col gap-1.5">
                   <span className="flex items-baseline justify-between gap-3">
-                    <span className="lead-style truncate font-medium">
-                      {row.title}
-                    </span>
+                    <span className="lead-style truncate">{row.title}</span>
                     <span className="caption-style text-danger shrink-0 tabular-nums">
                       {count(row.daysLate)}d late
                     </span>
@@ -335,7 +323,7 @@ export default function ForecastTab({
               )}
               empty={null}
             />
-          </Panel>
+          </div>
         </ReportSection>
       )}
     </Reloading>

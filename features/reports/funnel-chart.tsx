@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Tag from "@/components/_ui/tag";
 import SegmentBar from "@/components/_common/segment-bar";
 import {
   FIRST_PLATFORM_STEP,
@@ -36,11 +35,11 @@ export default function FunnelChart({
   const before = dropIndex > 0 ? funnel.steps[dropIndex - 1] : null;
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-4 sm:px-5">
+    <div className="flex flex-col gap-4">
       {drop && before && (
         <p className="lead-style text-fg-secondary leading-snug">
           Biggest drop:{" "}
-          <span className="text-foreground font-medium">
+          <span className="text-foreground">
             {before.label} → {drop.label}
           </span>
           . {percent(drop.stepRate)} moved on ({count(drop.count)} of{" "}
@@ -70,21 +69,14 @@ export default function FunnelChart({
               {GROUPS[index] && (
                 <span
                   className={cn(
-                    "eyebrow-style text-fg-tertiary pb-2 text-[10px]",
+                    "caption-style text-fg-tertiary pb-2",
                     index > 0 && "border-border mt-2 border-t pt-4",
                   )}
                 >
                   {GROUPS[index]}
                 </span>
               )}
-              <div
-                className={cn(
-                  GRID,
-                  "rounded-lg py-1.5",
-                  isDrop &&
-                    "-mx-2 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] px-2",
-                )}
-              >
+              <div className={cn(GRID, "py-1.5")}>
                 <span className="lead-style flex min-w-0 items-center gap-2">
                   <Link
                     href={hrefFor(step.key)}
@@ -97,11 +89,6 @@ export default function FunnelChart({
                   >
                     {step.label}
                   </Link>
-                  {isDrop && (
-                    <Tag tone="red" size="xs">
-                      Biggest drop
-                    </Tag>
-                  )}
                 </span>
                 <SegmentBar
                   percent={(step.count / scale) * 100}
@@ -110,9 +97,7 @@ export default function FunnelChart({
                   className="col-span-2 row-start-2 w-full sm:col-span-1 sm:row-start-auto"
                 />
                 <span className="lead-style flex items-baseline justify-end gap-2 text-right tabular-nums sm:contents">
-                  <span className="font-medium sm:text-right">
-                    {count(step.count)}
-                  </span>
+                  <span className="sm:text-right">{count(step.count)}</span>
                   <span className="text-fg-tertiary max-sm:hidden sm:text-right">
                     <span className="sr-only">previous period </span>
                     {count(prior)}
@@ -120,7 +105,7 @@ export default function FunnelChart({
                   <span
                     className={cn(
                       "text-fg-secondary sm:text-right",
-                      isDrop && "text-danger font-medium",
+                      isDrop && "text-danger",
                     )}
                   >
                     <span className="sr-only">from previous step </span>

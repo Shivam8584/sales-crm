@@ -12,8 +12,6 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
-import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
 import { firstSentence, stuckFor } from "./stall";
 
 /** Shown at the top of an account page while its onboarding is stuck on a step. */
@@ -78,60 +76,39 @@ export default function AccountStallBanner({
   return (
     <aside
       aria-label="Onboarding stuck"
-      className={cn(
-        "flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:gap-4",
-        snoozed || !open
-          ? "border-border bg-overlay-1"
-          : urgent
-            ? "border-danger/30 bg-[color-mix(in_srgb,var(--danger)_7%,transparent)]"
-            : "border-warning/30 bg-[color-mix(in_srgb,var(--warning)_7%,transparent)]",
-      )}
+      className="border-border flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:gap-4"
     >
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        {snoozed ? (
-          <ClockIcon
-            aria-hidden
-            className="text-fg-tertiary mt-0.5 size-4 shrink-0"
-          />
-        ) : (
-          <AlertIcon
-            aria-hidden
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p className="lead-style leading-snug">
+          <span
             className={cn(
-              "mt-0.5 size-4 shrink-0",
-              !open
-                ? "text-fg-tertiary"
-                : urgent
-                  ? "text-danger"
-                  : "text-warning",
+              "font-medium",
+              open && !snoozed && urgent && "text-danger",
             )}
-          />
-        )}
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="lead-style leading-snug">
-            <span className="font-medium" title={rule.description}>
-              {rule.label}
-            </span>
-            <span className="text-fg-secondary">
-              {" "}
-              for{" "}
-              <time
-                dateTime={new Date(stall.since).toISOString()}
-                title={`Since ${dateTime(stall.since)}`}
-              >
-                {stuckFor(stall.since)}
-              </time>
-            </span>
-          </p>
-          <p
-            className="caption-style text-fg-secondary leading-snug text-pretty"
-            title={rule.playbook}
+            title={rule.description}
           >
-            {firstSentence(rule.playbook)}
-          </p>
-          <p className="caption-style text-fg-tertiary truncate">{status}</p>
-        </div>
+            {rule.label}
+          </span>
+          <span className="text-fg-secondary">
+            {" "}
+            for{" "}
+            <time
+              dateTime={new Date(stall.since).toISOString()}
+              title={`Since ${dateTime(stall.since)}`}
+            >
+              {stuckFor(stall.since)}
+            </time>
+          </span>
+        </p>
+        <p
+          className="caption-style text-fg-secondary leading-snug text-pretty"
+          title={rule.playbook}
+        >
+          {firstSentence(rule.playbook)}
+        </p>
+        <p className="caption-style text-fg-tertiary truncate">{status}</p>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-1.5 max-sm:pl-7">
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
         {open && !snoozed && (
           <>
             <Button variant="ghost" size="sm" onClick={snooze}>

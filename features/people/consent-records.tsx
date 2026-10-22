@@ -75,76 +75,65 @@ export default function ConsentRecords({
       divider={divider}
       action={
         live && (
-          <span className="flex items-center gap-1">
-            {erasure === "none" && (
-              <Button
-                variant="subtle"
-                size="xs"
-                onClick={() => setAction("grant")}
-              >
-                Record
-              </Button>
-            )}
-            <DropdownMenu>
-              <Tooltip content="Consent actions">
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Consent actions"
-                    className="data-[state=open]:bg-overlay-2"
-                  >
-                    <DotsIcon aria-hidden className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="min-w-52">
-                {erasure === "none" && (
-                  <>
-                    <DropdownMenuItem onSelect={() => setAction("grant")}>
-                      Record consent
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setAction("withdraw")}>
-                      Withdraw consent
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => setAction(dnd ? "dnd_off" : "dnd_on")}
-                    >
-                      {dnd ? "Clear DND" : "Mark number as DND"}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onSelect={() => setAction("erasure_requested")}
-                    >
-                      Record erasure request
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {erasure === "requested" && admin && (
+          <DropdownMenu>
+            <Tooltip content="Consent actions">
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Consent actions"
+                  className="data-[state=open]:bg-overlay-2"
+                >
+                  <DotsIcon aria-hidden className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="min-w-52">
+              {erasure === "none" && (
+                <>
+                  <DropdownMenuItem onSelect={() => setAction("grant")}>
+                    Record consent
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setAction("withdraw")}>
+                    Withdraw consent
+                  </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => setAction("erasure_dismissed")}
+                    onSelect={() => setAction(dnd ? "dnd_off" : "dnd_on")}
                   >
-                    Dismiss erasure request
+                    {dnd ? "Clear DND" : "Mark number as DND"}
                   </DropdownMenuItem>
-                )}
-                {admin && (
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    className="text-danger"
-                    onSelect={() =>
-                      setErase({ kind: "person", id: personId, name })
-                    }
+                    onSelect={() => setAction("erasure_requested")}
                   >
-                    Erase personal data…
+                    Record erasure request
                   </DropdownMenuItem>
-                )}
-                {erasure === "requested" && !admin && (
-                  <DropdownMenuItem disabled>
-                    Waiting for an admin to erase
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </span>
+                </>
+              )}
+              {erasure === "requested" && admin && (
+                <DropdownMenuItem
+                  onSelect={() => setAction("erasure_dismissed")}
+                >
+                  Dismiss erasure request
+                </DropdownMenuItem>
+              )}
+              {admin && (
+                <DropdownMenuItem
+                  className="text-danger"
+                  onSelect={() =>
+                    setErase({ kind: "person", id: personId, name })
+                  }
+                >
+                  Erase personal data…
+                </DropdownMenuItem>
+              )}
+              {erasure === "requested" && !admin && (
+                <DropdownMenuItem disabled>
+                  Waiting for an admin to erase
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       }
     >
@@ -226,7 +215,7 @@ function ErasureNotice({
       </p>
       {!erased && admin && (
         <Button
-          variant="subtle"
+          variant="secondary"
           size="xs"
           className="text-danger self-start"
           onClick={onErase}

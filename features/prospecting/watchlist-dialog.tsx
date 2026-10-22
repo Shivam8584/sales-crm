@@ -101,8 +101,7 @@ function WatchlistForm({
       <DialogHeader>
         <DialogTitle>{draft._id ? "Edit source" : "New source"}</DialogTitle>
         <DialogDescription>
-          Group products that compete with each other, such as one category on
-          one marketplace, so the leaders set a fair benchmark.
+          Group competing products, such as one category on one marketplace.
         </DialogDescription>
       </DialogHeader>
       <div className="flex flex-col gap-4 px-6 py-5">
@@ -153,7 +152,7 @@ function WatchlistForm({
       </div>
       <DialogFooter>
         <DialogClose asChild>
-          <Button variant="subtle" size="sm">
+          <Button variant="secondary" size="sm">
             Cancel
           </Button>
         </DialogClose>

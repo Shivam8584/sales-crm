@@ -6,7 +6,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
-import { RecordSection } from "@/components/record/record-layout";
 import {
   formatDay,
   formatTotals,
@@ -16,7 +15,6 @@ import { DealStageTag, isOpenStage } from "@/features/deals/stage";
 import { formatMoney } from "@/lib/domain/money";
 import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import PlusIcon from "@/public/assets/icons/plus.svg";
 import { routes } from "@/lib/routes";
 
 /** Deals the person is a contact on, across accounts. */
@@ -37,26 +35,21 @@ export default function PersonDeals({
     : "";
 
   return (
-    <RecordSection
-      title="Deals"
-      action={
-        <span className="flex items-center gap-3">
-          {openTotal && (
-            <span className="caption-style text-fg-tertiary tabular-nums">
-              {openTotal} open
-            </span>
-          )}
-          {onAdd && (
-            <Button variant="ghost" size="xs" onClick={onAdd}>
-              <PlusIcon aria-hidden className="size-2.5" />
-              New deal
-            </Button>
-          )}
-        </span>
-      }
-    >
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-end gap-3">
+        {openTotal && (
+          <span className="caption-style text-fg-tertiary tabular-nums">
+            {openTotal} open
+          </span>
+        )}
+        {onAdd && (
+          <Button variant="ghost" size="xs" onClick={onAdd}>
+            New deal
+          </Button>
+        )}
+      </div>
       {deals === undefined ? (
-        <div className="border-border divide-border flex flex-col divide-y rounded-xl border">
+        <div className="divide-border -mx-3 flex flex-col divide-y">
           {[0, 1].map((index) => (
             <div key={index} className="flex items-center gap-3 px-3 py-3">
               <Skeleton className="h-3 w-40" />
@@ -65,12 +58,9 @@ export default function PersonDeals({
           ))}
         </div>
       ) : deals.length === 0 ? (
-        <p className="border-border caption-style text-fg-tertiary rounded-xl border border-dashed px-4 py-5 text-center">
-          Not on any deals yet. Add them as a contact when you create or edit a
-          deal.
-        </p>
+        <p className="caption-style text-fg-tertiary">Not on any deals yet.</p>
       ) : (
-        <ul className="border-border divide-border flex flex-col divide-y overflow-hidden rounded-xl border">
+        <ul className="divide-border -mx-3 flex flex-col divide-y">
           {deals.map((deal) => {
             const open = isOpenStage(deal.stage);
             const overdue =
@@ -131,6 +121,6 @@ export default function PersonDeals({
           })}
         </ul>
       )}
-    </RecordSection>
+    </div>
   );
 }

@@ -20,17 +20,15 @@ import { routes } from "@/lib/routes";
 /** Compact list of an account's people, used on the account page and peek. */
 export default function PeopleList({
   accountId,
-  onAdd,
 }: {
   accountId: Id<"accounts">;
-  onAdd?: () => void;
 }) {
   const people = useQuery(api.people.list, { accountId });
   const setPeek = useUiStore((state) => state.setPeek);
 
   if (people === undefined) {
     return (
-      <div className="border-border divide-border flex flex-col divide-y rounded-xl border">
+      <div className="divide-border -mx-3 flex flex-col divide-y">
         {[0, 1].map((index) => (
           <div key={index} className="flex items-center gap-3 px-3 py-2.5">
             <Skeleton className="size-7 rounded-full" />
@@ -45,24 +43,11 @@ export default function PeopleList({
   }
 
   if (people.length === 0) {
-    return (
-      <div className="border-border caption-style text-fg-tertiary flex flex-col items-center gap-1 rounded-xl border border-dashed px-4 py-5 text-center">
-        <span>No people at this account yet.</span>
-        {onAdd && (
-          <button
-            type="button"
-            onClick={onAdd}
-            className="text-fg-secondary hover:text-foreground focus-visible:ring-ring rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2"
-          >
-            Add the founder or your main contact
-          </button>
-        )}
-      </div>
-    );
+    return <p className="caption-style text-fg-tertiary">No people yet.</p>;
   }
 
   return (
-    <ul className="border-border divide-border flex flex-col divide-y overflow-hidden rounded-xl border">
+    <ul className="divide-border -mx-3 flex flex-col divide-y">
       {people.map((person) => {
         const name = personName(person);
         return (

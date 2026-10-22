@@ -28,7 +28,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/_ui/sheet";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
 import NotificationBell from "@/features/notifications/notification-bell";
@@ -151,7 +150,7 @@ export function PageHeader({
           </span>
         )}
       </nav>
-      <div className="flex shrink-0 items-center gap-2 max-[359px]:gap-1">
+      <div className="flex shrink-0 items-center gap-2 max-[359px]:gap-1 [&>button]:shadow-none">
         {actions && (
           <div className="flex items-center gap-1.5 sm:gap-2">{actions}</div>
         )}
@@ -175,7 +174,7 @@ function SearchButton() {
   return (
     <Tooltip content="Search" shortcut={`${MOD_KEY} K`}>
       <Button
-        variant="secondary"
+        variant="ghost"
         size="icon"
         aria-label="Search"
         aria-keyshortcuts="Meta+K Control+K"
@@ -196,7 +195,7 @@ const STATUS_DOT = {
   neutral: "text-fg-tertiary",
 } as const;
 
-/** Status pill for `PageHeader`'s `meta`, e.g. `<PageStatus>Active</PageStatus>`. */
+/** Status for `PageHeader`'s `meta`, e.g. `<PageStatus>Active</PageStatus>`. */
 export function PageStatus({
   tone = "success",
   children,
@@ -205,10 +204,10 @@ export function PageStatus({
   children: ReactNode;
 }) {
   return (
-    <Tag tone="neutral" size="xs" className="text-foreground gap-0.5 pl-0.5">
+    <span className="caption-style text-fg-secondary inline-flex items-center gap-0.5">
       <ActiveDot aria-hidden className={cn("size-3", STATUS_DOT[tone])} />
       {children}
-    </Tag>
+    </span>
   );
 }
 
@@ -318,7 +317,7 @@ export function PageActions({
                 size="icon"
                 aria-label={label}
                 className={cn(
-                  "data-[state=open]:bg-muted",
+                  "data-[state=open]:bg-overlay-2",
                   items.length === 0 && "sm:hidden",
                 )}
               >
@@ -418,7 +417,7 @@ export function PageToolbar({
     <div
       data-slot="page-toolbar"
       className={cn(
-        "border-border short:py-2 flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b px-4 py-3 sm:flex-nowrap sm:py-4",
+        "border-border short:py-2 flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b px-4 py-3 sm:flex-nowrap",
         className,
       )}
     >
@@ -475,7 +474,7 @@ function FilterSheet({
         aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
         data-active={active > 0}
         onClick={() => setOpen(true)}
-        className="data-[active=true]:bg-muted h-control-md max-[359px]:w-control-md py-0 max-[359px]:px-0 sm:hidden"
+        className="data-[active=true]:bg-overlay-2 h-control-md max-[359px]:w-control-md py-0 max-[359px]:px-0 sm:hidden"
       >
         <FilterIcon aria-hidden className="size-3" />
         <span className="max-[359px]:sr-only">Filters</span>

@@ -11,7 +11,6 @@ import {
   PopoverTrigger,
 } from "@/components/_ui/popover";
 import { readError } from "@/lib/errors";
-import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 
@@ -21,12 +20,6 @@ const OUTCOME_LABEL = {
   created: "New task",
   reopened: "Reopened",
   closed: "Closed",
-} as const;
-
-const OUTCOME_TONE = {
-  created: "text-(--tag-blue-text)",
-  reopened: "text-(--tag-amber-text)",
-  closed: "text-(--tag-green-text)",
 } as const;
 
 const plural = (count: number, noun: string) =>
@@ -100,12 +93,7 @@ export default function RunChecksButton() {
                       <span className="lead-style truncate font-medium">
                         {change.accountName}
                       </span>
-                      <span
-                        className={cn(
-                          "caption-style shrink-0",
-                          OUTCOME_TONE[change.outcome],
-                        )}
-                      >
+                      <span className="caption-style text-fg-tertiary shrink-0">
                         {OUTCOME_LABEL[change.outcome]}
                       </span>
                     </span>

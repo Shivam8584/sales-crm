@@ -14,10 +14,7 @@ import OptionPicker from "@/components/fields/option-picker";
 import TagsField from "@/components/fields/tags-field";
 import { DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
-import RecordLayout, {
-  RecordHeader,
-  RecordSection,
-} from "@/components/record/record-layout";
+import RecordLayout, { RecordHeader } from "@/components/record/record-layout";
 import RecordTabs from "@/components/record/record-tabs";
 import { useCommandActions } from "@/components/shell/command-actions";
 import {
@@ -55,7 +52,6 @@ import { useUiStore } from "@/stores/ui-store";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
-import PlusIcon from "@/public/assets/icons/plus.svg";
 import TargetIcon from "@/public/assets/icons/target-05.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
@@ -67,7 +63,6 @@ import {
   PipelineHealth,
 } from "./account-insights";
 import ActivationPath from "./activation-path";
-import { StageAndTags } from "./record-cells";
 import { STAGE_OPTIONS, StageTag } from "./stage";
 import { editRecordTitle, useTitleShortcut } from "./use-title-shortcut";
 import FollowButton from "@/features/notifications/follow-button";
@@ -234,21 +229,18 @@ function AccountView({ account }: { account: Account }) {
               }
               subtitle={
                 <>
-                  <span className="flex min-w-0 flex-wrap items-center gap-0.75 gap-y-1">
-                    <OptionPicker
-                      value={account.stage}
-                      label="Stage"
-                      options={STAGE_OPTIONS}
-                      onChange={(stage) =>
-                        stage &&
-                        void save({ stage: stage as LifecycleStage }, "Stage")
-                      }
-                      className="mx-0 h-auto rounded-full px-0 hover:bg-transparent data-[state=open]:bg-transparent"
-                    >
-                      <StageTag stage={account.stage} />
-                    </OptionPicker>
-                    <StageAndTags tags={account.tags} max={4} wrap />
-                  </span>
+                  <OptionPicker
+                    value={account.stage}
+                    label="Stage"
+                    options={STAGE_OPTIONS}
+                    onChange={(stage) =>
+                      stage &&
+                      void save({ stage: stage as LifecycleStage }, "Stage")
+                    }
+                    className="mx-0 h-auto rounded-full px-0 hover:bg-transparent data-[state=open]:bg-transparent"
+                  >
+                    <StageTag stage={account.stage} />
+                  </OptionPicker>
                   {account.domain && (
                     <a
                       href={`https://${account.domain}`}
@@ -271,11 +263,7 @@ function AccountView({ account }: { account: Account }) {
         aside={
           <>
             <AccountBrief accountId={account._id} />
-            <AccountSummary
-              account={account}
-              people={people}
-              className={ASIDE_SECTION}
-            />
+            <AccountSummary people={people} className={ASIDE_SECTION} />
             <PipelineHealth
               accountId={account._id}
               deals={deals}
@@ -300,17 +288,6 @@ function AccountView({ account }: { account: Account }) {
                     }
                   />
                 </Property>
-                <Property label="Stage">
-                  <OptionPicker
-                    value={account.stage}
-                    label="Stage"
-                    options={STAGE_OPTIONS}
-                    onChange={(stage) =>
-                      stage &&
-                      void save({ stage: stage as LifecycleStage }, "Stage")
-                    }
-                  />
-                </Property>
                 <Property label="Website">
                   <InlineText
                     value={account.domain}
@@ -328,6 +305,24 @@ function AccountView({ account }: { account: Account }) {
                     label="Tags"
                     onChange={(tags) => void save({ tags }, "Tags")}
                   />
+                </Property>
+                <Property label="Last activity">
+                  {account.lastActivityAt ? (
+                    <Tooltip content={dateTime(account.lastActivityAt)}>
+                      <span className="text-sm">
+                        {relativeTime(account.lastActivityAt)}
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <span className="text-fg-tertiary text-sm">None yet</span>
+                  )}
+                </Property>
+                <Property label="Created">
+                  <Tooltip content={dateTime(account._creationTime)}>
+                    <span className="text-sm">
+                      {shortDate(account._creationTime)}
+                    </span>
+                  </Tooltip>
                 </Property>
               </Properties>
             </DetailSection>
@@ -357,33 +352,6 @@ function AccountView({ account }: { account: Account }) {
               accountId={account._id}
               className={ASIDE_SECTION}
             />
-            <DetailSection
-              collapsible
-              title="Record"
-              className={cn(ASIDE_SECTION, "gap-2")}
-              divider={false}
-            >
-              <Properties>
-                <Property label="Last activity">
-                  {account.lastActivityAt ? (
-                    <Tooltip content={dateTime(account.lastActivityAt)}>
-                      <span className="text-sm">
-                        {relativeTime(account.lastActivityAt)}
-                      </span>
-                    </Tooltip>
-                  ) : (
-                    <span className="text-fg-tertiary text-sm">None yet</span>
-                  )}
-                </Property>
-                <Property label="Created">
-                  <Tooltip content={dateTime(account._creationTime)}>
-                    <span className="text-sm">
-                      {shortDate(account._creationTime)}
-                    </span>
-                  </Tooltip>
-                </Property>
-              </Properties>
-            </DetailSection>
           </>
         }
       >
@@ -409,17 +377,17 @@ function AccountView({ account }: { account: Account }) {
               label: "People",
               count: people?.length,
               content: (
-                <RecordSection
-                  title="People"
-                  action={
-                    <Button variant="ghost" size="xs" onClick={addPerson}>
-                      <PlusIcon aria-hidden className="size-2.5" />
-                      Add person
-                    </Button>
-                  }
-                >
-                  <PeopleList accountId={account._id} onAdd={addPerson} />
-                </RecordSection>
+                <div className="flex flex-col gap-3">
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={addPerson}
+                    className="self-end"
+                  >
+                    Add person
+                  </Button>
+                  <PeopleList accountId={account._id} />
+                </div>
               ),
             },
             {

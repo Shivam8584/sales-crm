@@ -3,7 +3,6 @@
 import Link from "next/link";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
-import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import { Checkbox } from "@/components/_ui/checkbox";
 import {
@@ -21,14 +20,10 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import ArchiveIcon from "@/public/assets/icons/archive.svg";
-import BuildingIcon from "@/public/assets/icons/building.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
 import InboxIcon from "@/public/assets/icons/inbox.svg";
 import MailIcon from "@/public/assets/icons/mail.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
-import UsersIcon from "@/public/assets/icons/users.svg";
-import WalletIcon from "@/public/assets/icons/wallet.svg";
 import { routes } from "@/lib/routes";
 
 type Result = FunctionReturnType<typeof api.notifications.inbox>;
@@ -37,12 +32,6 @@ export type InboxRecord = Result["records"][string];
 
 export const ROW_ATTR = "data-inbox-row";
 
-const RECORD_ICON: Record<RecordType, typeof BuildingIcon> = {
-  accounts: BuildingIcon,
-  deals: WalletIcon,
-  leads: TargetIcon,
-  people: UsersIcon,
-};
 const RECORD_LABEL: Record<RecordType, string> = {
   accounts: "Account",
   deals: "Deal",
@@ -97,10 +86,8 @@ export type RowActions = {
 export function GroupHeader({ group }: { group: Group }) {
   const unread = group.items.filter((item) => !item.read).length;
   const record = group.record;
-  const Icon = record ? RECORD_ICON[record.type] : InboxIcon;
   return (
-    <div className="bg-background/95 border-border z-sticky sticky top-0 flex h-9 items-center gap-2 border-b px-4 backdrop-blur-sm">
-      <Icon aria-hidden className="text-fg-tertiary size-3.5 shrink-0" />
+    <div className="bg-background/95 z-sticky sticky top-0 flex h-9 items-center gap-2 px-4 backdrop-blur-sm">
       {record ? (
         <Link
           href={record.href}
@@ -126,25 +113,6 @@ export function GroupHeader({ group }: { group: Group }) {
   );
 }
 
-function Tile({ item }: { item: InboxItem }) {
-  const urgent = isUrgentKind(item.kind);
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "bg-muted shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full",
-        urgent
-          ? "text-danger"
-          : item.kind === "mention"
-            ? "text-info-foreground bg-info-surface"
-            : "text-fg-secondary",
-      )}
-    >
-      <KindIcon kind={item.kind} className="size-3.5" />
-    </span>
-  );
-}
-
 export function InboxRow({
   item,
   cursor,
@@ -165,7 +133,7 @@ export function InboxRow({
     <li
       data-cursor={cursor || undefined}
       data-selected={selected || undefined}
-      className="group/row border-border data-[cursor]:bg-row-hover data-[selected]:bg-row-selected hover:bg-row-hover relative border-b last:border-b-0"
+      className="group/row data-[cursor]:bg-row-hover data-[selected]:bg-row-selected hover:bg-row-hover relative"
     >
       <span
         aria-hidden
@@ -181,14 +149,20 @@ export function InboxRow({
         onFocus={() => actions.setCursor(item._id)}
         className="focus-visible:ring-ring flex min-w-0 items-start gap-3 py-2.5 pr-4 pl-11 outline-none focus-visible:ring-2 focus-visible:ring-inset max-sm:pl-4 pointer-coarse:pr-10"
       >
-        <Tile item={item} />
+        <KindIcon
+          kind={item.kind}
+          className={cn(
+            "mt-[3px] size-3.5 shrink-0",
+            isUrgentKind(item.kind) ? "text-danger" : "text-fg-tertiary",
+          )}
+        />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-2">
             <span
               title={item.title}
               className={cn(
                 "lead-style min-w-0 flex-1 truncate leading-5",
-                item.read ? "text-fg-secondary" : "text-foreground font-medium",
+                item.read ? "text-fg-secondary" : "text-foreground",
               )}
             >
               {item.title}
@@ -211,13 +185,11 @@ export function InboxRow({
             </time>
           </span>
           {(item.body || item.actor) && (
-            <span className="caption-style text-fg-tertiary flex min-w-0 items-center gap-1.5 leading-5">
-              {item.actor && (
-                <Avatar name={item.actor.name} size="xs" className="shrink-0" />
-              )}
-              <span className="truncate" title={item.body ?? undefined}>
-                {item.body ?? item.actor?.name}
-              </span>
+            <span
+              className="caption-style text-fg-tertiary truncate leading-5"
+              title={item.body ?? undefined}
+            >
+              {item.body ?? item.actor?.name}
             </span>
           )}
         </span>
@@ -251,16 +223,6 @@ export function InboxRow({
             ) : (
               <ArchiveIcon aria-hidden className="size-3" />
             )}
-          </Button>
-        </Tooltip>
-        <Tooltip content={item.read ? "Mark unread" : "Mark read"} shortcut="U">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={item.read ? "Mark unread" : "Mark read"}
-            onClick={() => actions.toggleRead(item)}
-          >
-            <MailIcon aria-hidden className="size-3" />
           </Button>
         </Tooltip>
         <RowMenu item={item} actions={actions} />
@@ -328,17 +290,16 @@ function RowMenu({ item, actions }: { item: InboxItem; actions: RowActions }) {
 export function InboxSkeleton() {
   return (
     <div aria-busy className="flex flex-col">
-      <div className="border-border flex h-9 items-center gap-2 border-b px-4">
-        <Skeleton className="size-3.5 rounded" />
+      <div className="flex h-9 items-center px-4">
         <Skeleton className="h-3 w-32" />
       </div>
       {Array.from({ length: 6 }, (_, index) => (
         <div
           key={index}
-          className="border-border flex items-start gap-3 border-b py-2.5 pr-4 pl-11 max-sm:pl-4"
+          className="flex items-start gap-3 py-2.5 pr-4 pl-11 max-sm:pl-4"
         >
-          <Skeleton className="size-7 rounded-full" />
-          <span className="flex flex-1 flex-col gap-2 pt-1">
+          <Skeleton className="size-3.5 rounded-sm" />
+          <span className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3 w-3/5" />
             <Skeleton className="h-2.5 w-2/5" />
           </span>

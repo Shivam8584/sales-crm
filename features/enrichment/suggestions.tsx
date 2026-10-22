@@ -78,16 +78,13 @@ export function Suggestions({
         Suggestions
         <CountBadge>{facts.length}</CountBadge>
       </h3>
-      <ul className="flex flex-col gap-2">
+      <ul className="divide-border flex flex-col divide-y">
         {facts.map((fact) => {
           const label = factLabel(fact.field);
           const value = display(fact.field, fact.value);
           const current = currentValue?.(fact.field);
           return (
-            <li
-              key={fact._id}
-              className="bg-card shadow-hairline flex flex-col gap-2 rounded-lg px-3 py-2.5"
-            >
+            <li key={fact._id} className="flex flex-col gap-2 py-3 first:pt-1">
               <div className="flex min-w-0 flex-col gap-1.5">
                 <span className="caption-style text-fg-tertiary flex flex-wrap items-center gap-1.5">
                   {label} · {sourceNote(fact.source, fact.confidence)}
@@ -112,7 +109,7 @@ export function Suggestions({
                   Reject
                 </Button>
                 <Button
-                  variant="subtle"
+                  variant="secondary"
                   size="xs"
                   loading={pending === `${fact._id}:accept`}
                   disabled={pending !== null}

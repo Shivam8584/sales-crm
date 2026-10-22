@@ -7,7 +7,6 @@ import FilterMenu from "@/components/_common/filter-menu";
 import {
   Page,
   PageHeader,
-  PageStatus,
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
@@ -107,16 +106,7 @@ export default function ReportsPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Reports"
-        meta={
-          <PageStatus tone="info">
-            <span className="tabular-nums">
-              {tab === "forecast" ? "As of today" : PERIOD_LABEL[period].long}
-            </span>
-          </PageStatus>
-        }
-      />
+      <PageHeader title="Reports" />
       <PageViews
         param="tab"
         label="Reports"
@@ -166,7 +156,7 @@ export default function ReportsPage() {
       </PageToolbar>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-6 sm:px-6">
           {tab === "overview" && (
             <OverviewTab
               report={report}

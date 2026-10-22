@@ -19,7 +19,6 @@ import Timeline from "@/features/timeline/timeline";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
 import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
 import XIcon from "@/public/assets/icons/x.svg";
 import { LeadStatusControl, type Lead } from "./lead-fields";
 import { DemoTag, ScoreTag, SourceTag } from "./lead-meta";
@@ -49,10 +48,7 @@ export default function LeadPeek({
   return (
     <>
       <SheetHeader>
-        <div className="flex min-w-0 items-center gap-2">
-          <TargetIcon aria-hidden className="text-icon size-3.5 shrink-0" />
-          <SheetTitle>Lead details</SheetTitle>
-        </div>
+        <SheetTitle>Lead details</SheetTitle>
         <SheetDescription className="sr-only">
           Contact details, status and activity for this lead
         </SheetDescription>

@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from "react";
 import Button from "@/components/_ui/button";
-import { Card } from "@/components/_ui/card";
 import EmptyState from "@/components/_ui/empty-state";
 import SegmentedControl from "@/components/_ui/segmented-control";
 import {
@@ -34,18 +33,16 @@ function ManagerOnly({ children }: { children: ReactNode }) {
   const viewer = useViewer();
   if (ROLE_RANK[viewer.role] >= ROLE_RANK.manager) return <>{children}</>;
   return (
-    <Card className="py-6">
-      <EmptyState
-        icon={SettingsIcon}
-        title="Only managers can merge records"
-        description="Ask a manager or admin on your team to review duplicates."
-        action={
-          <Button variant="secondary" size="sm" href={routes.profile}>
-            Back to your profile
-          </Button>
-        }
-      />
-    </Card>
+    <EmptyState
+      icon={SettingsIcon}
+      title="Only managers can merge records"
+      description="Ask a manager or admin to review duplicates."
+      action={
+        <Button variant="secondary" size="sm" href={routes.profile}>
+          Back to your profile
+        </Button>
+      }
+    />
   );
 }
 
@@ -79,18 +76,16 @@ function DuplicateList({ type }: { type: DedupeType }) {
   if (!done && pairs.length === 0) return <SettingsSkeleton rows={3} />;
   if (done && pairs.length === 0) {
     return (
-      <Card className="py-6">
-        <EmptyState
-          icon={CheckCircleIcon}
-          title={`No duplicate ${noun} found`}
-          description="New matches show up here when records share a GSTIN, website, email or phone, or have very similar names."
-          action={
-            <Button variant="secondary" size="sm" onClick={rescan}>
-              Scan again
-            </Button>
-          }
-        />
-      </Card>
+      <EmptyState
+        icon={CheckCircleIcon}
+        title={`No duplicate ${noun} found`}
+        description="New matches show up here as they appear."
+        action={
+          <Button variant="secondary" size="sm" onClick={rescan}>
+            Scan again
+          </Button>
+        }
+      />
     );
   }
 

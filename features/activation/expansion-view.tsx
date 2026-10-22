@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import FilterMenu from "@/components/_common/filter-menu";
 import DataTable from "@/components/data-table/data-table";
@@ -29,17 +28,15 @@ function Signals({ row, max = 2 }: { row: HealthRow; max?: number }) {
   const shown = row.signals.slice(0, max);
   const rest = row.signals.slice(max);
   return (
-    <span className="flex min-w-0 items-center gap-1">
+    <span className="flex min-w-0 items-baseline gap-2">
       {shown.map((signal) => (
         <Tooltip key={signal.id} content={signal.detail}>
-          <Tag tone="green" size="xs">
-            {signal.label}
-          </Tag>
+          <span className="truncate">{signal.label}</span>
         </Tooltip>
       ))}
       {rest.length > 0 && (
         <Tooltip content={rest.map((signal) => signal.label).join(", ")}>
-          <Tag size="xs">+{rest.length}</Tag>
+          <span className="text-fg-tertiary shrink-0">+{rest.length}</span>
         </Tooltip>
       )}
     </span>
@@ -247,7 +244,6 @@ export default function ExpansionView({
           )}
           empty={
             <EmptyState
-              icon={TargetIcon}
               title={
                 rows && rows.length > 0
                   ? "No brands match"
@@ -255,8 +251,8 @@ export default function ExpansionView({
               }
               description={
                 rows && rows.length > 0
-                  ? "Try another signal or owner."
-                  : "Brands show up here when a campaign sells out, they top up a third time, list on a new marketplace, a campaign ends or their team grows."
+                  ? undefined
+                  : "Brands show up here when a campaign sells out, they top up again, list on a new marketplace or grow their team."
               }
               action={
                 <Button

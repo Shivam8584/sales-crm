@@ -8,13 +8,11 @@ export default function NotFound() {
   return (
     <AuthCard
       title="This page doesn't exist"
-      description="The link may be broken, or the record was deleted or moved."
+      description="The link may be broken, or the record was deleted."
     >
-      <div className="border-border border-t px-6 py-5">
-        <Button href="/" variant="primary" size="md" className="w-full">
-          Go to Today
-        </Button>
-      </div>
+      <Button href="/" variant="primary" size="md" className="w-full">
+        Go to Today
+      </Button>
     </AuthCard>
   );
 }

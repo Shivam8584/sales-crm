@@ -7,7 +7,7 @@ export function Card({ className, ...props }: ComponentProps<"section">) {
     <section
       data-slot="card"
       className={cn(
-        "bg-card border-border shadow-card flex min-w-0 flex-col overflow-hidden rounded-xl border",
+        "border-border flex min-w-0 flex-col overflow-hidden rounded-xl border",
         className,
       )}
       {...props}
@@ -18,7 +18,7 @@ export function Card({ className, ...props }: ComponentProps<"section">) {
 type CardHeaderProps = {
   /** Links the heading to the card's `aria-labelledby`. */
   id?: string;
-  /** A logo or icon tile; with one the title reads as a name, without it as an eyebrow. */
+  /** A logo or icon shown before the title. */
   visual?: ReactNode;
   title: ReactNode;
   /** Beside the title: a count or a status tag. */
@@ -54,10 +54,7 @@ export function CardHeader({
           <h2
             id={id}
             className={cn(
-              "min-w-0",
-              visual
-                ? "text-sm leading-5 font-medium"
-                : "eyebrow-style text-fg-secondary leading-5",
+              "min-w-0 text-sm leading-5 font-medium",
               tone === "danger" && "text-danger",
             )}
           >

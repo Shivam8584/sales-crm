@@ -139,7 +139,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       onPointerLeave={start}
       onFocus={pause}
       onBlur={start}
-      className="bg-popover border-line-strong shadow-overlay pointer-events-auto flex min-h-11 w-full items-center gap-2 rounded-xl border py-1.5 pr-1.5 pl-3.5 sm:w-90"
+      className="bg-popover shadow-overlay pointer-events-auto flex min-h-11 w-full items-center gap-2 rounded-xl py-1.5 pr-1.5 pl-3.5 sm:w-90"
     >
       <tone.icon
         aria-hidden
@@ -149,7 +149,12 @@ function ToastItem({ toast }: { toast: Toast }) {
         {toast.message}
       </span>
       {toast.undo && (
-        <Button variant="secondary" size="sm" onClick={undo} className="gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={undo}
+          className="text-foreground gap-2"
+        >
           Undo
           <Kbd className="h-4 min-w-4 px-1 max-sm:hidden">
             {navigator.userAgent.includes("Mac") ? "⌘Z" : "Ctrl Z"}

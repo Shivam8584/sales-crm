@@ -3,9 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Skeleton from "@/components/_ui/skeleton";
 import { formatPhone } from "@/lib/domain/normalize";
-import { cn } from "@/lib/utils";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import PhoneIcon from "@/public/assets/icons/phone-call.svg";
 
 export type SubmittedLead = {
   leadId: string | null;
@@ -36,13 +33,7 @@ function bookingUrl(link: string, lead: SubmittedLead) {
   return url.toString();
 }
 
-export default function DemoBooking({
-  lead,
-  embed,
-}: {
-  lead: SubmittedLead;
-  embed: boolean;
-}) {
+export default function DemoBooking({ lead }: { lead: SubmittedLead }) {
   const firstName = lead.name.split(/\s+/)[0];
   const [loaded, setLoaded] = useState(false);
   const [src] = useState(() =>
@@ -56,38 +47,25 @@ export default function DemoBooking({
   }, []);
 
   return (
-    <section
-      aria-labelledby="demo-done-title"
-      className={cn(
-        "flex flex-col gap-6",
-        !embed && "bg-card shadow-card rounded-2xl p-5 sm:p-7",
-      )}
-    >
-      <div role="status" className="flex items-start gap-3.5">
-        <span className="bg-muted shadow-hairline flex size-10 shrink-0 items-center justify-center rounded-full">
-          <CheckCircleIcon aria-hidden className="text-success size-4.5" />
-        </span>
-        <div className="flex min-w-0 flex-col gap-2 pt-0.5">
-          <h2
-            id="demo-done-title"
-            ref={heading}
-            tabIndex={-1}
-            className="text-lg leading-6 font-semibold outline-none"
-          >
-            Thanks, {firstName}. We have your request.
-          </h2>
-          <p className="text-fg-secondary">
-            A Hypedrive specialist is now assigned to {lead.companyName}.
-          </p>
-        </div>
+    <section aria-labelledby="demo-done-title" className="flex flex-col gap-6">
+      <div role="status" className="flex flex-col gap-2">
+        <h2
+          id="demo-done-title"
+          ref={heading}
+          tabIndex={-1}
+          className="text-lg leading-6 font-semibold outline-none"
+        >
+          Thanks, {firstName}. We have your request.
+        </h2>
+        <p className="text-fg-secondary">
+          A Hypedrive specialist is now assigned to {lead.companyName}.
+        </p>
       </div>
 
       {src ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <h3 className="lead-style font-medium">
-              Pick a time for your walkthrough
-            </h3>
+            <h3 className="lead-style">Pick a time for your walkthrough</h3>
             <p className="caption-style text-fg-secondary leading-snug">
               20 minutes, built around your catalogue.{" "}
               {lead.phone
@@ -111,21 +89,15 @@ export default function DemoBooking({
           </div>
         </div>
       ) : (
-        <div className="bg-raised shadow-hairline flex items-start gap-3 rounded-xl p-4">
-          <PhoneIcon
-            aria-hidden
-            className="text-fg-secondary mt-px size-4 shrink-0"
-          />
-          <div className="flex flex-col gap-2">
-            <p className="font-medium">
-              A specialist will call you within one business hour.
-            </p>
-            <p className="text-fg-secondary">
-              {lead.phone
-                ? `We'll call ${formatPhone(lead.phone)} or message you on WhatsApp.`
-                : `We'll write to ${lead.email}.`}
-            </p>
-          </div>
+        <div className="flex flex-col gap-2">
+          <p className="font-medium">
+            A specialist will call you within one business hour.
+          </p>
+          <p className="text-fg-secondary">
+            {lead.phone
+              ? `We'll call ${formatPhone(lead.phone)} or message you on WhatsApp.`
+              : `We'll write to ${lead.email}.`}
+          </p>
         </div>
       )}
     </section>

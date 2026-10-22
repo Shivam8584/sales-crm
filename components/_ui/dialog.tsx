@@ -54,7 +54,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:ease-power3-out z-overlay bg-scrim duration-slow data-[state=closed]:duration-base fixed inset-0 backdrop-blur-[6px]",
+        "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:ease-power3-out z-overlay bg-scrim duration-slow data-[state=closed]:duration-base fixed inset-0",
         className,
       )}
       {...props}
@@ -86,7 +86,7 @@ function DialogContent({
           submitOnModEnter(event);
         }}
         className={cn(
-          "border-line-strong bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=open]:slide-in-from-bottom-2 data-[state=open]:ease-power4-out z-overlay shadow-overlay duration-slow data-[state=closed]:duration-fast fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-120 -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border outline-none",
+          "bg-popover text-popover-foreground data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=open]:slide-in-from-bottom-2 data-[state=open]:ease-power4-out z-overlay shadow-overlay duration-slow data-[state=closed]:duration-fast fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-120 -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl outline-none",
           className,
         )}
       >
@@ -113,7 +113,7 @@ function DialogHeader({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="dialog-header"
       className={cn(
-        "border-line-strong bg-popover z-sticky sticky top-0 flex flex-col gap-2 border-b px-6 py-5",
+        "border-border bg-popover z-sticky sticky top-0 flex flex-col gap-2 border-b px-6 py-5",
         className,
       )}
       {...props}
@@ -126,7 +126,7 @@ function DialogFooter({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "border-line-strong bg-popover z-sticky sticky bottom-0 flex items-center justify-end gap-2 border-t px-6 py-4",
+        "border-border bg-popover z-sticky sticky bottom-0 flex items-center justify-end gap-2 border-t px-6 py-4",
         className,
       )}
       {...props}

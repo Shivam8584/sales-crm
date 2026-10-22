@@ -15,7 +15,6 @@ import {
   DialogTitle,
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
-import Tag from "@/components/_ui/tag";
 import { Textarea } from "@/components/_ui/textarea";
 import MemberPicker from "@/features/members/member-picker";
 import { useViewer } from "@/hooks/use-viewer";
@@ -24,8 +23,7 @@ import { PRIORITY_LABEL } from "@/lib/domain/labels";
 import { MAX_TASK_LINES, parseTaskLines } from "@/lib/domain/task-lines";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
-import CalendarIcon from "@/public/assets/icons/calendar.svg";
-import { PriorityIcon, formatDay } from "./task-meta";
+import { formatDay } from "./task-meta";
 
 export default function PasteTasksDialog({
   open,
@@ -154,23 +152,15 @@ export default function PasteTasksDialog({
                         >
                           {task.title || "Untitled"}
                         </span>
-                        {task.priority && (
-                          <Tag size="xs">
-                            <PriorityIcon
-                              priority={task.priority}
-                              className="size-3"
-                            />
-                            {PRIORITY_LABEL[task.priority]}
-                          </Tag>
-                        )}
-                        {task.dueDate && (
-                          <Tag size="xs">
-                            <CalendarIcon
-                              aria-hidden
-                              className="text-fg-tertiary size-3"
-                            />
-                            {formatDay(task.dueDate)}
-                          </Tag>
+                        {(task.priority || task.dueDate) && (
+                          <span className="caption-style text-fg-tertiary shrink-0">
+                            {[
+                              task.priority && PRIORITY_LABEL[task.priority],
+                              task.dueDate && formatDay(task.dueDate),
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
                         )}
                       </div>
                       {task.error && (
@@ -197,7 +187,7 @@ export default function PasteTasksDialog({
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>

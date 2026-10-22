@@ -16,7 +16,6 @@ import { SUBJECT_LABEL, type SubjectKind } from "@/lib/domain/automations";
 import { readError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
-import AutomationIcon from "@/public/assets/icons/automation.svg";
 import { routes } from "@/lib/routes";
 
 type EnrolResult = FunctionReturnType<typeof api.automations.enrolMany>;
@@ -140,11 +139,7 @@ export default function AddToAutomation({
               </CommandPrimitive.Loading>
             ) : targets.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-4 py-5 text-center">
-                <AutomationIcon
-                  aria-hidden
-                  className="text-fg-tertiary size-4"
-                />
-                <span className="text-sm font-medium">
+                <span className="text-sm">
                   No active sequence runs on {noun[1]}
                 </span>
                 <Link

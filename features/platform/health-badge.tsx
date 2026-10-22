@@ -1,15 +1,8 @@
 "use client";
 
-import Tag, { type TagTone } from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
 import { HEALTH_BAND_LABEL, type HealthBand } from "@/lib/domain/health";
 import { cn } from "@/lib/utils";
-
-export const HEALTH_TONE: Record<HealthBand, TagTone> = {
-  healthy: "green",
-  watch: "amber",
-  at_risk: "red",
-};
 
 const RING_TONE: Record<HealthBand, string> = {
   healthy: "text-success",
@@ -88,12 +81,9 @@ export function HealthBadge({
       <HealthRing score={score} band={band} />
       <span className="w-[2.5ch] text-right">{score}</span>
       {showBand && (
-        <Tag tone={HEALTH_TONE[band]} size="xs">
-          {HEALTH_BAND_LABEL[band]}
-        </Tag>
+        <span className="text-fg-secondary">{HEALTH_BAND_LABEL[band]}</span>
       )}
     </span>
   );
   return showBand ? badge : <Tooltip content={label}>{badge}</Tooltip>;
 }
-

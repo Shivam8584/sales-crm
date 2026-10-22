@@ -8,6 +8,12 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Avatar from "@/components/_ui/avatar";
 import Button from "@/components/_ui/button";
 import {
+  Collapsible,
+  CollapsibleChevron,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/_ui/collapsible";
+import {
   Dialog,
   DialogClose,
   DialogContent,
@@ -162,7 +168,7 @@ function EditTask({ id, onClose }: { id: Id<"tasks">; onClose: () => void }) {
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="subtle" size="sm" onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>
         </DialogFooter>
@@ -214,6 +220,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
   const [titleTouched, setTitleTouched] = useState(false);
+  const [more, setMore] = useState(Boolean(task));
 
   const [personSearch, setPersonSearch] = useState("");
   const personQuery = useDebouncedValue(personSearch, 150);
@@ -362,7 +369,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
     >
       <DialogHeader>
         <DialogTitle>{task ? "Edit task" : "New task"}</DialogTitle>
-        <DialogDescription>
+        <DialogDescription className={task ? undefined : "sr-only"}>
           {task
             ? [
                 `Created ${relativeTime(task._creationTime)}`,
@@ -372,7 +379,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
               ]
                 .filter(Boolean)
                 .join(" · ")
-            : "Something to follow up on, for you or a teammate."}
+            : "Add a task for yourself or a teammate"}
         </DialogDescription>
         {task && (task.deal || task.lead) && (
           <p className="caption-style text-fg-tertiary flex flex-wrap items-center gap-x-1.5">
@@ -404,23 +411,6 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
         )}
       </DialogHeader>
       <div className="flex flex-col gap-5 px-6 py-5">
-        <Choice label="Status">
-          <Pills
-            label="Status"
-            value={draft.status}
-            onChange={(value) => set("status", value)}
-            options={TASK_STATUSES.map((value) => ({
-              value,
-              label: TASK_STATUS_LABEL[value],
-              icon: (
-                <StatusBadge
-                  icon={STATUS_BADGE[value].icon}
-                  tone={STATUS_BADGE[value].tone}
-                />
-              ),
-            }))}
-          />
-        </Choice>
         <Field label="Title" htmlFor="task-title" required error={errors.title}>
           <Input
             id="task-title"
@@ -458,40 +448,6 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
             className="max-h-60 min-h-22"
           />
         </Field>
-        <Choice label="Priority">
-          <Pills
-            label="Priority"
-            value={draft.priority}
-            onChange={(value) => set("priority", value)}
-            options={PRIORITIES.map((value) => ({
-              value,
-              label: PRIORITY_LABEL[value],
-              icon: <PriorityIcon priority={value} />,
-            }))}
-          />
-        </Choice>
-        <Choice label="Assignee" error={errors.assigneeId}>
-          {members && members.length <= MAX_MEMBER_PILLS ? (
-            <Pills
-              label="Assignee"
-              value={draft.assigneeId as string}
-              onChange={(value) => set("assigneeId", value as Id<"members">)}
-              options={assigneeOptions.map((member) => ({
-                value: member._id,
-                label: member.name,
-                icon: <Avatar name={member.name} size="xs" className="-ml-1" />,
-              }))}
-            />
-          ) : (
-            <MemberPicker
-              label="Assignee"
-              value={draft.assigneeId}
-              currentName={task?.assignee?.name}
-              onChange={(id) => set("assigneeId", id as Id<"members">)}
-              className={PICKER_CLASS}
-            />
-          )}
-        </Choice>
         <Field
           label="Due date"
           htmlFor="task-due"
@@ -509,7 +465,7 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
                     onClick={() => set("dueDate", active ? null : day)}
                     className={cn(
                       chipClass("sm"),
-                      "text-fg-tertiary aria-pressed:text-foreground aria-pressed:shadow-[0_0_0_1px_var(--foreground)]",
+                      "text-fg-tertiary aria-pressed:bg-overlay-2 aria-pressed:text-foreground",
                     )}
                   >
                     {item.label}
@@ -528,51 +484,129 @@ function TaskForm({ task, initial, dealId, leadId, onClose }: TaskFormProps) {
             className="aria-invalid:border-danger tabular-nums"
           />
         </Field>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Choice label="Account" error={errors.accountId}>
-            <AccountPicker
-              value={draft.accountId}
-              currentName={task?.account?.name}
-              onChange={(id) => {
-                const accountId = id as Id<"accounts"> | null;
-                const person = people?.find((p) => p._id === draft.personId);
-                set("accountId", accountId);
-                if (
-                  draft.personId &&
-                  accountId &&
-                  person?.account?._id !== accountId
-                ) {
-                  set("personId", null);
-                }
-              }}
-              className={PICKER_CLASS}
-            />
-          </Choice>
-          <Choice label="Person" error={errors.personId}>
-            <OptionPicker
-              value={draft.personId}
-              options={personOptions}
-              label="Person"
-              placeholder={
-                people && people.length === 0 && !personQuery
-                  ? "No people"
-                  : "No person"
-              }
-              searchPlaceholder="Search people…"
-              onSearch={setPersonSearch}
-              clearLabel="Remove person"
-              onChange={(id) => {
-                const personId = id as Id<"people"> | null;
-                set("personId", personId);
-                const person = people?.find((p) => p._id === personId);
-                if (!draft.accountId && person?.account) {
-                  set("accountId", person.account._id);
-                }
-              }}
-              className={PICKER_CLASS}
-            />
-          </Choice>
-        </div>
+        <Collapsible
+          open={
+            more ||
+            Boolean(errors.assigneeId || errors.accountId || errors.personId)
+          }
+          onOpenChange={setMore}
+          className="group/collapsible flex flex-col"
+        >
+          <CollapsibleTrigger className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex w-fit cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+            More options
+            <CollapsibleChevron />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="flex flex-col gap-5 pt-4">
+              <Choice label="Status">
+                <Pills
+                  label="Status"
+                  value={draft.status}
+                  onChange={(value) => set("status", value)}
+                  options={TASK_STATUSES.map((value) => ({
+                    value,
+                    label: TASK_STATUS_LABEL[value],
+                    icon: (
+                      <StatusBadge
+                        icon={STATUS_BADGE[value].icon}
+                        tone={STATUS_BADGE[value].tone}
+                      />
+                    ),
+                  }))}
+                />
+              </Choice>
+              <Choice label="Priority">
+                <Pills
+                  label="Priority"
+                  value={draft.priority}
+                  onChange={(value) => set("priority", value)}
+                  options={PRIORITIES.map((value) => ({
+                    value,
+                    label: PRIORITY_LABEL[value],
+                    icon: <PriorityIcon priority={value} />,
+                  }))}
+                />
+              </Choice>
+              <Choice label="Assignee" error={errors.assigneeId}>
+                {members && members.length <= MAX_MEMBER_PILLS ? (
+                  <Pills
+                    label="Assignee"
+                    value={draft.assigneeId as string}
+                    onChange={(value) =>
+                      set("assigneeId", value as Id<"members">)
+                    }
+                    options={assigneeOptions.map((member) => ({
+                      value: member._id,
+                      label: member.name,
+                      icon: (
+                        <Avatar
+                          name={member.name}
+                          size="xs"
+                          className="-ml-1"
+                        />
+                      ),
+                    }))}
+                  />
+                ) : (
+                  <MemberPicker
+                    label="Assignee"
+                    value={draft.assigneeId}
+                    currentName={task?.assignee?.name}
+                    onChange={(id) => set("assigneeId", id as Id<"members">)}
+                    className={PICKER_CLASS}
+                  />
+                )}
+              </Choice>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Choice label="Account" error={errors.accountId}>
+                  <AccountPicker
+                    value={draft.accountId}
+                    currentName={task?.account?.name}
+                    onChange={(id) => {
+                      const accountId = id as Id<"accounts"> | null;
+                      const person = people?.find(
+                        (p) => p._id === draft.personId,
+                      );
+                      set("accountId", accountId);
+                      if (
+                        draft.personId &&
+                        accountId &&
+                        person?.account?._id !== accountId
+                      ) {
+                        set("personId", null);
+                      }
+                    }}
+                    className={PICKER_CLASS}
+                  />
+                </Choice>
+                <Choice label="Person" error={errors.personId}>
+                  <OptionPicker
+                    value={draft.personId}
+                    options={personOptions}
+                    label="Person"
+                    placeholder={
+                      people && people.length === 0 && !personQuery
+                        ? "No people"
+                        : "No person"
+                    }
+                    searchPlaceholder="Search people…"
+                    onSearch={setPersonSearch}
+                    clearLabel="Remove person"
+                    onChange={(id) => {
+                      const personId = id as Id<"people"> | null;
+                      set("personId", personId);
+                      const person = people?.find((p) => p._id === personId);
+                      if (!draft.accountId && person?.account) {
+                        set("accountId", person.account._id);
+                      }
+                    }}
+                    className={PICKER_CLASS}
+                  />
+                </Choice>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
         {errors.form && (
           <p role="alert" className="caption-style text-danger">
             {errors.form}

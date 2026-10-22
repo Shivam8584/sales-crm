@@ -87,9 +87,7 @@ function EntryForm({
     <form onSubmit={onSubmit}>
       <DialogHeader>
         <DialogTitle>{entry ? "Edit entry" : "New entry"}</DialogTitle>
-        <DialogDescription>
-          Plain text. Reps copy it into emails and messages as written.
-        </DialogDescription>
+        <DialogDescription>Plain text, copied as written.</DialogDescription>
       </DialogHeader>
       <div className="flex flex-col gap-5 px-6 py-5">
         <div className="flex flex-col gap-2">
@@ -118,7 +116,6 @@ function EntryForm({
           label="Text"
           htmlFor="playbook-body"
           error={errors.body}
-          hint="Leave a blank line between paragraphs."
           trailing={
             <span className="caption-style text-fg-tertiary tabular-nums">
               {body.length}/{PLAYBOOK_LIMITS.bodyMax}
@@ -132,9 +129,7 @@ function EntryForm({
             onChange={(event) => setBody(event.target.value)}
             rows={8}
             aria-invalid={errors.body ? true : undefined}
-            aria-describedby={
-              errors.body ? "playbook-body-error" : "playbook-body-hint"
-            }
+            aria-describedby={errors.body ? "playbook-body-error" : undefined}
             className="max-h-72 min-h-40"
           />
         </Field>

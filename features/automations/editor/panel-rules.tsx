@@ -400,7 +400,7 @@ export function ConditionsEditor({
         return (
           <div
             key={index}
-            className="bg-overlay-1 border-border flex flex-col gap-2 rounded-lg border p-3"
+            className="bg-overlay-1 flex flex-col gap-2 rounded-lg p-3"
           >
             <div className="flex items-center gap-2">
               <span className="text-fg-tertiary w-10 shrink-0 text-xs">

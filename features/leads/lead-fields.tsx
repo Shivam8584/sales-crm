@@ -123,14 +123,9 @@ export function LeadOwnerPicker({
 
 export function LeadMessage({ message }: { message: string }) {
   return (
-    <figure className="bg-card shadow-card flex flex-col gap-2 rounded-xl px-4 py-3.5">
-      <figcaption className="caption-style text-fg-tertiary">
-        Their message
-      </figcaption>
-      <blockquote className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-        {message}
-      </blockquote>
-    </figure>
+    <blockquote className="border-line-strong border-l-2 pl-3 text-sm leading-relaxed break-words whitespace-pre-wrap">
+      {message}
+    </blockquote>
   );
 }
 

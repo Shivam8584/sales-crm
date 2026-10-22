@@ -143,7 +143,7 @@ export default function AccountLogoButton({
               </Button>
             )}
             <DialogClose asChild>
-              <Button variant="subtle" size="sm" disabled={busy}>
+              <Button variant="secondary" size="sm" disabled={busy}>
                 Cancel
               </Button>
             </DialogClose>

@@ -51,8 +51,7 @@ export default function TargetsSettings() {
     <AdminOnly>
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <SettingsIntro>
-          Monthly goals per teammate and for the team. Reps see how they are
-          pacing on Today.
+          Monthly goals. Reps see their pace on Today.
         </SettingsIntro>
         <FilterMenu
           label="Month"
@@ -73,8 +72,7 @@ export default function TargetsSettings() {
         <>
           {rows.length === 0 && (
             <p className="caption-style text-fg-tertiary">
-              No targets set for {monthName(period)}. Reps see their numbers
-              without a goal until you add one.
+              No targets set for {monthName(period)}.
             </p>
           )}
           {TARGET_METRICS.map((metric) => (

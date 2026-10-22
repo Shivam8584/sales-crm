@@ -27,7 +27,7 @@ export function CardSurface({
   return (
     <div
       className={cn(
-        "bg-card shadow-card relative flex w-full flex-col overflow-clip rounded-2xl",
+        "border-border border relative flex w-full flex-col overflow-clip rounded-xl",
         lifted &&
           "shadow-overlay animate-card-lift -rotate-4 motion-reduce:animate-none",
         invisible && "invisible",

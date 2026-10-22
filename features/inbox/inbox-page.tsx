@@ -5,13 +5,11 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import EmptyState from "@/components/_ui/empty-state";
-import Kbd from "@/components/_ui/kbd";
 import { Switch } from "@/components/_ui/switch";
 import SelectionBar from "@/components/data-table/selection-bar";
 import {
   Page,
   PageHeader,
-  PageStatus,
   PageToolbar,
   PageViews,
 } from "@/components/shell/page";
@@ -20,11 +18,7 @@ import { useUrlState } from "@/hooks/use-url-state";
 import { isEditableTarget } from "@/lib/keyboard";
 import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
-import ArchiveIcon from "@/public/assets/icons/archive.svg";
-import AtSignIcon from "@/public/assets/icons/at-sign.svg";
-import BellIcon from "@/public/assets/icons/bell.svg";
 import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import MailIcon from "@/public/assets/icons/mail.svg";
 import {
   GroupHeader,
   InboxRow,
@@ -258,18 +252,7 @@ export default function InboxPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Inbox"
-        meta={
-          unread !== undefined && (
-            <PageStatus tone={unread > 0 ? "info" : "neutral"}>
-              <span className="tabular-nums">
-                {unread >= 500 ? "500+" : unread} unread
-              </span>
-            </PageStatus>
-          )
-        }
-      />
+      <PageHeader title="Inbox" />
       <PageViews
         label="Views"
         value={view}
@@ -306,19 +289,6 @@ export default function InboxPage() {
             Unread only
           </label>
         )}
-        <span className="caption-style text-fg-tertiary hidden items-center gap-1.5 pl-2 xl:flex">
-          <Kbd>J</Kbd>
-          <Kbd>K</Kbd>
-          move
-          <Kbd className="ml-2">↵</Kbd>
-          open
-          <Kbd className="ml-2">E</Kbd>
-          {view === "archived" ? "unarchive" : "archive"}
-          <Kbd className="ml-2">U</Kbd>
-          read
-          <Kbd className="ml-2">X</Kbd>
-          select
-        </span>
       </PageToolbar>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
@@ -380,11 +350,6 @@ export default function InboxPage() {
               rowActions.archive(selectedItems, view !== "archived")
             }
           >
-            {view === "archived" ? (
-              <BellIcon aria-hidden className="size-3" />
-            ) : (
-              <ArchiveIcon aria-hidden className="size-3" />
-            )}
             {view === "archived" ? "Move to inbox" : "Archive"}
           </Button>
           <Button
@@ -397,7 +362,6 @@ export default function InboxPage() {
               )
             }
           >
-            <MailIcon aria-hidden className="size-3" />
             {selectedItems.some((item) => !item.read)
               ? "Mark read"
               : "Mark unread"}
@@ -422,12 +386,10 @@ function InboxEmpty({
   if (unreadOnly) {
     return (
       <EmptyState
-        icon={CheckCircleIcon}
         title="No unread notifications"
-        description="Everything here has been read. Turn off Unread only to see the rest."
         action={
           <Button variant="secondary" size="sm" onClick={onShowAll}>
-            Show read notifications
+            Show read
           </Button>
         }
       />
@@ -436,12 +398,10 @@ function InboxEmpty({
   if (view === "mentions") {
     return (
       <EmptyState
-        icon={AtSignIcon}
         title="No mentions"
-        description="When a teammate types @ and your name in a note or call log, it lands here and links straight to the entry."
         action={
           <Button variant="secondary" size="sm" onClick={onReset}>
-            Back to the inbox
+            Back to inbox
           </Button>
         }
       />
@@ -450,22 +410,14 @@ function InboxEmpty({
   if (view === "archived") {
     return (
       <EmptyState
-        icon={ArchiveIcon}
-        title="Nothing archived yet"
-        description="Press E on a notification once you've dealt with it. It moves here, out of your inbox."
+        title="Nothing archived"
         action={
           <Button variant="secondary" size="sm" onClick={onReset}>
-            Back to the inbox
+            Back to inbox
           </Button>
         }
       />
     );
   }
-  return (
-    <EmptyState
-      icon={BellIcon}
-      title="You're all caught up"
-      description="Mentions, updates on records you follow, new leads, demo bookings and SLA alerts land here as they happen."
-    />
-  );
+  return <EmptyState title="You're all caught up" />;
 }

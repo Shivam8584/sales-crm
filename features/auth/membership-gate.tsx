@@ -100,10 +100,7 @@ function Blocked({
 }) {
   return (
     <AuthCard title="You can't enter this workspace" description={message}>
-      <div className="border-border flex flex-col gap-3 border-t px-6 py-5">
-        <p className="caption-style text-fg-tertiary text-center leading-snug">
-          Signed in with the wrong account? Sign out and use your work email.
-        </p>
+      <div className="flex flex-col gap-3">
         {onRetry && (
           <Button
             variant="primary"
@@ -122,6 +119,9 @@ function Blocked({
         >
           Sign out
         </Button>
+        <p className="caption-style text-fg-tertiary text-center leading-snug">
+          Wrong account? Sign out and use your work email.
+        </p>
       </div>
     </AuthCard>
   );

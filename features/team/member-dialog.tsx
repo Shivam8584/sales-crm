@@ -10,14 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/_ui/dialog";
-import Tag from "@/components/_ui/tag";
 import { Properties, Property } from "@/components/record";
 import { type Role } from "@/lib/domain/enums";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { StatusTag } from "./members-table";
-import { ROLE_DESCRIPTION, ROLE_OPTIONS, ROLE_TONE } from "./roles";
+import { ROLE_DESCRIPTION, ROLE_OPTIONS } from "./roles";
 import {
   lockReason,
   useMemberActions,
@@ -66,9 +65,7 @@ export default function MemberDialog({
                 </Property>
                 {!editable && (
                   <Property label="Role">
-                    <Tag tone={ROLE_TONE[member.role]} size="sm">
-                      {ROLE_LABEL[member.role]}
-                    </Tag>
+                    <span className="text-sm">{ROLE_LABEL[member.role]}</span>
                   </Property>
                 )}
               </Properties>

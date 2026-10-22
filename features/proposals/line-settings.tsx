@@ -342,14 +342,14 @@ function SettingsForm({
       <DialogFooter>
         {readOnly ? (
           <DialogClose asChild>
-            <Button variant="subtle" size="sm">
+            <Button variant="secondary" size="sm">
               Close
             </Button>
           </DialogClose>
         ) : (
           <>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>

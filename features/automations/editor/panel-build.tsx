@@ -709,7 +709,7 @@ function DeliveryNote({ channel }: { channel: "email" | "whatsapp" }) {
   if (!status) return null;
   const outbox = status.provider === "outbox";
   return (
-    <p className="bg-overlay-1 border-border caption-style text-fg-secondary rounded-lg border px-3 py-2.5 leading-snug">
+    <p className="bg-overlay-1 caption-style text-fg-secondary rounded-lg px-3 py-2.5 leading-snug">
       {outbox ? (
         <>
           <span className="text-foreground font-medium">Outbox only.</span>{" "}

@@ -58,7 +58,6 @@ import { readError } from "@/lib/errors";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
 import UsersIcon from "@/public/assets/icons/users.svg";
-import PlusIcon from "@/public/assets/icons/plus.svg";
 import PhoneCallIcon from "@/public/assets/icons/phone-call.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import { routes } from "@/lib/routes";
@@ -144,7 +143,7 @@ const COLUMNS: Column<PersonRow>[] = [
     id: "trend",
     header: "Activity trend",
     width: "7rem",
-    minViewport: 1180,
+    minViewport: 1440,
     cell: (row) => <TrendCell values={row.trend} />,
   },
   {
@@ -584,7 +583,7 @@ export default function PeoplePage() {
                 description={
                   view === "mine"
                     ? "People you own show up here."
-                    : "People without an account show up here, so you can link them to the brand they work for."
+                    : "People without an account show up here."
                 }
                 action={
                   <Button
@@ -600,25 +599,15 @@ export default function PeoplePage() {
               <EmptyState
                 icon={UsersIcon}
                 title="No people yet"
-                description="Add the founders, marketplace managers and marketers you talk to, or import them from a CSV."
+                description="Add the people you talk to, or import a CSV."
                 action={
-                  <span className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setImporting(true)}
-                    >
-                      Import CSV
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => setCreate({ type: "person" })}
-                    >
-                      <PlusIcon aria-hidden className="size-3" />
-                      New person
-                    </Button>
-                  </span>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setCreate({ type: "person" })}
+                  >
+                    New person
+                  </Button>
                 }
               />
             )

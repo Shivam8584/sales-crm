@@ -17,7 +17,6 @@ import {
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import SelectField from "@/components/_ui/select-field";
-import Tag from "@/components/_ui/tag";
 import { Textarea } from "@/components/_ui/textarea";
 import {
   CUSTOM_FIELD_ENTITIES,
@@ -35,7 +34,6 @@ import PlusIcon from "@/public/assets/icons/plus.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
 import {
   AdminOnly,
-  SettingsIntro,
   SettingsRow,
   SettingsSection,
   SettingsSkeleton,
@@ -52,10 +50,6 @@ const ENTITY_TITLE: Record<CustomFieldEntity, string> = {
 export default function FieldsSettings() {
   return (
     <AdminOnly>
-      <SettingsIntro>
-        Add fields your team fills in on accounts, people and deals. They show
-        in each record&apos;s sidebar.
-      </SettingsIntro>
       {CUSTOM_FIELD_ENTITIES.map((entity) => (
         <EntityFields key={entity} entity={entity} />
       ))}
@@ -102,44 +96,47 @@ function EntityFields({ entity }: { entity: CustomFieldEntity }) {
       {fields.length === 0 ? (
         <SettingsRow
           label="No custom fields yet"
-          description={`Add one, like a contract renewal date or a customer tier, and it shows on every ${entity}.`}
+          description={`A field you add shows on every ${entity}.`}
         />
       ) : (
         fields.map((field, index) => (
           <SettingsRow
             key={field._id}
             label={field.label}
-            description={
-              field.type === "select" ? field.options.join(" · ") : undefined
-            }
+            className="group"
+            description={[
+              CUSTOM_FIELD_TYPE_LABEL[field.type],
+              ...(field.type === "select" ? [field.options.join(" · ")] : []),
+            ].join(" · ")}
           >
-            <Tag size="xs">{CUSTOM_FIELD_TYPE_LABEL[field.type]}</Tag>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Move ${field.label} up`}
-              disabled={index === 0}
-              onClick={() => void move(index, -1)}
-            >
-              <ChevronDownIcon aria-hidden className="size-3.5 rotate-180" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Move ${field.label} down`}
-              disabled={index === fields.length - 1}
-              onClick={() => void move(index, 1)}
-            >
-              <ChevronDownIcon aria-hidden className="size-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Delete ${field.label}`}
-              onClick={() => setRemoving(field)}
-            >
-              <TrashIcon aria-hidden className="size-3.5" />
-            </Button>
+            <span className="flex items-center transition-opacity not-pointer-coarse:opacity-0 not-pointer-coarse:group-focus-within:opacity-100 not-pointer-coarse:group-hover:opacity-100">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Move ${field.label} up`}
+                disabled={index === 0}
+                onClick={() => void move(index, -1)}
+              >
+                <ChevronDownIcon aria-hidden className="size-3.5 rotate-180" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Move ${field.label} down`}
+                disabled={index === fields.length - 1}
+                onClick={() => void move(index, 1)}
+              >
+                <ChevronDownIcon aria-hidden className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Delete ${field.label}`}
+                onClick={() => setRemoving(field)}
+              >
+                <TrashIcon aria-hidden className="size-3.5" />
+              </Button>
+            </span>
           </SettingsRow>
         ))
       )}
@@ -206,8 +203,7 @@ function AddFieldDialog({
           <DialogHeader>
             <DialogTitle>Add a {entity} field</DialogTitle>
             <DialogDescription>
-              The type can&apos;t change later, because saved values depend on
-              it.
+              The type can&apos;t change later.
             </DialogDescription>
           </DialogHeader>
           <div className="flex min-w-0 flex-col gap-4 px-6 py-5">
@@ -263,7 +259,7 @@ function AddFieldDialog({
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>
@@ -309,14 +305,13 @@ function RemoveFieldDialog({
         <DialogHeader>
           <DialogTitle>Delete {field?.label}?</DialogTitle>
           <DialogDescription>
-            It disappears from every record. Values already entered are kept out
-            of sight, and reappear if you add a field with the same name and
-            type.
+            It disappears from every record. Saved values come back if you add a
+            field with the same name and type.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="subtle" size="sm">
+            <Button variant="secondary" size="sm">
               Cancel
             </Button>
           </DialogClose>

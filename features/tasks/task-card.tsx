@@ -1,14 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Avatar from "@/components/_ui/avatar";
 import Tag from "@/components/_ui/tag";
 import { useCardFields } from "@/components/board/board-prefs";
-import AccountLogo from "@/features/accounts/account-logo";
-import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
-import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import TaskChips, { CardSafe } from "./task-chips";
 import { StatusIcon, type TaskRow } from "./task-meta";
 import { useTaskActions } from "./use-task-actions";
@@ -32,7 +27,6 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
     return {
       href: routes.person(person._id),
       label: person.name,
-      icon: <Avatar name={person.name} size="xs" />,
       context: !hide && account ? account.name : null,
     };
   }
@@ -40,7 +34,6 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
     return {
       href: routes.account(account._id),
       label: account.name,
-      icon: <AccountLogo account={account} size="xs" className="size-4" />,
       context: null,
     };
   }
@@ -48,7 +41,6 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
     return {
       href: routes.deal(deal._id),
       label: deal.title,
-      icon: <TargetIcon aria-hidden className="text-fg-tertiary size-3.5" />,
       context: null,
     };
   }
@@ -56,7 +48,6 @@ function chipTarget(task: ChipRecord, hide?: HiddenRecord) {
     return {
       href: routes.lead(lead._id),
       label: lead.name,
-      icon: <UserPlusIcon aria-hidden className="text-fg-tertiary size-3.5" />,
       context: null,
     };
   }
@@ -88,7 +79,6 @@ export function RecordChip({
           className,
         )}
       >
-        {target.icon}
         <span className="truncate">{target.label}</span>
         {target.context && (
           <>
@@ -143,7 +133,7 @@ export function AutoTag({ className }: { className?: string }) {
   return (
     <Tag
       size="xs"
-      tone="purple"
+      tone="neutral"
       title="Opened automatically"
       className={className}
     >
@@ -152,7 +142,7 @@ export function AutoTag({ className }: { className?: string }) {
   );
 }
 
-/** Board card body: status and title, created date and record, then property chips. */
+/** Board card body: status and title, linked record, then property chips. */
 export default function TaskCard({ task }: { task: TaskRow }) {
   const show = useCardFields("tasks");
   const done = task.status === "done";
@@ -161,40 +151,25 @@ export default function TaskCard({ task }: { task: TaskRow }) {
     Boolean(task.person || task.account || task.deal || task.lead);
   const hasChips = ["priority", "assignee", "due"].some(show);
   return (
-    <>
-      <div className="flex flex-col gap-2 p-4">
-        <div className="flex items-start gap-2">
-          <DoneToggle task={task} className="mt-0.75" />
-          <h3
-            className={cn(
-              "lead-style line-clamp-2 min-w-0 flex-1 leading-5 font-medium break-words",
-              done && "text-fg-secondary",
-            )}
-          >
-            {task.title}
-          </h3>
-          {task.automated && <AutoTag className="mt-0.5" />}
-        </div>
-        <div className="text-fg-tertiary flex min-w-0 items-center gap-2 text-[13px] leading-5">
-          <span className="shrink-0 whitespace-nowrap">
-            Created {shortDate(task._creationTime)}
-          </span>
-          {hasRecord && (
-            <>
-              <span
-                aria-hidden
-                className="bg-fg-disabled size-0.75 shrink-0 rounded-full"
-              />
-              <RecordChip task={task} meta className="min-w-0" />
-            </>
+    <div className="flex flex-col gap-2 p-4">
+      <div className="flex items-start gap-2">
+        <DoneToggle task={task} className="mt-0.75" />
+        <h3
+          className={cn(
+            "lead-style line-clamp-2 min-w-0 flex-1 leading-5 font-medium break-words",
+            done && "text-fg-secondary",
           )}
-        </div>
+        >
+          {task.title}
+        </h3>
+        {task.automated && <AutoTag className="mt-0.5" />}
       </div>
-      {hasChips && (
-        <div className="border-border border-t px-4 py-3">
-          <TaskChips task={task} show={show} />
-        </div>
+      {hasRecord && (
+        <RecordChip task={task} meta className="ml-5.5 min-w-0 text-xs" />
       )}
-    </>
+      {hasChips && (
+        <TaskChips task={task} show={show} size="sm" className="ml-3.5 gap-1" />
+      )}
+    </div>
   );
 }

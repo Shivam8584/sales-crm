@@ -76,10 +76,7 @@ export default function SurveyPage({ token }: { token: string }) {
       </header>
       <main className="mx-auto w-full max-w-2xl flex-1 px-5 pt-6 pb-16 sm:px-8 sm:pt-10">
         {phase === "loading" ? (
-          <div
-            className="bg-card shadow-card flex flex-col gap-5 rounded-2xl p-5 sm:p-7"
-            aria-busy
-          >
+          <div className="flex flex-col gap-5" aria-busy>
             <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-11 w-full" />
             <Skeleton className="h-18 w-full" />
@@ -105,7 +102,7 @@ function Notice({ phase }: { phase: keyof typeof MESSAGE }) {
   return (
     <div
       role={phase === "thanks" ? "status" : undefined}
-      className="bg-card shadow-card flex flex-col gap-2.5 rounded-2xl p-5 sm:p-7"
+      className="flex flex-col gap-2.5"
     >
       <h1
         ref={heading}
@@ -191,7 +188,7 @@ function SurveyForm({
       onSubmit={submit}
       noValidate
       aria-labelledby="survey-question"
-      className="bg-card shadow-card flex flex-col gap-5 rounded-2xl p-5 sm:p-7"
+      className="flex flex-col gap-5"
     >
       <div className="flex flex-col gap-2.5">
         <h1
@@ -200,7 +197,7 @@ function SurveyForm({
         >
           How likely are you to recommend Hypedrive to another brand?
         </h1>
-        <p className="text-fg-secondary">A quick question for {brand}.</p>
+        <p className="text-fg-tertiary">A quick question for {brand}.</p>
       </div>
 
       <div className="flex flex-col gap-2">

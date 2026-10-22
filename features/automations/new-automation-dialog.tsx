@@ -76,8 +76,8 @@ export default function NewAutomationDialog({
           <DialogHeader>
             <DialogTitle>New sequence</DialogTitle>
             <DialogDescription>
-              Pick what starts it and which records go through it. You’ll add
-              the steps on the canvas.
+              Choose what starts it and which records it enrols. You add the
+              steps next.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-5 px-6 py-5">

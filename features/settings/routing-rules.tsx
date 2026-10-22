@@ -17,7 +17,6 @@ import {
 } from "@/components/_ui/dialog";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
-import Skeleton from "@/components/_ui/skeleton";
 import OptionPicker, { type Option } from "@/components/fields/option-picker";
 import { LEAD_KINDS } from "@/lib/domain/enums";
 import { LEAD_KIND_LABEL } from "@/lib/domain/labels";
@@ -35,7 +34,12 @@ import { toast } from "@/stores/toast-store";
 import ChevronDownIcon from "@/public/assets/icons/chevron-down.svg";
 import PlusIcon from "@/public/assets/icons/plus.svg";
 import TrashIcon from "@/public/assets/icons/trash.svg";
-import { SettingsBlock, SettingsRow, SettingsSection } from "./settings-ui";
+import {
+  SettingsBlock,
+  SettingsRow,
+  SettingsRowSkeleton,
+  SettingsSection,
+} from "./settings-ui";
 
 const RULES_KEY = "routing.rules";
 const HOT_KEY = "routing.hotSlaFactor";
@@ -96,7 +100,7 @@ export function RoutingRules() {
   return (
     <SettingsSection
       title="Routing rules"
-      description="The first rule that matches picks the owner of a new lead. Anything else rotates round-robin. Applies to leads that arrive from now on."
+      description="The first matching rule picks the owner of a new lead; the rest rotate round-robin."
       action={
         <Button
           variant="secondary"
@@ -111,14 +115,13 @@ export function RoutingRules() {
     >
       {!rules ? (
         <>
-          <RowSkeleton />
-          <RowSkeleton />
+          <SettingsRowSkeleton />
+          <SettingsRowSkeleton />
         </>
       ) : rules.length === 0 ? (
         <SettingsBlock>
           <p className="caption-style text-fg-tertiary leading-snug">
-            No rules yet, so every new lead rotates round-robin. Add one to send
-            hot demo requests, or leads with a GSTIN, to a specific person.
+            No rules yet, so every new lead rotates round-robin.
           </p>
         </SettingsBlock>
       ) : (
@@ -126,7 +129,7 @@ export function RoutingRules() {
           {rules.map((rule, index) => (
             <li
               key={rule.id}
-              className="border-border flex min-h-13 items-center gap-3 border-t px-4 py-2 sm:px-5"
+              className="group border-border flex min-h-13 items-center gap-3 border-t py-2"
             >
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="lead-style truncate">{rule.name}</span>
@@ -134,7 +137,7 @@ export function RoutingRules() {
                   {describeCondition(rule.when, sourceLabel)} → {assignee(rule)}
                 </span>
               </span>
-              <span className="flex shrink-0 items-center">
+              <span className="flex shrink-0 items-center transition-opacity not-pointer-coarse:opacity-0 not-pointer-coarse:group-focus-within:opacity-100 not-pointer-coarse:group-hover:opacity-100">
                 <Button
                   variant="ghost"
                   size="icon-xs"
@@ -295,8 +298,7 @@ function AddRuleDialog({
           <DialogHeader>
             <DialogTitle>Add routing rule</DialogTitle>
             <DialogDescription>
-              New leads that match every condition below go to the person you
-              pick. Leave a condition on Any to ignore it.
+              New leads matching every condition go to the person you pick.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 px-6 py-5">
@@ -390,7 +392,7 @@ function AddRuleDialog({
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>
@@ -418,7 +420,7 @@ function Choice({ label, children }: { label: string; children: ReactNode }) {
 /** First-touch window for hot leads as a percent of the normal SLA. */
 export function HotSlaRow() {
   const settings = useQuery(api.settings.get, {});
-  if (!settings) return <RowSkeleton />;
+  if (!settings) return <SettingsRowSkeleton />;
   return <HotSlaForm key={settings[HOT_KEY]} settings={settings} />;
 }
 
@@ -548,14 +550,5 @@ function HotSlaForm({ settings }: { settings: Settings }) {
         </div>
       </SettingsRow>
     </form>
-  );
-}
-
-function RowSkeleton() {
-  return (
-    <div className="border-border flex h-13 items-center gap-3 border-t px-4 sm:px-5">
-      <Skeleton className="h-3 w-40" />
-      <Skeleton className="ml-auto h-3 w-16" />
-    </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { ComponentType, SVGProps } from "react";
-import Tag, { type TagTone } from "@/components/_ui/tag";
+import type { TagTone } from "@/components/_ui/tag";
 import type { BadgeTone } from "@/components/_common/status-badge";
 import ToneDot from "@/components/board/tone-dot";
 import type { Option } from "@/components/fields/option-picker";
@@ -48,8 +48,9 @@ export const DEAL_STAGE_OPTIONS: Option[] = DEAL_STAGES.map((stage) => ({
 
 export function DealStageTag({ stage }: { stage: DealStage }) {
   return (
-    <Tag tone={DEAL_STAGE_TONE[stage]} size="sm">
+    <span className="inline-flex items-center gap-1.5">
+      <ToneDot tone={DEAL_STAGE_TONE[stage]} />
       {DEAL_STAGE_LABEL[stage]}
-    </Tag>
+    </span>
   );
 }

@@ -8,14 +8,11 @@ import Button from "@/components/_ui/button";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import Skeleton from "@/components/_ui/skeleton";
-import Tag from "@/components/_ui/tag";
 import { Tabs, TabsList, TabsTrigger } from "@/components/_ui/tabs";
-import { ROLE_TONE } from "@/features/team/roles";
 import type { Role } from "@/lib/domain/enums";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import AlertIcon from "@/public/assets/icons/alert-triangle.svg";
-import MailIcon from "@/public/assets/icons/mail.svg";
 import AuthCard from "./auth-card";
 
 type Flow = "signIn" | "signUp";
@@ -50,14 +47,10 @@ export default function SignIn() {
             ? "Create your account"
             : "Sign in to Hypedrive"
       }
-      description={
-        signingUp
-          ? "Set a password to start working leads, accounts and deals."
-          : "Pick up your team's pipeline where you left it."
-      }
+      description={signingUp ? "Set a password to get started." : undefined}
     >
       {methods === undefined ? (
-        <div className="border-border border-t px-6 py-5">
+        <div>
           <Skeleton className="h-9 w-full rounded-full" />
         </div>
       ) : passwordView ? (
@@ -76,7 +69,7 @@ export default function SignIn() {
           }
         />
       ) : (
-        <p className="border-border text-fg-secondary border-t px-6 py-5 text-center">
+        <p className="text-fg-secondary text-center">
           Sign-in isn&apos;t set up for this workspace yet. Ask an admin.
         </p>
       )}
@@ -109,7 +102,7 @@ function SsoPanel({
   }
 
   return (
-    <div className="border-border flex flex-col gap-3 border-t px-6 pt-5 pb-6">
+    <div className="flex flex-col gap-3">
       {inviteNote}
       <Button
         variant="primary"
@@ -191,7 +184,7 @@ function PasswordForm({
       >
         <TabsList
           aria-label="Sign in or create an account"
-          className="justify-center gap-6 px-6 shadow-[inset_0_-1px_0_var(--border)]"
+          className="justify-center gap-6 shadow-[inset_0_-1px_0_var(--border)]"
         >
           <TabsTrigger value="signIn" className="py-3">
             Sign in
@@ -202,10 +195,7 @@ function PasswordForm({
         </TabsList>
       </Tabs>
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-4 px-6 pt-5 pb-6"
-      >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {inviteNote}
         {flow === "signUp" && (
           <Field label="Full name" htmlFor="auth-name">
@@ -299,42 +289,14 @@ function InviteNote({
 }: {
   invite: { email: string; role: Role } | null;
 }) {
-  if (!invite) {
-    return (
-      <div
-        role="status"
-        className="border-border bg-overlay-1 flex items-start gap-3 rounded-xl border p-3 text-left"
-      >
-        <span className="bg-muted shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full">
-          <AlertIcon aria-hidden className="text-warning size-3.5" />
-        </span>
-        <p className="caption-style text-fg-secondary pt-0.5 leading-snug">
-          This invite link has expired or was revoked. Ask an admin for a new
-          one, or sign in if you already have an account.
-        </p>
-      </div>
-    );
-  }
   return (
-    <div
+    <p
       role="status"
-      className="border-border bg-overlay-1 flex items-center gap-3 rounded-xl border p-3 text-left"
+      className="caption-style text-fg-secondary text-center leading-snug text-balance"
     >
-      <span className="bg-muted shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full">
-        <MailIcon aria-hidden className="text-fg-secondary size-3.5" />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <span className="lead-style font-medium">You&apos;re invited</span>
-        <span
-          className="caption-style text-fg-tertiary truncate"
-          title={invite.email}
-        >
-          {invite.email}
-        </span>
-      </span>
-      <Tag tone={ROLE_TONE[invite.role]} size="sm">
-        {ROLE_LABEL[invite.role]}
-      </Tag>
-    </div>
+      {invite
+        ? `${invite.email} is invited to join as ${ROLE_LABEL[invite.role].toLowerCase()}.`
+        : "This invite link has expired or was revoked. Ask an admin for a new one, or sign in if you already have an account."}
+    </p>
   );
 }

@@ -100,19 +100,18 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
       {(data.runs.length > 0 || addButton) && (
         <div className="flex items-center justify-between gap-2">
           <span className="caption-style text-fg-tertiary">
-            {data.runs.filter((item) => isLive(item.status)).length} running ·{" "}
-            {data.runs.length} total
+            {data.runs.length > 0 &&
+              `${data.runs.filter((item) => isLive(item.status)).length} running of ${data.runs.length}`}
           </span>
           {addButton}
         </div>
       )}
       {data.runs.length === 0 ? (
-        <div className="border-border flex flex-col items-start gap-2 rounded-xl border border-dashed px-4 py-5">
-          <span className="text-sm font-medium">Not in any sequence</span>
+        <div className="flex flex-col items-start gap-2">
           <span className="caption-style text-fg-tertiary leading-snug">
-            Sequences enrol this {noun} when their trigger fires.
+            Not in any sequence.
             {data.available.length
-              ? " You can also add it by hand."
+              ? ` Sequences enrol this ${noun} when their trigger fires, or add it by hand.`
               : ` No active sequence runs on ${SUBJECT_LABEL[subject.kind][1]} yet.`}
           </span>
           {data.available.length === 0 && (
@@ -122,7 +121,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
           )}
         </div>
       ) : (
-        <ul className="bg-card shadow-card flex flex-col overflow-hidden rounded-xl">
+        <ul className="flex flex-col">
           {data.runs.map((item) => {
             const live = isLive(item.status);
             const detail = live
@@ -138,7 +137,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
             return (
               <li
                 key={item._id}
-                className="border-border flex items-center gap-3 px-4 py-3 not-last:border-b max-sm:flex-wrap"
+                className="border-border group/run flex items-center gap-3 border-t py-3 max-sm:flex-wrap"
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex min-w-0 items-center gap-2">
@@ -162,7 +161,7 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
                   </span>
                 </div>
                 {live && (
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="duration-fast flex shrink-0 items-center gap-1 transition-opacity sm:opacity-0 sm:group-focus-within/run:opacity-100 sm:group-hover/run:opacity-100">
                     <Button
                       variant="ghost"
                       size="xs"

@@ -56,16 +56,15 @@ export default function TemplatesGallery({
   }
 
   return (
-    <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-4">
+    <ul className="flex flex-col">
       {templates === undefined
         ? Array.from({ length: 3 }, (_, index) => (
             <li
               key={index}
-              className="bg-card shadow-card flex h-56 flex-col gap-4 rounded-2xl p-5"
+              className="border-border flex flex-col gap-2 border-t py-4"
             >
-              <Skeleton className="h-5 w-48" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-7 w-40" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-3 w-full max-w-md" />
             </li>
           ))
         : templates.map((template) => {
@@ -76,38 +75,39 @@ export default function TemplatesGallery({
             return (
               <li
                 key={template.key}
-                className="bg-card shadow-card flex flex-col gap-4 rounded-2xl p-5"
+                className="border-border flex flex-col gap-3 border-t py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
               >
-                <h3 className="text-base leading-6 font-medium text-balance">
-                  {template.name}
-                </h3>
-                <p
-                  lang={copy.language === "hi" ? "hi" : undefined}
-                  className="text-fg-secondary line-clamp-3 text-sm leading-5"
-                >
-                  {copy.description}
-                </p>
-                {template.copies.length > 1 && (
-                  <SegmentedControl
-                    label={`${template.name} language`}
-                    value={copy.language}
-                    onChange={(language) =>
-                      setLanguages((current) => ({
-                        ...current,
-                        [template.key]: language as Language,
-                      }))
-                    }
-                    segments={template.copies.map((item) => ({
-                      value: item.language,
-                      label: LANGUAGE_LABEL[item.language],
-                    }))}
-                    className="self-start"
-                  />
-                )}
-                <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <h3 className="text-sm font-medium text-balance">
+                    {template.name}
+                  </h3>
+                  <p
+                    lang={copy.language === "hi" ? "hi" : undefined}
+                    className="text-fg-secondary line-clamp-2 text-sm"
+                  >
+                    {copy.description}
+                  </p>
                   <span className="caption-style text-fg-tertiary">
                     {summary(copy.steps)}
                   </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  {template.copies.length > 1 && (
+                    <SegmentedControl
+                      label={`${template.name} language`}
+                      value={copy.language}
+                      onChange={(language) =>
+                        setLanguages((current) => ({
+                          ...current,
+                          [template.key]: language as Language,
+                        }))
+                      }
+                      segments={template.copies.map((item) => ({
+                        value: item.language,
+                        label: LANGUAGE_LABEL[item.language],
+                      }))}
+                    />
+                  )}
                   <Button
                     variant="secondary"
                     size="sm"

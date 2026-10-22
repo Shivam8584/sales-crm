@@ -177,7 +177,7 @@ export default function LogCallDialog({
                   {clock(seconds)}
                 </Tag>
                 {running && (
-                  <Button variant="subtle" size="xs" onClick={stop}>
+                  <Button variant="secondary" size="xs" onClick={stop}>
                     Stop
                   </Button>
                 )}
@@ -255,7 +255,7 @@ export default function LogCallDialog({
                   {suggestion}
                 </p>
                 <Button
-                  variant="subtle"
+                  variant="secondary"
                   size="xs"
                   className="self-start"
                   onClick={() => {
@@ -301,7 +301,7 @@ export default function LogCallDialog({
               {MOD_KEY} ↵ to save
             </span>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>

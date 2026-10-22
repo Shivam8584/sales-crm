@@ -147,13 +147,11 @@ export default function AddProductsDialog({
           <DialogHeader>
             <DialogTitle>Watch products</DialogTitle>
             <DialogDescription>
-              Paste product links from Amazon, Flipkart, Myntra, Nykaa and other
-              Indian marketplaces, or upload a CSV. Each one is checked daily
-              for its ratings.
+              Each product link is checked daily for its ratings.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 px-6 py-5">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-4">
               <Field
                 label="Source"
                 htmlFor="watch-list"
@@ -241,10 +239,7 @@ export default function AddProductsDialog({
               />
             </Field>
             {entries.length > 0 && (
-              <div
-                aria-live="polite"
-                className="bg-overlay-1 shadow-hairline flex flex-col gap-2.5 rounded-xl p-3"
-              >
+              <div aria-live="polite" className="flex flex-col gap-2.5">
                 <p className="caption-style flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="text-foreground font-medium tabular-nums">
                     {ready.length} ready
@@ -295,7 +290,7 @@ export default function AddProductsDialog({
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>

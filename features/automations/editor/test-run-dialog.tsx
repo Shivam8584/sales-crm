@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useConvex, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import Button from "@/components/_ui/button";
 import {
   Dialog,
   DialogContent,
@@ -71,8 +70,8 @@ export default function TestRunDialog({
         <DialogHeader>
           <DialogTitle>Test run</DialogTitle>
           <DialogDescription>
-            Pick one of your {plural} to see the path it would take with the
-            current draft. Nothing is sent, created or changed.
+            Pick one of your {plural} to see its path through the current draft.
+            Nothing is sent or changed.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 px-6 pb-6">
@@ -131,14 +130,6 @@ export default function TestRunDialog({
               ))
             )}
           </ul>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="self-end"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

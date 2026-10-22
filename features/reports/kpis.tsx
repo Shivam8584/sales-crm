@@ -1,12 +1,6 @@
 import Skeleton from "@/components/_ui/skeleton";
 import NpsTile from "@/features/surveys/nps-tile";
 import type { Report } from "@/convex/lib/reports";
-import ActivityIcon from "@/public/assets/icons/activity.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
-import ClockIcon from "@/public/assets/icons/clock.svg";
-import TargetIcon from "@/public/assets/icons/target-05.svg";
-import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
-import WalletIcon from "@/public/assets/icons/wallet.svg";
 import {
   count,
   duration,
@@ -18,8 +12,9 @@ import {
 } from "./format";
 import { Delta, MetricTile } from "./section";
 
-const GRID = "grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6";
-const GRID_WITH_NPS = "grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7";
+const GRID = "grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 xl:grid-cols-6";
+const GRID_WITH_NPS =
+  "grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4 xl:grid-cols-7";
 
 const pts = (current: number | null, previous: number | null) =>
   current === null || previous === null
@@ -44,7 +39,6 @@ export default function Kpis({ report }: { report: Report }) {
   return (
     <div className={GRID_WITH_NPS}>
       <MetricTile
-        icon={UserPlusIcon}
         label="New leads"
         value={count(leads)}
         delta={
@@ -55,7 +49,6 @@ export default function Kpis({ report }: { report: Report }) {
         }
       />
       <MetricTile
-        icon={TargetIcon}
         label="Converted"
         value={count(converted)}
         detail={`${percent(rate(converted, leads))} of leads`}
@@ -67,7 +60,6 @@ export default function Kpis({ report }: { report: Report }) {
         }
       />
       <MetricTile
-        icon={ActivityIcon}
         label="Activated"
         value={count(activated)}
         detail={`${percent(rate(activated, leads))} of leads`}
@@ -79,7 +71,6 @@ export default function Kpis({ report }: { report: Report }) {
         }
       />
       <MetricTile
-        icon={ClockIcon}
         label="Speed to lead"
         value={duration(speed.medianMs)}
         detail={`Median · p90 ${duration(speed.p90Ms)}`}
@@ -95,7 +86,6 @@ export default function Kpis({ report }: { report: Report }) {
         }
       />
       <MetricTile
-        icon={CheckCircleIcon}
         label="Touched within SLA"
         value={percent(speed.withinRate)}
         detail={`${count(speed.breached)} breached`}
@@ -107,7 +97,6 @@ export default function Kpis({ report }: { report: Report }) {
         }
       />
       <MetricTile
-        icon={WalletIcon}
         label="Deals won"
         value={count(report.pipeline.won.count)}
         detail={totals(report.pipeline.won.totals, "No value yet")}
@@ -129,10 +118,7 @@ export function KpisSkeleton({ tiles = 6 }: { tiles?: number }) {
   return (
     <div className={tiles > 6 ? GRID_WITH_NPS : GRID}>
       {Array.from({ length: tiles }, (_, index) => (
-        <div
-          key={index}
-          className="border-line-strong flex flex-col gap-3 rounded-lg border p-2.75"
-        >
+        <div key={index} className="flex flex-col gap-2">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-6 w-10" />
           <Skeleton className="h-3 w-24" />

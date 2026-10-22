@@ -3,7 +3,6 @@
 import { useMemo, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import DataTable from "@/components/data-table/data-table";
-import ToneDot from "@/components/board/tone-dot";
 import type { Column, SortState } from "@/components/data-table/types";
 import Avatar from "@/components/_ui/avatar";
 import { PRIORITIES, TASK_STATUSES } from "@/lib/domain/enums";
@@ -135,18 +134,6 @@ function MobileCard({ row }: { row: TaskRow }) {
   );
 }
 
-const GROUP_TONE: Record<
-  DueGroup,
-  "red" | "amber" | "blue" | "neutral" | "green"
-> = {
-  overdue: "red",
-  today: "amber",
-  week: "blue",
-  later: "neutral",
-  none: "neutral",
-  done: "green",
-};
-
 const GROUPED_COLUMNS: Column<TaskRow>[] = LIST_COLUMNS.filter(
   (column) => column.id !== "status",
 ).map((column) =>
@@ -214,7 +201,6 @@ export default function TasksList({
             ? (a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)
             : byUrgency,
         ),
-      icon: <ToneDot tone={GROUP_TONE[group]} />,
       tone: group === "overdue" ? "danger" : undefined,
       defaultCollapsed: group === "done",
     }));

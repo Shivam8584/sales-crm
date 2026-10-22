@@ -15,7 +15,6 @@ import { useViewer } from "@/hooks/use-viewer";
 import { useUrlState } from "@/hooks/use-url-state";
 import { ROLES } from "@/lib/domain/enums";
 import { ROLE_LABEL } from "@/lib/domain/labels";
-import UsersIcon from "@/public/assets/icons/users.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import InviteDialog from "./invite-dialog";
 import InvitesSection from "./invites-section";
@@ -206,7 +205,6 @@ export default function TeamPage() {
               footer={footer}
               empty={
                 <EmptyState
-                  icon={UsersIcon}
                   title="No members match"
                   description="Try another search or clear the filters."
                   action={
@@ -227,8 +225,7 @@ export default function TeamPage() {
         <>
           <PageToolbar actions={inviteButton}>
             <p className="caption-style text-fg-tertiary truncate leading-snug max-sm:hidden">
-              Links work for one email and expire after 7 days. Joined and
-              revoked invites stay here for 14 days.
+              Links work for one email and expire after 7 days.
             </p>
           </PageToolbar>
           <InvitesSection

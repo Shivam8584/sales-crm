@@ -4,19 +4,14 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium leading-none outline-none select-none transition-[background-color,color,box-shadow,scale] duration-fast ease-power3-out active:scale-[0.96] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:inset-y-[min(0px,calc((100%-44px)/2))] pointer-coarse:after:content-['']",
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-medium leading-none outline-none select-none transition-[background-color,color,box-shadow,scale] duration-fast ease-power3-out active:scale-[0.98] motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:inset-y-[min(0px,calc((100%-44px)/2))] pointer-coarse:after:content-['']",
   {
     variants: {
       variant: {
-        primary:
-          "bg-primary text-primary-foreground shadow-brand hover:bg-primary-hover",
-        secondary:
-          "bg-secondary text-secondary-foreground shadow-raised hover:bg-muted",
-        muted: "bg-muted text-foreground shadow-raised hover:bg-muted-hover",
-        subtle: "bg-raised text-foreground shadow-hairline hover:bg-muted",
+        primary: "bg-primary text-primary-foreground hover:bg-primary-hover",
+        secondary: "text-foreground shadow-raised hover:bg-overlay-2",
         ghost: "text-fg-tertiary hover:bg-overlay-2 hover:text-foreground",
-        nav: "w-full justify-start rounded-lg active:scale-100 text-sidebar-foreground hover:text-foreground data-[active=true]:bg-sidebar-primary data-[active=true]:text-foreground data-[active=true]:shadow-raised",
-        item: "w-full active:scale-100 items-start justify-start gap-3 rounded-lg text-left font-normal whitespace-normal text-foreground hover:bg-overlay-1",
+        nav: "w-full justify-start active:scale-100 text-sidebar-foreground hover:text-foreground data-[active=true]:bg-overlay-2 data-[active=true]:text-foreground",
         link: "rounded-none active:scale-100 text-foreground underline decoration-from-font underline-offset-2 hover:text-fg-secondary",
       },
       size: {
@@ -25,7 +20,6 @@ export const buttonVariants = cva(
         control: "h-control-md text-xs leading-none",
         avatar:
           "h-control-md gap-1.5 py-1.25 pr-1.75 pl-1.25 text-xs leading-none font-normal",
-        inline: "-mx-1.5 gap-1.5 px-1.5 py-1 font-normal",
         md: "p-2 text-sm leading-none",
         icon: "relative size-control-md p-0 pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']",
         "icon-xs":

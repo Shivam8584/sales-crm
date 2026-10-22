@@ -51,13 +51,10 @@ function Card({
   return (
     <section
       aria-label={eyebrow}
-      className={cn(
-        "bg-card shadow-card flex min-w-0 flex-col gap-5 rounded-xl p-5",
-        className,
-      )}
+      className={cn("flex min-w-0 flex-col gap-5", className)}
     >
       <header className="flex items-baseline justify-between gap-3">
-        <h3 className="eyebrow-style text-fg-secondary">{eyebrow}</h3>
+        <h3 className="text-fg-secondary text-sm font-medium">{eyebrow}</h3>
         <span className="caption-style text-fg-tertiary truncate">{note}</span>
       </header>
       {children}
@@ -156,7 +153,7 @@ function MarginGauge({
           <span
             aria-hidden
             className={cn(
-              "ring-card absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 transition-[left] duration-200",
+              "ring-background absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 transition-[left] duration-200",
               BAND_FILL[band],
             )}
             style={{ left: position(bps) }}
@@ -199,7 +196,7 @@ export function InternalTotals({
     <Card eyebrow="Internal" note="Only your team sees this">
       <div className="flex flex-col gap-1.5">
         <span className="caption-style text-fg-tertiary">Hypedrive take</span>
-        <span className="text-display leading-none font-medium">
+        <span className="text-2xl leading-none font-medium">
           {money(total.take)}
         </span>
         <span className="caption-style text-fg-secondary">
@@ -358,7 +355,7 @@ function BrandLine({
       </div>
       {note && <span className="caption-style text-fg-secondary">{note}</span>}
       {line.presentation === "itemised" && (
-        <dl className="bg-overlay-1 caption-style flex flex-col gap-1.5 rounded-lg px-3 py-2.5">
+        <dl className="caption-style border-border flex flex-col gap-1.5 border-l-2 pl-3">
           {brandParts(line, pricing).map((part) => (
             <div
               key={part.label}

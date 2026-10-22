@@ -129,8 +129,7 @@ export default function Timeline({
                 onClick={() => setFilter(item.id)}
                 className={cn(
                   "caption-style text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:ring-ring duration-fast flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 transition-colors outline-none focus-visible:ring-2",
-                  active &&
-                    "bg-raised text-foreground shadow-hairline hover:bg-raised",
+                  active && "bg-overlay-2 text-foreground hover:bg-overlay-2",
                 )}
               >
                 {item.label}
@@ -147,7 +146,7 @@ export default function Timeline({
         <ol className="flex flex-col gap-5" aria-busy>
           {Array.from({ length: 3 }, (_, index) => (
             <li key={index} className="flex gap-3">
-              <Skeleton className="size-7 rounded-lg" />
+              <Skeleton className="size-5" />
               <span className="flex flex-1 flex-col gap-2 pt-1">
                 <Skeleton className="h-3 w-40" />
                 <Skeleton className="h-3 w-64" />
@@ -157,7 +156,7 @@ export default function Timeline({
         </ol>
       ) : entries.length === 0 ? (
         <p className="caption-style text-fg-tertiary py-6 text-center">
-          Nothing logged yet. Notes, calls and changes will appear here.
+          Nothing logged yet.
         </p>
       ) : groups.length === 0 ? (
         <p className="caption-style text-fg-tertiary py-6 text-center">
@@ -174,16 +173,14 @@ export default function Timeline({
         <div className="flex flex-col gap-4">
           {groups.map((group) => (
             <section key={group.key} aria-label={group.label}>
-              <h3 className="eyebrow-style text-fg-secondary flex items-center gap-3 py-2">
+              <h3 className="caption-style text-fg-tertiary pb-3">
                 {group.label}
-                <span aria-hidden className="bg-line-strong h-px flex-1" />
               </h3>
-              <ol className="flex flex-col pt-3">
-                {group.entries.map((entry, index) => (
+              <ol className="flex flex-col">
+                {group.entries.map((entry) => (
                   <TimelineItem
                     key={entry._id}
                     entry={entry}
-                    last={index === group.entries.length - 1}
                     showContext={onAccount}
                     readOnly={readOnly}
                     highlighted={highlight === entry._id}
@@ -255,19 +252,6 @@ function useEntryAnchor(entries: Entry[] | undefined, showAll: () => void) {
   return highlight;
 }
 
-function Rail({ last, compact }: { last: boolean; compact: boolean }) {
-  if (last) return null;
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "bg-line-strong absolute bottom-0.5 left-3.5 w-px -translate-x-1/2",
-        compact ? "top-6.5" : "top-8.5",
-      )}
-    />
-  );
-}
-
 function Time({ at, edited }: { at: number; edited?: boolean }) {
   return (
     <Tooltip content={dateTime(at)}>
@@ -284,26 +268,21 @@ function Time({ at, edited }: { at: number; edited?: boolean }) {
 
 function TimelineItem({
   entry,
-  last,
   showContext,
   readOnly,
   highlighted,
 }: {
   entry: Entry;
-  last: boolean;
   showContext: boolean;
   readOnly: boolean;
   highlighted: boolean;
 }) {
   if (entry.kind === "change" || entry.kind === "system") {
-    return (
-      <AutomaticItem entry={entry} last={last} highlighted={highlighted} />
-    );
+    return <AutomaticItem entry={entry} highlighted={highlighted} />;
   }
   return (
     <LoggedItem
       entry={entry}
-      last={last}
       showContext={showContext}
       readOnly={readOnly}
       highlighted={highlighted}
@@ -318,11 +297,9 @@ const ANCHOR_ON = "before:ring-selected/45 before:bg-selected/5";
 
 function AutomaticItem({
   entry,
-  last,
   highlighted,
 }: {
   entry: Entry;
-  last: boolean;
   highlighted: boolean;
 }) {
   const meta = KIND_META[entry.kind];
@@ -338,11 +315,8 @@ function AutomaticItem({
         highlighted && ANCHOR_ON,
       )}
     >
-      <Rail last={last} compact />
-      <span className="flex w-7 shrink-0 justify-center">
-        <span className="bg-overlay-2 text-fg-tertiary flex size-5.5 items-center justify-center rounded-md">
-          <meta.icon aria-hidden className="size-3" />
-        </span>
+      <span className="text-fg-tertiary flex h-5.5 w-5 shrink-0 items-center justify-center">
+        <meta.icon aria-hidden className="size-3" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="caption-style flex min-h-5.5 items-baseline gap-2 pt-0.5 leading-5">
@@ -442,13 +416,11 @@ function ChangeText({
 
 function LoggedItem({
   entry,
-  last,
   showContext,
   readOnly,
   highlighted,
 }: {
   entry: Entry;
-  last: boolean;
   showContext: boolean;
   readOnly: boolean;
   highlighted: boolean;
@@ -499,8 +471,7 @@ function LoggedItem({
         highlighted && ANCHOR_ON,
       )}
     >
-      <Rail last={last} compact={false} />
-      <span className="bg-card shadow-card text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg">
+      <span className="text-fg-tertiary flex h-6 w-5 shrink-0 items-center justify-center">
         <meta.icon aria-hidden className="size-3.5" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
@@ -597,7 +568,7 @@ function LoggedItem({
                 }
               }}
               aria-label="Edit entry"
-              className="border-selected ring-selected/20 bg-secondary field-sizing-content min-h-16 w-full resize-none rounded-lg border px-3 py-2 text-sm leading-snug ring-3 outline-none"
+              className="border-line-strong focus-visible:border-selected field-sizing-content min-h-16 w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm leading-snug outline-none"
             />
             <div className="flex justify-end gap-2">
               <Button
@@ -614,7 +585,7 @@ function LoggedItem({
           </div>
         ) : (
           entry.body && (
-            <p className="bg-card shadow-card text-fg-secondary rounded-lg px-4 py-3 text-sm leading-relaxed break-words whitespace-pre-wrap">
+            <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
               <EntryBody body={entry.body} mentioned={entry.mentioned} />
             </p>
           )

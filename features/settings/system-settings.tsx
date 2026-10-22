@@ -6,16 +6,15 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import Button from "@/components/_ui/button";
 import Tooltip from "@/components/_ui/tooltip";
-import { PageStatus } from "@/components/shell/page";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime } from "@/lib/time";
 import { toast } from "@/stores/toast-store";
 import {
   AdminOnly,
-  SettingsIntro,
   SettingsRow,
   SettingsSection,
   SettingsSkeleton,
+  StatusText,
 } from "./settings-ui";
 import { routes } from "@/lib/routes";
 
@@ -32,10 +31,6 @@ const TABLES: { table: Table; label: string }[] = [
 export default function SystemSettings() {
   return (
     <AdminOnly>
-      <SettingsIntro>
-        Which services are connected, what failed in the last week, and whether
-        the list counts match the data.
-      </SettingsIntro>
       <SystemOverview />
     </AdminOnly>
   );
@@ -62,10 +57,10 @@ function SystemOverview() {
 }
 
 function ModeTag({ mode }: { mode: "live" | "sandbox" | null }) {
-  if (mode === "live") return <PageStatus>Connected</PageStatus>;
+  if (mode === "live") return <StatusText>Connected</StatusText>;
   if (mode === "sandbox")
-    return <PageStatus tone="warning">Sandbox</PageStatus>;
-  return <PageStatus tone="neutral">Not configured</PageStatus>;
+    return <StatusText tone="warning">Sandbox</StatusText>;
+  return <StatusText tone="muted">Not configured</StatusText>;
 }
 
 function ProviderRow({
@@ -147,9 +142,9 @@ function FailuresSection({ failures }: { failures: Overview["failures"] }) {
   const empty = items.length === 0 && failures.platformEvents === 0;
 
   return (
-    <SettingsSection title="Recent failures" description="The last 7 days.">
+    <SettingsSection title="Failures in the last 7 days">
       {empty && (
-        <p className="caption-style text-fg-tertiary border-border border-t px-4 py-4 sm:px-5">
+        <p className="caption-style text-fg-tertiary border-border border-t py-3.5">
           Nothing failed in the last 7 days.
         </p>
       )}
@@ -168,7 +163,7 @@ function FailuresSection({ failures }: { failures: Overview["failures"] }) {
           {items.map((item) => (
             <li
               key={item.id}
-              className="border-border flex min-h-10.5 items-center gap-3 border-t px-4 py-2 sm:px-5"
+              className="border-border flex min-h-10.5 items-center gap-3 border-t py-2"
             >
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <span className="lead-style truncate">{item.title}</span>
@@ -242,9 +237,9 @@ function CountRow({ table, label }: { table: Table; label: string }) {
       }
     >
       {check && (
-        <PageStatus tone={check.ok ? "success" : "danger"}>
+        <StatusText tone={check.ok ? "neutral" : "danger"}>
           {check.ok ? "In sync" : "Mismatch"}
-        </PageStatus>
+        </StatusText>
       )}
       <Button
         variant="ghost"

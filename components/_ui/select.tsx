@@ -51,7 +51,7 @@ function SelectContent({
         position={position}
         sideOffset={6}
         className={cn(
-          "z-overlay border-line-strong bg-popover text-popover-foreground shadow-overlay duration-base data-[state=closed]:duration-fast data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=open]:ease-power3-out max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] origin-(--radix-select-content-transform-origin) overflow-hidden rounded-xl border",
+          "z-overlay bg-popover text-popover-foreground shadow-overlay duration-base data-[state=closed]:duration-fast data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97] data-[state=closed]:ease-power3-in data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=open]:ease-power3-out max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] origin-(--radix-select-content-transform-origin) overflow-hidden rounded-xl",
           className,
         )}
         {...props}

@@ -122,8 +122,7 @@ function LeadForm({
       <DialogHeader>
         <DialogTitle>Lead for {draft.brand}</DialogTitle>
         <DialogDescription>
-          You own it. Add a contact if you have one; the talking point is saved
-          as the lead&apos;s note.
+          You own it. The talking point is saved as the lead&apos;s note.
         </DialogDescription>
       </DialogHeader>
       <div className="flex flex-col gap-4 px-6 py-5">
@@ -136,7 +135,7 @@ function LeadForm({
             autoComplete="off"
           />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-4">
           <Field label="Email" htmlFor="prospect-email" error={errors.email}>
             <Input
               id="prospect-email"
@@ -195,7 +194,7 @@ function LeadForm({
       </div>
       <DialogFooter>
         <DialogClose asChild>
-          <Button variant="subtle" size="sm">
+          <Button variant="secondary" size="sm">
             Cancel
           </Button>
         </DialogClose>

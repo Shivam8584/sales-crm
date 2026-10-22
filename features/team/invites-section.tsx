@@ -14,19 +14,15 @@ import {
 } from "@/components/_ui/dropdown-menu";
 import EmptyState from "@/components/_ui/empty-state";
 import Skeleton from "@/components/_ui/skeleton";
-import Tag from "@/components/_ui/tag";
 import Tooltip from "@/components/_ui/tooltip";
-import { PageStatus } from "@/components/shell/page";
 import { ROLE_LABEL } from "@/lib/domain/labels";
 import { readError } from "@/lib/errors";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import DotsIcon from "@/public/assets/icons/dots-horizontal.svg";
-import MailIcon from "@/public/assets/icons/mail.svg";
 import UserPlusIcon from "@/public/assets/icons/user-plus.svg";
 import { copyText, inviteUrl } from "./invite-link";
-import { ROLE_TONE } from "./roles";
 
 export type Invite = FunctionReturnType<typeof api.invites.list>[number];
 
@@ -35,10 +31,10 @@ const GRID =
 const WIDE_ONLY = "max-[999px]:hidden";
 
 const STATUS = {
-  pending: { tone: "info", label: "Pending" },
-  expired: { tone: "warning", label: "Expired" },
-  accepted: { tone: "success", label: "Joined" },
-  revoked: { tone: "neutral", label: "Revoked" },
+  pending: { className: "text-foreground", label: "Pending" },
+  expired: { className: "text-warning", label: "Expired" },
+  accepted: { className: "text-fg-secondary", label: "Joined" },
+  revoked: { className: "text-fg-tertiary", label: "Revoked" },
 } as const;
 
 function statusTime(invite: Invite) {
@@ -128,7 +124,6 @@ export default function InvitesSection({
     return (
       <div className="flex min-h-0 flex-1 flex-col justify-center overflow-auto pb-[8vh]">
         <EmptyState
-          icon={MailIcon}
           title="No invites yet"
           description="Invite teammates to send them a sign-up link with the right role."
           action={
@@ -183,32 +178,25 @@ export default function InvitesSection({
           ))}
         </ul>
       </div>
-      <div
-        role="group"
+      <p
         aria-label="Invite totals"
-        className="caption-style border-border bg-background grid shrink-0 grid-cols-2 gap-px overflow-hidden border-t sm:grid-cols-4"
+        className="caption-style border-border text-fg-tertiary flex shrink-0 flex-wrap gap-x-5 gap-y-1 border-t px-4 py-3 tabular-nums"
       >
-        {[
-          { label: "Pending", value: count("pending") },
-          { label: "Expired", value: count("expired") },
-          { label: "Joined in 14 days", value: count("accepted") },
-          { label: "Revoked in 14 days", value: count("revoked") },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="outline-border flex min-w-0 items-center gap-2 px-4 py-3 outline-1"
-          >
-            {invites ? (
-              <span className="text-foreground shrink-0 tabular-nums">
-                {stat.value}
-              </span>
-            ) : (
-              <Skeleton className="h-3 w-6" />
-            )}
-            <span className="text-fg-tertiary truncate">{stat.label}</span>
-          </div>
-        ))}
-      </div>
+        {invites ? (
+          [
+            ["Pending", count("pending")],
+            ["Expired", count("expired")],
+            ["Joined in 14 days", count("accepted")],
+            ["Revoked in 14 days", count("revoked")],
+          ].map(([label, value]) => (
+            <span key={label}>
+              <span className="text-foreground">{value}</span> {label}
+            </span>
+          ))
+        ) : (
+          <Skeleton className="h-3 w-48" />
+        )}
+      </p>
     </div>
   );
 }
@@ -228,7 +216,7 @@ function InviteRow({
 }) {
   const isOpen = invite.status === "pending" || invite.status === "expired";
   const canCopy = invite.status === "pending" && link;
-  const { tone, label } = STATUS[invite.status];
+  const { className, label } = STATUS[invite.status];
   const time = statusTime(invite);
 
   const actions = isOpen && (
@@ -267,7 +255,7 @@ function InviteRow({
 
   const status = (
     <span className="flex min-w-0 items-center gap-2">
-      <PageStatus tone={tone}>{label}</PageStatus>
+      <span className={className}>{label}</span>
       <Tooltip content={dateTime(time.at)}>
         <span className="caption-style text-fg-tertiary truncate">
           {time.text}
@@ -278,12 +266,9 @@ function InviteRow({
 
   const email = (
     <span className="flex min-w-0 items-center gap-2.5">
-      <span className="bg-muted shadow-hairline flex size-5 shrink-0 items-center justify-center rounded-full">
-        <MailIcon aria-hidden className="text-fg-secondary size-3" />
-      </span>
       <span
         title={invite.email}
-        className={cn("truncate", isOpen ? "font-medium" : "text-fg-tertiary")}
+        className={cn("truncate", !isOpen && "text-fg-tertiary")}
       >
         {invite.email}
       </span>
@@ -294,10 +279,8 @@ function InviteRow({
     <li className="border-border hover:bg-row-hover duration-fast border-b transition-colors">
       <div className={cn(GRID, "lead-style h-row items-center max-sm:hidden")}>
         {email}
-        <span className="flex min-w-0">
-          <Tag tone={ROLE_TONE[invite.role]} size="sm">
-            {ROLE_LABEL[invite.role]}
-          </Tag>
+        <span className="text-fg-secondary truncate">
+          {ROLE_LABEL[invite.role]}
         </span>
         <span className={cn("flex min-w-0 items-center gap-2", WIDE_ONLY)}>
           {invite.invitedBy ? (
@@ -317,11 +300,11 @@ function InviteRow({
       <div className="flex flex-col gap-2.5 px-4 py-3.5 sm:hidden">
         <span className="lead-style flex items-center gap-3">
           <span className="min-w-0 flex-1">{email}</span>
-          <Tag tone={ROLE_TONE[invite.role]} size="xs">
+          <span className="caption-style text-fg-tertiary">
             {ROLE_LABEL[invite.role]}
-          </Tag>
+          </span>
         </span>
-        <span className="flex items-center justify-between gap-2 pl-7.5">
+        <span className="flex items-center justify-between gap-2">
           {status}
           <span className="flex shrink-0 items-center gap-1">{actions}</span>
         </span>

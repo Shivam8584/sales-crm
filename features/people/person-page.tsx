@@ -13,7 +13,6 @@ import Skeleton from "@/components/_ui/skeleton";
 import Tooltip from "@/components/_ui/tooltip";
 import InlineText from "@/components/fields/inline-text";
 import TagsField from "@/components/fields/tags-field";
-import Tag, { tagVariants } from "@/components/_ui/tag";
 import { DetailSection } from "@/components/record/detail";
 import { Properties, Property } from "@/components/record/properties";
 import RecordLayout, { RecordHeader } from "@/components/record/record-layout";
@@ -31,7 +30,6 @@ import {
   ActivityTrend,
 } from "@/features/accounts/account-insights";
 import AccountPicker from "@/features/accounts/account-picker";
-import { StageAndTags } from "@/features/accounts/record-cells";
 import {
   editRecordTitle,
   useTitleShortcut,
@@ -311,35 +309,21 @@ function PersonView({ person }: { person: Person }) {
             }
             subtitle={
               <>
-                <span className="flex min-w-0 flex-wrap items-center gap-0.75">
-                  {person.title && (
-                    <Tag tone="neutral" size="sm">
-                      {person.title}
-                    </Tag>
-                  )}
-                  {person.account && (
-                    <Link
-                      href={routes.account(person.account._id)}
-                      className={cn(
-                        tagVariants({ tone: "neutral", size: "sm" }),
-                        "hover:text-foreground focus-visible:ring-ring min-w-0 gap-1 pl-0.5 outline-none focus-visible:ring-2",
-                      )}
-                    >
-                      <AccountLogo
-                        account={person.account}
-                        size="xs"
-                        className="size-4"
-                      />
-                      <span className="truncate">{person.account.name}</span>
-                    </Link>
-                  )}
-                  <StageAndTags tags={person.tags} max={4} wrap />
-                </span>
-                {person.owner && (
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <Avatar name={person.owner.name} size="xs" />
-                    <span className="truncate">{person.owner.name}</span>
-                  </span>
+                {person.title && (
+                  <span className="truncate">{person.title}</span>
+                )}
+                {person.account && (
+                  <Link
+                    href={routes.account(person.account._id)}
+                    className="hover:text-foreground focus-visible:ring-ring flex min-w-0 items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2"
+                  >
+                    <AccountLogo
+                      account={person.account}
+                      size="xs"
+                      className="size-4"
+                    />
+                    <span className="truncate">{person.account.name}</span>
+                  </Link>
                 )}
               </>
             }
@@ -424,13 +408,6 @@ function PersonView({ person }: { person: Person }) {
               className={cn(ASIDE_SECTION, "gap-2")}
             >
               <Properties>
-                <Property label="First name">
-                  <InlineText
-                    value={person.firstName}
-                    label="First name"
-                    onSave={(firstName) => save({ firstName }, "First name")}
-                  />
-                </Property>
                 <Property label="Last name">
                   <InlineText
                     value={person.lastName || null}
@@ -475,31 +452,6 @@ function PersonView({ person }: { person: Person }) {
                     onChange={(tags) => void save({ tags }, "Tags")}
                   />
                 </Property>
-              </Properties>
-            </DetailSection>
-            <CustomFields
-              entity="person"
-              target={{ personId: person._id }}
-              values={person.custom}
-              className={cn(ASIDE_SECTION, "gap-2")}
-            />
-            <FilesSection
-              target={{ personId: person._id }}
-              className={cn(ASIDE_SECTION, "gap-2")}
-            />
-            <ConsentRecords personId={person._id} className={ASIDE_SECTION} />
-            <DinLookup personId={person._id} className={ASIDE_SECTION} />
-            <FeedbackSection
-              target={{ personId: person._id }}
-              className={ASIDE_SECTION}
-            />
-            <DetailSection
-              collapsible
-              title="Record"
-              className={cn(ASIDE_SECTION, "gap-2")}
-              divider={false}
-            >
-              <Properties>
                 <Property label="Last activity">
                   {person.lastActivityAt ? (
                     <Tooltip content={dateTime(person.lastActivityAt)}>
@@ -520,6 +472,22 @@ function PersonView({ person }: { person: Person }) {
                 </Property>
               </Properties>
             </DetailSection>
+            <CustomFields
+              entity="person"
+              target={{ personId: person._id }}
+              values={person.custom}
+              className={cn(ASIDE_SECTION, "gap-2")}
+            />
+            <FilesSection
+              target={{ personId: person._id }}
+              className={cn(ASIDE_SECTION, "gap-2")}
+            />
+            <ConsentRecords personId={person._id} className={ASIDE_SECTION} />
+            <DinLookup personId={person._id} className={ASIDE_SECTION} />
+            <FeedbackSection
+              target={{ personId: person._id }}
+              className={ASIDE_SECTION}
+            />
           </>
         }
       >

@@ -200,7 +200,7 @@ function TourCard({ onClose }: { onClose: (completed: boolean) => void }) {
         tabIndex={-1}
         style={layout.card ?? undefined}
         className={
-          "border-line-strong bg-popover text-popover-foreground shadow-overlay fixed rounded-xl border p-4 outline-none " +
+          "bg-popover text-popover-foreground shadow-overlay fixed rounded-xl p-4 outline-none " +
           (layout.card ? "w-80" : "inset-x-3 bottom-3")
         }
       >

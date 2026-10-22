@@ -15,6 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/_ui/dialog";
+import {
+  Collapsible,
+  CollapsibleChevron,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/_ui/collapsible";
 import Field from "@/components/_ui/field";
 import { Input } from "@/components/_ui/input";
 import { Textarea } from "@/components/_ui/textarea";
@@ -73,6 +79,7 @@ export default function CreateLeadDialog() {
   const [ownerId, setOwnerId] = useState<string>(viewer._id);
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
+  const [more, setMore] = useState(false);
 
   function set(field: FieldName, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -84,6 +91,7 @@ export default function CreateLeadDialog() {
     setValues(EMPTY);
     setOwnerId(viewer._id);
     setErrors({});
+    setMore(false);
   }
 
   function validate() {
@@ -170,76 +178,45 @@ export default function CreateLeadDialog() {
         <form onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>New lead</DialogTitle>
-            <DialogDescription>
-              Someone who reached out by phone, at an event or through a
-              referral.
+            <DialogDescription className="sr-only">
+              Add a lead who reached out by phone, at an event or by referral
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 px-6 py-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="Name"
-                htmlFor="lead-name"
-                required
-                error={errors.name}
-              >
-                {input("name", {
-                  autoFocus: true,
-                  placeholder: "Priya Sharma",
-                })}
-              </Field>
-              <Field
-                label="Account"
-                htmlFor="lead-companyName"
-                required
-                error={errors.companyName}
-              >
-                {input("companyName")}
-              </Field>
-              <Field label="Email" htmlFor="lead-email" error={errors.email}>
-                {input("email", {
-                  type: "email",
-                  inputMode: "email",
-                  spellCheck: false,
-                  placeholder: "name@brand.in",
-                })}
-              </Field>
-              <Field label="Phone" htmlFor="lead-phone" error={errors.phone}>
-                {input("phone", {
-                  type: "tel",
-                  inputMode: "tel",
-                  placeholder: "98200 12345",
-                  className: `${INVALID} tabular-nums`,
-                })}
-              </Field>
-              <Field
-                label="Website"
-                htmlFor="lead-website"
-                error={errors.website}
-              >
-                {input("website", {
-                  inputMode: "url",
-                  spellCheck: false,
-                  placeholder: "brand.in",
-                })}
-              </Field>
-              <Field label="GSTIN" htmlFor="lead-gstin" error={errors.gstin}>
-                {input("gstin", {
-                  maxLength: 15,
-                  spellCheck: false,
-                  placeholder: "29AAACI4798L1ZU",
-                  className: `${INVALID} font-mono uppercase`,
-                })}
-              </Field>
-            </div>
-            <Field label="Notes" htmlFor="lead-message" error={errors.message}>
-              <Textarea
-                id="lead-message"
-                rows={3}
-                value={values.message}
-                onChange={(event) => set("message", event.target.value)}
-                placeholder="What they asked about, where you met"
-              />
+            <Field
+              label="Name"
+              htmlFor="lead-name"
+              required
+              error={errors.name}
+            >
+              {input("name", {
+                autoFocus: true,
+                placeholder: "Priya Sharma",
+              })}
+            </Field>
+            <Field
+              label="Account"
+              htmlFor="lead-companyName"
+              required
+              error={errors.companyName}
+            >
+              {input("companyName")}
+            </Field>
+            <Field label="Email" htmlFor="lead-email" error={errors.email}>
+              {input("email", {
+                type: "email",
+                inputMode: "email",
+                spellCheck: false,
+                placeholder: "name@brand.in",
+              })}
+            </Field>
+            <Field label="Phone" htmlFor="lead-phone" error={errors.phone}>
+              {input("phone", {
+                type: "tel",
+                inputMode: "tel",
+                placeholder: "98200 12345",
+                className: `${INVALID} tabular-nums`,
+              })}
             </Field>
             <div className="flex flex-col gap-2">
               <span className="caption-style text-fg-secondary">Owner</span>
@@ -248,12 +225,64 @@ export default function CreateLeadDialog() {
                 onChange={setOwnerId}
                 className="border-input bg-secondary mx-0 h-9 border px-3"
               />
-              <span className="caption-style text-fg-tertiary leading-snug">
-                {ownerId === viewer._id
-                  ? "You own it, so it starts as contacted with no SLA clock."
-                  : "They get a notification and the speed-to-lead clock starts."}
-              </span>
+              {ownerId !== viewer._id && (
+                <span className="caption-style text-fg-tertiary leading-snug">
+                  They get a notification and the speed-to-lead clock starts.
+                </span>
+              )}
             </div>
+            <Collapsible
+              open={
+                more ||
+                Boolean(errors.website || errors.gstin || errors.message)
+              }
+              onOpenChange={setMore}
+              className="group/collapsible flex flex-col"
+            >
+              <CollapsibleTrigger className="caption-style text-fg-secondary hover:text-foreground focus-visible:ring-ring duration-fast -mx-1 flex w-fit cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 transition-colors outline-none focus-visible:ring-2">
+                More options
+                <CollapsibleChevron />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="flex flex-col gap-4 pt-4">
+                  <Field
+                    label="Website"
+                    htmlFor="lead-website"
+                    error={errors.website}
+                  >
+                    {input("website", {
+                      inputMode: "url",
+                      spellCheck: false,
+                      placeholder: "brand.in",
+                    })}
+                  </Field>
+                  <Field
+                    label="GSTIN"
+                    htmlFor="lead-gstin"
+                    error={errors.gstin}
+                  >
+                    {input("gstin", {
+                      maxLength: 15,
+                      spellCheck: false,
+                      placeholder: "29AAACI4798L1ZU",
+                      className: `${INVALID} font-mono uppercase`,
+                    })}
+                  </Field>
+                  <Field
+                    label="Notes"
+                    htmlFor="lead-message"
+                    error={errors.message}
+                  >
+                    <Textarea
+                      id="lead-message"
+                      rows={3}
+                      value={values.message}
+                      onChange={(event) => set("message", event.target.value)}
+                    />
+                  </Field>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
             {errors.form && (
               <p role="alert" className="caption-style text-danger">
                 {errors.form}
@@ -262,7 +291,7 @@ export default function CreateLeadDialog() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="subtle" size="sm">
+              <Button variant="secondary" size="sm">
                 Cancel
               </Button>
             </DialogClose>

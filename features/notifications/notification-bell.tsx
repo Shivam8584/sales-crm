@@ -19,7 +19,6 @@ import Tooltip from "@/components/_ui/tooltip";
 import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
-import ArrowRightIcon from "@/public/assets/icons/arrow-right.svg";
 import BellIcon from "@/public/assets/icons/bell.svg";
 import { isUrgentKind, KindIcon } from "./kinds";
 import { useNotificationActions } from "./use-notification-actions";
@@ -104,7 +103,7 @@ export default function NotificationBell() {
         align="end"
         className="flex w-[min(25rem,calc(100vw-2rem))] flex-col p-0"
       >
-        <div className="border-line-strong flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4">
+        <div className="flex h-12 shrink-0 items-center justify-between gap-2 px-4">
           <span className="flex items-center gap-2">
             <h2>Notifications</h2>
             {unread > 0 && (
@@ -132,11 +131,7 @@ export default function NotificationBell() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <EmptyState
-              icon={BellIcon}
-              title="You're all caught up"
-              description="New leads, demo bookings and SLA alerts show up here."
-            />
+            <EmptyState title="You're all caught up" />
           ) : (
             <ul className="flex flex-col p-1">
               {items.slice(0, PREVIEW).map((item) => (
@@ -150,10 +145,9 @@ export default function NotificationBell() {
         <Link
           href={routes.inbox}
           onClick={() => setOpen(false)}
-          className="border-line-strong text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:bg-overlay-2 duration-fast caption-style flex h-10 shrink-0 items-center justify-center gap-1.5 border-t font-medium transition-colors outline-none"
+          className="border-border text-fg-secondary hover:text-foreground hover:bg-overlay-1 focus-visible:bg-overlay-2 duration-fast caption-style flex h-10 shrink-0 items-center justify-center border-t transition-colors outline-none"
         >
           View all in Inbox
-          <ArrowRightIcon aria-hidden className="size-3" />
         </Link>
       </PopoverContent>
     </Popover>
@@ -174,19 +168,18 @@ function NotificationRow({
       onClick={onSelect}
       className="hover:bg-overlay-1 focus-visible:bg-overlay-2 duration-fast flex w-full cursor-pointer items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors outline-none"
     >
-      <span
+      <KindIcon
+        kind={item.kind}
         className={cn(
-          "bg-muted shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full",
-          urgent ? "text-danger" : "text-fg-secondary",
+          "mt-0.5 size-3.5 shrink-0",
+          urgent ? "text-danger" : "text-fg-tertiary",
         )}
-      >
-        <KindIcon kind={item.kind} className="size-3.5" />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-1.5 pt-0.5">
+      />
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span
           className={cn(
             "lead-style leading-snug",
-            item.read ? "text-fg-secondary" : "text-foreground font-medium",
+            item.read ? "text-fg-secondary" : "text-foreground",
           )}
         >
           {item.title}

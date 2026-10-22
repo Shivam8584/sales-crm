@@ -1,5 +1,4 @@
 import Logo from "@/public/assets/images/_common/logo.svg";
-import CheckCircleIcon from "@/public/assets/icons/check-circle.svg";
 import DemoForm from "./demo-form";
 import EmbedResizer from "./embed-resizer";
 
@@ -41,7 +40,7 @@ function ForcedTheme({ theme }: { theme: DemoTheme }) {
 function Intro() {
   return (
     <div className="flex flex-col gap-5">
-      <p className="eyebrow-style text-fg-tertiary">
+      <p className="caption-style text-fg-tertiary">
         For D2C brands and marketplace sellers
       </p>
       <h1 className="text-display font-semibold tracking-[-0.025em] sm:text-[2.5rem] sm:leading-[1.1]">
@@ -61,28 +60,18 @@ function Details() {
     <div className="flex flex-col gap-10">
       <ul className="flex flex-col gap-6">
         {POINTS.map((point) => (
-          <li key={point.title} className="flex items-start gap-3.5">
-            <span className="bg-muted shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full">
-              <CheckCircleIcon aria-hidden className="text-success size-3.5" />
-            </span>
-            <div className="flex flex-col gap-2 pt-1">
-              <h2 className="h3-style">{point.title}</h2>
-              <p className="text-fg-secondary">{point.body}</p>
-            </div>
+          <li key={point.title} className="flex flex-col gap-2">
+            <h2 className="h3-style">{point.title}</h2>
+            <p className="text-fg-secondary">{point.body}</p>
           </li>
         ))}
       </ul>
 
       <div className="border-border flex flex-col gap-4 border-t pt-8">
-        <h2 className="eyebrow-style font-normal">What happens next</h2>
-        <ol className="flex flex-col gap-3.5">
-          {STEPS.map((step, index) => (
-            <li key={step} className="flex items-center gap-3.5">
-              <span className="caption-style bg-muted text-fg-secondary shadow-hairline flex size-7 shrink-0 items-center justify-center rounded-full tabular-nums">
-                {index + 1}
-              </span>
-              <p className="text-fg-secondary">{step}</p>
-            </li>
+        <h2 className="h3-style">What happens next</h2>
+        <ol className="text-fg-secondary flex list-decimal flex-col gap-2.5 pl-5 marker:tabular-nums">
+          {STEPS.map((step) => (
+            <li key={step}>{step}</li>
           ))}
         </ol>
       </div>
@@ -103,7 +92,7 @@ export default function DemoPage({
       <main className="mx-auto w-full max-w-xl p-4 sm:p-6">
         <ForcedTheme theme={theme} />
         <EmbedResizer />
-        <DemoForm embed />
+        <DemoForm />
       </main>
     );
   }
@@ -117,7 +106,6 @@ export default function DemoPage({
           <span className="lead-style font-medium tracking-[-0.01em]">
             Hypedrive
           </span>
-          <span className="caption-style text-fg-tertiary">Talk to sales</span>
         </span>
       </header>
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-10 px-5 pt-6 pb-16 sm:px-8 sm:pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:grid-rows-[auto_1fr] lg:gap-x-20 lg:gap-y-12 lg:pt-16">

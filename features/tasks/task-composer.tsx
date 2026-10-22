@@ -99,7 +99,7 @@ export default function TaskComposer({
       aria-label={label}
       className={cn("bg-card shadow-card flex flex-col rounded-2xl", className)}
     >
-      <div className="flex flex-col gap-2 p-4">
+      <div className="flex flex-col gap-2 p-4 pb-2">
         <input
           autoFocus
           value={title}
@@ -127,9 +127,9 @@ export default function TaskComposer({
           </p>
         )}
       </div>
-      <div className="border-border flex flex-wrap items-center gap-2 border-t px-4 py-3">
-        <PriorityPicker size="md" value={priority} onChange={setPriority} />
-        <DuePicker size="md" value={dueDate} onChange={setDueDate} />
+      <div className="flex flex-wrap items-center gap-1 px-3 pb-3">
+        <PriorityPicker value={priority} onChange={setPriority} />
+        <DuePicker value={dueDate} onChange={setDueDate} />
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="xs" onClick={onClose}>
             Cancel

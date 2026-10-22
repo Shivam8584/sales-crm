@@ -32,7 +32,7 @@ export default function SegmentedControl({
       onValueChange={(next) => next && onChange(next)}
       aria-label={label}
       className={cn(
-        "bg-overlay-2 h-control-md inline-flex shrink-0 items-center gap-0.5 rounded-full p-0.75",
+        "bg-overlay-2 h-control-md inline-flex shrink-0 items-center gap-0.5 rounded-lg p-0.75",
         className,
       )}
     >
@@ -43,7 +43,7 @@ export default function SegmentedControl({
             key={segment.value}
             value={segment.value}
             className={cn(
-              "text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast relative flex h-full cursor-pointer items-center gap-1.5 rounded-full px-3 text-xs leading-none font-medium transition-colors outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']",
+              "text-fg-tertiary hover:text-foreground focus-visible:ring-ring duration-fast relative flex h-full cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs leading-none font-medium transition-colors outline-none focus-visible:ring-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']",
               active && "text-foreground",
             )}
           >
@@ -52,7 +52,7 @@ export default function SegmentedControl({
                 aria-hidden
                 layoutId={`${id}-thumb`}
                 transition={{ type: "spring", duration: 0.3, bounce: 0 }}
-                className="bg-secondary shadow-raised absolute inset-0 rounded-full"
+                className="bg-background absolute inset-0 rounded-md"
               />
             )}
             <span className="relative">{segment.label}</span>
