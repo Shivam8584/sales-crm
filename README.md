@@ -249,7 +249,7 @@ Set each secret first; an endpoint with no secret answers 503. All are on `https
 | `/webhooks/chatwoot`      | Chatwoot messages                            | `INBOUND_CHATWOOT_SECRET` or `INBOUND_CHATWOOT_TOKEN` |
 | `/webhooks/exotel`        | Exotel call status                           | `EXOTEL_WEBHOOK_SECRET` (`?secret=`)                  |
 
-Point `EMAIL_REPLY_TO` at the inbox that feeds `/webhooks/email-inbound`, so a reply of "unsubscribe" withdraws consent and stops the person's sequences.
+The inbound email relay (a Cloudflare Email Worker on `replies.hypedrive.app`) is in `deploy/inbound-email-worker/`. Point `EMAIL_REPLY_TO` at the inbox that feeds `/webhooks/email-inbound`, so a reply of "unsubscribe" withdraws consent and stops the person's sequences.
 
 ### One-off steps after a release
 
