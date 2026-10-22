@@ -11,6 +11,7 @@
 import type * as account360 from "../account360.js";
 import type * as accounts from "../accounts.js";
 import type * as activation from "../activation.js";
+import type * as ai from "../ai.js";
 import type * as alerts from "../alerts.js";
 import type * as auth from "../auth.js";
 import type * as automations from "../automations.js";
@@ -27,6 +28,7 @@ import type * as inbound from "../inbound.js";
 import type * as invites from "../invites.js";
 import type * as leads from "../leads.js";
 import type * as lib_activation from "../lib/activation.js";
+import type * as lib_aiTypes from "../lib/aiTypes.js";
 import type * as lib_assignment from "../lib/assignment.js";
 import type * as lib_automations_delivery from "../lib/automations/delivery.js";
 import type * as lib_automations_engine from "../lib/automations/engine.js";
@@ -94,6 +96,7 @@ declare const fullApi: ApiFromModules<{
   account360: typeof account360;
   accounts: typeof accounts;
   activation: typeof activation;
+  ai: typeof ai;
   alerts: typeof alerts;
   auth: typeof auth;
   automations: typeof automations;
@@ -110,6 +113,7 @@ declare const fullApi: ApiFromModules<{
   invites: typeof invites;
   leads: typeof leads;
   "lib/activation": typeof lib_activation;
+  "lib/aiTypes": typeof lib_aiTypes;
   "lib/assignment": typeof lib_assignment;
   "lib/automations/delivery": typeof lib_automations_delivery;
   "lib/automations/engine": typeof lib_automations_engine;

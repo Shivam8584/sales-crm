@@ -6,7 +6,8 @@ export type ErrorCode =
   | "not_found"
   | "invalid"
   | "conflict"
-  | "rate_limited";
+  | "rate_limited"
+  | "unavailable";
 
 export type AppErrorData = { code: ErrorCode; message: string; field?: string };
 
