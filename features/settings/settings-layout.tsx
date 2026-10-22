@@ -30,6 +30,7 @@ const GROUPS: { title: string; hrefs: SettingsHref[] }[] = [
       routes.fields,
       routes.targets,
       routes.duplicates,
+      routes.audit,
       routes.integrations,
       routes.system,
     ],
@@ -50,7 +51,8 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     [routes.team]: activeMembers?.length,
   };
   // The members table fills the content area like every other list.
-  const fullBleed = isActive(pathname, routes.team);
+  const fullBleed =
+    isActive(pathname, routes.team) || isActive(pathname, routes.audit);
 
   return (
     <Page>

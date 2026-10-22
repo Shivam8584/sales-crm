@@ -7,6 +7,7 @@ import { findAccounts } from "./accounts";
 import { findDeals } from "./deals";
 import { findPeople } from "./people";
 import { generate } from "./lib/ai";
+import { getSecret, secretEnv } from "./lib/secrets";
 import {
   askInput,
   contextHash,
@@ -87,7 +88,8 @@ async function cacheRow(ctx: QueryCtx, kind: "brief" | "next", key: string) {
 /** Whether an AI key is configured; the UI hides every AI surface when false. */
 export const enabled = memberQuery({
   args: {},
-  handler: async () => Boolean(process.env.OPENAI_API_KEY?.trim()),
+  handler: async (ctx): Promise<boolean> =>
+    Boolean(await getSecret(ctx, "OPENAI_API_KEY")),
 });
 
 /** The cached brief for an account, or null if none has been generated. */
@@ -409,6 +411,11 @@ export const resolveNames = memberQuery({
   },
 });
 
+const ask = async <T>(
+  ctx: ActionCtx,
+  options: Parameters<typeof generate>[0],
+) => await generate<T>(options, fetch, await secretEnv(ctx));
+
 async function begin(ctx: ActionCtx): Promise<void> {
   if (!(await ctx.runQuery(api.ai.enabled, {}))) unavailable();
 }
@@ -474,7 +481,7 @@ export const generateBrief = action({
     if (previous.hash === hash && Date.now() - previous.at < BRIEF_TTL) return;
 
     await spend(ctx);
-    const out = await generate<BriefOut>({
+    const out = await ask<BriefOut>(ctx, {
       model: "main",
       system: BRIEF.system,
       input: `Today is ${todayLine(istToday())}.\n${wrapData(context)}`,
@@ -560,7 +567,7 @@ export const refreshNextActions = action({
     if (previous.hash === hash && Date.now() - previous.at < NEXT_TTL) return;
 
     await spend(ctx);
-    const out = await generate<NextOut>({
+    const out = await ask<NextOut>(ctx, {
       model: "fast",
       system: NEXT.system,
       input: `Today is ${todayLine(today)}.\n${wrapData(items)}`,
@@ -591,7 +598,7 @@ export const parseCapture = action({
     if (!line) invalid("text", "Type something first");
     await spend(ctx);
     const today = istToday();
-    const out = await generate<CaptureOut>({
+    const out = await ask<CaptureOut>(ctx, {
       model: "fast",
       system: CAPTURE.system,
       input: `Today is ${todayLine(today)}.\n${wrapData({ line })}`,
@@ -647,7 +654,7 @@ export const draft = action({
     await spend(ctx);
     const spec = channel === "email" ? EMAIL : WHATSAPP;
     const wanted = truncate(goal, 500);
-    const out = await generate<DraftOut>({
+    const out = await ask<DraftOut>(ctx, {
       model: "main",
       system: spec.system,
       input: `Today is ${todayLine(istToday())}.${wanted ? `\nThe rep's goal for this message: ${wanted}` : ""}\n${wrapData(context)}`,
@@ -672,7 +679,7 @@ export const summarizeCall = action({
     const context = await ctx.runQuery(api.ai.targetContext, { target });
     await spend(ctx);
     const today = istToday();
-    const out = await generate<CallOut>({
+    const out = await ask<CallOut>(ctx, {
       model: "main",
       system: CALL.system,
       input: `Today is ${todayLine(today)}.\n${wrapData({ notes: text, record: context })}`,
@@ -705,7 +712,7 @@ export const askRecord = action({
     if (!asked) invalid("question", "Type a question first");
     const context = await ctx.runQuery(api.ai.targetContext, { target });
     await spend(ctx);
-    const out = await generate<AskOut>({
+    const out = await ask<AskOut>(ctx, {
       model: "fast",
       system: ASK.system,
       input: askInput(istToday(), asked, context),

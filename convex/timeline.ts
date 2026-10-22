@@ -406,6 +406,8 @@ export const restore = memberMutation({
         v.union(v.literal("inbound"), v.literal("outbound")),
       ),
       mentions: v.optional(v.array(v.id("members"))),
+      link: v.optional(v.string()),
+      via: v.optional(v.string()),
     }),
   },
   handler: async (ctx, { entry }) => {

@@ -1,5 +1,6 @@
 import { sourceFamily } from "@/convex/lib/enrichment/kyc";
 import { confidenceBand } from "@/convex/lib/enrichment/waterfall";
+import { AGENT_SOURCES } from "@/lib/domain/research";
 
 const FACT_LABEL: Record<string, string> = {
   gstin: "GSTIN",
@@ -17,6 +18,10 @@ const FACT_LABEL: Record<string, string> = {
   phone: "Phone",
   email: "Email",
   siteDescription: "Website description",
+  title: "Title",
+  linkedinUrl: "LinkedIn",
+  domain: "Website",
+  employment: "Employment",
 };
 
 export function factLabel(field: string) {
@@ -37,6 +42,12 @@ export function sourceLabel(source: string) {
       return "Hypedrive platform";
     case "website":
       return "Company website";
+    case "email":
+      return "Their emails";
+    case "note":
+      return "Team notes";
+    case "contacts":
+      return "Contact emails";
     default:
       return source;
   }
@@ -45,9 +56,12 @@ export function sourceLabel(source: string) {
 /** "From the GST registry · high confidence"; the confidence is absent on older facts. */
 export function sourceNote(source: string, confidence: number | null) {
   const name = sourceLabel(source);
-  const from = sourceFamily(source) === "website" ? name.toLowerCase() : name;
+  const family = sourceFamily(source);
+  const from = family === "website" ? name.toLowerCase() : name;
   return [
-    `From the ${from}`,
+    AGENT_SOURCES.some((own) => own === family)
+      ? `From ${name.toLowerCase()}`
+      : `From the ${from}`,
     confidence === null ? null : bandLabel(confidence),
   ]
     .filter(Boolean)

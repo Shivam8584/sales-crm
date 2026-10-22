@@ -21,6 +21,7 @@ export const PERMISSIONS = {
   "record.import": { min: "rep" },
   "record.export": { min: "manager" },
   "record.merge": { min: "manager" },
+  "record.restore": { min: "manager" },
 
   "account.reassign": { min: "manager", own: true },
   "account.archive": { min: "manager", own: true },
@@ -37,6 +38,7 @@ export const PERMISSIONS = {
   "proposal.approve": { min: "manager" },
   "activation.run": { min: "manager" },
   "sequence.run": { min: "manager", own: true },
+  "report.send": { min: "manager", own: true },
 
   "member.manage": { min: "admin" },
   "invite.manage": { min: "admin" },
@@ -75,6 +77,7 @@ const DENIED: Partial<Record<Action, string>> = {
   "proposal.approve": "Only a manager or an admin can decide on pricing",
   "sequence.run":
     "Reps can only start, pause and enrol records in their own sequences",
+  "report.send": "Only the owner or a manager can email this report",
 };
 
 export function assertCan(

@@ -80,6 +80,23 @@ test(
   }),
 );
 
+test("a supplied env wins over process.env for the key, model and base URL", async () => {
+  reply.calls = [];
+  const env = {
+    OPENAI_API_KEY: "sk-stored",
+    OPENAI_BASE_URL: "https://proxy.example/v1/",
+    AI_MODEL: "custom-model",
+  };
+  await generate(options, reply(200, message(sample)), env);
+  const { url, init } = reply.calls[0];
+  assert.equal(url, "https://proxy.example/v1/responses");
+  assert.equal(init.headers.authorization, "Bearer sk-stored");
+  assert.equal(JSON.parse(init.body).model, "custom-model");
+  await assert.rejects(() =>
+    generate(options, reply(200, message(sample)), {}),
+  );
+});
+
 test(
   "the fast tier uses the fast model",
   withKey(async () => {

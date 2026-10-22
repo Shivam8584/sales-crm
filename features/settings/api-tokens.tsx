@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import Button from "@/components/_ui/button";
 import {
   Dialog,
@@ -35,7 +36,11 @@ const PICKER_CLASS = "border-input bg-secondary mx-0 h-9 w-full border px-3";
 
 const ACCESS = [
   { value: "read", label: "Read only", hint: "Look things up" },
-  { value: "write", label: "Read & write", hint: "Also add tasks and notes" },
+  {
+    value: "write",
+    label: "Read & write",
+    hint: "Also add notes, tasks and leads, move deals, tag",
+  },
 ];
 const EXPIRY = [
   { value: "30", label: "30 days" },
@@ -69,31 +74,79 @@ export default function ApiTokens() {
   const active = tokens.filter((token) => !token.revokedAt);
 
   return (
+    <>
+      <SettingsSection
+        title="AI assistants (MCP)"
+        description="Let Claude or another MCP client use your CRM. A token acts as you, with your permissions, and its changes show on timelines as done via MCP. Revoke it any time."
+        action={
+          <Button
+            variant="secondary"
+            size="xs"
+            disabled={
+              active.filter((token) => !token.expired).length >= MAX_LIVE_TOKENS
+            }
+            onClick={() => setCreating(true)}
+          >
+            Create token
+          </Button>
+        }
+      >
+        {active.length === 0 ? (
+          <SettingsRow
+            label="No tokens yet"
+            description="Create one, then paste its config into your MCP client."
+          />
+        ) : (
+          active.map((token) => <TokenRow key={token._id} token={token} />)
+        )}
+        <CreateDialog open={creating} onOpenChange={setCreating} />
+      </SettingsSection>
+      <RecentChanges />
+    </>
+  );
+}
+
+function RecentChanges() {
+  const writes = useQuery(api.tokens.writes, {});
+  const undo = useMutation(api.tokens.undo);
+  const [busy, setBusy] = useState<string>();
+  if (!writes?.length) return null;
+
+  async function run(id: Id<"mcpWrites">) {
+    setBusy(id);
+    try {
+      await undo({ id });
+      toast("Change undone");
+    } catch (error) {
+      toast(readError(error, "Couldn't undo that").message, { tone: "danger" });
+    } finally {
+      setBusy(undefined);
+    }
+  }
+
+  return (
     <SettingsSection
-      title="AI assistants (MCP)"
-      description="Let Claude or another MCP client look up your CRM data. A token acts as you, with your permissions. Revoke it any time."
-      action={
-        <Button
-          variant="secondary"
-          size="xs"
-          disabled={
-            active.filter((token) => !token.expired).length >= MAX_LIVE_TOKENS
-          }
-          onClick={() => setCreating(true)}
-        >
-          Create token
-        </Button>
-      }
+      title="Recent assistant changes"
+      description="What your tokens changed lately. Undo puts it back if nothing has changed since."
     >
-      {active.length === 0 ? (
+      {writes.map((write) => (
         <SettingsRow
-          label="No tokens yet"
-          description="Create one, then paste its config into your MCP client."
-        />
-      ) : (
-        active.map((token) => <TokenRow key={token._id} token={token} />)
-      )}
-      <CreateDialog open={creating} onOpenChange={setCreating} />
+          key={write._id}
+          label={write.summary}
+          description={`${write.token} · ${relativeTime(write.at)}${write.undone ? " · undone" : ""}`}
+        >
+          {write.undoable && (
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={busy === write._id}
+              onClick={() => void run(write._id)}
+            >
+              Undo
+            </Button>
+          )}
+        </SettingsRow>
+      ))}
     </SettingsSection>
   );
 }
@@ -225,8 +278,9 @@ function CreateDialog({
             <DialogHeader>
               <DialogTitle>Create token</DialogTitle>
               <DialogDescription>
-                It acts as you. Read & write tokens can also add tasks for you
-                and notes on records.
+                It acts as you. Read & write tokens can also add notes, tasks
+                and leads, log calls, move deals and add tags. They can&apos;t
+                delete, merge or send anything.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 px-6 py-5">

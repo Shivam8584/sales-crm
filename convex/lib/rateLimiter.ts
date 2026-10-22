@@ -11,10 +11,13 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   enrichment: { kind: "fixed window", rate: 20, period: MINUTE },
   fileUpload: { kind: "fixed window", rate: 30, period: MINUTE },
   testEmail: { kind: "fixed window", rate: 10, period: HOUR },
+  brandReport: { kind: "fixed window", rate: 10, period: HOUR },
   calls: { kind: "fixed window", rate: 20, period: MINUTE },
   productChecks: { kind: "fixed window", rate: 300, period: HOUR },
   /** MCP requests per token. */
   mcp: { kind: "fixed window", rate: 60, period: MINUTE },
+  /** MCP write tool calls per token. */
+  mcpWrite: { kind: "fixed window", rate: 20, period: MINUTE },
   /** Failed MCP authentications per client IP. */
   mcpAuthFail: { kind: "fixed window", rate: 20, period: MINUTE },
   /** Public survey page requests per client IP. */

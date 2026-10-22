@@ -24,6 +24,7 @@ import {
   type ThemePreference,
 } from "@/lib/theme";
 import { dateTime, shortDate } from "@/lib/time";
+import GoogleSection from "@/features/connections/google-section";
 import { DigestSetting } from "@/features/notifications/digest-setting";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -132,6 +133,8 @@ export default function ProfileSettings() {
       </SettingsSection>
 
       <CallingSection />
+
+      <GoogleSection />
 
       <ApiTokens />
 

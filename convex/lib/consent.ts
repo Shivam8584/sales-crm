@@ -405,6 +405,27 @@ async function redactAround(
     });
   }
   for (const fact of unique(facts)) await ctx.db.delete(fact._id);
+  if (person) {
+    const personId = person._id;
+    const tasks = await ctx.db
+      .query("researchTasks")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect();
+    for (const task of tasks) await ctx.db.delete(task._id);
+    const accountId = person.accountId;
+    const accountTask = accountId
+      ? await ctx.db
+          .query("researchTasks")
+          .withIndex("by_account", (q) => q.eq("accountId", accountId))
+          .first()
+      : null;
+    if (accountTask) {
+      await ctx.db.patch(accountTask._id, {
+        summary: undefined,
+        summaryHash: undefined,
+      });
+    }
+  }
 
   const hrefs = [
     ...(person ? [routes.person(person._id)] : []),

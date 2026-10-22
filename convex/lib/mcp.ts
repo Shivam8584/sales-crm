@@ -1,5 +1,5 @@
 import type { Auth, RegisteredMutation, RegisteredQuery } from "convex/server";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { fail } from "./errors";
 
@@ -63,4 +63,25 @@ export function runAs<F extends Registered>(
     _handler: (c: unknown, a: unknown) => Promise<ResultOf<F>>;
   };
   return handler(actingCtx, args);
+}
+
+/**
+ * The context with every timeline entry it inserts marked as written through
+ * the named token, however deep in the app's helpers the insert happens.
+ */
+export function viaToken(ctx: MutationCtx, via: string): MutationCtx {
+  const db = new Proxy(ctx.db, {
+    get(target, prop) {
+      if (prop === "insert") {
+        return (table: string, doc: object) =>
+          target.insert(
+            table as "timeline",
+            (table === "timeline" ? { ...doc, via } : doc) as never,
+          );
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  return { ...ctx, db };
 }

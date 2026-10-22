@@ -1,4 +1,4 @@
-import { PRIORITIES } from "./enums";
+import { CALL_OUTCOMES, DEAL_STAGES, PRIORITIES } from "./enums";
 
 /**
  * The MCP server's wire contract: token format, JSON-RPC envelopes and the
@@ -8,6 +8,17 @@ import { PRIORITIES } from "./enums";
 export const TOKEN_PREFIX = "hdcrm_";
 export const TOKEN_ACCESS = ["read", "write"] as const;
 export type TokenAccess = (typeof TOKEN_ACCESS)[number];
+
+/** How a person takes back a change an MCP write tool made. */
+export const UNDO_OPS = [
+  "remove_task",
+  "remove_entry",
+  "update_task",
+  "update_deal",
+  "update_account",
+  "update_person",
+] as const;
+export type UndoOp = (typeof UNDO_OPS)[number];
 
 export const MAX_LIVE_TOKENS = 10;
 export const MAX_BODY_BYTES = 64 * 1024;
@@ -194,6 +205,16 @@ const text = (description: string, maxLength = 100): Schema => ({
   maxLength,
 });
 const recordId = (what: string) => text(`The ${what} id`, 64);
+const target = (types: readonly string[]): Schema => ({
+  type: "object",
+  description: "The record",
+  properties: {
+    type: { type: "string", description: "The kind of record", enum: types },
+    id: recordId("record"),
+  },
+  required: ["type", "id"],
+  additionalProperties: false,
+});
 const object = (
   properties: Record<string, Schema>,
   required: string[] = [],
@@ -204,7 +225,18 @@ const object = (
   additionalProperties: false,
 });
 
+/** Lets a client retry a write without doing it twice. */
+export const IDEMPOTENCY_KEY = text(
+  "Optional. Repeating a call with the same key returns the first result instead of acting again",
+  64,
+);
+const writeObject = (
+  properties: Record<string, Schema>,
+  required: string[] = [],
+) => object({ ...properties, idempotencyKey: IDEMPOTENCY_KEY }, required);
+
 export const RECORD_TYPES = ["account", "person", "lead", "deal"] as const;
+export const TAGGABLE = ["account", "person"] as const;
 const TASK_WHEN = ["overdue", "today", "upcoming", "all"] as const;
 
 export const TOOLS: ToolDef[] = [
@@ -313,7 +345,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "Create a task assigned to the token's owner, optionally linked to one account, person, lead or deal.",
     access: "write",
-    inputSchema: object(
+    inputSchema: writeObject(
       {
         title: text("What to do", 200),
         dueDate: text("Due day as YYYY-MM-DD", 10),
@@ -331,26 +363,87 @@ export const TOOLS: ToolDef[] = [
     ),
   },
   {
-    name: "add_note",
+    name: "complete_task",
+    description: "Mark a task done. Use list_my_tasks to find its id.",
+    access: "write",
+    inputSchema: writeObject({ id: recordId("task") }, ["id"]),
+  },
+  {
+    name: "create_note",
     description:
       "Add a note to an account, person, lead or deal timeline, written as the token's owner.",
     access: "write",
-    inputSchema: object(
-      {
-        target: object(
-          {
-            type: {
-              type: "string",
-              description: "The kind of record",
-              enum: RECORD_TYPES,
-            },
-            id: recordId("record"),
-          },
-          ["type", "id"],
-        ),
-        body: text("The note", 5000),
-      },
+    inputSchema: writeObject(
+      { target: target(RECORD_TYPES), body: text("The note", 5000) },
       ["target", "body"],
+    ),
+  },
+  {
+    name: "log_call",
+    description:
+      "Log a call that already happened on an account, person, lead or deal timeline. Does not place a call.",
+    access: "write",
+    inputSchema: writeObject(
+      {
+        target: target(RECORD_TYPES),
+        outcome: {
+          type: "string",
+          description: "How the call went",
+          enum: CALL_OUTCOMES,
+        },
+        durationMin: {
+          type: "integer",
+          description: "Length in minutes",
+          minimum: 0,
+          maximum: 600,
+        },
+        body: text("What was discussed", 5000),
+      },
+      ["target"],
+    ),
+  },
+  {
+    name: "create_lead",
+    description:
+      "Add a lead owned by the token's owner. Refused when an open lead or a person with the same email or phone already exists; the error names it.",
+    access: "write",
+    inputSchema: writeObject(
+      {
+        name: text("The contact's name", 120),
+        companyName: text("The company's name", 120),
+        email: text("Email address", 200),
+        phone: text("Mobile number", 30),
+        website: text("Company website", 200),
+        message: text("Context for whoever follows up", 2000),
+      },
+      ["name", "companyName"],
+    ),
+  },
+  {
+    name: "update_deal_stage",
+    description:
+      "Move a deal to another stage. Moving to lost needs lostReason.",
+    access: "write",
+    inputSchema: writeObject(
+      {
+        id: recordId("deal"),
+        stage: {
+          type: "string",
+          description: "The new stage",
+          enum: DEAL_STAGES,
+        },
+        lostReason: text("Why the deal was lost", 300),
+      },
+      ["id", "stage"],
+    ),
+  },
+  {
+    name: "add_tag",
+    description: "Add a tag to an account or person. Existing tags are kept.",
+    access: "write",
+    inputSchema: writeObject(
+      { target: target(TAGGABLE), tag: text("The tag", 30) },
+      ["target", "tag"],
     ),
   },
 ];

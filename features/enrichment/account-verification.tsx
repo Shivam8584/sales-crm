@@ -184,7 +184,9 @@ function Verification({
             ? data.account.name
             : field === "gstin"
               ? (data.account.gstin ?? undefined)
-              : undefined
+              : field === "domain"
+                ? (data.account.domain ?? undefined)
+                : undefined
         }
         display={(field, value) =>
           field === "phone" ? formatPhone(value) : value

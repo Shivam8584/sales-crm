@@ -17,6 +17,7 @@ import {
   StatusText,
 } from "./settings-ui";
 import { routes } from "@/lib/routes";
+import ResearchSettings from "@/features/research/research-settings";
 
 type Overview = FunctionReturnType<typeof api.system.overview>;
 type Table = "accounts" | "people" | "leads";
@@ -50,6 +51,7 @@ function SystemOverview() {
   return (
     <>
       <ServicesSection services={overview.services} />
+      <ResearchSettings />
       <FailuresSection failures={overview.failures} />
       <DataSection members={overview.members} />
     </>
@@ -116,7 +118,11 @@ function ServicesSection({ services }: { services: Overview["services"] }) {
       </SettingsRow>
       <SettingsRow
         label="AI"
-        description={`${services.ai.main}, ${services.ai.fast}`}
+        description={
+          services.ai.configured
+            ? `${services.ai.main}, ${services.ai.fast}`
+            : "Add an OpenAI key under Integrations → Keys"
+        }
       >
         <ModeTag mode={services.ai.configured ? "live" : null} />
       </SettingsRow>

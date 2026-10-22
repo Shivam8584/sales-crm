@@ -1,12 +1,15 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import Button from "@/components/_ui/button";
 import Skeleton from "@/components/_ui/skeleton";
+import { readError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
+import { toast } from "@/stores/toast-store";
 import { NODE_META } from "./node-meta";
 
 type Analytics = NonNullable<
@@ -14,6 +17,8 @@ type Analytics = NonNullable<
 >;
 
 const number = (value: number) => value.toLocaleString("en-IN");
+const percentOf = (part: number, whole: number) =>
+  Math.round((part / whole) * 1000) / 10;
 
 function Section({
   title,
@@ -220,6 +225,121 @@ function Exits({ exits }: { exits: Analytics["exits"] }) {
   );
 }
 
+function SplitTests({
+  id,
+  tests,
+}: {
+  id: Id<"automations">;
+  tests: Analytics["tests"];
+}) {
+  const setSplit = useMutation(api.automations.setSplit);
+
+  async function send(nodeId: string, splitB: number) {
+    try {
+      const { previous } = await setSplit({ id, nodeId, splitB });
+      toast(
+        splitB === 100
+          ? "Version B now goes to everyone"
+          : "Version A now goes to everyone",
+        {
+          undo: () =>
+            void setSplit({ id, nodeId, splitB: previous }).catch((reason) =>
+              toast(readError(reason).message, { tone: "danger" }),
+            ),
+        },
+      );
+    } catch (reason) {
+      toast(readError(reason).message, { tone: "danger" });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {tests.map((test) => (
+        <div key={test.nodeId} className="flex flex-col gap-3">
+          <table className="w-full text-sm tabular-nums">
+            <caption className="sr-only">{test.title}</caption>
+            <thead>
+              <tr className="caption-style text-fg-tertiary">
+                <th scope="col" className="py-2 pr-2 text-left font-normal">
+                  Version
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-normal">
+                  Sent
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-normal">
+                  Replied
+                </th>
+                <th scope="col" className="py-2 pl-2 text-right font-normal">
+                  Reply rate
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {(["a", "b"] as const).map((variant) => {
+                const row = test[variant];
+                return (
+                  <tr key={variant} className="border-border border-t">
+                    <th
+                      scope="row"
+                      className="max-w-0 py-2.5 pr-2 text-left font-normal"
+                    >
+                      <span className="block truncate" title={row.subject}>
+                        <span className="text-fg-tertiary">
+                          {variant.toUpperCase()} ·{" "}
+                        </span>
+                        {row.subject}
+                      </span>
+                    </th>
+                    <td className="px-2 py-2.5 text-right">
+                      {number(row.sent)}
+                    </td>
+                    <td className="px-2 py-2.5 text-right">
+                      {number(row.replied)}
+                    </td>
+                    <td
+                      className={cn(
+                        "py-2.5 pl-2 text-right",
+                        test.leader === variant && "font-medium",
+                      )}
+                    >
+                      {row.sent ? `${percentOf(row.replied, row.sent)}%` : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="caption-style text-fg-tertiary text-pretty">
+            {test.summary}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {test.splitB > 0 && test.splitB < 100 ? (
+              <>
+                <Button size="sm" onClick={() => void send(test.nodeId, 0)}>
+                  Send A to everyone
+                </Button>
+                <Button size="sm" onClick={() => void send(test.nodeId, 100)}>
+                  Send B to everyone
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="caption-style text-fg-tertiary">
+                  {test.splitB === 100 ? "B" : "A"} goes to everyone.
+                </span>
+                <Button size="sm" onClick={() => void send(test.nodeId, 50)}>
+                  Split 50/50 again
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AnalyticsSkeleton() {
   return (
     <div className="flex flex-col gap-6">
@@ -286,6 +406,14 @@ export default function AutomationAnalytics({ id }: { id: Id<"automations"> }) {
                 <Section title="Messages">
                   <Messages messages={data.messages} />
                 </Section>
+                {data.tests.length > 0 && (
+                  <Section
+                    title="Split tests"
+                    description="Replies come from people who answered after that email. Opens are not tracked."
+                  >
+                    <SplitTests id={id} tests={data.tests} />
+                  </Section>
+                )}
               </div>
             </div>
             {data.truncated && (

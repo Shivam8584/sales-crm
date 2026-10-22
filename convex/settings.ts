@@ -7,6 +7,7 @@ import { retry } from "./lib/platform";
 import { providerMode } from "./lib/enrichment/kyc";
 import { logAddress } from "./lib/emailLog";
 import { requireActiveMember } from "./lib/records";
+import { secretEnv } from "./lib/secrets";
 import { literals, vLeadKind } from "./lib/validators";
 import { DEFAULT_HOT_SLA_FACTOR, HOT_SLA_PERCENT } from "../lib/domain/scoring";
 import { rulesProblem } from "../lib/domain/routing";
@@ -228,13 +229,14 @@ function eventStatus(event: Doc<"platformEvents">) {
 export const integrations = adminQuery({
   args: {},
   handler: async (ctx) => {
+    const env = await secretEnv(ctx);
     const site = (process.env.CONVEX_SITE_URL ?? "").replace(/\/$/, "");
     const recent = await ctx.db
       .query("platformEvents")
       .order("desc")
       .take(EVENT_SCAN);
     const waiting = recent.filter((event) => !event.processedAt);
-    const kyc = providerMode(process.env);
+    const kyc = providerMode(env);
     return {
       platform: {
         secretSet: Boolean(process.env.PLATFORM_WEBHOOK_SECRET),
@@ -256,7 +258,7 @@ export const integrations = adminQuery({
       },
       kyc: {
         mode: kyc,
-        signatureCheck: Boolean(process.env.KYC_HMAC_SECRET),
+        signatureCheck: Boolean(env.KYC_HMAC_SECRET),
       },
       alerts: {
         slack: Boolean(process.env.ALERT_SLACK_WEBHOOK_URL),

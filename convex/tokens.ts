@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
+import { mutation } from "./_generated/server";
 import { MAX_LIVE_TOKENS, generateToken, tokenPrefix } from "../lib/domain/mcp";
 import { cleanText } from "../lib/domain/normalize";
 import { sha256Hex } from "./lib/crypto";
 import { fail, invalid, notFound } from "./lib/errors";
-import { memberMutation, memberQuery } from "./lib/functions";
+import { getViewer, memberMutation, memberQuery } from "./lib/functions";
+import { runUndo } from "./lib/mcpTools";
 import { can } from "./lib/permissions";
 import { literals } from "./lib/validators";
 
@@ -95,5 +97,49 @@ export const revoke = memberMutation({
       fail("forbidden", "You can only revoke your own tokens");
     }
     if (!token.revokedAt) await ctx.db.patch(id, { revokedAt: Date.now() });
+  },
+});
+
+const RECENT = 20;
+
+/** What this member's write tokens changed lately. */
+export const writes = memberQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db
+      .query("mcpWrites")
+      .withIndex("by_member", (q) => q.eq("memberId", ctx.viewer._id))
+      .order("desc")
+      .take(RECENT);
+    return await Promise.all(
+      rows.map(async (row) => ({
+        _id: row._id,
+        summary: row.summary,
+        at: row.at,
+        token: (await ctx.db.get(row.tokenId))?.name ?? "Deleted token",
+        undoable: row.undo !== undefined && row.undoneAt === undefined,
+        undone: row.undoneAt !== undefined,
+      })),
+    );
+  },
+});
+
+/**
+ * The raw builder on purpose, like `mcp.write`: the app mutation that takes the
+ * change back wraps `ctx.db` with the count triggers itself.
+ */
+export const undo = mutation({
+  args: { id: v.id("mcpWrites") },
+  handler: async (ctx, { id }) => {
+    const viewer = await getViewer(ctx);
+    if (!viewer || viewer.status !== "active") {
+      fail("unauthenticated", "Sign in to continue");
+    }
+    const row = await ctx.db.get(id);
+    if (!row || row.memberId !== viewer._id) notFound("Change");
+    if (!row.undo) fail("conflict", "That change can't be undone");
+    if (row.undoneAt) fail("conflict", "Already undone");
+    await runUndo(ctx, viewer, row.undo);
+    await ctx.db.patch(id, { undoneAt: Date.now() });
   },
 });

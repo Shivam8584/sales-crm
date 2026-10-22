@@ -196,6 +196,12 @@ export const SETTINGS_PAGES = [
     adminOnly: false,
     minRole: "manager",
   },
+  {
+    href: routes.audit,
+    label: "Audit log",
+    adminOnly: false,
+    minRole: "manager",
+  },
   { href: routes.integrations, label: "Integrations", adminOnly: true },
   { href: routes.system, label: "System", adminOnly: true },
 ] as const;

@@ -321,7 +321,10 @@ function AutomaticItem({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="caption-style flex min-h-5.5 items-baseline gap-2 pt-0.5 leading-5">
           <p className="text-fg-secondary min-w-0 flex-1">
-            <span className="text-foreground font-medium">{actorName}</span>{" "}
+            <span className="text-foreground font-medium">{actorName}</span>
+            {entry.via && (
+              <span className="text-fg-tertiary"> via MCP ({entry.via})</span>
+            )}{" "}
             {entry.kind === "system" ? (
               entry.subject
             ) : changes.length === 1 ? (
@@ -486,7 +489,13 @@ function LoggedItem({
               </>
             ) : (
               <>
-                <span className="text-foreground font-medium">{actorName}</span>{" "}
+                <span className="text-foreground font-medium">{actorName}</span>
+                {entry.via && (
+                  <span className="text-fg-tertiary">
+                    {" "}
+                    via MCP ({entry.via})
+                  </span>
+                )}{" "}
                 {entry.kind === "note"
                   ? "added a note"
                   : `logged ${entry.kind === "email" ? "an" : "a"} ${meta.label.toLowerCase()}`}
@@ -589,6 +598,16 @@ function LoggedItem({
               <EntryBody body={entry.body} mentioned={entry.mentioned} />
             </p>
           )
+        )}
+        {entry.link?.startsWith("https://") && (
+          <a
+            href={entry.link}
+            target="_blank"
+            rel="noreferrer"
+            className="caption-style text-fg-tertiary hover:text-foreground w-fit hover:underline"
+          >
+            {entry.kind === "meeting" ? "Open in Calendar" : "Open in Gmail"}
+          </a>
         )}
       </div>
     </li>

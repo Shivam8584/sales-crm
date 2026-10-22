@@ -35,6 +35,7 @@ import {
   PanelSection,
   TemplateInput,
 } from "./form-bits";
+import SplitTest from "./split-test";
 import TemplatePreview from "./template-preview";
 
 const ASSIGNEE_LABEL: Record<Assignee, string> = {
@@ -417,6 +418,13 @@ function BuildFields({
               onChange={(body) => set({ body })}
             />
           </Field>
+          <SplitTest
+            id={id}
+            config={config}
+            fieldErrors={fieldErrors}
+            readOnly={readOnly}
+            set={set}
+          />
           <DeliveryNote channel="email" />
           <TemplatePreview node={node} />
         </>

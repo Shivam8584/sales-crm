@@ -29,6 +29,15 @@ function reason(fact: Fact, current: string | null | undefined) {
       ? "Printed on the company's website"
       : "Taken from the company's website";
   }
+  if (sourceFamily(fact.source) === "email") {
+    return "Read from an email they sent";
+  }
+  if (sourceFamily(fact.source) === "note") {
+    return "Mentioned in a teammate's note";
+  }
+  if (sourceFamily(fact.source) === "contacts") {
+    return "Their contacts write from this domain";
+  }
   return "Needs a person to confirm";
 }
 

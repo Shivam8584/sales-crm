@@ -7,6 +7,7 @@ import { emailProvider, whatsappProvider } from "./lib/automations/delivery";
 import { providerMode } from "./lib/enrichment/kyc";
 import { platformMode } from "./lib/platformClient";
 import { scraperMode } from "./lib/scraper";
+import { secretEnv } from "./lib/secrets";
 import { literals } from "./lib/validators";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -27,6 +28,7 @@ function target(run: Doc<"enrichmentRuns">) {
 export const overview = adminQuery({
   args: {},
   handler: async (ctx) => {
+    const env = await secretEnv(ctx);
     const since = Date.now() - WEEK_MS;
 
     const subscriptions = await ctx.db.query("pushSubscriptions").take(SCAN);
@@ -97,11 +99,11 @@ export const overview = adminQuery({
           failing: syncFailing.length,
           lastError: syncFailing[0]?.error ?? null,
         },
-        enrichment: providerMode(process.env),
+        enrichment: providerMode(env),
         scraper: scraperMode(process.env),
         ai: {
-          configured: Boolean(process.env.OPENAI_API_KEY?.trim()),
-          ...aiModels(process.env),
+          configured: Boolean(env.OPENAI_API_KEY?.trim()),
+          ...aiModels(env),
         },
       },
       failures: {

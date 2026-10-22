@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { auth } from "./auth";
 import { exotelWebhook } from "./calls";
 import { chatwootWebhook, emailInbound } from "./inbound";
+import { callback as googleCallback } from "./google";
 import { calcomWebhook, submit, submitPreflight } from "./leads";
 import { endpoint as mcpEndpoint, methodNotAllowed as mcpGet } from "./mcp";
 import { webhook as platformWebhook } from "./platform";
@@ -51,6 +52,11 @@ http.route({
   path: "/survey/respond",
   method: "OPTIONS",
   handler: surveyPreflight,
+});
+http.route({
+  path: "/google/callback",
+  method: "GET",
+  handler: googleCallback,
 });
 http.route({ path: "/mcp", method: "POST", handler: mcpEndpoint });
 http.route({ path: "/mcp", method: "GET", handler: mcpGet });

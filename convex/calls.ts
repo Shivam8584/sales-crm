@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import { action, httpAction } from "./_generated/server";
+import {
+  action,
+  httpAction,
+  type ActionCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import type { CallOutcome } from "../lib/domain/enums";
 import { callMinutes } from "../lib/domain/calls";
 import { normalizePhone } from "../lib/domain/normalize";
@@ -10,6 +15,7 @@ import { json, readJson, timingSafeEqual } from "./lib/http";
 import { resolveMerged } from "./lib/merged";
 import { sha256Hex } from "./lib/crypto";
 import { rateLimiter } from "./lib/rateLimiter";
+import { getSecret, secretEnv } from "./lib/secrets";
 import { touchRecords } from "./lib/tasks";
 import { vCallOutcome } from "./lib/validators";
 
@@ -21,8 +27,9 @@ const vTarget = v.union(
 const BODY_LIMIT = 64 * 1024;
 const MAX_URL = 500;
 
-function exotel() {
-  const env = (name: string) => process.env[name]?.trim() ?? "";
+async function exotel(ctx: QueryCtx | ActionCtx) {
+  const secrets = await secretEnv(ctx);
+  const env = (name: string) => secrets[name]?.trim() ?? "";
   const config = {
     sid: env("EXOTEL_SID"),
     key: env("EXOTEL_API_KEY"),
@@ -30,7 +37,7 @@ function exotel() {
     host: env("EXOTEL_SUBDOMAIN"),
     callerId: env("EXOTEL_CALLER_ID"),
     secret: env("EXOTEL_WEBHOOK_SECRET"),
-    site: env("CONVEX_SITE_URL").replace(/\/$/, ""),
+    site: (process.env.CONVEX_SITE_URL?.trim() ?? "").replace(/\/$/, ""),
   };
   const ready =
     Object.values(config).every(Boolean) &&
@@ -41,13 +48,14 @@ function exotel() {
 /** Whether the provider is set up on this server. */
 export const configured = memberQuery({
   args: {},
-  handler: async () => exotel() !== null,
+  handler: async (ctx) => (await exotel(ctx)) !== null,
 });
 
 /** Whether the viewer can start a call from the CRM: provider set up and their own phone saved. */
 export const enabled = memberQuery({
   args: {},
-  handler: async (ctx) => exotel() !== null && Boolean(ctx.viewer.phone),
+  handler: async (ctx) =>
+    (await exotel(ctx)) !== null && Boolean(ctx.viewer.phone),
 });
 
 /** The numbers come from the database, never from the client. */
@@ -102,7 +110,7 @@ export const begin = internalMutation({
 export const start = action({
   args: { target: vTarget },
   handler: async (ctx, { target }): Promise<void> => {
-    const config = exotel();
+    const config = await exotel(ctx);
     if (!config || !(await ctx.runQuery(api.calls.enabled, {}))) {
       fail("unavailable", "Calling from the CRM isn't set up");
     }
@@ -236,7 +244,7 @@ function outcomeOf(
 
 /** `POST /webhooks/exotel?secret=…`: Exotel's terminal status callback (JSON). */
 export const exotelWebhook = httpAction(async (ctx, request) => {
-  const secret = process.env.EXOTEL_WEBHOOK_SECRET?.trim();
+  const secret = await getSecret(ctx, "EXOTEL_WEBHOOK_SECRET");
   if (!secret) {
     console.error(
       "EXOTEL_WEBHOOK_SECRET must be set; rejecting Exotel webhook",

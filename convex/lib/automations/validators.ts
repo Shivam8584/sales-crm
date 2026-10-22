@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { VARIANTS } from "../../../lib/domain/ab-test";
 import {
   AUTOMATION_STATUSES,
   CONDITION_OPS,
@@ -94,6 +95,7 @@ export const vPublished = v.object({
 export const vStepLevel = literals(["info", "success", "warning", "error"]);
 export const vMessageStatus = literals(["queued", "sending", "sent", "failed"]);
 export const vMessageChannel = literals(["email", "whatsapp"]);
+export const vVariant = literals(VARIANTS);
 
 export const vHistoryEntry = v.object({
   nodeId: v.string(),

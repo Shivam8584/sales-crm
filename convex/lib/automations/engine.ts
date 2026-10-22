@@ -18,6 +18,11 @@ import type {
   LifecycleStage,
 } from "../../../lib/domain/enums";
 import {
+  hasVariantB,
+  pickVariant,
+  variantContent,
+} from "../../../lib/domain/ab-test";
+import {
   NODE_CHANNEL,
   SUBJECT_LABEL,
   SUBJECT_REF,
@@ -42,6 +47,7 @@ import {
   templateVariables,
   waitTimeout,
   waitUntil,
+  type EmailConfig,
   type ExitKind,
   type GraphNode,
   type PortId,
@@ -865,10 +871,25 @@ function waitStep({ node, enrollment, now }: StepContext): Outcome {
 
 const CHANNEL_NOUN = { email: "email", whatsapp: "WhatsApp message" } as const;
 
-const usesSurveyLink = (node: GraphNode) =>
-  nodeTexts(node).some((text) =>
-    templateVariables(text).includes("survey.link"),
-  );
+const usesSurveyLink = (texts: string[]) =>
+  texts.some((text) => templateVariables(text).includes("survey.link"));
+
+async function emailVariant(
+  ctx: MutationCtx,
+  enrollmentId: Id<"automationEnrollments">,
+  node: GraphNode,
+  email: EmailConfig,
+) {
+  if (!hasVariantB(email.ab)) return undefined;
+  const earlier = await ctx.db
+    .query("automationMessages")
+    .withIndex("by_enrollment", (q) => q.eq("enrollmentId", enrollmentId))
+    .collect();
+  const previous = earlier.find(
+    (message) => message.nodeId === node.id && message.variant,
+  )?.variant;
+  return pickVariant(email.ab, `${enrollmentId}:${node.id}`, previous);
+}
 
 const STOPPED_FOR_GOOD = new Set<ContactReason>([
   "withdrawn",
@@ -880,10 +901,15 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
   const { node, subject, published, automation, enrollment, now, stepKey } =
     step;
   const channel = NODE_CHANNEL[node.kind] as "email" | "whatsapp";
-  const config =
-    node.kind === "send_email"
-      ? configOf(node, "send_email")
-      : configOf(node, "send_whatsapp");
+  const email =
+    node.kind === "send_email" ? configOf(node, "send_email") : null;
+  const config = email ?? configOf(node, "send_whatsapp");
+  const variant = email
+    ? await emailVariant(ctx, enrollment._id, node, email)
+    : undefined;
+  const texts = email
+    ? Object.values(variantContent(email, variant ?? "a"))
+    : nodeTexts(node);
   const recipient = await recipientFor(ctx, subject, channel);
   const decision = await contactDecision(
     ctx,
@@ -910,9 +936,7 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
   const to = recipientAddress(recipient, channel)!;
   const vars = await subjectVars(ctx, subject, recipient, enrollment.context);
   const missing = [
-    ...new Set(
-      nodeTexts(node).flatMap((text) => renderTemplate(text, vars).missing),
-    ),
+    ...new Set(texts.flatMap((text) => renderTemplate(text, vars).missing)),
   ];
   if (missing.length) {
     return {
@@ -989,7 +1013,7 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
 
   let sendVars = vars;
   let surveyLink: string | undefined;
-  if (usesSurveyLink(node) && subject.account) {
+  if (usesSurveyLink(texts) && subject.account) {
     const token = await issueSurveyToken(ctx, {
       accountId: subject.account._id,
       personId: recipient.personId,
@@ -1020,10 +1044,9 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
   let params: string[] | undefined;
   let template: string | undefined;
   let language: string | undefined;
-  if (node.kind === "send_email") {
-    const email = configOf(node, "send_email");
+  if (email) {
     ({ subject: subjectLine, body } = renderEmail(
-      email,
+      variantContent(email, variant ?? "a"),
       sendVars,
       published.settings.language,
     ));
@@ -1061,6 +1084,8 @@ async function sendStep(ctx: MutationCtx, step: StepContext): Promise<Outcome> {
     automationId: automation._id,
     enrollmentId: enrollment._id,
     stepKey,
+    nodeId: variant ? node.id : undefined,
+    variant,
     channel,
     personId: recipient.personId,
     leadId: recipient.leadId,

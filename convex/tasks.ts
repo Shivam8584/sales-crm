@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { WithoutSystemFields } from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -11,6 +12,7 @@ import {
 } from "../lib/domain/task-lines";
 import { taskCompletedAt } from "../lib/domain/transitions";
 import { emitAutomationTrigger } from "./lib/automations/engine";
+import { markRestored, recordDelete, recordTaskEdit } from "./lib/audit";
 import { invalid, notFound } from "./lib/errors";
 import { memberMutation, memberQuery, type Viewer } from "./lib/functions";
 import { searchText, vSearch } from "./lib/lists";
@@ -455,6 +457,7 @@ export const update = memberMutation({
       fields.reassignedAt = now;
     }
     await ctx.db.patch(id, { ...fields, updatedAt: now });
+    await recordTaskEdit(ctx, task, fields, ctx.viewer._id);
     await logStatus(ctx, { ...task, ...fields }, task.status);
     return before;
   },
@@ -504,6 +507,7 @@ export const updateMany = memberMutation({
         fields.reassignedAt = now;
       }
       await ctx.db.patch(id, { ...fields, updatedAt: now });
+      await recordTaskEdit(ctx, task, fields, ctx.viewer._id);
       await logStatus(ctx, { ...task, ...fields }, task.status);
       previous.push({
         id,
@@ -540,6 +544,7 @@ export const move = memberMutation({
       now,
     );
     await ctx.db.patch(id, { status, position, completedAt, updatedAt: now });
+    await recordTaskEdit(ctx, task, { status }, ctx.viewer._id);
     await logStatus(ctx, { ...task, status }, task.status);
     return previous;
   },
@@ -559,6 +564,7 @@ export const place = memberMutation({
       completedAt: taskCompletedAt(task.status, status, task.completedAt, now),
       updatedAt: now,
     });
+    await recordTaskEdit(ctx, task, { status }, ctx.viewer._id);
     await logStatus(ctx, { ...task, status }, task.status);
   },
 });
@@ -584,55 +590,68 @@ export const remove = memberMutation({
       );
     }
     const { _id, _creationTime, ...stored } = task;
-    void _id;
     void _creationTime;
+    await recordDelete(ctx, "tasks", _id, task.title, ctx.viewer._id, stored);
     return stored;
   },
 });
 
+/** Puts a deleted task back; also what "Restore" in the audit log runs. */
+export async function restoreTask(
+  ctx: MutationCtx & { viewer: Doc<"members"> },
+  task: WithoutSystemFields<Doc<"tasks">>,
+) {
+  const exists = async (id: Id<"accounts" | "people" | "deals" | "leads">) =>
+    (await ctx.db.get(id)) !== null;
+  const assignee = await ctx.db.get(task.assigneeId);
+  if (!Number.isFinite(task.position)) invalid("position", "Invalid position");
+  const id = await ctx.db.insert("tasks", {
+    ...task,
+    completedAt: taskCompletedAt(
+      task.status,
+      task.status,
+      task.completedAt,
+      Date.now(),
+    ),
+    assigneeId:
+      assignee?.status === "active" ? task.assigneeId : ctx.viewer._id,
+    accountId:
+      task.accountId && (await exists(task.accountId))
+        ? task.accountId
+        : undefined,
+    personId:
+      task.personId && (await exists(task.personId))
+        ? task.personId
+        : undefined,
+    dealId:
+      task.dealId && (await exists(task.dealId)) ? task.dealId : undefined,
+    leadId:
+      task.leadId && (await exists(task.leadId)) ? task.leadId : undefined,
+    updatedAt: Date.now(),
+  });
+  const restored = (await ctx.db.get(id))!;
+  const refs = taskRefs(restored);
+  if (hasRefs(refs)) {
+    await logSystem(
+      ctx,
+      refs,
+      `restored the task “${restored.title}”`,
+      undefined,
+      ctx.viewer._id,
+    );
+  }
+  await markRestored(
+    ctx,
+    "tasks",
+    ({ snapshot: copy }) =>
+      copy?.title === task.title &&
+      copy.position === task.position &&
+      copy.assigneeId === task.assigneeId,
+  );
+  return id;
+}
+
 export const restore = memberMutation({
   args: { task: vStored },
-  handler: async (ctx, { task }) => {
-    const exists = async (id: Id<"accounts" | "people" | "deals" | "leads">) =>
-      (await ctx.db.get(id)) !== null;
-    const assignee = await ctx.db.get(task.assigneeId);
-    if (!Number.isFinite(task.position))
-      invalid("position", "Invalid position");
-    const id = await ctx.db.insert("tasks", {
-      ...task,
-      completedAt: taskCompletedAt(
-        task.status,
-        task.status,
-        task.completedAt,
-        Date.now(),
-      ),
-      assigneeId:
-        assignee?.status === "active" ? task.assigneeId : ctx.viewer._id,
-      accountId:
-        task.accountId && (await exists(task.accountId))
-          ? task.accountId
-          : undefined,
-      personId:
-        task.personId && (await exists(task.personId))
-          ? task.personId
-          : undefined,
-      dealId:
-        task.dealId && (await exists(task.dealId)) ? task.dealId : undefined,
-      leadId:
-        task.leadId && (await exists(task.leadId)) ? task.leadId : undefined,
-      updatedAt: Date.now(),
-    });
-    const restored = (await ctx.db.get(id))!;
-    const refs = taskRefs(restored);
-    if (hasRefs(refs)) {
-      await logSystem(
-        ctx,
-        refs,
-        `restored the task “${restored.title}”`,
-        undefined,
-        ctx.viewer._id,
-      );
-    }
-    return id;
-  },
+  handler: async (ctx, { task }) => restoreTask(ctx, task),
 });

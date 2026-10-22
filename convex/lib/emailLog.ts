@@ -8,6 +8,7 @@ import {
 import { normalizeEmail } from "../../lib/domain/normalize";
 import { markFirstTouch, touch } from "../timeline";
 import { notifyFollowers } from "./follows";
+import { onReply } from "./research/queue";
 import type { RecordRefs } from "./timeline";
 
 export const logAddress = () =>
@@ -49,6 +50,9 @@ export async function logEmail(
     subject: string;
     body: string;
     at: number;
+    link?: string;
+    /** Skip follower notifications, for history imported after the fact. */
+    quiet?: boolean;
   },
 ) {
   const entry = {
@@ -59,11 +63,16 @@ export async function logEmail(
     occurredAt: input.at,
     subject: input.subject,
     body: input.body || undefined,
+    link: input.link,
   };
   const id = await ctx.db.insert("timeline", entry);
   await touch(ctx, input.refs, input.at);
-  await notifyFollowers(ctx, { _id: id, ...entry });
+  if (!input.quiet) await notifyFollowers(ctx, { _id: id, ...entry });
+  if (input.direction === "inbound" && input.refs.personId && !input.quiet) {
+    await onReply(ctx, input.refs.personId, input.body);
+  }
   if (input.actorId) {
     await markFirstTouch(ctx, input.lead, input.actorId, "email", input.at);
   }
+  return id;
 }

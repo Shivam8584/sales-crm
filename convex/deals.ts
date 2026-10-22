@@ -37,6 +37,7 @@ import {
   requireAccount,
   requireActiveMember,
 } from "./lib/records";
+import { markRestored, recordDelete, recordEdit } from "./lib/audit";
 import { logChanges, logSystem } from "./lib/timeline";
 import { literals, vDay, vDealStage, vMoney } from "./lib/validators";
 
@@ -141,9 +142,20 @@ function snapshot(deal: Doc<"deals">): Required<Patch> {
 async function logStage(
   ctx: MutationCtx & { viewer: Doc<"members"> },
   deal: Pick<Doc<"deals">, "_id" | "accountId" | "title">,
+  from: DealStage,
   stage: DealStage,
   lostReason?: string,
 ) {
+  await recordEdit(ctx, "deals", deal._id, deal.title, ctx.viewer._id, [
+    {
+      field: "Stage",
+      from: DEAL_STAGE_LABEL[from],
+      to:
+        stage === "lost" && lostReason
+          ? `${DEAL_STAGE_LABEL[stage]} (${lostReason})`
+          : DEAL_STAGE_LABEL[stage],
+    },
+  ]);
   const subject =
     stage === "won"
       ? `won the deal ${deal.title}`
@@ -711,7 +723,13 @@ export const update = memberMutation({
     }
     await logChanges(ctx, { accountId, dealId: id }, ctx.viewer._id, changes);
     if (stageChanged) {
-      await logStage(ctx, { _id: id, accountId, title }, stage, reason);
+      await logStage(
+        ctx,
+        { _id: id, accountId, title },
+        deal.stage,
+        stage,
+        reason,
+      );
     }
     return before;
   },
@@ -766,7 +784,7 @@ export const move = memberMutation({
       position,
       updatedAt: Date.now(),
     });
-    await logStage(ctx, deal, stage, reason);
+    await logStage(ctx, deal, deal.stage, stage, reason);
     return previous;
   },
 });
@@ -807,6 +825,10 @@ export const remove = memberMutation({
     );
     const { _id, _creationTime, ...fields } = deal;
     void _creationTime;
+    await recordDelete(ctx, "deals", _id, deal.title, ctx.viewer._id, {
+      deal: fields,
+      taskIds,
+    });
     return { previousId: _id, deal: fields, proposals, taskIds };
   },
 });
@@ -827,6 +849,71 @@ export const purgeProposals = internalMutation({
   },
 });
 
+type StoredDeal = Omit<Doc<"deals">, "_id" | "_creationTime">;
+
+/** Re-creates a deleted deal; also what "Restore" in the audit log runs. */
+export async function restoreDeal(
+  ctx: MutationCtx & { viewer: Doc<"members"> },
+  previousId: Id<"deals">,
+  deal: StoredDeal,
+  taskIds: Id<"tasks">[] = [],
+) {
+  if (await ctx.db.get(previousId)) {
+    fail("conflict", "That deal still exists");
+  }
+  const account = await requireAccount(ctx, deal.accountId);
+  const owner = await ctx.db.get(deal.ownerId);
+  const effects = dealStageEffects(
+    { stage: deal.stage, closedAt: deal.closedAt },
+    deal.stage,
+    cleanReason(deal.lostReason),
+    Date.now(),
+  );
+  if (!effects.ok) invalid(effects.problem.field, effects.problem.message);
+  const id = await ctx.db.insert("deals", {
+    ...deal,
+    closedAt: effects.closedAt,
+    lostReason: effects.lostReason,
+    title: cleanTitle(deal.title),
+    amount: assertMoney(deal.amount, "amount"),
+    ownerId: owner ? deal.ownerId : ctx.viewer._id,
+    closeDate: cleanCloseDate(deal.closeDate ?? null),
+    personIds: await keepPeopleAt(ctx, deal.personIds, account._id),
+    updatedAt: Date.now(),
+  });
+  // Ids are never reused, so re-point history, tasks and proposals at the new document.
+  const entries = await ctx.db
+    .query("timeline")
+    .withIndex("by_deal", (q) => q.eq("dealId", previousId))
+    .collect();
+  for (const entry of entries) await ctx.db.patch(entry._id, { dealId: id });
+  const tasks = await ctx.db
+    .query("tasks")
+    .withIndex("by_deal", (q) => q.eq("dealId", previousId))
+    .collect();
+  for (const task of tasks) await ctx.db.patch(task._id, { dealId: id });
+  for (const taskId of taskIds) {
+    const task = await ctx.db.get(taskId);
+    if (task && !task.dealId) await ctx.db.patch(taskId, { dealId: id });
+  }
+  const proposals = await ctx.db
+    .query("proposals")
+    .withIndex("by_deal", (q) => q.eq("dealId", previousId))
+    .collect();
+  for (const proposal of proposals) {
+    await ctx.db.patch(proposal._id, { dealId: id });
+  }
+  await logSystem(
+    ctx,
+    { accountId: account._id, dealId: id },
+    `restored the deal ${deal.title}`,
+    undefined,
+    ctx.viewer._id,
+  );
+  await markRestored(ctx, "deals", (event) => event.recordId === previousId);
+  return id;
+}
+
 export const restore = memberMutation({
   args: {
     previousId: v.id("deals"),
@@ -846,59 +933,6 @@ export const restore = memberMutation({
     proposals: v.optional(v.array(vStoredProposal)),
     taskIds: v.optional(v.array(v.id("tasks"))),
   },
-  handler: async (ctx, { previousId, deal, taskIds = [] }) => {
-    if (await ctx.db.get(previousId)) {
-      fail("conflict", "That deal still exists");
-    }
-    const account = await requireAccount(ctx, deal.accountId);
-    const owner = await ctx.db.get(deal.ownerId);
-    const effects = dealStageEffects(
-      { stage: deal.stage, closedAt: deal.closedAt },
-      deal.stage,
-      cleanReason(deal.lostReason),
-      Date.now(),
-    );
-    if (!effects.ok) invalid(effects.problem.field, effects.problem.message);
-    const id = await ctx.db.insert("deals", {
-      ...deal,
-      closedAt: effects.closedAt,
-      lostReason: effects.lostReason,
-      title: cleanTitle(deal.title),
-      amount: assertMoney(deal.amount, "amount"),
-      ownerId: owner ? deal.ownerId : ctx.viewer._id,
-      closeDate: cleanCloseDate(deal.closeDate ?? null),
-      personIds: await keepPeopleAt(ctx, deal.personIds, account._id),
-      updatedAt: Date.now(),
-    });
-    // Ids are never reused, so re-point history, tasks and proposals at the new document.
-    const entries = await ctx.db
-      .query("timeline")
-      .withIndex("by_deal", (q) => q.eq("dealId", previousId))
-      .collect();
-    for (const entry of entries) await ctx.db.patch(entry._id, { dealId: id });
-    const tasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_deal", (q) => q.eq("dealId", previousId))
-      .collect();
-    for (const task of tasks) await ctx.db.patch(task._id, { dealId: id });
-    for (const taskId of taskIds) {
-      const task = await ctx.db.get(taskId);
-      if (task && !task.dealId) await ctx.db.patch(taskId, { dealId: id });
-    }
-    const proposals = await ctx.db
-      .query("proposals")
-      .withIndex("by_deal", (q) => q.eq("dealId", previousId))
-      .collect();
-    for (const proposal of proposals) {
-      await ctx.db.patch(proposal._id, { dealId: id });
-    }
-    await logSystem(
-      ctx,
-      { accountId: account._id, dealId: id },
-      `restored the deal ${deal.title}`,
-      undefined,
-      ctx.viewer._id,
-    );
-    return id;
-  },
+  handler: async (ctx, { previousId, deal, taskIds }) =>
+    restoreDeal(ctx, previousId, deal, taskIds),
 });

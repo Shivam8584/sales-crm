@@ -5,7 +5,7 @@ The sales CRM for the Hypedrive team, built for selling to D2C brands and market
 - **Pipeline:** inbound leads with a speed-to-lead SLA, scoring and routing rules; accounts and people with GSTIN/DIN verification and an enrichment waterfall; deals with a board, a deal desk and one proposal per deal; tasks and a Today cockpit; a per-record timeline; custom fields and file attachments.
 - **Selling:** Sequences (template-first multi-step email and task follow-ups, with consent checks and one-reply unsubscribe), a Playbook of objection answers and battlecards, click-to-call and a call log, optional AI briefs, next-action hints, quick capture, drafts and call summaries.
 - **Platform:** sync and activation tracking against the Hypedrive platform, stuck-brand alerts, prospecting from marketplace listings, reports.
-- **Data quality and access:** duplicate finder and merge (Settings → Duplicates), a team Activity feed, a weekly manager report email, rep emails logged to timelines by BCC (`log@replies.hypedrive.app`), and an MCP server with personal API tokens so Claude or Cursor can read the CRM and add tasks and notes as you.
+- **Data quality and access:** duplicate finder and merge (Settings → Duplicates), an audit log of field changes with restore for archived and deleted records (Settings → Audit log, managers and admins), a team Activity feed, a weekly manager report email, rep emails logged to timelines by BCC (`log@replies.hypedrive.app`), and an MCP server with personal API tokens so Claude or Cursor can read the CRM and, with a read and write token, make a small set of safe changes as you.
 - **Working in it:** saved views, pins, inline and bulk edits with Undo (Ctrl/Cmd+Z), a command palette, smart notifications with a daily digest and web push, a first-run tour, an installable PWA with an offline page, and an admin System page.
 
 Only `/demo` (the embeddable demo-request form) and `/api/health` are public. Everything else is behind sign-in.
@@ -55,9 +55,9 @@ stores/                ui-store (dialogs, sidebar, command menu), toast-store
 | Work       | `/today`, `/inbox`, `/tasks`                                             |
 | Pipeline   | `/pipeline/{prospecting,leads,deals,activation}`, detail at `…/<id>`     |
 | Automation | `/automation/sequences`, `/automation/sequences/<id>`                    |
-| Records    | `/records/{accounts,people}`, detail at `…/<id>`                         |
+| Records    | `/records/{accounts,people}`, detail at `…/<id>`, `…/accounts/<id>/report` |
 | Insights   | `/insights/{reports,activity,playbook}`                                  |
-| Settings   | `/settings/{profile,team,workspace,fields,targets,duplicates,integrations,system}` |
+| Settings   | `/settings/{profile,team,workspace,fields,targets,duplicates,audit,integrations,system}` |
 
 There are no redirects from the old paths. `npx convex run migrations:runAll` rewrites stored notification links and saved-view paths to the new ones (run it once per deployment). The lead-capture webhook stays `POST /leads` on the Convex site URL; it is not a page.
 
@@ -104,7 +104,7 @@ Data migrations live in `convex/migrations.ts` (`migrations.define`). Deploy, th
 
 ## Environment
 
-Convex deployment variables are set with `npx convex env set NAME value`. All are optional unless marked.
+Convex deployment variables are set with `npx convex env set NAME value`. All are optional unless marked. Integration keys (OpenAI, the KYC service, Exotel) can instead be saved by an admin in Settings → Integrations → Keys once `KEYS_ENCRYPTION_KEY` is set; they are stored AES-256-GCM encrypted, shown only as their last 4 characters, and an environment variable of the same name always wins. Changing `KEYS_ENCRYPTION_KEY` makes stored keys unreadable, so re-enter them afterwards.
 
 | Variable                             | Where  | What it does                                                                                               |
 | ------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------- |
@@ -136,7 +136,9 @@ Convex deployment variables are set with `npx convex env set NAME value`. All ar
 | `VAPID_PRIVATE_KEY`                  | Convex | Browser push only. Private key of the same pair; keep it secret                                            |
 | `VAPID_SUBJECT`                      | Convex | Browser push only. Contact for push services, e.g. `mailto:you@hypedrive.in`                               |
 | `WHATSAPP_PHONE_NUMBER_ID`           | Convex | Meta WhatsApp Cloud API number; with `WHATSAPP_ACCESS_TOKEN` automations send for real                     |
-| `OPENAI_API_KEY`                     | Convex | Turns on AI briefs, drafts, call summaries and quick capture; unset = AI is hidden                         |
+| `OPENAI_API_KEY`                     | Convex | Turns on AI briefs, drafts, call summaries and quick capture; unset = AI is hidden. Can also be saved in Settings → Integrations → Keys |
+| `KEYS_ENCRYPTION_KEY`                | Convex | 32+ random characters (`openssl rand -base64 32`). Encrypts keys saved in Settings → Integrations → Keys; unset = env only |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Convex | Google OAuth client for Profile → Connections (Gmail and Calendar sync); needs `KEYS_ENCRYPTION_KEY` too, else the section is hidden |
 | `EXOTEL_SID`, `EXOTEL_API_KEY`       | Convex | Exotel account SID and API key for click-to-call; needs every Exotel variable here, else it is hidden      |
 | `EXOTEL_API_TOKEN`                   | Convex | Exotel API token                                                                                           |
 | `EXOTEL_SUBDOMAIN`                   | Convex | Exotel API host for your region: `api.exotel.com` (Singapore) or `api.in.exotel.com` (Mumbai)              |
@@ -283,15 +285,38 @@ The admin System page (Settings → System) shows service health, the last week'
 
 ### MCP (AI assistants)
 
-`POST https://convex-sales-site.hypedrive.app/mcp` is a stateless MCP server (Streamable HTTP, JSON-RPC). Each member creates a token under Settings → Profile → AI assistants; a token acts as that member, read-only or read and write, never with more permission than the member has. Tools: `search_records`, `get_account`, `get_person`, `get_lead`, `get_deal`, `list_my_tasks`, `todays_summary`, `list_sequences`, `get_sequence`, `read_sequence_log`, and (write tokens) `create_task` and `add_note`. Tokens are stored hashed, limited to 60 calls a minute, and browser origins are refused. The failed-auth limiter keys on `X-Forwarded-For`, so the proxy must set it.
+`POST https://convex-sales-site.hypedrive.app/mcp` is a stateless MCP server (Streamable HTTP, JSON-RPC). Each member creates a token under Settings → Profile → AI assistants; a token acts as that member, read-only or read and write, never with more permission than the member has. Tools: `search_records`, `get_account`, `get_person`, `get_lead`, `get_deal`, `list_my_tasks`, `todays_summary`, `list_sequences`, `get_sequence`, `read_sequence_log`, and, for read and write tokens only, `create_note`, `create_task`, `complete_task`, `create_lead` (refused when an open lead or person with that email or phone exists), `update_deal_stage`, `log_call` and `add_tag`. Nothing destructive is exposed: no delete, erase, merge or send. Tokens are read only unless you pick Read & write when creating one. Writes run through the same mutations as the app with the owner's role, so permission and erasure rules apply; each is limited to 20 a minute per token, accepts an optional `idempotencyKey` (repeating it returns the first result), and shows on the record's timeline and the Activity feed as "via MCP (token name)". Settings → Profile → AI assistants lists recent changes with Undo (kept 30 days; refused if the record has changed since). Tokens are stored hashed, limited to 60 calls a minute, and browser origins are refused. The failed-auth limiter keys on `X-Forwarded-For`, so the proxy must set it.
 
 ### Logging customer emails
 
 BCC `log@replies.hypedrive.app` (or forward the mail to it) from your own CRM email address and it appears on the matching person's or lead's timeline. It is accepted only when the sender is an active member and the mail passed SPF or DKIM; otherwise it is ignored silently. The Cloudflare rule and Worker are described in `deploy/inbound-email-worker/README.md`.
 
+### Gmail and Calendar sync
+
+Each member can connect their own Google account under Settings → Profile → Connections. Mail and meetings with people already in the CRM are added to their timeline (subject, a short snippet and a link, never the body); nothing is sent or changed in Google. The section is hidden until `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `KEYS_ENCRYPTION_KEY` are set on the Convex deployment (refresh tokens are stored AES-256-GCM encrypted).
+
+In Google Cloud, create an OAuth client of type Web application, enable the Gmail API and Google Calendar API, add the scopes `gmail.readonly` and `calendar.readonly`, and register the redirect URI `<CONVEX_SITE_URL>/google/callback` (the HTTP actions domain, the same host as `NEXT_PUBLIC_CONVEX_SITE_URL`). While the consent screen is in Testing, only listed test users can connect; publishing needs Google's verification for these sensitive and restricted scopes.
+
+A cron runs every 15 minutes. The first run reads 14 days of mail and 30 days of meetings; after that it follows Gmail history, at most 300 messages per member per run. A message is logged once even if the rep also BCCs it (matched by Message-ID), and a meeting once even if several teammates attended. Teammates, our own domains, each member's "Never log" list, erased people and anyone who withdrew consent or asked for erasure are skipped. Disconnecting deletes the stored token, revokes it at Google and, if asked, removes the entries it added. If Google revokes access the member gets a notification to reconnect.
+
+### Research agent
+
+A background worker that keeps accounts and people fresh without anyone clicking. It is off until an admin turns it on under Settings → System → Research agent, which also sets the daily limit (default 50 checks) and how long a record may sit before its routine refresh (default 30 days). Turning the switch off stops it at once; a manual "Research now" is refused while it is off. It needs no env var: the queue and the CRM-history checks work without an AI key, and with a key (Settings → Integrations → Keys) each record also gets a short written summary.
+
+- **What it reads:** only what this install already has: inbound email signatures and replies on the person's timeline, teammates' notes and calls, the contacts' company email domain, and the enrichment waterfall (GST registry, platform, company website) for accounts that have a GSTIN, website or platform link. There is no web search.
+- **Nothing is guessed.** Findings are stored as facts with their evidence in the same model as enrichment suggestions. Only a person's own signature that names them may fill a field (phone, title, LinkedIn), and only while it is empty and nobody cleared or rejected that value; "Undo" on the record clears it and it never returns. Everything else, including a possible job change, is a suggestion to accept or reject. Human-entered values are never overwritten. Erased people are skipped and their queue entry and findings are deleted.
+- **When it looks:** new accounts and people, existing records (a few per run, urgent ones first), a reply that hints the sender moved on, a record not checked for the refresh interval, and "Research now". After each check it schedules the next with a visible reason on the record, for example "Checking again in 2 weeks: no reply to 2 emails".
+- **Cost bounds:** a cron runs every 10 minutes and leases at most 5 records, within the daily limit; a lease expires after 10 minutes and a record that keeps failing waits for its routine refresh. An AI summary is one call per changed history, at most 6,000 characters in and 300 tokens out, and is skipped when the history has not changed.
+
+### Results reports and split tests
+
+- **Results report:** a linked account's page has Results report in its menu: `/records/accounts/<id>/report` shows a month or a quarter from the platform data the CRM already holds (wallet top-ups, approved results, campaigns, wallet balance, reviews waiting, activation milestones), compared with the period before, and prints to A4 or PDF. The quarter view adds editable talking points, drafted from the numbers (and by AI when a key is set). Spend per campaign is not in the platform feed, so the report shows top-ups and approvals, not spend.
+- **Email it:** Email on that page previews the plain-text version, sends it to the account's main contact now, and can switch on a monthly send per account. Both need the contact's consent to product updates, an email provider, and the account's owner or a manager; the workspace stop-all switch holds them. The monthly send runs daily from the 2nd (India time), once per month, and skips a month where nothing happened. It starts with the month after you switch it on.
+- **Split tests:** an email step can show a second subject and/or message (Test a second version in the step panel) to a share of the audience. Each enrolment gets one version for good, and Analytics lists sent and replied per version with a "too early to call" note until both have 30 sends; opens are not tracked. Send A or Send B to everyone sets the share to 0 or 100% on the live version without a new version.
+
 ### AI, push and calls
 
-- **AI:** set `OPENAI_API_KEY` (and optionally `AI_MODEL`, `AI_MODEL_FAST`) on the Convex deployment. Unset, every AI surface stays hidden.
+- **AI:** add the OpenAI key (and optionally the models and base URL) in Settings → Integrations → Keys, or set `OPENAI_API_KEY`, `AI_MODEL`, `AI_MODEL_FAST` on the Convex deployment. Unset, every AI surface stays hidden.
 - **Web push:** generate a VAPID pair with `node -e "console.log(require('web-push').generateVAPIDKeys())"` and set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`.
 - **Click-to-call from the CRM:** set the `EXOTEL_*` variables; without them the Call button opens the phone dialer or a timed call log.
 

@@ -51,6 +51,7 @@ import {
   ownDomains,
 } from "./lib/emailLog";
 import { isOpen, resolveLeadSla } from "./lib/leads";
+import { onReply } from "./lib/research/queue";
 import { rateLimiter } from "./lib/rateLimiter";
 import type { RecordRefs } from "./lib/timeline";
 import { notify } from "./notifications";
@@ -71,7 +72,7 @@ const vChannel = v.union(v.literal("email"), v.literal("whatsapp"));
 
 type Contact = { email?: string; phone?: string; name?: string };
 
-async function findContacts(
+export async function findContacts(
   ctx: MutationCtx,
   contact: Contact,
   orgId: string | undefined,
@@ -143,7 +144,7 @@ type Group = {
 };
 
 /** One timeline entry per contact: a person (with their newest lead), a lead on its own, or the org's account. */
-function groupContacts(found: Awaited<ReturnType<typeof findContacts>>) {
+export function groupContacts(found: Awaited<ReturnType<typeof findContacts>>) {
   const groups: Group[] = [];
   const used = new Set<Id<"leads">>();
   const newestFirst = [...found.leads].sort(
@@ -269,6 +270,9 @@ export const receive = internalMutation({
         body: input.text || undefined,
       });
       await touch(ctx, group.refs, at);
+      if (input.channel === "email" && group.refs.personId) {
+        await onReply(ctx, group.refs.personId, input.text);
+      }
       const lead = group.lead;
       if (lead && isOpen(lead) && !lead.firstTouchedAt) {
         await ctx.db.patch(lead._id, {

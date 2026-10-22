@@ -31,6 +31,7 @@ import AccountStallBanner from "@/features/activation/account-stall-banner";
 import { RecordAutomations } from "@/features/automations/record-automations";
 import RecordDeals from "@/features/deals/record-deals";
 import AccountVerification from "@/features/enrichment/account-verification";
+import AgentSection from "@/features/research/agent-section";
 import CustomFields from "@/features/fields/custom-fields";
 import FilesSection from "@/features/files/files-section";
 import MemberPicker from "@/features/members/member-picker";
@@ -49,6 +50,7 @@ import { dateTime, relativeTime, shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useUiStore } from "@/stores/ui-store";
+import BarChartIcon from "@/public/assets/icons/bar-chart-10.svg";
 import BuildingIcon from "@/public/assets/icons/building.svg";
 import CheckSquareIcon from "@/public/assets/icons/check-square.svg";
 import EditIcon from "@/public/assets/icons/edit.svg";
@@ -198,6 +200,11 @@ function AccountView({ account }: { account: Account }) {
                 },
                 { label: "New deal", icon: TargetIcon, onSelect: newDeal },
                 { label: "New task", icon: CheckSquareIcon, onSelect: newTask },
+                Boolean(account.platformOrgId) && {
+                  label: "Results report",
+                  icon: BarChartIcon,
+                  href: routes.accountReport(account._id),
+                },
                 {
                   label: archived ? "Restore account" : "Archive account",
                   icon: TrashIcon,
@@ -338,6 +345,10 @@ function AccountView({ account }: { account: Account }) {
             />
             <AccountVerification
               accountId={account._id}
+              className={ASIDE_SECTION}
+            />
+            <AgentSection
+              subject={{ accountId: account._id }}
               className={ASIDE_SECTION}
             />
             <AccountPlatform

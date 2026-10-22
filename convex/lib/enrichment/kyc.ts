@@ -55,7 +55,7 @@ export const SOURCES = {
 } as const;
 
 export const KYC_ENV_HINT =
-  "Set KYC_BASE_URL and KYC_API_TOKEN on the Convex deployment (or ENRICHMENT_SANDBOX=1 for local test data).";
+  "Add the KYC service URL and token in Settings → Integrations (or ENRICHMENT_SANDBOX=1 for local test data).";
 
 export const DIN_PATTERN = /^[0-9]{8}$/;
 

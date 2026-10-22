@@ -6,7 +6,9 @@ import {
   CUSTOM_FIELD_TYPES,
 } from "../lib/domain/custom-fields";
 import { TARGET_METRICS } from "../lib/domain/forecast";
+import { UNDO_OPS } from "../lib/domain/mcp";
 import { PLAYBOOK_KINDS } from "../lib/domain/playbook";
+import { RESEARCH_REASONS } from "../lib/domain/research";
 import { EMBED_DIMS } from "./lib/aiEmbedText";
 import {
   literals,
@@ -52,6 +54,7 @@ import {
   vStepLevel,
   vSubjectKind,
   vTrigger,
+  vVariant,
 } from "./lib/automations/validators";
 
 const vCustomFieldEntity = literals(CUSTOM_FIELD_ENTITIES);
@@ -359,6 +362,10 @@ export default defineSchema({
     automated: v.optional(v.boolean()),
     /** For emails and WhatsApp: "inbound" is a reply received from the contact. */
     direction: v.optional(v.union(v.literal("inbound"), v.literal("outbound"))),
+    /** Where an imported email or meeting lives, e.g. the Gmail thread. */
+    link: v.optional(v.string()),
+    /** Name of the MCP token that wrote this on the actor's behalf. */
+    via: v.optional(v.string()),
   })
     .index("by_account", ["accountId", "occurredAt"])
     .index("by_person", ["personId", "occurredAt"])
@@ -550,6 +557,30 @@ export default defineSchema({
     at: v.number(),
   }).index("by_at", ["at"]),
 
+  /** Each change an MCP write token made; the key makes a retried call a no-op, `undo` lets its owner take it back. */
+  mcpWrites: defineTable({
+    tokenId: v.id("apiTokens"),
+    memberId: v.id("members"),
+    tool: v.string(),
+    key: v.optional(v.string()),
+    inputHash: v.string(),
+    result: v.string(),
+    summary: v.string(),
+    undo: v.optional(
+      v.object({
+        op: literals(UNDO_OPS),
+        id: v.string(),
+        patch: v.optional(v.any()),
+        expect: v.optional(v.any()),
+      }),
+    ),
+    undoneAt: v.optional(v.number()),
+    at: v.number(),
+  })
+    .index("by_token_key", ["tokenId", "key"])
+    .index("by_member", ["memberId", "at"])
+    .index("by_at", ["at"]),
+
   /** Two records a manager said are not duplicates; `aKey` sorts before `bKey`. */
   dedupeDismissals: defineTable({
     type: v.union(v.literal("accounts"), v.literal("people")),
@@ -595,6 +626,115 @@ export default defineSchema({
     value: v.number(),
   }).index("by_period", ["period"]),
 
+  /** Integration keys managed in Settings. `value` is AES-GCM ciphertext; `hint` is the last 4 characters of a secret, or the whole value when it isn't one. */
+  secrets: defineTable({
+    name: v.string(),
+    value: v.string(),
+    hint: v.string(),
+    updatedBy: v.id("members"),
+    updatedAt: v.number(),
+  }).index("by_name", ["name"]),
+
+  /** Who set, rotated or removed which key. Never holds a value. */
+  secretEvents: defineTable({
+    name: v.string(),
+    action: v.union(
+      v.literal("set"),
+      v.literal("rotate"),
+      v.literal("remove"),
+    ),
+    actorId: v.id("members"),
+  }),
+
+  /** A member's own Google account, read-only. `refreshToken` is AES-GCM ciphertext. */
+  googleConnections: defineTable({
+    memberId: v.id("members"),
+    email: v.string(),
+    refreshToken: v.string(),
+    status: v.union(v.literal("active"), v.literal("reconnect")),
+    mail: v.boolean(),
+    calendar: v.boolean(),
+    /** Addresses and domains whose mail and meetings are never logged. */
+    excludes: v.array(v.string()),
+    connectedAt: v.number(),
+    /** Gmail history cursor. */
+    historyId: v.optional(v.string()),
+    /** Calendar events up to here have been read. */
+    calendarCursor: v.optional(v.number()),
+    syncedAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+  })
+    .index("by_member", ["memberId"])
+    .index("by_status", ["status"]),
+
+  /** Timeline entries a member's Google sync created, so disconnecting can remove them. */
+  googleImports: defineTable({
+    memberId: v.id("members"),
+    dedupeKey: v.string(),
+    entryIds: v.array(v.id("timeline")),
+  }).index("by_member", ["memberId"]),
+
+  /**
+   * What the timeline can't hold: edits to tasks and deal stages, and the copy
+   * of a deleted deal or task that "Restore" re-creates.
+   */
+  auditEvents: defineTable({
+    action: v.union(v.literal("update"), v.literal("delete")),
+    recordType: v.union(v.literal("deals"), v.literal("tasks")),
+    recordId: v.string(),
+    label: v.string(),
+    actorId: v.optional(v.id("members")),
+    at: v.number(),
+    changes: v.optional(
+      v.array(
+        v.object({
+          field: v.string(),
+          from: v.optional(v.string()),
+          to: v.optional(v.string()),
+        }),
+      ),
+    ),
+    snapshot: v.optional(v.any()),
+    restoredAt: v.optional(v.number()),
+  }).index("by_action_at", ["action", "at"]),
+
+  /** One row per account or person the research agent keeps fresh; also its queue. */
+  researchTasks: defineTable({
+    accountId: v.optional(v.id("accounts")),
+    personId: v.optional(v.id("people")),
+    reason: literals(RESEARCH_REASONS),
+    /** 0 for a record someone is waiting on, 1 for routine refreshes. */
+    rank: v.number(),
+    dueAt: v.number(),
+    /** Failed or abandoned runs since the last good one. */
+    attempts: v.number(),
+    leaseUntil: v.optional(v.number()),
+    /** Why the next check is when it is, e.g. "no reply to 2 emails". */
+    note: v.optional(v.string()),
+    lastRunAt: v.optional(v.number()),
+    summary: v.optional(v.string()),
+    summaryHash: v.optional(v.string()),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_person", ["personId"])
+    .index("by_rank_due", ["rank", "dueAt"]),
+
+  /** An account's monthly results email: opt-in, and what the last send did. */
+  brandReports: defineTable({
+    accountId: v.id("accounts"),
+    enabled: v.boolean(),
+    enabledById: v.id("members"),
+    /** Month (`2026-09`) of the report last sent or skipped, so each month goes once. */
+    lastKey: v.optional(v.string()),
+    lastSentAt: v.optional(v.number()),
+    lastStatus: v.optional(
+      v.union(v.literal("sent"), v.literal("skipped"), v.literal("failed")),
+    ),
+    lastNote: v.optional(v.string()),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_enabled_key", ["enabled", "lastKey"]),
+
   /** Evidence-backed field values from enrichment providers. */
   facts: defineTable({
     accountId: v.optional(v.id("accounts")),
@@ -622,7 +762,8 @@ export default defineSchema({
     provider: v.string(),
     status: vRunStatus,
     error: v.optional(v.string()),
-    requestedById: v.id("members"),
+    /** Absent on lookups the research agent started. */
+    requestedById: v.optional(v.id("members")),
     finishedAt: v.optional(v.number()),
     attempts: v.optional(v.array(vAttempt)),
   })
@@ -882,6 +1023,9 @@ export default defineSchema({
     automationId: v.id("automations"),
     enrollmentId: v.id("automationEnrollments"),
     stepKey: v.string(),
+    /** Set on emails sent from a step with a split test. */
+    nodeId: v.optional(v.string()),
+    variant: v.optional(vVariant),
     channel: vMessageChannel,
     personId: v.optional(v.id("people")),
     leadId: v.optional(v.id("leads")),

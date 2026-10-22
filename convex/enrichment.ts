@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import {
   action,
+  internalAction,
   internalQuery,
   type ActionCtx,
   type MutationCtx,
@@ -9,7 +10,12 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { checkGstin, gstinError, panRoot } from "../lib/domain/gstin";
-import { normalizePhone } from "../lib/domain/normalize";
+import {
+  cleanText,
+  normalizeDomain,
+  normalizeLinkedin,
+  normalizePhone,
+} from "../lib/domain/normalize";
 import type { FactStatus } from "../lib/domain/enums";
 import { fail, invalid, notFound } from "./lib/errors";
 import {
@@ -40,6 +46,7 @@ import {
   accountChain,
 } from "./lib/enrichment/providers";
 import { vAttempt } from "./lib/enrichment/validators";
+import { secretEnv } from "./lib/secrets";
 import {
   needsConfirmation,
   runWaterfall,
@@ -76,9 +83,12 @@ const FIELD_LABEL: Record<string, string> = {
   name: "Name",
   phone: "Phone",
   gstin: "GSTIN",
+  title: "Title",
+  linkedinUrl: "LinkedIn",
+  domain: "Website",
 };
 
-function factsFor(ctx: QueryCtx, target: Target) {
+export function factsFor(ctx: QueryCtx, target: Target) {
   if (target.accountId) {
     return ctx.db
       .query("facts")
@@ -104,32 +114,32 @@ function runsFor(ctx: QueryCtx, target: Target) {
     .collect();
 }
 
-function modes() {
-  const mode = providerMode(process.env);
-  return { gst: mode, din: mode };
-}
-
 export const config = memberQuery({
   args: {},
-  handler: async () => ({
-    ...modes(),
-    envHint: KYC_ENV_HINT,
-    providers: accountChain(process.env).map((provider) => ({
-      id: provider.id,
-      label: provider.label,
-      configured: provider.isConfigured(process.env),
-    })),
-  }),
+  handler: async (ctx) => {
+    const env = await secretEnv(ctx);
+    const mode = providerMode(env);
+    return {
+      gst: mode,
+      din: mode,
+      envHint: KYC_ENV_HINT,
+      providers: accountChain(env).map((provider) => ({
+        id: provider.id,
+        label: provider.label,
+        configured: provider.isConfigured(env),
+      })),
+    };
+  },
 });
 
-async function summarize(
+export async function summarize(
   ctx: QueryCtx,
   facts: Doc<"facts">[],
   runs: Doc<"enrichmentRuns">[],
 ) {
   const ids = new Set<Id<"members">>();
   for (const fact of facts) if (fact.decidedById) ids.add(fact.decidedById);
-  for (const run of runs) ids.add(run.requestedById);
+  for (const run of runs) if (run.requestedById) ids.add(run.requestedById);
   const names = new Map<Id<"members">, string>();
   for (const id of ids) {
     const member = await ctx.db.get(id);
@@ -164,7 +174,9 @@ async function summarize(
         attempts: run.attempts ?? [],
         startedAt: run._creationTime,
         finishedAt: run.finishedAt ?? null,
-        requestedBy: names.get(run.requestedById) ?? null,
+        requestedBy: run.requestedById
+          ? (names.get(run.requestedById) ?? null)
+          : null,
       })),
   };
 }
@@ -244,26 +256,41 @@ export const startRun = internalMutation({
       );
     }
 
-    const now = Date.now();
-    for (const run of await runsFor(ctx, target)) {
-      if (run.status !== "running") continue;
-      if (now - run._creationTime < STALE_RUN_MS) {
-        fail("conflict", "A lookup is already running for this record");
-      }
-      await ctx.db.patch(run._id, {
-        status: "failed",
-        error: "The lookup timed out",
-        finishedAt: now,
-      });
-    }
-
-    return await ctx.db.insert("enrichmentRuns", {
-      ...target,
-      provider,
-      status: "running",
-      requestedById: viewer._id,
-    });
+    return await openRun(ctx, target, provider, viewer._id);
   },
+});
+
+async function openRun(
+  ctx: MutationCtx,
+  target: Target,
+  provider: string,
+  requestedById?: Id<"members">,
+) {
+  const now = Date.now();
+  for (const run of await runsFor(ctx, target)) {
+    if (run.status !== "running") continue;
+    if (now - run._creationTime < STALE_RUN_MS) {
+      fail("conflict", "A lookup is already running for this record");
+    }
+    await ctx.db.patch(run._id, {
+      status: "failed",
+      error: "The lookup timed out",
+      finishedAt: now,
+    });
+  }
+  return await ctx.db.insert("enrichmentRuns", {
+    ...target,
+    provider,
+    status: "running",
+    requestedById,
+  });
+}
+
+/** Opens a run for the research agent, which has no signed-in member. */
+export const openAgentRun = internalMutation({
+  args: { target: vTarget, provider: v.string() },
+  handler: async (ctx, { target, provider }) =>
+    await openRun(ctx, target, provider),
 });
 
 export const finishRun = internalMutation({
@@ -305,7 +332,7 @@ export const finishRun = internalMutation({
   },
 });
 
-type Ledger = {
+export type Ledger = {
   ctx: MutationCtx;
   target: Target;
   source: string;
@@ -314,7 +341,7 @@ type Ledger = {
   active: Doc<"facts">[];
 };
 
-async function supersede(ctx: MutationCtx, facts: Doc<"facts">[]) {
+export async function supersede(ctx: MutationCtx, facts: Doc<"facts">[]) {
   for (const fact of facts) {
     await ctx.db.patch(fact._id, { status: "superseded" });
     fact.status = "superseded";
@@ -326,7 +353,7 @@ async function supersede(ctx: MutationCtx, facts: Doc<"facts">[]) {
  * rejected; a new registry value replaces the old one; a new suggestion
  * replaces an older pending suggestion but never a human-accepted value.
  */
-async function observe(
+export async function observe(
   ledger: Ledger,
   { field, value, confidence, url }: Candidate,
   status: "applied" | "suggested",
@@ -582,10 +609,13 @@ async function execute(
     wanted: readonly Field[];
     input: () => Promise<LookupInput> | LookupInput;
     failure: string;
+    agent?: boolean;
   },
 ): Promise<Outcome> {
   const runId: Id<"enrichmentRuns"> = await ctx.runMutation(
-    internal.enrichment.startRun,
+    args.agent
+      ? internal.enrichment.openAgentRun
+      : internal.enrichment.startRun,
     { target: args.target, provider: args.provider },
   );
   const close = (attempts: Attempt[], groups: Group[], error?: string) =>
@@ -601,7 +631,7 @@ async function execute(
       input: await args.input(),
       wanted: args.wanted,
       context: {
-        env: process.env,
+        env: await secretEnv(ctx),
         homepage: (url) =>
           ctx.runAction(internal.enrichmentWeb.homepage, { url }),
       },
@@ -646,7 +676,7 @@ export const verifyGst = action({
   handler: async (ctx, args): Promise<Outcome> => {
     const check = checkGstin(args.gstin);
     if (!check.ok) invalid("gstin", gstinError(check) ?? "Enter a GSTIN");
-    const mode = providerMode(process.env);
+    const mode = providerMode(await secretEnv(ctx));
     if (!mode)
       fail("forbidden", `GST lookup isn't configured. ${KYC_ENV_HINT}`);
     return await execute(ctx, {
@@ -660,19 +690,33 @@ export const verifyGst = action({
   },
 });
 
+async function lookUpAccount(
+  ctx: ActionCtx,
+  accountId: Id<"accounts">,
+  agent: boolean,
+) {
+  return await execute(ctx, {
+    target: { accountId },
+    provider: "waterfall",
+    providers: accountChain(await secretEnv(ctx)),
+    wanted: ACCOUNT_WANTED,
+    input: () => ctx.runQuery(internal.enrichment.accountInput, { accountId }),
+    failure: "The lookup failed unexpectedly. Try again.",
+    agent,
+  });
+}
+
 /** Fills in what the account is missing from the GST registry, the platform and its website. */
 export const enrichAccount = action({
   args: { accountId: v.id("accounts") },
   handler: async (ctx, { accountId }): Promise<Outcome> =>
-    await execute(ctx, {
-      target: { accountId },
-      provider: "waterfall",
-      providers: accountChain(process.env),
-      wanted: ACCOUNT_WANTED,
-      input: () =>
-        ctx.runQuery(internal.enrichment.accountInput, { accountId }),
-      failure: "The lookup failed unexpectedly. Try again.",
-    }),
+    await lookUpAccount(ctx, accountId, false),
+});
+
+export const agentEnrich = internalAction({
+  args: { accountId: v.id("accounts") },
+  handler: async (ctx, { accountId }): Promise<Outcome> =>
+    await lookUpAccount(ctx, accountId, true),
 });
 
 export const lookupDin = action({
@@ -680,7 +724,7 @@ export const lookupDin = action({
   handler: async (ctx, args): Promise<Outcome> => {
     const din = args.din.replace(/\s/g, "");
     if (!DIN_PATTERN.test(din)) invalid("din", "A DIN has 8 digits");
-    const mode = providerMode(process.env);
+    const mode = providerMode(await secretEnv(ctx));
     if (!mode)
       fail("forbidden", `DIN lookup isn't configured. ${KYC_ENV_HINT}`);
     return await execute(ctx, {
@@ -694,25 +738,37 @@ export const lookupDin = action({
   },
 });
 
-async function recordValue(ctx: QueryCtx, fact: Doc<"facts">) {
+export async function recordValue(
+  ctx: QueryCtx,
+  fact: Pick<Doc<"facts">, "accountId" | "personId" | "field">,
+) {
   if (fact.accountId && fact.field === "name") {
     return (await ctx.db.get(fact.accountId))?.name;
   }
   if (fact.accountId && fact.field === "gstin") {
     return (await ctx.db.get(fact.accountId))?.gstin;
   }
+  if (fact.accountId && fact.field === "domain") {
+    return (await ctx.db.get(fact.accountId))?.domain;
+  }
   if (fact.personId && fact.field === "phone") {
     return (await ctx.db.get(fact.personId))?.phone;
+  }
+  if (fact.personId && fact.field === "title") {
+    return (await ctx.db.get(fact.personId))?.title;
+  }
+  if (fact.personId && fact.field === "linkedinUrl") {
+    return (await ctx.db.get(fact.personId))?.linkedinUrl;
   }
   return undefined;
 }
 
 /** Writes an accepted value onto the record it came from, returning the old value. */
-async function applyToRecord(
+export async function applyToRecord(
   ctx: MutationCtx,
-  fact: Doc<"facts">,
+  fact: Pick<Doc<"facts">, "accountId" | "personId" | "field">,
   value: string | null,
-  actorId: Id<"members">,
+  actorId: Id<"members"> | undefined,
 ) {
   if (fact.accountId && fact.field === "name") {
     const account = await ctx.db.get(fact.accountId);
@@ -742,6 +798,59 @@ async function applyToRecord(
       { field: FIELD_LABEL.gstin, from: account.gstin, to: gstin },
     ]);
     return { previous: account.gstin ?? null };
+  }
+  if (fact.accountId && fact.field === "domain") {
+    const account = await ctx.db.get(fact.accountId);
+    if (!account) notFound("Account");
+    const domain = value === null ? undefined : normalizeDomain(value);
+    if (domain === null) invalid("domain", "Enter a website like acme.in");
+    if (domain === account.domain) return { previous: account.domain ?? null };
+    if (domain) {
+      const taken = await ctx.db
+        .query("accounts")
+        .withIndex("by_domain", (q) => q.eq("domain", domain))
+        .collect();
+      const other = taken.find(
+        (item) => item._id !== account._id && !item.archivedAt,
+      );
+      if (other) {
+        fail("conflict", `${other.name} already uses ${domain}`, "domain");
+      }
+    }
+    await ctx.db.patch(account._id, { domain, updatedAt: Date.now() });
+    await logChanges(ctx, { accountId: account._id }, actorId, [
+      { field: FIELD_LABEL.domain, from: account.domain, to: domain },
+    ]);
+    return { previous: account.domain ?? null };
+  }
+  if (
+    fact.personId &&
+    (fact.field === "title" || fact.field === "linkedinUrl")
+  ) {
+    const person = await ctx.db.get(fact.personId);
+    if (!person) notFound("Person");
+    const field = fact.field;
+    const next =
+      value === null
+        ? undefined
+        : field === "title"
+          ? cleanText(value)
+          : normalizeLinkedin(value);
+    if (next === null) invalid(field, "Enter a LinkedIn profile URL");
+    const previous = person[field] ?? null;
+    if (next === person[field]) return { previous };
+    const account = person.accountId
+      ? await ctx.db.get(person.accountId)
+      : null;
+    await ctx.db.patch(person._id, {
+      [field]: next,
+      searchText: personSearchText({ ...person, [field]: next }, account?.name),
+      updatedAt: Date.now(),
+    });
+    await logChanges(ctx, { personId: person._id }, actorId, [
+      { field: FIELD_LABEL[field], from: previous ?? undefined, to: next },
+    ]);
+    return { previous };
   }
   if (fact.personId && fact.field === "phone") {
     const person = await ctx.db.get(fact.personId);

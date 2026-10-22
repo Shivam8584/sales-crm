@@ -25,24 +25,24 @@ const KIND = {
 } as const;
 
 /** Most specific first: a lead's own entries also carry its account and person. */
-const REF = {
+export const REF = {
   deals: "dealId",
   leads: "leadId",
   people: "personId",
   accounts: "accountId",
 } as const;
-const PRECEDENCE = ["deals", "leads", "people", "accounts"] as const;
+export const PRECEDENCE = ["deals", "leads", "people", "accounts"] as const;
 
 const MAX_SUBJECT = 200;
 // A rare actor or record type can mean scanning far past a page of matches.
 const MAX_SCAN = 600;
 
-type RecordType = (typeof FEED_RECORDS)[number];
+export type RecordType = (typeof FEED_RECORDS)[number];
 
 const clip = (text: string | undefined) =>
   text && text.length > MAX_SUBJECT ? `${text.slice(0, MAX_SUBJECT)}…` : text;
 
-const primaryType = (entry: Doc<"timeline">): RecordType | null =>
+export const primaryType = (entry: Doc<"timeline">): RecordType | null =>
   PRECEDENCE.find((type) => entry[REF[type]] !== undefined) ?? null;
 
 /** Everyone's changes, calls and notes, newest first, a page at a time. */
@@ -142,6 +142,7 @@ export const feed = memberQuery({
           at: entry.occurredAt,
           actor: memberRef(members, entry.actorId),
           automated: entry.automated === true,
+          via: entry.via,
           subject: clip(entry.subject ?? body ?? undefined),
           record:
             type && id && doc

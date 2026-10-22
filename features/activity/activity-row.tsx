@@ -62,7 +62,11 @@ export function ActivityRow({ entry }: { entry: ActivityEntry }) {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex min-w-0 items-baseline gap-2 text-sm leading-5">
           <p className="text-fg-secondary min-w-0 flex-1 break-words">
-            <span className="text-foreground font-medium">{actor}</span> {what}
+            <span className="text-foreground font-medium">{actor}</span>
+            {entry.via && (
+              <span className="text-fg-tertiary"> via MCP ({entry.via})</span>
+            )}{" "}
+            {what}
             {record && (
               <>
                 {" on "}

@@ -3,6 +3,7 @@
  * graph of steps. Everything here is pure so the Convex engine, the dry run and
  * the editor share one definition of triggers, steps, waits and validation.
  */
+import { hasVariantB, variantContent, type AbConfig } from "./ab-test";
 import type { ConsentPurpose } from "./consent";
 import {
   DEAL_STAGES,
@@ -304,6 +305,7 @@ export type EmailConfig = {
   subject: string;
   body: string;
   purpose: ConsentPurpose;
+  ab?: AbConfig;
 };
 
 export type WhatsAppConfig = {
@@ -1352,6 +1354,25 @@ function checkNode(
         (message) => push(message, "body"),
       );
       checkPurpose(value.purpose, push);
+      if (value.ab) {
+        const { ab } = value;
+        if (!Number.isInteger(ab.splitB) || ab.splitB < 0 || ab.splitB > 100)
+          push("Give version B between 0 and 100 percent", "abSplit");
+        const b = variantContent(value, "b");
+        if (!hasVariantB(ab))
+          push("Write a subject or message for version B", "abSubject");
+        else if (b.subject === value.subject && b.body === value.body)
+          push("Version B is the same as A", "abSubject");
+        if ((ab.subject?.length ?? 0) > LIMITS.subject)
+          push("Shorten the subject for version B", "abSubject");
+        if ((ab.body?.length ?? 0) > LIMITS.body)
+          push("Shorten the message for version B", "abBody");
+        checkVariables(
+          `${ab.subject ?? ""} ${ab.body ?? ""}`,
+          subject,
+          (message) => push(message, "abBody"),
+        );
+      }
       return;
     }
     case "send_whatsapp": {

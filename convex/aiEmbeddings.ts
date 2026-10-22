@@ -8,6 +8,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { embed, embedModel } from "./lib/ai";
+import { getSecret, secretEnv } from "./lib/secrets";
 import { contextHash } from "./lib/aiContext";
 import {
   closeness,
@@ -185,7 +186,11 @@ export const store = internalMutation({
 
 /** Embeds one batch of pending accounts and stores the vectors; returns them in order. */
 async function embedPending(ctx: ActionCtx, items: Pending) {
-  const vectors = await embed(items.map((item) => item.text));
+  const vectors = await embed(
+    items.map((item) => item.text),
+    fetch,
+    await secretEnv(ctx),
+  );
   await ctx.runMutation(internal.aiEmbeddings.store, {
     rows: items.map(({ accountId, stage, hash }, index) => ({
       accountId,
@@ -217,7 +222,7 @@ export const embedBatch = internalAction({
 export const embedStale = internalAction({
   args: {},
   handler: async (ctx): Promise<number> => {
-    if (!process.env.OPENAI_API_KEY?.trim()) return 0;
+    if (!(await getSecret(ctx, "OPENAI_API_KEY"))) return 0;
     let done = 0;
     let cursor: string | null = null;
     do {

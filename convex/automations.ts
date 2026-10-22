@@ -8,6 +8,14 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
+  describeComparison,
+  compareVariants,
+  hasVariantB,
+  variantContent,
+  type Tally,
+  type Variant,
+} from "../lib/domain/ab-test";
+import {
   DEFAULT_SETTINGS,
   LIMITS,
   SUBJECT_LABEL,
@@ -828,6 +836,44 @@ export const activate = memberMutation({
   },
 });
 
+/** Changes a split test's share for version B (0 or 100 declares a winner) without a new version. */
+export const setSplit = memberMutation({
+  args: { id: v.id("automations"), nodeId: v.string(), splitB: v.number() },
+  handler: async (ctx, { id, nodeId, splitB }) => {
+    const automation = await requireAutomation(ctx, id);
+    assertOwnSequence(ctx, automation);
+    if (!Number.isInteger(splitB) || splitB < 0 || splitB > 100) {
+      invalid("splitB", "Use a whole number from 0 to 100");
+    }
+    const abOf = (node: Graph["nodes"][number]) =>
+      node.id === nodeId && node.kind === "send_email"
+        ? configOf(node, "send_email").ab
+        : undefined;
+    const previous = (automation.graph as Graph).nodes
+      .map(abOf)
+      .find(hasVariantB);
+    if (!previous) fail("conflict", "This step has no split test");
+    const apply = (graph: Graph): Graph => ({
+      ...graph,
+      nodes: graph.nodes.map((node) => {
+        const ab = abOf(node);
+        return ab
+          ? { ...node, config: { ...node.config, ab: { ...ab, splitB } } }
+          : node;
+      }),
+    });
+    await ctx.db.patch(id, {
+      graph: apply(automation.graph as Graph),
+      published: automation.published && {
+        ...automation.published,
+        graph: apply(automation.published.graph as Graph),
+      },
+      updatedAt: Date.now(),
+    });
+    return { previous: previous.splitB };
+  },
+});
+
 export const pause = memberMutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
@@ -1404,6 +1450,7 @@ export const analytics = memberQuery({
     const messaged = new Set(messages.map((message) => message.enrollmentId));
     const contacted = runs.filter((run) => messaged.has(run._id));
     const replied = contacted.filter((run) => run.repliedAt).length;
+    const runById = new Map(runs.map((run) => [run._id, run]));
 
     const graph = (automation.published?.graph ?? automation.graph) as Graph;
     const funnel = nodeFunnel(runs);
@@ -1423,8 +1470,45 @@ export const analytics = memberQuery({
         ended: funnel[node.id]?.ended ?? 0,
       }));
 
+    const tests = graph.nodes
+      .filter((node) => node.kind === "send_email")
+      .flatMap((node) => {
+        const email = configOf(node, "send_email");
+        if (!hasVariantB(email.ab)) return [];
+        const tally = (variant: Variant): Tally => {
+          const sent = messages.filter(
+            (message) =>
+              message.nodeId === node.id &&
+              message.variant === variant &&
+              message.status === "sent",
+          );
+          return {
+            sent: sent.length,
+            replied: sent.filter((message) => {
+              const repliedAt = runById.get(message.enrollmentId)?.repliedAt;
+              return repliedAt && repliedAt >= (message.sentAt ?? 0);
+            }).length,
+          };
+        };
+        const a = tally("a");
+        const b = tally("b");
+        const comparison = compareVariants(a, b);
+        return [
+          {
+            nodeId: node.id,
+            title: node.title?.trim() || variantContent(email, "a").subject,
+            splitB: email.ab.splitB,
+            a: { ...a, subject: variantContent(email, "a").subject },
+            b: { ...b, subject: variantContent(email, "b").subject },
+            leader: comparison.state === "ahead" ? comparison.leader : null,
+            summary: describeComparison(a, b),
+          },
+        ];
+      });
+
     return {
       counts,
+      tests,
       truncated: runs.length >= MAX_ENROLLMENTS_SCAN,
       exits: [...exits]
         .map(([kind, count]) => ({

@@ -95,7 +95,7 @@ export function diff<T extends Record<string, unknown>>(
 export async function logChanges(
   ctx: MutationCtx,
   refs: RecordRefs,
-  actorId: Id<"members">,
+  actorId: Id<"members"> | undefined,
   changes: Change[],
 ) {
   if (changes.length === 0) return null;

@@ -21,6 +21,8 @@ export const routes = {
   sequence: (id: string) => `${AUTOMATION}/sequences/${id}`,
   accounts: `${RECORDS}/accounts`,
   account: (id: string) => `${RECORDS}/accounts/${id}`,
+  accountReport: (id: string, kind?: string, key?: string) =>
+    `${RECORDS}/accounts/${id}/report${kind ? `?kind=${kind}${key ? `&key=${key}` : ""}` : ""}`,
   people: `${RECORDS}/people`,
   person: (id: string) => `${RECORDS}/people/${id}`,
   reports: `${INSIGHTS}/reports`,
@@ -33,6 +35,7 @@ export const routes = {
   fields: `${SETTINGS}/fields`,
   targets: `${SETTINGS}/targets`,
   duplicates: `${SETTINGS}/duplicates`,
+  audit: `${SETTINGS}/audit`,
   integrations: `${SETTINGS}/integrations`,
   system: `${SETTINGS}/system`,
 } as const;

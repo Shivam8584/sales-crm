@@ -1,8 +1,10 @@
 import { fail } from "./errors";
 import { EMBED_DIMS } from "./aiEmbedText";
 
-const endpoint = (path: "responses" | "embeddings") =>
-  `${(process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/$/, "")}/${path}`;
+type Env = Record<string, string | undefined>;
+
+const endpoint = (env: Env, path: "responses" | "embeddings") =>
+  `${(env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/$/, "")}/${path}`;
 const TIMEOUT_MS = 20_000;
 const RETRY_MS = 400;
 
@@ -58,7 +60,7 @@ export function matches(schema: Schema, value: unknown): boolean {
   );
 }
 
-export function aiModels(env: Record<string, string | undefined>) {
+export function aiModels(env: Env) {
   return {
     main: env.AI_MODEL?.trim() || "gpt-6.1-sol",
     fast: env.AI_MODEL_FAST?.trim() || "gpt-6-luna",
@@ -69,6 +71,7 @@ type Reply = { ok: boolean; status: number; json: unknown };
 
 async function post(
   fetcher: typeof fetch,
+  env: Env,
   key: string,
   body: string,
   path: "responses" | "embeddings" = "responses",
@@ -76,7 +79,7 @@ async function post(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetcher(endpoint(path), {
+    const response = await fetcher(endpoint(env, path), {
       method: "POST",
       headers: {
         authorization: `Bearer ${key}`,
@@ -138,10 +141,11 @@ export async function generate<T>(
     maxOutputTokens: number;
   },
   fetcher: typeof fetch = fetch,
+  env: Env = process.env,
 ): Promise<T> {
-  const key = process.env.OPENAI_API_KEY?.trim();
+  const key = env.OPENAI_API_KEY?.trim();
   if (!key) fail("unavailable", "AI is not set up on this server");
-  const model = aiModels(process.env)[options.model];
+  const model = aiModels(env)[options.model];
   const body = JSON.stringify({
     model,
     instructions: options.system,
@@ -159,10 +163,10 @@ export async function generate<T>(
     },
   });
 
-  let reply = await post(fetcher, key, body);
+  let reply = await post(fetcher, env, key, body);
   if (reply.status === 429 || reply.status >= 500) {
     await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
-    reply = await post(fetcher, key, body);
+    reply = await post(fetcher, env, key, body);
   }
   if (!reply.ok) {
     console.log("ai failed", model, reply.status);
@@ -198,20 +202,21 @@ export async function generate<T>(
 
 const MAX_EMBED_BATCH = 64;
 
-export const embedModel = () =>
-  process.env.AI_EMBED_MODEL?.trim() || "text-embedding-3-small";
+export const embedModel = (env: Env = process.env) =>
+  env.AI_EMBED_MODEL?.trim() || "text-embedding-3-small";
 
 /** One vector per input, in order. The inputs are never logged. */
 export async function embed(
   inputs: string[],
   fetcher: typeof fetch = fetch,
+  env: Env = process.env,
 ): Promise<number[][]> {
-  const key = process.env.OPENAI_API_KEY?.trim();
+  const key = env.OPENAI_API_KEY?.trim();
   if (!key) fail("unavailable", "AI is not set up on this server");
   if (inputs.length === 0 || inputs.length > MAX_EMBED_BATCH) {
     fail("unavailable", "Too many texts to embed at once");
   }
-  const model = embedModel();
+  const model = embedModel(env);
   const body = JSON.stringify({
     model,
     input: inputs,
@@ -219,10 +224,10 @@ export async function embed(
     ...(/^text-embedding-3/.test(model) ? { dimensions: EMBED_DIMS } : {}),
   });
 
-  let reply = await post(fetcher, key, body, "embeddings");
+  let reply = await post(fetcher, env, key, body, "embeddings");
   if (reply.status === 429 || reply.status >= 500) {
     await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
-    reply = await post(fetcher, key, body, "embeddings");
+    reply = await post(fetcher, env, key, body, "embeddings");
   }
   if (!reply.ok) {
     console.log("ai embed failed", model, reply.status);

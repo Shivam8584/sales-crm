@@ -4,6 +4,7 @@
  * `{{placeholders}}`), never record data, database ids or counters.
  */
 import { toCsv } from "../csv";
+import { hasVariantB, variantContent } from "./ab-test";
 import {
   NODE_LABEL,
   PORTS,
@@ -274,11 +275,23 @@ function stepDetails(
 ): string[] {
   switch (node.kind) {
     case "send_email": {
-      const { subject, body } = configOf(node, "send_email");
-      return [
+      const email = configOf(node, "send_email");
+      const lines = (subject: string, body: string | undefined) => [
         `Subject: ${subject}`,
         "",
         ...(body ?? "").trim().split("\n"),
+      ];
+      const b = variantContent(email, "b");
+      return [
+        ...lines(email.subject, email.body),
+        ...(hasVariantB(email.ab)
+          ? [
+              "",
+              `Version B, shown to ${email.ab.splitB}% of people:`,
+              "",
+              ...lines(b.subject, b.body),
+            ]
+          : []),
       ].map((line) => `> ${line}`.trimEnd());
     }
     case "send_whatsapp": {

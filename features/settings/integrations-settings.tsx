@@ -13,6 +13,7 @@ import { dateTime, relativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import DemoFormCard from "./demo-form-card";
+import KeysSection from "./keys-section";
 import PlatformSyncCard from "./platform-sync-card";
 import {
   AdminOnly,
@@ -37,8 +38,8 @@ export default function IntegrationsSettings() {
   return (
     <AdminOnly>
       <SettingsIntro>
-        Systems that send data to the CRM or receive it. Secrets live in the
-        Convex deployment&apos;s environment and are never shown here.
+        Systems that send data to the CRM or receive it. Other secrets live in
+        the Convex deployment&apos;s environment and are never shown here.
       </SettingsIntro>
       <IntegrationList />
     </AdminOnly>
@@ -58,6 +59,7 @@ function IntegrationList() {
   }
   return (
     <>
+      <KeysSection />
       <PlatformCard platform={status.platform} />
       <PlatformSyncCard />
       <KycCard kyc={status.kyc} />
@@ -292,9 +294,9 @@ function KycCard({ kyc }: { kyc: Status["kyc"] }) {
       )}
       {kyc.mode === null && (
         <EnvHint>
-          Set <Code>KYC_BASE_URL</Code> and <Code>KYC_API_TOKEN</Code> on the
-          Convex deployment, or <Code>ENRICHMENT_SANDBOX=1</Code> for local test
-          data. Until then lookups are switched off.
+          Add the service URL and token under Keys above, or set{" "}
+          <Code>ENRICHMENT_SANDBOX=1</Code> for local test data. Until then
+          lookups are switched off.
         </EnvHint>
       )}
       <SettingsRow

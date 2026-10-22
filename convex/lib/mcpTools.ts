@@ -1,10 +1,10 @@
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { PRIORITIES } from "../../lib/domain/enums";
+import { PRIORITIES, type DealStage } from "../../lib/domain/enums";
 import { istToday } from "../../lib/domain/day";
 import { personName } from "../../lib/domain/labels";
 import { formatMoney } from "../../lib/domain/money";
-import { clip, RECORD_TYPES } from "../../lib/domain/mcp";
+import { clip, RECORD_TYPES, type TAGGABLE, type UndoOp } from "../../lib/domain/mcp";
 import {
   describeNode,
   describeTrigger,
@@ -12,6 +12,11 @@ import {
   type Graph,
   type Trigger,
 } from "../../lib/domain/automations";
+import {
+  normalizeEmail,
+  normalizePhone,
+  cleanTags,
+} from "../../lib/domain/normalize";
 import { isDealClosed } from "../../lib/domain/transitions";
 import * as account360 from "../account360";
 import * as accounts from "../accounts";
@@ -23,6 +28,9 @@ import * as people from "../people";
 import * as tasks from "../tasks";
 import * as timeline from "../timeline";
 import { fail, invalid, notFound } from "./errors";
+import { findPerson } from "./identity";
+import { isOpen } from "./leads";
+import { logSystem } from "./timeline";
 import { runAs, type ArgsOf, type ResultOf } from "./mcp";
 
 type Input = Record<string, unknown>;
@@ -138,16 +146,24 @@ async function liveDeal(ctx: QueryCtx, raw: string) {
   return deal;
 }
 
-async function noteTarget(ctx: QueryCtx, type: RecordType, id: string) {
+async function recordTarget(ctx: QueryCtx, type: RecordType, id: string) {
   switch (type) {
-    case "account":
-      return { accountId: (await liveAccount(ctx, id))._id };
-    case "person":
-      return { personId: (await livePerson(ctx, id))._id };
-    case "lead":
-      return { leadId: (await liveLead(ctx, id))._id };
-    case "deal":
-      return { dealId: (await liveDeal(ctx, id))._id };
+    case "account": {
+      const row = await liveAccount(ctx, id);
+      return { refs: { accountId: row._id }, name: row.name };
+    }
+    case "person": {
+      const row = await livePerson(ctx, id);
+      return { refs: { personId: row._id }, name: personName(row) };
+    }
+    case "lead": {
+      const row = await liveLead(ctx, id);
+      return { refs: { leadId: row._id }, name: row.name };
+    }
+    case "deal": {
+      const row = await liveDeal(ctx, id);
+      return { refs: { dealId: row._id }, name: row.title };
+    }
   }
 }
 
@@ -503,7 +519,48 @@ export const READ: Record<string, Tool<QueryCtx>> = {
   },
 };
 
-export const WRITE: Record<string, Tool<MutationCtx>> = {
+/** What a write tool did, and how a person can take it back. */
+export type Undo = {
+  op: UndoOp;
+  id: string;
+  patch?: Record<string, unknown>;
+  /** Fields that must still hold the value the tool set, or the undo would overwrite newer work. */
+  expect?: Record<string, unknown>;
+};
+
+type Done = { result: object; summary: string; undo?: Undo };
+type WriteTool = (
+  ctx: MutationCtx,
+  member: Member,
+  input: Input,
+) => Promise<Done>;
+
+const optionalText = (value: unknown) =>
+  value === undefined ? undefined : String(value);
+
+async function openLeadFor(
+  ctx: QueryCtx,
+  email: string | undefined,
+  phone: string | undefined,
+) {
+  const rows = [
+    ...(email
+      ? await ctx.db
+          .query("leads")
+          .withIndex("by_email", (q) => q.eq("email", email))
+          .take(20)
+      : []),
+    ...(phone
+      ? await ctx.db
+          .query("leads")
+          .withIndex("by_phone", (q) => q.eq("phone", phone))
+          .take(20)
+      : []),
+  ];
+  return rows.find((lead) => isOpen(lead) && !lead.erasedAt) ?? null;
+}
+
+export const WRITE: Record<string, WriteTool> = {
   async create_task(ctx, member, input) {
     const links = (
       ["accountId", "personId", "leadId", "dealId"] as const
@@ -512,7 +569,7 @@ export const WRITE: Record<string, Tool<MutationCtx>> = {
       invalid(links[1], "Link a task to one record at most");
     const args: ArgsOf<typeof tasks.create> = {
       title: String(input.title).trim(),
-      dueDate: input.dueDate === undefined ? undefined : String(input.dueDate),
+      dueDate: optionalText(input.dueDate),
       priority: input.priority as never,
     };
     const raw = links[0] ? String(input[links[0]]) : null;
@@ -524,20 +581,233 @@ export const WRITE: Record<string, Tool<MutationCtx>> = {
     if (links[0] === "dealId") args.dealId = (await liveDeal(ctx, raw!))._id;
     const id = await runAs(tasks.create, ctx, member, args);
     return {
-      id,
-      title: args.title,
-      dueDate: args.dueDate ?? null,
-      priority: args.priority ?? "normal",
+      result: {
+        id,
+        title: args.title,
+        dueDate: args.dueDate ?? null,
+        priority: args.priority ?? "normal",
+      },
+      summary: `Added the task “${clip(args.title, 80)}”`,
+      undo: { op: "remove_task", id },
     };
   },
 
-  async add_note(ctx, member, input) {
-    const target = input.target as unknown as { type: RecordType; id: string };
+  async complete_task(ctx, member, input) {
+    const id = ctx.db.normalizeId("tasks", String(input.id));
+    const task = id ? await ctx.db.get(id) : null;
+    if (!id || !task) notFound("Task");
+    if (task.status === "done") {
+      return {
+        result: { id, alreadyDone: true },
+        summary: "Task was already done",
+      };
+    }
+    const before = await runAs(tasks.update, ctx, member, {
+      id,
+      patch: { status: "done" },
+    });
+    return {
+      result: { id, title: task.title, status: "done" },
+      summary: `Completed the task “${clip(task.title, 80)}”`,
+      undo: {
+        op: "update_task",
+        id,
+        patch: { status: before.status },
+        expect: { status: "done" },
+      },
+    };
+  },
+
+  async create_note(ctx, member, input) {
+    const { type, id } = input.target as { type: RecordType; id: string };
+    const { refs, name } = await recordTarget(ctx, type, id);
     const logged = await runAs(timeline.log, ctx, member, {
-      target: await noteTarget(ctx, target.type, target.id),
+      target: refs,
       kind: "note",
       body: String(input.body).trim(),
     });
-    return { id: logged.id };
+    return {
+      result: { id: logged.id },
+      summary: `Added a note on ${clip(name, 80)}`,
+      undo: { op: "remove_entry", id: logged.id },
+    };
+  },
+
+  async log_call(ctx, member, input) {
+    const { type, id } = input.target as { type: RecordType; id: string };
+    const { refs, name } = await recordTarget(ctx, type, id);
+    const logged = await runAs(timeline.log, ctx, member, {
+      target: refs,
+      kind: "call",
+      outcome: input.outcome as never,
+      durationMin: input.durationMin as number | undefined,
+      body: optionalText(input.body)?.trim(),
+    });
+    return {
+      result: { id: logged.id },
+      summary: `Logged a call on ${clip(name, 80)}`,
+      undo: { op: "remove_entry", id: logged.id },
+    };
+  },
+
+  async create_lead(ctx, member, input) {
+    const email = optionalText(input.email);
+    const phone = optionalText(input.phone);
+    const person = await findPerson(ctx, { email, phone });
+    if (person) {
+      fail(
+        "conflict",
+        `${personName(person)} is already a person in the CRM (id ${person._id}). Use that record instead.`,
+      );
+    }
+    const open = await openLeadFor(
+      ctx,
+      email && (normalizeEmail(email) ?? undefined),
+      phone && (normalizePhone(phone) ?? undefined),
+    );
+    if (open) {
+      fail(
+        "conflict",
+        `${open.name} already has an open lead (id ${open._id}). Use that record instead.`,
+      );
+    }
+    const id = await runAs(leads.create, ctx, member, {
+      name: String(input.name),
+      companyName: String(input.companyName),
+      email,
+      phone,
+      website: optionalText(input.website),
+      message: optionalText(input.message),
+    });
+    await logSystem(
+      ctx,
+      { leadId: id },
+      "added the lead",
+      undefined,
+      member._id,
+    );
+    return {
+      result: { id, name: String(input.name).trim() },
+      summary: `Added the lead ${clip(String(input.name), 80)}`,
+    };
+  },
+
+  async update_deal_stage(ctx, member, input) {
+    const deal = await liveDeal(ctx, String(input.id));
+    const stage = input.stage as DealStage;
+    if (deal.stage === stage) {
+      return {
+        result: { id: deal._id, stage, unchanged: true },
+        summary: `Deal ${clip(deal.title, 80)} was already ${stage}`,
+      };
+    }
+    const before = await runAs(deals.update, ctx, member, {
+      id: deal._id,
+      patch: { stage, lostReason: optionalText(input.lostReason) },
+    });
+    return {
+      result: { id: deal._id, stage },
+      summary: `Moved ${clip(deal.title, 80)} to ${stage}`,
+      undo: {
+        op: "update_deal",
+        id: deal._id,
+        patch: { stage: before.stage, lostReason: before.lostReason },
+        expect: { stage },
+      },
+    };
+  },
+
+  async add_tag(ctx, member, input) {
+    const { type, id } = input.target as {
+      type: (typeof TAGGABLE)[number];
+      id: string;
+    };
+    const [tag] = cleanTags([String(input.tag)]);
+    if (!tag) invalid("tag", "Enter a tag");
+    const row =
+      type === "account"
+        ? await liveAccount(ctx, id)
+        : await livePerson(ctx, id);
+    const name = "firstName" in row ? personName(row) : row.name;
+    if (row.tags.some((item) => item.toLowerCase() === tag.toLowerCase())) {
+      return {
+        result: { id: row._id, tags: row.tags, unchanged: true },
+        summary: `${clip(name, 80)} already has the tag ${tag}`,
+      };
+    }
+    const tags = cleanTags([...row.tags, tag]);
+    if (!tags.includes(tag))
+      invalid("tag", "This record has the most tags allowed");
+    const patch = { tags };
+    const before =
+      "firstName" in row
+        ? await runAs(people.update, ctx, member, {
+            id: row._id as Id<"people">,
+            patch,
+          })
+        : await runAs(accounts.update, ctx, member, {
+            id: row._id as Id<"accounts">,
+            patch,
+          });
+    return {
+      result: { id: row._id, tags },
+      summary: `Tagged ${clip(name, 80)} ${tag}`,
+      undo: {
+        op: type === "account" ? "update_account" : "update_person",
+        id: row._id,
+        patch: { tags: before.tags },
+        expect: { tags },
+      },
+    };
   },
 };
+
+/** Takes a write back through the same app mutation a person would use. */
+export async function runUndo(ctx: MutationCtx, member: Member, undo: Undo) {
+  const table = {
+    remove_task: "tasks",
+    update_task: "tasks",
+    remove_entry: "timeline",
+    update_deal: "deals",
+    update_account: "accounts",
+    update_person: "people",
+  } as const;
+  const id = ctx.db.normalizeId(table[undo.op], undo.id);
+  const doc = id ? await ctx.db.get(id) : null;
+  if (!id || !doc) notFound("Record");
+  for (const [field, value] of Object.entries(undo.expect ?? {})) {
+    if (
+      JSON.stringify((doc as Record<string, unknown>)[field]) !==
+      JSON.stringify(value)
+    ) {
+      fail("conflict", "That changed since, so it can't be undone safely");
+    }
+  }
+  const patch = undo.patch as never;
+  switch (undo.op) {
+    case "remove_task":
+      await runAs(tasks.remove, ctx, member, { id: id as Id<"tasks"> });
+      break;
+    case "remove_entry":
+      await runAs(timeline.remove, ctx, member, { id: id as Id<"timeline"> });
+      break;
+    case "update_task":
+      await runAs(tasks.update, ctx, member, { id: id as Id<"tasks">, patch });
+      break;
+    case "update_deal":
+      await runAs(deals.update, ctx, member, { id: id as Id<"deals">, patch });
+      break;
+    case "update_account":
+      await runAs(accounts.update, ctx, member, {
+        id: id as Id<"accounts">,
+        patch,
+      });
+      break;
+    case "update_person":
+      await runAs(people.update, ctx, member, {
+        id: id as Id<"people">,
+        patch,
+      });
+      break;
+  }
+}
