@@ -1,0 +1,9 @@
+[Unit]
+Description=Deploy new commits of Hypedrive CRM
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=30min
+ExecStart=/opt/hypedrive-crm/src/deploy/autodeploy.sh

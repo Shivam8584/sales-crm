@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for new Hypedrive CRM commits
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=60s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

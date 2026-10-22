@@ -177,14 +177,18 @@ Convex stores its data in a dedicated `postgres:17` container (database `hypedri
 
 ### Deploying a new version
 
-`deploy/deploy.sh` syncs the source to the server, builds the image there, restarts `web` and polls `/api/health`; if the new container isn't healthy within two minutes it re-tags the previous image and restarts it. Convex functions are deployed separately, before it.
+Pushing to `main` deploys. A systemd timer on the server (`hypedrive-crm-autodeploy.timer`, every minute) runs `deploy/autodeploy.sh`, which fetches `origin/main` and, when there is a new commit:
 
-With the two Convex variables from `.env.production.local` exported:
+1. runs `npm ci`, `npm run check` and `npx convex deploy` in a Node container on the Convex network, as the Convex docs describe for a Git-integrated host (the admin key is generated on the spot and never stored);
+2. builds the `web` image and restarts it;
+3. polls `/api/health`; if the new container isn't healthy within two minutes it re-tags the previous image, restarts it and records the commit as failed so it isn't retried.
+
+A failing check or Convex deploy stops before anything changes. Progress and failures are in `/var/log/hypedrive-crm-deploy.log`; run it now with `ssh ampere2 sudo systemctl start hypedrive-crm-autodeploy.service`. `deploy/compose.prod.yml` is copied over `/opt/hypedrive-crm/compose.yml` on every deploy.
+
+Anyone who can push to `main` can deploy, so protect that branch. One-time setup (clones the repo into `/opt/hypedrive-crm/src` and enables the timer):
 
 ```bash
-set -a; . ./.env.production.local; set +a
-npx convex deploy      # functions, schema, crons
-deploy/deploy.sh       # web
+ssh ampere2 'sudo bash -s' < deploy/install-autodeploy.sh
 ```
 
 The production workspace is a demo for now (`DEMO_DEPLOYMENT=1`), so it can be reset to fresh demo data:
@@ -267,4 +271,4 @@ The admin System page (Settings → System) shows service health, the last week'
 
 ### Checks
 
-`npm run check` runs the type check, lint and the pure-logic tests.
+`npm run check` runs `next typegen`, the type check, lint and the pure-logic tests.
