@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: baseHeaders },
       // The public forms are embedded by the marketing site, so only they may be framed.
       {
-        source: "/:path((?!demo|review-gap).*)",
+        source: "/:path((?!demo).*)",
         headers: [{ key: "X-Frame-Options", value: "DENY" }],
       },
       {

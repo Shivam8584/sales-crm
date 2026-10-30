@@ -6,7 +6,6 @@ import { callback as googleCallback } from "./google";
 import { calcomWebhook, submit, submitPreflight } from "./leads";
 import { endpoint as mcpEndpoint, methodNotAllowed as mcpGet } from "./mcp";
 import { webhook as platformWebhook } from "./platform";
-import { reviewGap, reviewGapPreflight } from "./prospecting";
 import { surveyInfo, surveyPreflight, surveyRespond } from "./surveys";
 
 const http = httpRouter();
@@ -15,12 +14,6 @@ auth.addHttpRoutes(http);
 
 http.route({ path: "/leads", method: "POST", handler: submit });
 http.route({ path: "/leads", method: "OPTIONS", handler: submitPreflight });
-http.route({ path: "/review-gap", method: "POST", handler: reviewGap });
-http.route({
-  path: "/review-gap",
-  method: "OPTIONS",
-  handler: reviewGapPreflight,
-});
 http.route({
   path: "/webhooks/calcom",
   method: "POST",

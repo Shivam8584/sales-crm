@@ -188,5 +188,3 @@ export function RecordAutomations({ target }: { target: AutomationTarget }) {
     </div>
   );
 }
-
-export default RecordAutomations;

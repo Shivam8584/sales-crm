@@ -347,7 +347,7 @@ function BrandView({ brand }: { brand: Brand }) {
               <p className="text-fg-secondary text-sm">
                 {brand.score === null
                   ? "Not scored yet: the source needs at least three rated products to set a benchmark."
-                  : "Every listing is level with its benchmark, so there is no review gap to pitch."}
+                  : "Every listing is level with its benchmark."}
               </p>
             )}
             {brand.reasons.length > 0 && (

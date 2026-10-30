@@ -147,7 +147,7 @@ export default function AddProductsDialog({
           <DialogHeader>
             <DialogTitle>Watch products</DialogTitle>
             <DialogDescription>
-              Each product link is checked daily for its ratings.
+              Each product link is checked daily.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 px-6 py-5">

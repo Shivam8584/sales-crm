@@ -192,7 +192,7 @@ export const TEMPLATES: AutomationTemplate[] = [
     steps: [
       email(
         "Quick hello from Hypedrive",
-        "Thanks for your interest in Hypedrive. We help brands selling on marketplaces get genuine reviews and photos from real buyers.\n\nTell me which marketplaces you sell on and roughly how many orders you ship a month, and I'll suggest where to start. Or reply with a time for a short call.",
+        "Thanks for your interest in Hypedrive. We help brands selling on marketplaces get real buyers and the photos and videos they make.\n\nTell me which marketplaces you sell on and roughly how many orders you ship a month, and I'll suggest where to start. Or reply with a time for a short call.",
       ),
       wait(1),
       email(
@@ -212,7 +212,7 @@ export const TEMPLATES: AutomationTemplate[] = [
         emails: [
           [
             "Hypedrive ki taraf se ek chhota sa hello",
-            "Hypedrive mein interest dikhane ke liye thank you. Hum marketplaces par bechne wale brands ko real buyers se genuine reviews aur photos dilwane mein help karte hain.\n\nAap bata dijiye ki aap kaun se marketplaces par sell karte hain aur mahine mein lagbhag kitne orders ship karte hain, hum bata denge ki shuruaat kahan se karein. Ya phir ek chhoti call ke liye time bata dijiye.",
+            "Hypedrive mein interest dikhane ke liye thank you. Hum marketplaces par bechne wale brands ko real buyers aur unki banayi photos aur videos dilwane mein help karte hain.\n\nAap bata dijiye ki aap kaun se marketplaces par sell karte hain aur mahine mein lagbhag kitne orders ship karte hain, hum bata denge ki shuruaat kahan se karein. Ya phir ek chhoti call ke liye time bata dijiye.",
           ],
           [
             "Hypedrive mein abhi bhi interest hai?",

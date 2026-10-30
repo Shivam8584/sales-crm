@@ -1,6 +1,5 @@
 import { v, type Infer } from "convex/values";
 import {
-  httpAction,
   internalAction,
   internalQuery,
   type MutationCtx,
@@ -17,16 +16,12 @@ import {
   INBOUND_SOURCE,
   MAX_IMPORT_URLS,
   MAX_WATCHLIST_PRODUCTS,
-  REVIEW_GAP_CONSENT,
-  REVIEW_GAP_LEAD_SOURCE,
-  parseReviewGap,
   VELOCITY_WINDOW_DAYS,
   benchmarksFor,
   brandKey,
   dailyGains,
   dayOf,
   domainKey,
-  marketplaceName,
   parseProductUrl,
   sameBrand,
   scoreBand,
@@ -39,20 +34,11 @@ import {
 import { fail, invalid, notFound } from "./lib/errors";
 import { internalMutation, memberMutation, memberQuery } from "./lib/functions";
 import {
-  allowedOrigins,
-  clientIp,
-  corsHeaders,
-  json,
-  originAllowed,
-  preflight,
-  readJson,
-  siteOrigins,
 } from "./lib/http";
 import {
   createLead,
   isOpen,
   leadHref,
-  recordConsents,
   type NewLead,
 } from "./lib/leads";
 import { requireAccount } from "./lib/records";
@@ -382,15 +368,12 @@ async function brandsOf(ctx: QueryCtx, rows: ProductRow[]) {
           10
         : null,
       gains,
-      talkingPoint:
-        top && top.score!.gap > 0
-          ? talkingPoint({
-              title: top.title ?? top.identifier,
-              marketplace: top.marketplace,
-              ratingsCount: top.ratingsCount!,
-              benchmark: top.benchmark!,
-            })
-          : null,
+      talkingPoint: top
+        ? talkingPoint({
+            title: top.title ?? top.identifier,
+            marketplace: top.marketplace,
+          })
+        : null,
       account: linked
         ? { via: "linked" as const, ...accountRef(linked) }
         : matched
@@ -513,7 +496,7 @@ function cleanName(value: string) {
   if (!name) invalid("name", "Name the source");
   if (name.length > MAX_NAME) invalid("name", "Name is too long");
   if (name.toLowerCase() === INBOUND_SOURCE.toLowerCase()) {
-    invalid("name", `${INBOUND_SOURCE} is kept for public review-gap checks`);
+    invalid("name", `${INBOUND_SOURCE} is a reserved name`);
   }
   return name;
 }
@@ -538,7 +521,7 @@ async function requireCurated(ctx: QueryCtx, id: Id<"watchlists">) {
   if (isInbound(list)) {
     fail(
       "forbidden",
-      `${INBOUND_SOURCE} is filled by public review-gap checks`,
+      `${INBOUND_SOURCE} is read-only`,
     );
   }
   return list;
@@ -592,7 +575,7 @@ export const setWatchlistDeleted = memberMutation({
     if (isInbound(list)) {
       fail(
         "forbidden",
-        `${INBOUND_SOURCE} is filled by public review-gap checks`,
+        `${INBOUND_SOURCE} is read-only`,
       );
     }
     await ctx.db.patch(id, {
@@ -916,12 +899,15 @@ export const record = internalMutation({
 export const refreshAll = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const { products } = await loadScope(ctx);
+    const { products, watchlists } = await loadScope(ctx);
+    const curated = products.filter(
+      (row) => !isInbound(watchlists.get(row.watchlistId)!),
+    );
     await queueChecks(
       ctx,
-      products.map((row) => row._id),
+      curated.map((row) => row._id),
     );
-    return products.length;
+    return curated.length;
   },
 });
 
@@ -978,7 +964,7 @@ async function openLeadFor(ctx: MutationCtx, decision: Doc<"prospectBrands">) {
   return lead && isOpen(lead) ? lead : null;
 }
 
-/** Creates the brand's lead, opening with its review-gap talking point, and remembers it on the brand. */
+/** Creates the brand's lead, opening with its talking point, and remembers it on the brand. */
 async function prospectLead(
   ctx: MutationCtx,
   decision: Doc<"prospectBrands">,
@@ -996,7 +982,7 @@ async function prospectLead(
   return id;
 }
 
-/** A lead for a brand, owned by the viewer, opening with the review-gap talking point. */
+/** A lead for a brand, owned by the viewer, opening with the talking point. */
 export const createProspectLead = memberMutation({
   args: {
     key: v.string(),
@@ -1038,327 +1024,9 @@ export const createProspectLead = memberMutation({
         // Owning a lead you created counts as the first touch, as for manual leads.
         firstTouchedAt: Date.now(),
       },
-      `created the lead from ${decision.brand}'s marketplace review gap`,
+      `created the lead from ${decision.brand}'s marketplace listings`,
       ctx.viewer._id,
     );
     return { id, href: leadHref(id) };
-  },
-});
-
-// ── Public review-gap check ─────────────────────────────────────────────────
-
-const MIN_FILL_MS = 1500;
-
-const auditOrigins = () => allowedOrigins("LEAD_FORM_ORIGINS", siteOrigins());
-
-export const reviewGapPreflight = httpAction(async (_ctx, request) =>
-  preflight(request, auditOrigins()),
-);
-
-/**
- * Public "How far behind is your listing?" check: reads one listing with the
- * same scraper and scoring as Prospecting, files it under Inbound audits and
- * opens a lead with the visitor's consent. CORS-limited, rate-limited per IP
- * and honeypot-guarded like the demo form; the hourly check budget is shared
- * by every visitor so the public page can't run the scraper hot.
- */
-export const reviewGap = httpAction(async (ctx, request) => {
-  const origins = auditOrigins();
-  const cors = corsHeaders(request, origins);
-  if (!originAllowed(request, origins)) {
-    return json({ ok: false, error: "Origin not allowed" }, 403, cors);
-  }
-  const ip = clientIp(request);
-  const limited = await rateLimiter.limit(ctx, "leadForm", {
-    key: `review-gap:${ip}`,
-  });
-  if (!limited.ok) {
-    return json(
-      { ok: false, error: "Too many checks. Try again in a minute." },
-      429,
-      { ...cors, "Retry-After": "60" },
-    );
-  }
-  const body = await readJson(request);
-  if (!body.ok)
-    return json({ ok: false, error: body.error }, body.status, cors);
-  const { value } = body;
-  const elapsed = Number(value.elapsedMs);
-  const trapped = typeof value.fax === "string" && value.fax.trim() !== "";
-  if (trapped || !Number.isFinite(elapsed) || elapsed < MIN_FILL_MS) {
-    return json({ ok: true, report: null }, 200, cors);
-  }
-  const parsed = parseReviewGap(value);
-  if (!parsed.ok) {
-    return json(
-      {
-        ok: false,
-        error: "Check the highlighted fields",
-        errors: parsed.errors,
-      },
-      422,
-      cors,
-    );
-  }
-  const budget = await rateLimiter.limit(ctx, "productChecks", {
-    key: "public",
-  });
-  if (!budget.ok) {
-    return json(
-      {
-        ok: false,
-        error: "We're checking a lot of listings right now. Try again shortly.",
-      },
-      429,
-      { ...cors, "Retry-After": String(Math.ceil(budget.retryAfter / 1000)) },
-    );
-  }
-  const { listing, ...contact } = parsed.value;
-  const at = Date.now();
-  const { source, results } = await readListings(
-    [{ id: listing.key, url: listing.url }],
-    at,
-  );
-  const report = await ctx.runMutation(internal.prospecting.recordAudit, {
-    at,
-    source,
-    url: listing.url,
-    marketplace: listing.marketplace,
-    identifier: listing.identifier,
-    listingKey: listing.key,
-    reading: toReading(results[0]),
-    contact,
-    ip: ip === "unknown" ? undefined : ip,
-  });
-  return json({ ok: true, report }, 200, cors);
-});
-
-const vReading = v.object({
-  error: v.optional(v.string()),
-  listing: vResult.fields.listing,
-});
-
-function toReading(result: ScrapeResult) {
-  const { id, ...reading } = toRecord(result);
-  void id;
-  return reading;
-}
-
-async function inboundSource(ctx: MutationCtx, memberId: Id<"members">) {
-  const lists = await liveWatchlists(ctx);
-  const existing = [...lists.values()].find(isInbound);
-  if (existing) return existing._id;
-  return await ctx.db.insert("watchlists", {
-    name: INBOUND_SOURCE,
-    createdById: memberId,
-    updatedAt: Date.now(),
-  });
-}
-
-export const recordAudit = internalMutation({
-  args: {
-    at: v.number(),
-    source: vSource,
-    url: v.string(),
-    marketplace: v.string(),
-    identifier: v.string(),
-    listingKey: v.string(),
-    reading: vReading,
-    contact: v.object({
-      name: v.optional(v.string()),
-      email: v.optional(v.string()),
-      phone: v.optional(v.string()),
-      utm: v.record(v.string(), v.string()),
-      referrer: v.optional(v.string()),
-      landingPage: v.optional(v.string()),
-    }),
-    ip: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const members = await ctx.db
-      .query("members")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
-    const keeper =
-      members.find((member) => member.role === "admin") ?? members[0];
-    if (!keeper) fail("conflict", "The CRM has no active members yet");
-    const watchlistId = await inboundSource(ctx, keeper._id);
-    const existing = await ctx.db
-      .query("watchedProducts")
-      .withIndex("by_watchlist_listing", (q) =>
-        q.eq("watchlistId", watchlistId).eq("listingKey", args.listingKey),
-      )
-      .unique();
-    const productId =
-      existing?._id ??
-      (await ctx.db.insert("watchedProducts", {
-        watchlistId,
-        marketplace: args.marketplace,
-        identifier: args.identifier,
-        listingKey: args.listingKey,
-        url: args.url,
-        status: "pending",
-        addedById: keeper._id,
-      }));
-    if (existing?.removedAt) {
-      await ctx.db.patch(productId, { removedAt: undefined });
-    }
-    await applyReading(
-      ctx,
-      { id: productId, ...args.reading },
-      args.at,
-      args.source,
-    );
-    await ctx.db.patch(watchlistId, { refreshedAt: args.at });
-
-    const product = (await ctx.db.get(productId))!;
-    const row = product.brandKey
-      ? scoreScope(await loadScope(ctx, [product.brandKey])).find(
-          (item) => item._id === productId,
-        )
-      : undefined;
-    const pitch =
-      row?.score && row.benchmark && row.score.gap > 0
-        ? talkingPoint({
-            title: row.title ?? row.identifier,
-            marketplace: row.marketplace,
-            ratingsCount: row.ratingsCount!,
-            benchmark: row.benchmark,
-          })
-        : null;
-
-    const { contact } = args;
-    const message = [
-      pitch ?? `Ran a review-gap check on ${args.url}`,
-      row?.score?.reasons.join(". "),
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-    const consent = {
-      text: REVIEW_GAP_CONSENT,
-      source: REVIEW_GAP_LEAD_SOURCE,
-      ip: args.ip,
-    };
-    const decision = product.brand
-      ? await brandDecision(ctx, product.brandKey!)
-      : null;
-    const open = decision ? await openLeadFor(ctx, decision) : null;
-    let leadId = open?._id;
-    if (open) {
-      await logSystem(
-        ctx,
-        { leadId: open._id },
-        "ran the public review-gap check again",
-        message,
-      );
-    } else {
-      const lead: NewLead = {
-        kind: "contact",
-        name:
-          contact.name ??
-          contact.email ??
-          `${product.brand ?? "Review-gap"} contact`,
-        email: contact.email,
-        phone: contact.phone,
-        companyName: product.brand ?? product.title ?? args.url,
-        message,
-        source: REVIEW_GAP_LEAD_SOURCE,
-        utm: contact.utm,
-        referrer: contact.referrer,
-        landingPage: contact.landingPage,
-      };
-      leadId = decision
-        ? await prospectLead(
-            ctx,
-            decision,
-            lead,
-            `created the lead from a public review-gap check on ${marketplaceName(args.marketplace)}`,
-          )
-        : (await createLead(ctx, lead)).id;
-    }
-    await recordConsents(ctx, leadId!, contact, consent);
-
-    if (!row || product.status !== "ok") return null;
-    return {
-      title: row.title ?? row.identifier,
-      brand: row.brand,
-      marketplace: row.marketplace,
-      rating: row.rating,
-      ratingsCount: row.ratingsCount,
-      velocity: row.velocity,
-      benchmark: row.benchmark,
-      score: row.score,
-      band: row.score ? scoreBand(row.score.score) : null,
-      talkingPoint: pitch,
-      sandbox: args.source === "sandbox",
-    };
-  },
-});
-
-// ── Demo data ───────────────────────────────────────────────────────────────
-
-const DEMO_NAME = "Hair & skin care (demo)";
-const DEMO_DAYS = 21;
-const DEMO_URLS = [
-  "https://www.amazon.in/Kesarleaf-Saffron-Face-Serum/dp/B0D4KL7Q21",
-  "https://www.nykaa.com/kesarleaf-kumkumadi-face-cream/p/7731042",
-  "https://www.flipkart.com/glowtheory-vitamin-c-face-serum/p/itm5a8d2e7c41b9",
-  "https://www.amazon.in/Glowtheory-Niacinamide-Face-Toner/dp/B0C9TQ4M8X",
-  "https://www.amazon.in/Ojasveda-Bhringraj-Hair-Oil/dp/B0BX2R7HJK",
-  "https://www.nykaa.com/ojasveda-onion-hair-shampoo/p/6610385",
-  "https://www.purplle.com/product/neelam-botanicals-rosemary-hair-oil-48213",
-  "https://www.amazon.in/Neelam-Botanicals-Rice-Water-Shampoo/dp/B0CQ8N2V5L",
-  "https://www.myntra.com/face-serum/rangrez/rangrez-retinol-night-face-serum/26118034/buy",
-  "https://www.amazon.in/Doodhwala-Ceramide-Face-Moisturiser/dp/B0B7P3KX2W",
-  "https://www.flipkart.com/doodhwala-hair-growth-onion-shampoo/p/itm3c1f9a2b7d40",
-  "https://www.amazon.in/Gulmohar-Kesar-Ubtan-Face-Wash/dp/B09XK2M7QZ",
-];
-
-/** Seeds one demo watchlist with three weeks of sandbox history. Safe to run twice. */
-export const seedDemo = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const lists = await ctx.db.query("watchlists").collect();
-    if (lists.some((row) => row.name === DEMO_NAME && !row.deletedAt)) {
-      return "exists";
-    }
-    const members = await ctx.db.query("members").collect();
-    const owner =
-      members.find((row) => row.role === "admin" && row.status === "active") ??
-      members.find((row) => row.status === "active");
-    if (!owner) return "no members";
-    const now = Date.now();
-    const watchlistId = await ctx.db.insert("watchlists", {
-      name: DEMO_NAME,
-      createdById: owner._id,
-      refreshedAt: now,
-      updatedAt: now,
-    });
-    for (const url of DEMO_URLS) {
-      const parsed = parseProductUrl(url);
-      if (!parsed.ok) continue;
-      const id = await ctx.db.insert("watchedProducts", {
-        watchlistId,
-        marketplace: parsed.marketplace,
-        identifier: parsed.identifier,
-        listingKey: parsed.key,
-        url: parsed.url,
-        status: "pending",
-        addedById: owner._id,
-      });
-      let last: ScrapeResult | null = null;
-      for (let day = DEMO_DAYS; day >= 0; day--) {
-        const at = now - day * DAY_MS;
-        last = sandboxScrape({ id, url: parsed.url }, at);
-        if (!last.ok) break;
-        await writeSnapshot(ctx, id, at, {
-          rating: last.listing.rating ?? undefined,
-          ratingsCount: last.listing.ratingsCount ?? undefined,
-          price: last.listing.price ?? undefined,
-        });
-      }
-      await applyReading(ctx, toRecord(last!), now, "sandbox");
-    }
-    return `seeded ${DEMO_URLS.length} products`;
   },
 });

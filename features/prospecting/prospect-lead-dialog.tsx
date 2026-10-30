@@ -29,7 +29,7 @@ export type LeadDraft = {
 type FieldName = "name" | "email" | "phone" | "message";
 type Errors = Partial<Record<FieldName | "form", string>>;
 
-/** A lead for a prospect brand, prefilled with its review-gap talking point. */
+/** A lead for a prospect brand, prefilled with its talking point. */
 export default function ProspectLeadDialog({
   draft,
   onClose,

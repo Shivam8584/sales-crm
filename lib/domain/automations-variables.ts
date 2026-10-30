@@ -174,7 +174,7 @@ export const VARIABLES: readonly VariableDef[] = [
     label: "Talking point",
     group: "Prospect",
     subjects: SUBJECT_KINDS,
-    example: "your 4.1★ rating on Nykaa",
+    example: "Saw your air fryer on Amazon.",
   },
   {
     key: "record.name",

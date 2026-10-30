@@ -164,7 +164,7 @@ type Match = {
   logoUrl: string | null;
 } | null;
 
-/** The CRM account a brand maps to, its lead, or "New"; `inbound` marks public review-gap checks. */
+/** The CRM account a brand maps to, its lead, or "New"; `inbound` marks old public checks. */
 export function MatchCell({
   account,
   lead,

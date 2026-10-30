@@ -276,8 +276,8 @@ export default function ProspectingPage() {
   const noWatchlists = watchlists !== undefined && watchlists.length === 0;
   const firstRun = (
     <EmptyState
-      title="Find brands with a review gap"
-      description="Watch product links from marketplaces. Daily checks track ratings, so you can pitch brands whose listings trail their category."
+      title="Find brands with new listings"
+      description="Watch product links from marketplaces. Daily checks show which brands have a new launch worth a conversation."
       action={
         <Button
           variant={noWatchlists ? "primary" : "well"}

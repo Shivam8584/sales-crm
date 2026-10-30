@@ -258,7 +258,7 @@ const DEALS: DealSeed[] = [
   },
   {
     account: "Baybee",
-    title: "Diaper range reviews, Q1",
+    title: "Diaper range content, Q1",
     stage: "discovery",
     rupees: 120000,
     closeInDays: 40,
@@ -274,7 +274,7 @@ const DEALS: DealSeed[] = [
   },
   {
     account: "Drogo",
-    title: "Earbuds review push",
+    title: "Earbuds launch push",
     stage: "proposal",
     rupees: 120000,
     closeInDays: 14,
@@ -447,7 +447,7 @@ const LEADS: LeadSeed[] = [
     companyName: "Lume Bags",
     utm: { source: "website", medium: "cta" },
     status: "qualified",
-    message: "Want reviews on our new Myntra listings.",
+    message: "Want buyer content for our new Myntra listings.",
     owner: 0,
   },
   {
@@ -484,7 +484,7 @@ const LEADS: LeadSeed[] = [
 
 const NOTES: [string, string, CallOutcome?][] = [
   ["note", "Intro call booked. They sell mostly on Amazon."],
-  ["call", "Walked through review campaigns; wants pricing.", "connected"],
+  ["call", "Walked through buyer campaigns; wants pricing.", "connected"],
   ["email", "Sent the case study deck and pricing sheet."],
   ["meeting", "Demo with founder and marketing lead."],
   ["whatsapp", "Shared onboarding checklist on WhatsApp."],
@@ -660,7 +660,7 @@ async function seedWorkspace(ctx: MutationCtx) {
     });
   }
 
-  const drogo = dealIds.get("Earbuds review push")!;
+  const drogo = dealIds.get("Earbuds launch push")!;
   await ctx.db.insert("proposals", {
     dealId: drogo,
     status: "sent",
@@ -866,7 +866,7 @@ async function recordPersonConsent(
   actorId: Id<"members">,
 ) {
   if (!consent) return;
-  const text = "Agreed on a call to hear about review campaigns.";
+  const text = "Agreed on a call to hear about buyer campaigns.";
   await appendLedger(ctx, {
     personId,
     channels: ["email", "whatsapp"],

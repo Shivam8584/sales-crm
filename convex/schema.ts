@@ -967,7 +967,7 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_deal", ["dealId"]),
 
-  /** Marketplace listings watched for their review gap against category leaders. */
+  /** Marketplace listings watched against category leaders. */
   watchlists: defineTable({
     name: v.string(),
     /** Ratings a listing should reach; absent means its category's leaders set it. */

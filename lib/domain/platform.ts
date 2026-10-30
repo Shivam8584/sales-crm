@@ -58,7 +58,6 @@ export const PLATFORM_EVENTS = [
 export type PlatformEventType = (typeof PLATFORM_EVENTS)[number];
 
 export const ENVELOPE_VERSIONS = [1] as const;
-export const CURRENT_ENVELOPE_VERSION = 1;
 
 /** Campaign lifecycle on the platform (campaign/status.go). */
 export const CAMPAIGN_STATUSES = [

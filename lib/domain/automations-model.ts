@@ -359,9 +359,6 @@ export function portsOf(node: Pick<GraphNode, "kind" | "config">): PortId[] {
 export const hasInput = (node: Pick<GraphNode, "kind">) =>
   node.kind !== "trigger";
 
-export const isOutbound = (kind: NodeKind) =>
-  kind === "send_email" || kind === "send_whatsapp";
-
 export const NODE_CHANNEL: Partial<Record<NodeKind, Channel>> = {
   send_email: "email",
   send_whatsapp: "whatsapp",

@@ -1,11 +1,9 @@
 /**
  * Marketplace prospecting: reading product links, grouping listings by brand
- * and scoring the review gap between a brand's products and the leaders in
+ * and scoring the gap between a brand's products and the leaders in
  * the same category. Pure, so forms, Convex functions and tests share it.
  */
 
-import { UTM_KEYS, type Utm } from "./leads";
-import { cleanText, normalizeEmail, normalizePhone } from "./normalize";
 
 export const MARKETPLACES = [
   "amazon",
@@ -131,11 +129,8 @@ const NOT_PRODUCT_HOSTS = [
 export const MAX_IMPORT_URLS = 200;
 export const MAX_WATCHLIST_PRODUCTS = 500;
 
-/** The source public review-gap checks land in; its listings are scored against every other source. */
+/** The source old public checks landed in; its listings are never re-checked. */
 export const INBOUND_SOURCE = "Inbound audits";
-export const REVIEW_GAP_LEAD_SOURCE = "review_gap";
-export const REVIEW_GAP_CONSENT =
-  "I agree that Hypedrive may contact me about this report by email, phone or WhatsApp.";
 
 export function marketplaceName(slug: string) {
   return MARKETPLACE[slug as Marketplace]?.name ?? slug;
@@ -627,75 +622,9 @@ export function shortTitle(title: string, words = 6) {
     : parts.join(" ");
 }
 
-/** The opening line for outreach about a listing's review gap. */
-export function talkingPoint(input: {
-  title: string;
-  marketplace: string;
-  ratingsCount: number;
-  benchmark: Benchmark;
-}) {
-  const count = input.ratingsCount;
-  return `Your ${shortTitle(input.title)} on ${marketplaceName(input.marketplace)} has ${formatCount(count)} ${count === 1 ? "rating" : "ratings"}; category leaders have ${formatCount(roundDown(input.benchmark.ratings))}+.`;
+/** The opening line for outreach about a listing. Ratings stay out of it. */
+export function talkingPoint(input: { title: string; marketplace: string }) {
+  return `Saw your ${shortTitle(input.title)} on ${marketplaceName(input.marketplace)}.`;
 }
 
-const PUBLIC_TEXT_LIMIT = 200;
 
-function publicText(value: unknown) {
-  return typeof value === "string"
-    ? cleanText(value.slice(0, PUBLIC_TEXT_LIMIT))
-    : undefined;
-}
-
-export type ReviewGapField = "url" | "email" | "phone" | "contact" | "consent";
-export type ReviewGapErrors = Partial<Record<ReviewGapField, string>>;
-
-/**
- * Validates an untrusted public review-gap submission. The page runs it for
- * instant feedback; the HTTP endpoint runs it again as the authority.
- */
-export function parseReviewGap(raw: Record<string, unknown>) {
-  const errors: ReviewGapErrors = {};
-  const url = publicText(raw.url);
-  const listing = parseProductUrl(url ?? "");
-  if (!listing.ok) {
-    errors.url = url ? listing.reason : "Paste the link to your product page.";
-  }
-  const emailRaw = publicText(raw.email);
-  const phoneRaw = publicText(raw.phone);
-  const email = emailRaw ? normalizeEmail(emailRaw) : undefined;
-  const phone = phoneRaw ? normalizePhone(phoneRaw) : undefined;
-  if (email === null) errors.email = "Enter a valid email address.";
-  if (phone === null) {
-    errors.phone = "Enter a valid mobile number, like 98200 12345.";
-  }
-  if (!emailRaw && !phoneRaw) {
-    errors.contact = "Add an email or a phone number so we can follow up.";
-  }
-  if (raw.consent !== true) {
-    errors.consent = "Tick the box so we can contact you about the report.";
-  }
-  if (!listing.ok || Object.keys(errors).length > 0) {
-    return { ok: false as const, errors };
-  }
-  const utmRaw =
-    raw.utm && typeof raw.utm === "object"
-      ? (raw.utm as Record<string, unknown>)
-      : {};
-  const utm: Utm = {};
-  for (const key of UTM_KEYS) {
-    const value = publicText(utmRaw[key]);
-    if (value) utm[key] = value;
-  }
-  return {
-    ok: true as const,
-    value: {
-      listing,
-      name: publicText(raw.name),
-      email: email ?? undefined,
-      phone: phone ?? undefined,
-      utm,
-      referrer: publicText(raw.referrer),
-      landingPage: publicText(raw.landingPage),
-    },
-  };
-}

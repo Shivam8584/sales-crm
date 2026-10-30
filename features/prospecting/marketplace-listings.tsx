@@ -58,7 +58,7 @@ export default function MarketplaceListings({
           >
             Watch its listings
           </Link>{" "}
-          to track ratings against its category.
+          to track it against its category.
         </p>
       ) : (
         <>
